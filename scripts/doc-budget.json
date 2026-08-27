@@ -22,8 +22,8 @@
     },
     {
       "path": "skills/story-long-write/references/workflow-chapter.md",
-      "budget": 12030,
-      "why": "单章正文与质量检查，日更/单章路径都加载。含 spawn prompt 的正文形状层约束——细纲边界只传「不许自造」半边时，子代理会一条情节点一段平推（#255 的复发路径），形状半边必须随 prompt 传达。+180：把筛选后的偏好传给初稿/去味 agent，并明确禁止为最大化命中牺牲连贯、节奏和字数"
+      "budget": 12290,
+      "why": "单章正文与质量检查，日更/单章路径都加载。含 spawn prompt 的正文形状层约束——细纲边界只传「不许自造」半边时，子代理会一条情节点一段平推（#255 的复发路径），形状半边必须随 prompt 传达。+180：把筛选后的偏好传给初稿/去味 agent，并明确禁止为最大化命中牺牲连贯、节奏和字数 +260：把八问接进 spawn prompt 与交付摘要，让 writing-craft 的新增条目有验收出口，不再只是可读不可查的文本。"
     },
     {
       "path": "skills/story-long-write/references/workflow-setup.md",
@@ -37,13 +37,13 @@
     },
     {
       "path": "skills/story-setup/references/templates/agents/narrative-writer.md",
-      "budget": 13320,
-      "why": "正文 agent 的系统提示，每章每次 spawn 都付。正文规则中的 reference 引用必须保留 canonical agent-references 前缀，否则运行时无法可靠定位部署文件；本次同时加入正文形状、机器统计与细纲重合复核规则。+150：参考文件表的「何时读取」改为可判定的必读条件——旧措辞「按需读取…时」是场景描述，被当成自由裁量，实测同一章 6 轮全部漏读 writing-craft.md（9 个参考文件里只读到 banned-words.md，而它是靠 spawn prompt 点名才被读的）；条件化后同条件 1 轮命中 5 读 4 不读，判定全对且未出现全量预加载"
+      "budget": 13540,
+      "why": "正文 agent 的系统提示，每章每次 spawn 都付。正文规则中的 reference 引用必须保留 canonical agent-references 前缀，否则运行时无法可靠定位部署文件；本次同时加入正文形状、机器统计与细纲重合复核规则。+150：参考文件表的「何时读取」改为可判定的必读条件——旧措辞「按需读取…时」是场景描述，被当成自由裁量，实测同一章 6 轮全部漏读 writing-craft.md（9 个参考文件里只读到 banned-words.md，而它是靠 spawn prompt 点名才被读的）；条件化后同条件 1 轮命中 5 读 4 不读，判定全对且未出现全量预加载 +220：交付前八问写进 agent 的交付门槛，要求逐条指出正文对应处，只答「已遵守」不算。"
     },
     {
       "path": "skills/story-long-write/references/writing-craft.md",
-      "budget": 8300,
-      "why": "narrative-writer 每章写作时读"
+      "budget": 10400,
+      "why": "narrative-writer 每章写作时读。+2100：第 10 节「在场者的账」与八问自检表。实测同一章由完整流程产出的正文里，本文件既有的「疏密分配」「反平推」「反注水」全部落空，而唯一配了自检句的「三指遮盖法」是唯一被执行的条目——技法库不配自问句就会被当成风格建议读过去。本次新增的八条（状态台阶／同类递减／性质由代价演示／标价人／镜头准入／人物余韵／最重的一句最短／密处禁概括）经四种章型交叉验证（无冲突独角戏、群像零交手、战斗释放、遭遇未开战），只保留四型都成立的条目。"
     },
     {
       "path": "skills/story-long-write/references/anti-ai-writing.md",
@@ -59,7 +59,7 @@
   "paths": [
     {
       "label": "长篇日更主会话",
-      "budget": 36730,
+      "budget": 36990,
       "files": [
         "skills/story-long-write/SKILL.md",
         "skills/story-long-write/references/workflow-daily.md",
@@ -76,7 +76,7 @@
     },
     {
       "label": "正文 agent 上下文",
-      "budget": 39120,
+      "budget": 41480,
       "files": [
         "skills/story-setup/references/templates/agents/narrative-writer.md",
         "skills/story-long-write/references/writing-craft.md",
