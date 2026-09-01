@@ -66,8 +66,8 @@ from pathlib import Path
 
 skills = sorted(Path('skills').glob('*/SKILL.md'))
 commands = sorted(Path('skills/story-setup/references/zcode/commands').glob('*.md'))
-assert len(skills) == 14, f'expected 14 skills, got {len(skills)}'
-assert len(commands) == 14, f'expected 14 commands, got {len(commands)}'
+assert len(skills) == 15, f'expected 15 skills, got {len(skills)}'
+assert len(commands) == 15, f'expected 15 commands, got {len(commands)}'
 expected = {p.parent.name for p in skills}
 assert {p.stem for p in commands} == expected
 
@@ -92,7 +92,7 @@ for command in commands:
     assert 'description' in keys and 'skills' in keys
     assert '$ARGUMENTS' in body
 PY
-echo "  OK 14 Skills + 14 Commands (schema and one-to-one names)"
+echo "  OK 15 Skills + 15 Commands (schema and one-to-one names)"
 
 python3 - <<'PY'
 import json

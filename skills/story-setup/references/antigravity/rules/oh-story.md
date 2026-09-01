@@ -13,6 +13,7 @@ load its references only when that skill instructs you to do so.
 - Long-form writing or continuation: `story-long-write`
 - Short-form writing: `story-short-write`
 - Long/short deconstruction: `story-long-analyze` / `story-short-analyze`
+- Inspiration distillation: `story-inspiration-distill`
 - Long-running checkpoint and reread guard: `story-runtime-guard`
 - Long/short market scan: `story-long-scan` / `story-short-scan`
 - Remove AI-writing patterns: `story-deslop`

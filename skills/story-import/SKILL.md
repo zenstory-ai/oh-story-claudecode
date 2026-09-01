@@ -14,7 +14,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > Agent 兼容性：只检查当前运行时的 canonical 目录：Claude `.claude/agents/{agent}.md`、OpenCode `.opencode/agents/{agent}.md`、Codex `.codex/agents/{agent}.toml`、Antigravity `.agents/agents/agent-name/agent.md`（`agent-name` 为目标 agent 名），不得因其他端文件存在而误判。Codex 使用同名 `agent_type`；Antigravity 使用 `invoke_subagent` + `TypeName`。对应运行时未暴露 custom-agent registry / `invoke_subagent` 或返回未知 agent 时，必须降级 solo/direct。检测到 `.zcode/` 时同样直接 solo/direct，因为 ZCode 3.3.4 不执行项目 custom agents；报告 `Fallback: project custom agents unavailable -> solo`。Claude/OpenCode 兼容面保留 `subagent_type`。
 >
-> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 30` 不一致时（标记缺失、字段缺失/非整数、小于或大于 30）**照常按文件存在性检查并 spawn**，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 30）` 并提示重新运行 `/story-setup` 后新开会话；大于 30 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct，报告 `Fallback: ... -> solo`。
+> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 31` 不一致时（标记缺失、字段缺失/非整数、小于或大于 31）**照常按文件存在性检查并 spawn**，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 31）` 并提示重新运行 `/story-setup` 后新开会话；大于 31 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct，报告 `Fallback: ... -> solo`。
 
 ## 核心原则
 
@@ -122,7 +122,7 @@ story-setup 仍是 hooks、写作 agents 与后续日更的推荐基础设施；
 
 #### 长篇：自动续跑过 Stage 1 停靠点
 
-story-long-analyze 在 Stage 0+1（黄金三章）后会**自动停靠**并询问是否继续全量拆解。但导入场景需要 Stage 2-6 的 JSON checkpoint schema v4、分析契约 v5.0 全套产物：五列 `chapter_index.csv`、20 列 `structure_blocks.csv` 与 `全局分析/` 下三个文件。
+story-long-analyze 在 Stage 0+1（黄金三章）后会**自动停靠**并询问是否继续全量拆解。但导入场景需要 Stage 2-6 的 JSON checkpoint schema v4、分析契约 v5.0 全套产物：五列 `chapter_index.csv`、25 列 `structure_blocks.csv` 与 `全局分析/` 下三个文件。
 
 **当前拆文契约**：`_progress.json` 必须是 `schema_version: 4`、`contract_version: "5.0"` 且源/边界哈希有效；主契约还包括 `structure_blocks.csv`、`全局分析/爆款机制.md` 和含完整关系、双时间线、三维节奏章节的 `全局分析/六维拆书.md`。任一缺失都先修复对应 Stage，不得从历史逐章摘要、旧拆分全局文件或旧二十列索引拼出导入工程。
 
@@ -197,7 +197,7 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 | 0 | 概要提取 | 原始文本 | 概要.md + 章节边界 | 章节结构识别完成 |
 | 1 | 黄金三章 | 前 3 章原文 | 第1章_深度拆解.md / 第2章_深度拆解.md / 第3章_深度拆解.md → **停靠产出快速预览.md**（导入场景自动续跑，不停下询问） | 3 章拆解完成 |
 | 2 | 一次机械索引 | 章节边界 | 五列 `chapter_index.csv`；不含任何语义字段 | 索引行数 == 章节数，locator 可回读 |
-| 3 | 结构块 | 信号章 + 定点原文 | 20 列 `structure_blocks.csv` | 同次语义读取完成循环、关系迁移与节奏锚点 |
+| 3 | 结构块 | 信号章 + 定点原文 | 25 列 `structure_blocks.csv` | 同次语义读取完成循环、关系迁移、节奏锚点与灵感预抽象 |
 | 4 | 完整六维拆书 | 结构块 + 定点原文 | `六维拆书.md` | 人物、关系、冲突、双时间线、伏笔、三维节奏均在单文件中自包含 |
 | 5 | 爆款机制 | 结构块 + 六维拆书 | `爆款机制.md` | 机制可核证、可迁移边界明确 |
 | 6 | 证据与边界 | 全部全局结论 + 原文定位 | `证据与边界.md`：A/B/C 证据等级、反例、边界与待验证项 | 三个全局文件通过交叉引用审计 |

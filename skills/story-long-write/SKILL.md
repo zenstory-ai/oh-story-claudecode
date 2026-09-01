@@ -25,7 +25,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > 内置适配 Claude Code / OpenCode / Codex / Antigravity / ZCode / OpenClaw。专业 agent 只查当前端 canonical 目录（`.claude/agents`、`.opencode/agents`、`.codex/agents` TOML、`.agents/agents`）；Antigravity 用 `invoke_subagent` + 同名 `TypeName`。文件或运行时能力缺失、返回 unknown agent，或当前为不执行 custom agents 的 ZCode 3.3.4 时，报告 fallback 并 solo/direct 执行。
 >
-> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 30` 不一致时（标记缺失、字段缺失/非整数、小于或大于 30）**照常按文件存在性检查并 spawn**，但只检查当前运行时的 canonical 目录；同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 30）` 并提示重新运行 `/story-setup` 后新开会话；大于 30 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct，报告 `Fallback: ... -> solo`。
+> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 31` 不一致时（标记缺失、字段缺失/非整数、小于或大于 31）**照常按文件存在性检查并 spawn**，但只检查当前运行时的 canonical 目录；同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 31）` 并提示重新运行 `/story-setup` 后新开会话；大于 31 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct，报告 `Fallback: ... -> solo`。
 
 ## 核心方法
 
@@ -85,6 +85,8 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 ### 路径与术语约定
 
 > **拆文库/对标关系**：`拆文库/` = analyze skill 的原始产出，是数据源。`对标/` = 写作项目的引用视图。首次引用对标书时，从 `拆文库/{书名}/` 复制 `章节/`（仅黄金三章）、五列 `chapter_index.csv`、`structure_blocks.csv`、`全局分析/` 与 `原文/` 到 `对标/{书名}/`；不再同步旧逐章摘要、剧情/角色/设定拆分目录、拆文报告或文风文件。
+>
+> **公共灵感库**：按任务标签从 `灵感库/灵感索引.csv` 只读 Top 3–8 张 CBA，不读 IA/NM。预算见 [references/cross-book-recall.md](references/cross-book-recall.md)。
 >
 > **对标书路径查找**：优先 `{项目}/对标/{书名}/`，不存在则回退 `拆文库/{书名}/`。下文所有对标数据加载均使用此规则。
 
@@ -202,7 +204,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 3. 同一文件的“双时间线与信息差”章节管真实时间、披露顺序、信息差与伏笔回收；“人物关系图谱”章节管有向关系动作；其余章节管全局事实与功能诊断。
 4. `structure_blocks.csv` 提供可变长度剧情单元、功能与三维强度候选；`chapter_index.csv` 只把块内章号映射到 `source_locator`。五列索引不能按情绪、事件或人物检索，也不能覆盖原文事实。
 5. `全局分析/证据与边界.md` 决定结论的 A/B/C 置信度与可迁移边界；写作不得把 C 暂定当作原作事实。
-6. **多对标六维拆书召回**最多读取 2 本副对标的三个全局文件；副对标原文不读，主对标才可按 locator 定点核证。
+6. **公共灵感召回**按任务标签选 3–8 张 CBA；不传 IA/NM，也不把灵感卡当风格样本。
 7. **自定义文风 `设定/文风.md`** 是权威风格基；缺失时才按结构块和五列索引定位主对标原文，即时提炼文风。硬安全线始终优先。
 
 **文件组织原则：**

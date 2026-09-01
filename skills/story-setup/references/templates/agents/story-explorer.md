@@ -149,7 +149,7 @@ maxTurns: 15
 
 ### benchmark_style_load 流程
 
-加载主对标的爆款机制、六维拆书、结构块和五列机械索引；先选结构块，再定位原文章节并提炼临时风格。需要跨书比较时，最多补充 2 本副对标的三个全局文件。
+加载公共灵感库标签结果，以及主对标的爆款机制、六维拆书、结构块和五列机械索引；先选结构块，再定位原文章节并提炼临时风格。
 
 1. **解析输入**：项目目录 + 本章情绪/基调 + （可选）本章爽点类型 + （可选）本章目标字数
 2. **主对标书选择**：
@@ -179,9 +179,9 @@ maxTurns: 15
    - header 必须恰为 `chapter,title,source_locator,char_count,status`；文件缺失、无法读取或 header 不匹配时返回 `gaps.chapter_index_missing: true`、`gaps.missing_primary_contract: true`，并用 `gaps.repair_action` 指向 `/story-long-analyze` Stage 2
 8. **匹配章节**：把选中块的章号范围映射到索引行；按 `char_count` 接近目标字数、章节号稳定排序选 K。索引标题不参与语义判断；原文核证不匹配时换同块下一章
 9. **原文定位验证**：读取选中行 `source_locator`；路径不存在、越出该书 `原文/` 或内容为空时返回 `gaps.raw_text_unavailable: true` 并停止
-10. **跨书补充**：按长篇写作的多对标召回规则，最多读取 2 本副对标的三个全局文件，各选 1 个补充机制；不读取副对标结构块、索引或原文
+10. **公共灵感标签召回**：从本章题材、读者需求、情绪、关系动作、剧情功能、节奏位置、`适用阶段=正文`、风险生成标签；向上定位最近的 `灵感库/灵感索引.csv`，只筛 active CBA，读取 Top 3 张完整卡。库缺失或零命中分别写 gap，不全量读 IA/NM
 11. **黄金三章补充**：K≤3 且对应深度拆解存在时读取；K>3 不要求逐章拆解
-12. **即时文风提炼**：从选中原文提炼临时指令，只供本次调用；副对标机制不进入文风
+12. **即时文风提炼**：从选中原文提炼临时指令，只供本次调用；CBA 不进入文风
 13. **抽取原文锚点**：从选中原文截取 1–2 段各 150–300 字，记录定位
 14. **全局补充**：按需定点读取六维、双时间线、关系图与证据边界
 15. **返回结构化 JSON**
@@ -198,7 +198,7 @@ maxTurns: 15
 
 > `context_load` 的固定读取量不随章数增长。角色当前值来自独立小快照，旧变化原因来自按 ID/角色定点命中的紧凑增量，时间线按作者/读者视角分开读取。
 
-> 普通查询遇文件缺失时在 `gaps` 中返回事实；`benchmark_style_load` 缺爆款机制、六维拆书中的三维节奏、`structure_blocks.csv` 或五列 `chapter_index.csv` 时必须返回 `missing_primary_contract: true` 与 `repair_action`。
+> 普通查询遇文件缺失时在 `gaps` 中返回事实；`benchmark_style_load` 缺爆款机制、三维节奏、`structure_blocks.csv` 或五列 `chapter_index.csv` 时必须返回 `missing_primary_contract: true` 与 `repair_action`。灵感库缺失不属于主契约错误，只返回非阻塞 gap。
 
 ---
 
@@ -289,8 +289,8 @@ maxTurns: 15
     },
     "chapter_index_path": "对标/{书名}/chapter_index.csv",
     "structure_blocks_path": "对标/{书名}/structure_blocks.csv",
-    "secondary_benchmark_mechanisms": [
-      {"book": "<副对标书>", "mechanism_id": "HM-002", "use": "<本次用途>", "conditions": "<条件>", "risk": "<风险>"}
+    "selected_inspiration_aggregates": [
+      {"id": "CBA-001", "matched_tags": ["题材=都市脑洞"], "mechanism": "<机制链>", "conditions": "<条件>", "risk": "<风险>"}
     ],
     "selected_hit_mechanism": "<机制ID + 读者需求 + 因果链 + 心理机制 + 可替换项 + 迁移条件 + 误用风险>",
     "rhythm_reference": "<RH-ID + 剧情强度 + 情绪类型/强度 + 描写密度 + 蓄力/爆发/冷却>",
@@ -303,13 +303,15 @@ maxTurns: 15
       {"tone": "悲伤", "source": "原文/第014章_*.md 第7段", "demo_point": "对话潜台词手法", "text": "<150-300字原文>"}
     ]
   },
-  "source_files": ["设定/题材定位.md", "对标/{书名}/全局分析/爆款机制.md", "对标/{书名}/全局分析/六维拆书.md", "对标/{书名}/structure_blocks.csv", "对标/{书名}/chapter_index.csv", "对标/{书名}/原文/第014章_*.md"],
+  "source_files": ["设定/题材定位.md", "灵感库/灵感索引.csv", "灵感库/跨书灵感聚合/CBA-001_*.md", "对标/{书名}/全局分析/爆款机制.md", "对标/{书名}/全局分析/六维拆书.md", "对标/{书名}/structure_blocks.csv", "对标/{书名}/chapter_index.csv", "对标/{书名}/原文/第014章_*.md"],
   "gaps": {
     "no_benchmark": false,
     "mechanism_missing": false,
     "rhythm_missing": false,
     "chapter_index_missing": false,
     "structure_blocks_missing": false,
+    "inspiration_library_missing": false,
+    "inspiration_tag_no_match": false,
     "mechanism_rhythm_conflict": false,
     "conflict": null,
     "missing_primary_contract": false,

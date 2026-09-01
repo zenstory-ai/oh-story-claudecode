@@ -28,21 +28,23 @@
    - (11) 对标书路径下 `全局分析/爆款机制.md` — 读者需求、触发链、心理机制、迁移条件与误用风险；缺失按SKILL.md Phase 4 的「缺失文件处理」设置 `missing_primary_contract` 并停止准备
 - (12) 对标书路径下 `全局分析/六维拆书.md` 的“三维节奏”章节 — 剧情强度、读者情绪强度、描写密度及峰谷规律；文件或章节缺失时按 SKILL.md Phase 4 的「缺失文件处理」设置 `missing_primary_contract` 并停止准备
    - (13) `设定/题材正文提示卡.md`（如存在）— 本书正文层题材卡；缺失时从 `设定/题材定位.md` + `references/genre-prose-cards.md` 索引 + `references/genre-prose-cards/` 单题材卡目录（按题材分类优先）+ `references/style-genre-modules.md`（兜底）即时生成 `genre_prose_card`，不阻塞写作
+   - (14) 工作区 `灵感库/灵感索引.csv`（如存在）— 只按所需标签筛 `跨书灵感聚合`；不全量读原子/单小说层，不把灵感卡当文风
 3. **写前准备**（下面的 3 步是核心方法在单章写作中的落地：筛选状态 → 召回模块 → 确认意图）：
    - **状态筛选**：从 `追踪/上下文.md` 的 `## 核心角色状态` 取当前角色，从 `## 活跃伏笔` 取需回收/推进项，从 `## 下一章承诺` 取本章必须履行项，输出本节速记（参考 state-tracking.md）。久别角色按名读取 `追踪/角色状态/{名}.md`；只有追查变化原因时才定点查逐章增量。续写状态卡或 meta 不存在时按 workflow-daily 的当前协议处理，不手写替代文件
    - **机制召回、题材卡与文风召回**：
      - ① 本章目标情绪词？② 借鉴哪个参考文件的哪个技法？③ 用在哪些段落？答不出 → 先回读参考再动笔
+- (a0) **公共灵感标签召回**：按 `references/cross-book-recall.md` 从本章题材、读者需求、目标情绪、关系动作、剧情功能、节奏位置、`适用阶段=正文` 和风险生成查询；只读 Top 3 张 active CBA，输出 `selected_inspiration_aggregates`。不沿来源链接读取 IA/NM；灵感库不存在或零命中只记 gap，不阻塞
      - (a) **爆款机制召回**：按「对标书路径查找」规则读 `{对标书路径}/全局分析/爆款机制.md`，选出 1 个与本章功能和目标情绪最贴近的 `selected_hit_mechanism`，至少携带机制 ID、读者需求、表层表现、因果链、心理机制、可替换要素、迁移条件与误用风险。只能迁移机制，不复制原书设定、桥段或措辞。缺失时设置 `missing_primary_contract: true`，返回明确 `repair_action` 后停止准备
 - (b) **节奏召回**：读 `{对标书路径}/全局分析/六维拆书.md` 的“三维节奏”章节，根据本章所在阶段和目标强度选出 `rhythm_reference`（剧情强度 → 情绪类型/强度 → 描写密度 → 峰前蓄力/峰后冷却）。文件或章节缺失时设置 `missing_primary_contract: true`，返回明确 `repair_action` 后停止准备
      - (c) **题材正文提示卡召回**：优先读 `设定/题材正文提示卡.md`；缺失则先读 `设定/题材定位.md` + `references/genre-prose-cards.md` 索引，按主题材精确匹配后只读取 `references/genre-prose-cards/` 中对应单题材卡（如 都市脑洞 / 豪门总裁 / 年代 / 双男主；低置信卡必须在意图确认标注低置信，并要求同题材对标校准），无命中再读 `references/style-genre-modules.md` 通用流派模块。跨题材时主题材抽 3-5 条、辅题材抽 1-2 条，生成短 `genre_prose_card`（题材边界、核心逻辑、读者期待、核心爽点/情绪、正文落点、前中后期打法、节奏密度、场景颗粒、禁止漂移、本章取舍、卡片置信度）。题材卡只约束正文层题材味，不改细纲剧情、不覆盖 `selected_hit_mechanism` / `rhythm_reference` / `设定/文风.md`；只在内部校准取舍，正文里不得出现卡名/标签/置信度/条目/合规自评
      - (d) **文风召回**：先直接读 `设定/文风.md`（不经 explorer）：含实质内容（去空白 ≥200 字，或含 句长 / 标点 / 对话 / 锚点 / 笔调 小节且小节内有可执行约束：比例 / 例句 / 禁止或偏好描述）则置 `custom_style=true`、进入「自定义文风模式」，它是权威风格基；空 / 仅空白 / 仅标题 / 占位 stub（待办 / 待补充 / ___）视为不存在。未进入自定义文风模式时不再寻找拆文阶段持久化的 `文风.md`，而是在步骤 (e) 选中主对标章节后，从该章原文即时提炼只供本次调用使用的 `transient_style_directives`。`structure_blocks.csv`、五列 `chapter_index.csv` 或选中 `source_locator` 不可用才 fail-fast；拆文端不为文风召回新增逐章分析正文
      - (e) **匹配章节挑选**：先读 `{对标书路径}/structure_blocks.csv`，按本章功能、目标情绪和三维强度选一个块；再读取五列 `chapter_index.csv`，把块内章号展开为 locator。需要文风时从候选中按 `char_count` 与目标字数、章节号稳定选 K，读取原文后核证功能并生成锚点；不匹配则换同块下一章，不从索引标题推断。K≤3 且存在 `章节/第K章_深度拆解.md` 时加读黄金三章拆解
 - (f) **全局结构召回**：按本章情节从 `六维拆书.md` 的人物关系图谱、双时间线与信息差、三维节奏章节及 `证据与边界.md` 定点提取角色、冲突、信息差、关系变化、节奏与证据边界；机制以 `爆款机制.md` 为权威，节奏以六维中的“三维节奏”为权威，并记录 `conflict`
-     - (g) 输出“多对标六维拆书召回摘要 + selected_hit_mechanism + rhythm_reference + genre_prose_card + transient_style_directives/自定义文风指令 + 原文锚点”，作为 narrative-writer 输入。副对标只提供全局机制；主对标提供结构块、定点原文和临时文风。
+     - (g) 输出“selected_inspiration_aggregates + 主对标召回摘要 + selected_hit_mechanism + rhythm_reference + genre_prose_card + transient_style_directives/自定义文风指令 + 原文锚点”，作为 narrative-writer 输入。跨书机制统一走带标签 CBA；主对标提供结构块、定点原文和临时文风；副书原文不读取。
      - **快捷路径**：项目已部署 story-explorer agent 时，可一次性召回文风/模块材料。
        - 按本文件顶部规则确认 story-explorer 已部署。
        - 查询类型：`benchmark_style_load`；传入项目目录、章节号、目标基调/字数和爽点类型。
-       - 需要返回：`global_analysis_paths`、`structure_blocks_path`、`chapter_index_path`、`selected_hit_mechanism`、`rhythm_reference`、`style_source`、`transient_style_directives`、匹配章节、`source_locator`、锚点片段、`gaps`。
+       - 需要返回：`global_analysis_paths`、`structure_blocks_path`、`chapter_index_path`、`selected_inspiration_aggregates`、`selected_hit_mechanism`、`rhythm_reference`、`style_source`、`transient_style_directives`、匹配章节、`source_locator`、锚点片段、`gaps`。
        - `gaps.missing_primary_contract` 为 true 时先按 `repair_action` 修复，不进入正文生成。
        - 主会话另行直接读 `设定/文风.md`：含实质内容时作为本书风格基准；但不豁免情绪/节奏缺失。
    - **指令确认**：综合细纲、本节速记和模块召回结果，用一句话写清本章意图。
@@ -67,6 +69,7 @@
      - 项目目录、章节、细纲文件、上一章、输出路径。
      - 写前准备输出：本节速记、情绪目标、涉及角色、参考技法。
      - 主对标/拆文路径、主/副对标召回摘要。
+     - `selected_inspiration_aggregates`（只含本章命中 CBA 的机制、条件和风险，不含 IA 全文）。
      - `selected_hit_mechanism`、`rhythm_reference` 及来源路径。
      - `genre_prose_card`（题材正文提示卡摘要，只含本章相关条目）。
      - 文风路径、文风召回指令、原文锚点片段。

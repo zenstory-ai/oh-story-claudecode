@@ -36,7 +36,7 @@ SKILL.md 只保留场景路由与停靠规则；进入任一 Phase 前读本文�
 2. 按对标书路径查找规则检查 `全局分析/爆款机制.md`、`全局分析/六维拆书.md`（必须含“三维节奏”章节）、`structure_blocks.csv` 与五列 `chapter_index.csv`。
 3. 任一主产物缺失时必须停止，设置 `missing_primary_contract: true`，并给出 `repair_action`：重跑 `/story-long-analyze` 对应 Stage（索引 Stage 2、结构块 Stage 3、全局分析 Stage 4-6）或重新 `/story-import`；不得以历史 `拆文报告.md`、逐章摘要或故事线代替。
 4. 齐全后，从 `爆款机制.md`、`六维拆书.md` 和 `证据与边界.md` 召回机制、关系、双时间线与三维节奏；用 `structure_blocks.csv` 选范围，索引只映射 locator 后回读原文。
-5. 需要跨书比较时，按 `cross-book-recall.md` 最多读取 2 本副对标的三个全局文件；不读副对标原文。
+5. 有 `灵感库/灵感索引.csv` 时按阶段标签只读 Top 3–8 张 CBA；不读 IA/NM，缺失或零命中不阻塞。
 
 根据回答做匹配：
 - 脑洞好 → 推荐：系统文、诸天流、无限流
@@ -105,7 +105,7 @@ story-architect 属于高层级结构设计 agent。轻量题材定位优先由�
 - **设定/题材定位.md**：题材核心梗三分法+对标分析（参考 long-genre-mechanics.md「核心梗解析」）。对标分析表保留 2-3 行摘要，详细数据见 `对标/` 目录
 - **设定/题材正文提示卡.md**：从 `设定/题材定位.md` + `references/genre-prose-cards.md`（索引）+ `references/genre-prose-cards/`（单题材正文卡目录，按题材分类优先）+ `references/style-genre-modules.md`（通用流派补充）抽取本书正文层题材卡，只写题材边界、核心逻辑、读者期待、核心爽点/情绪、正文落点、前中后期打法、节奏密度、场景颗粒、禁止漂移；不写通用格式规则，不覆盖 `设定/文风.md`
 
-> **跨书机制时**：参 `references/cross-book-recall.md`，副对标只补充全局机制；对标登记仍负责主对标原文与证据来源。
+> **跨书机制时**：参 `references/cross-book-recall.md`，机制优先从带标签 CBA 召回；对标登记仍只负责主对标原文/证据来源。
 
 #### Agent 调用：story-architect + character-designer
 
@@ -171,9 +171,9 @@ story-architect 属于高层级结构设计 agent。轻量题材定位优先由�
 - 核心事件：{一句话}
 ```
 
-> **跨书机制时**：参 `references/cross-book-recall.md`，最多读取 2 本副对标的三个全局文件，不读取副书原文。
+> **跨书机制时**：参 `references/cross-book-recall.md`，卷级规律按标签读 CBA；需要书级证据时回到来源 NM/IA，但不读取副书原文
 
-> **对标节奏回流（有主对标书时，卷纲定稿前做一次）**：读主对标 `六维拆书.md` 的“三维节奏”章节、`爆款机制.md` 与 `structure_blocks.csv`；任一缺失时 fail-fast。先按机制/节奏选结构块，再用五列 `chapter_index.csv` 展开定位并按需核证原文，不从索引标题猜事件。跨书补充只读副对标三个全局文件；无对标书则按八节点占比自排。
+> **对标节奏回流（有主对标书时，卷纲定稿前做一次）**：读主对标 `六维拆书.md` 的“三维节奏”章节、`爆款机制.md` 与 `structure_blocks.csv`；任一缺失时 fail-fast。先按机制/节奏选结构块，再用五列 `chapter_index.csv` 展开定位并按需核证原文，不从索引标题猜事件。跨书补充机制按标签读取 CBA；无对标书则按八节点占比自排。
 
 #### 细纲（全书每章）
 

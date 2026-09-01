@@ -39,6 +39,16 @@
       "skills": ["./skills/story-long-analyze"]
     },
     {
+      "name": "story-inspiration-distill",
+      "description": "把拆文结构块抽象为原子灵感、单小说灵感合并与带标签的跨书灵感聚合。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "novel-analysis",
+      "keywords": ["inspiration", "aggregation", "tags", "灵感", "跨书聚合", "chinese"],
+      "skills": ["./skills/story-inspiration-distill"]
+    },
+    {
       "name": "story-runtime-guard",
       "description": "长任务运行守卫，限制历史上下文复制、重复读取和非原子续跑。",
       "source": "./",

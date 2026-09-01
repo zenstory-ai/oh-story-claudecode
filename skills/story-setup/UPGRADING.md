@@ -2,10 +2,10 @@
 
 ## 当前版本
 
-- `setup_skill_version: 1.2.11`
-- `agents_version: 30`
+- `setup_skill_version: 1.2.12`
+- `agents_version: 31`
 
-`.story-deployed` 缺失任一字段，或 `agents_version` 缺失 / 非整数 / 小于 `30`，都视为待更新部署。直接重新运行 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或自然语言点名）；不在运行时逐级兼容历史模板。如项目 `agents_version` 大于 `30`，说明本地 story-setup 比项目旧：先更新 oh-story-claudecode，不得用 v30 降级覆盖。历史版本改动见仓库根目录 `CHANGELOG.md`。
+`.story-deployed` 缺失任一字段，或 `agents_version` 缺失 / 非整数 / 小于 `31`，都视为待更新部署。直接重新运行 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或自然语言点名）；不在运行时逐级兼容历史模板。如项目 `agents_version` 大于 `31`，说明本地 story-setup 比项目旧：先更新 oh-story-claudecode，不得用 v31 降级覆盖。历史版本改动见仓库根目录 `CHANGELOG.md`。
 
 ## 升级策略
 
@@ -21,7 +21,7 @@
 
 部署清单的 Source 相对 skill 包、Target 相对项目根，两个基准目录在 skills-only 端会重合；经 `.agents/skills → ../skills` 等 symlink 加载时，路径文字不同也可能指向同一目录。部署器会先按 realpath / samefile 语义拒绝同对象与「目标位于源目录内」的递归复制，再删掉已有的 `agent-references/agent-references/`（可能多层）或 `skills/story-setup/skills/` 残留。
 
-OpenClaw / Reasonix / generic 三条路径的 skill 副本在项目 `skills/` 里，重跑时执行的就是项目里那份，自动清理到不了：先手动删掉上述目录。要让项目里的 skill 文本本身更新，还需要更新 oh-story-claudecode 后，用新包覆盖项目 `skills/` 下这 14 个目录。
+OpenClaw / Reasonix / generic 三条路径的 skill 副本在项目 `skills/` 里，重跑时执行的就是项目里那份，自动清理到不了：先手动删掉上述目录。要让项目里的 skill 文本本身更新，还需要更新 oh-story-claudecode 后，用新包覆盖项目 `skills/` 下这 15 个目录。
 
 ## 文件所有权
 
@@ -32,9 +32,9 @@ OpenClaw / Reasonix / generic 三条路径的 skill 副本在项目 `skills/` �
 - `.claude/agents/` — 所有 agent 定义
 - `.claude/rules/` — 所有 path-scoped 规则
 - `.claude/skills/story-setup/references/agent-references/` — Agent 参考资料副本
-- `.agents/skills/{14 known skills}/`、`.agents/agents/agent-name/agent.md`（7 个已知 `agent-name`）、`.agents/rules/oh-story.md`、`.agents/hooks/{story_antigravity_hook.js,story_hook_core.js}` — Antigravity 项目内真实 Skills、生成 Agents、Always-On Rule 与 Hook runtime；同目录其他用户 Skills/Agents 保留
-- `skills/{14 known skills}/` — OpenClaw / Reasonix / generic 的项目 skill 副本，仅覆盖 oh-story 已知名称
-- `.zcode/skills/{14 known skills}/`、`.zcode/commands/{14 known commands}.md` — 仅覆盖 oh-story 已知名称
+- `.agents/skills/{15 known skills}/`、`.agents/agents/agent-name/agent.md`（7 个已知 `agent-name`）、`.agents/rules/oh-story.md`、`.agents/hooks/{story_antigravity_hook.js,story_hook_core.js}` — Antigravity 项目内真实 Skills、生成 Agents、Always-On Rule 与 Hook runtime；同目录其他用户 Skills/Agents 保留
+- `skills/{15 known skills}/` — OpenClaw / Reasonix / generic 的项目 skill 副本，仅覆盖 oh-story 已知名称
+- `.zcode/skills/{15 known skills}/`、`.zcode/commands/{15 known commands}.md` — 仅覆盖 oh-story 已知名称
 - `.zcode/hooks/story_zcode_hook.js` — ZCode 专用 Hook runner
 
 ### 用户与 story-setup 共同维护，只合并管理块
@@ -52,11 +52,19 @@ OpenClaw / Reasonix / generic 三条路径的 skill 副本在项目 `skills/` �
 - `{书名}/设定/`、`大纲/`、`追踪/`
 - `.active-book`
 
-## v30 当前契约
+## v31 当前契约
 
-- 新增 `story-runtime-guard`，项目部署面从 13 个技能扩展为 14 个，并为 OpenCode/ZCode 增加同名命令。
+- 新增 `story-inspiration-distill`，项目部署面从 14 个技能扩展为 15 个，并为 OpenCode/ZCode 增加同名命令。
+- 六维拆书在结构块首次语义读取时同步保存五个去专名灵感字段；Stage 7 只消费已落盘结构块，不为灵感库二次阅读全文。
+- story-explorer 与长篇写作消费面按标签召回 active CBA，再回链单小说合并和灵感原子；跨书层不保存原作专名或可直接拼接的剧情正文。
+
+重新部署后需**新开会话**，custom agent 与 hooks 才会重新注册。
+
+## v30 历史契约
+
+- 新增 `story-runtime-guard`，项目部署面从 13 个技能扩展为 14 个。
 - 长篇拆文改用 schema v4：Stage 0 只提交章节边界，Stage 2 只提交五列机械索引；暂停态、产物校验和和快照字段在续跑时保留。
-- story-explorer 与写作/导入消费面改用 `structure_blocks.csv → chapter_index.csv locator → 原文`；副对标只读取三个全局文件。
+- story-explorer 与写作/导入消费面改用 `structure_blocks.csv → chapter_index.csv locator → 原文`，不从 CSV 凭空重建历史状态。
 
 重新部署后需**新开会话**，custom agent 与 hooks 才会重新注册。
 
@@ -135,7 +143,7 @@ OpenClaw / Reasonix / generic 三条路径的 skill 副本在项目 `skills/` �
 - 新建、补建、改纲的细纲只接受完整章节蓝图：缺少阶段位置、结构公式、禁止提前释放、内容概括、情节安排、人物关系、情节细化或结尾设定时，先补齐再写。旧版细纲缺这些字段不阻塞日更，回退消费旧字段（核心事件、情节点序列、目标情绪、章首/章尾钩子、字数目标）。
 - 细纲字段是本章「要发生什么」的内容规格，不规定正文形状：各字段都要在正文里兑现，但正文可合并、穿插、重排情节点，不按条目顺序一条一段平推。细纲「结尾 / 结尾设定」写本章最后落在什么动作、画面或台词上，不写状态判词。
 - 每个 agent adapter 只读取本目标的 canonical reference 路径：Claude `.claude/skills/`、OpenCode `skills/`、Codex `.codex/skills/`。
-- 当前恢复只接受 `_progress.json` 与 `_state_snapshot.json` 的 `schema_version: 4`、`contract_version: "5.0"`、源哈希和章节边界哈希；旧 `_progress.md` / v2 / v3 产物保留为只读 legacy，从 Stage 2 重建五列 `chapter_index.csv`、20 列 `structure_blocks.csv` 与三个 `全局分析/` 文件，不执行隐式混合迁移。
+- 当前恢复只接受 `_progress.json` 与 `_state_snapshot.json` 的 `schema_version: 4`、`contract_version: "5.0"`、源哈希和章节边界哈希；旧 `_progress.md` / v2 / v3 产物保留为只读 legacy，从 Stage 2 重建五列 `chapter_index.csv`、25 列 `structure_blocks.csv` 与三个 `全局分析/` 文件，不执行隐式混合迁移。
 - Codex hooks 升级使用稳定管理身份替换注册；会先移除旧直调 Python 命令与已有 launcher 命令，再写入当前 6 个注册，不会双重执行。
 - 定制 hook 如果调用了已删除的 `discover_book_dir()`，请改为 `discover_active_book()`。当前版不再保留该兼容别名。
 - `拆文库/` 的「未完成拆文」提醒按 `_progress.md` 的「最终状态」取值过滤：`completed` / `completed_with_errors` 不计入，其余取值与字段缺失、空文件、不可读一律按未完成上报。判定收在 `lib/common.sh` 的 `discover_incomplete_analyses()`。
@@ -144,7 +152,7 @@ OpenClaw / Reasonix / generic 三条路径的 skill 副本在项目 `skills/` �
 ## 升级步骤
 
 1. 在项目根目录重新运行 story-setup。
-2. 确认 `.story-deployed` 写入 `agents_version: 30` 与 `setup_skill_version: 1.2.11`。
+2. 确认 `.story-deployed` 写入 `agents_version: 31` 与 `setup_skill_version: 1.2.12`。
 3. 确认目标 CLI 的 agents、hooks/rules 和 reference bundle 都通过安装验证。
 4. 新开会话，使 custom agents 与 hooks 按当前文件重新注册。
 5. **长篇在写项目必做**：检查每本书的 `追踪/_tracking-state.json` 是否存在。不存在就是旧追踪结构，按下方「追踪模型迁移」重建，否则写下一章会被拦。

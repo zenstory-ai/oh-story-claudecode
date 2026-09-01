@@ -1,6 +1,6 @@
 # 全局拆书输出模板
 
-本文件是 `story-long-analyze` 当前输出契约（JSON checkpoint `schema_version: 4`，analysis contract `5.0`）。Stage 1 黄金三章保留 A 的逻辑；Stage 2 只做机械定位；Stage 3 在结构块首次语义读取中固化关系变化与节奏锚点；Stage 4–6 只做全书合并、机制解释和证据审计。
+本文件是 `story-long-analyze` 当前输出契约（JSON checkpoint `schema_version: 4`，analysis contract `5.0`）。Stage 1 黄金三章保留 A 的逻辑；Stage 2 只做机械定位；Stage 3 在结构块首次语义读取中同时固化关系变化、节奏锚点与灵感原子字段；Stage 4–6 只做全书合并、机制解释和证据审计。
 
 ---
 
@@ -164,7 +164,7 @@ chapter,title,source_locator,char_count,status
 输出 `structure_blocks.csv`，表头必须逐字一致：
 
 ```csv
-block_id,chapter_range,block_name,initial_gap,goal,pressure,turning_point,payoff,remaining_hook,state_change,main_characters,evidence_locator,plot_intensity,emotion_type,emotion_intensity,description_density,relationship_delta,rhythm_anchors,confidence,status
+block_id,chapter_range,block_name,initial_gap,goal,pressure,turning_point,payoff,remaining_hook,state_change,main_characters,evidence_locator,plot_intensity,emotion_type,emotion_intensity,description_density,relationship_delta,rhythm_anchors,inspiration_title,inspiration_mechanism,inspiration_reader_effect,inspiration_transfer_boundary,inspiration_risk,confidence,status
 ```
 
 字段规则：
@@ -174,6 +174,8 @@ block_id,chapter_range,block_name,initial_gap,goal,pressure,turning_point,payoff
 - 强度字段在结构块层评分：剧情/情绪 1–5，描写密度 1–3；不是逐章打分。
 - `relationship_delta` 最多写 3 条有证据的关系变化，格式为 `A--动作-->B：旧状态→新状态@第N章`；无变化写「无明确变化」。
 - `rhythm_anchors` 最多写 4 个本次已经核证的章级锚点，格式为 `第N章:蓄力/峰值/释放/余波:Pn/En/Dn`。只记录实际读到的锚点，不为凑逐章曲线回读成功范围。
+- `inspiration_title`、`inspiration_mechanism`、`inspiration_reader_effect`、`inspiration_transfer_boundary`、`inspiration_risk` 必须在同一次结构块提交中完成。五项只写去专名后的抽象机制，不得包含原作角色名、独有设定、原句或具体事件链。
+- `inspiration_mechanism` 使用一条完整机制链；其余四项各写一句。Stage 7 只机械渲染这些字段，不再次逐块调用模型。
 - `confidence` 取 `A 明确/B 强推断/C 暂定`；`status` 取 `ok/failed`。
 - 有效块必须写出缺口/目标、加压、转折、兑现、新阅读债和状态变化；无法成立的过渡范围并入相邻块。
 - 严禁标题改写、首尾句截断、摘句拼接和“本段主要讲述”等空模板。证据不足写「未知」并降级，不能机械补齐。
@@ -433,7 +435,7 @@ graph LR
 - [ ] 双时间线没有混淆真实顺序与披露顺序
 - [ ] 三维节奏包含结构块评分和已核证的块内锚点，数值范围合法
 - [ ] 关系使用有向动作动词，核心关系至少有起点、转折与当前状态
-- [ ] 每个有效结构块都在同一次提交中写出关系变化与节奏锚点
+- [ ] 每个有效结构块都在同一次提交中写出关系变化、节奏锚点和五个 `inspiration_*` 字段
 - [ ] 三个爆款机制均有证据、可迁移原则与误用风险
 - [ ] 关键硬事实能回查原文；未命中项已降级或删除
 - [ ] 未生成逐章摘要正文、逐章语义 CSV、剧情/角色/设定拆分目录、拆文报告或文风文件

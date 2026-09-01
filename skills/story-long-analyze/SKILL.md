@@ -1,7 +1,7 @@
 ---
 name: story-long-analyze
 version: 1.2.0
-description: "长篇网文拆文。保留黄金三章；全文只建立一次机械章节索引，再按可变长度结构块定点阅读。完整人物关系、双时间线与三维节奏统一写入六维拆书；支持断点恢复，不生成非黄金章逐章分析。"
+description: "长篇网文拆文。保留黄金三章；全文只建立一次机械章节索引，再按可变长度结构块定点阅读。完整人物关系、双时间线与三维节奏统一写入六维拆书，并在同一次结构块读取中产出灵感原子字段；支持断点恢复，不生成非黄金章逐章分析。"
 metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudecode"}}
 ---
 # story-long-analyze：长篇网文拆文
@@ -14,7 +14,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > Stage 2 是确定性机械步骤，不调用模型或子代理。Stage 3–6 如需并行，只把一个明确结构块和固定输出 schema 交给一个子代理；支持历史分叉参数的运行时必须使用 `fork_turns=none`，不得复制主会话历史。完整运行纪律见 `/story-runtime-guard`；该守卫不可用时，仍执行本文件的同等硬约束。
 >
-> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 30` 不一致时（标记缺失、字段缺失/非整数、小于或大于 30）**照常按文件存在性检查并 spawn**，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 30）` 并提示重新运行 `/story-setup` 后新开会话；大于 30 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct；该降级只涉及 Stage 3–6 的语义 worker，Stage 2 始终只运行确定性脚本，不依赖任何 agent。
+> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 31` 不一致时（标记缺失、字段缺失/非整数、小于或大于 31）**照常按文件存在性检查并 spawn**，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 31）` 并提示重新运行 `/story-setup` 后新开会话；大于 31 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct；该降级只涉及 Stage 3–6 的语义 worker，Stage 2 始终只运行确定性脚本，不依赖任何 agent。
 >
 > 检测到 `.zcode/`（ZCode 3.3.4）时，因其不执行项目 custom agents，Stage 3–6 的语义工作直接降级为 solo/direct，并报告 `Fallback: project custom agents unavailable -> solo`；Stage 2 仍只运行确定性脚本。
 
@@ -90,10 +90,11 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | 0 | 概要与章节边界 | 原文 | `概要.md` thin first-pass + 状态快照中的章节边界 | 边界连续、无重复、可定位；源哈希已锁定 |
 | 1 | 黄金三章 | 前 3 章原文 | 3 个深度拆解文件 + `快速预览.md` | A 原有黄金三章能力完成 |
 | 2 | 一次机械索引 | Stage 0 边界 | 五列 `chapter_index.csv` | 确定性脚本一次写入；不读章节语义 |
-| 3 | 结构块识别 | 标题/卷界/信号章 + 定点原文 | `structure_blocks.csv` | 结构循环、关系变化与节奏锚点在同一次读取中完成 |
+| 3 | 结构块识别 + 原子候选 | 标题/卷界/信号章 + 定点原文 | `structure_blocks.csv` | 结构循环、关系变化、节奏锚点与抽象灵感字段在同一次读取中完成 |
 | 4 | 完整六维拆书 | 结构块 + 定点原文 | `六维拆书.md` | 人物、完整有向关系、冲突、双时间线、叙事顺序、三维节奏与题材体量全部自包含 |
 | 5 | 爆款机制 | 结构块 + Stage 4 | `爆款机制.md` | 机制有证据、心理效果、可迁移原则与误用风险 |
 | 6 | 证据与边界审计 | 全部终态产物 | `证据与边界.md` + JSON 完成状态 | 关键结论可回查，缺失和推断已分级 |
+| 7 | 灵感聚合（独立后处理） | 结构块内已完成的原子字段 + 三个全局文件 | 公共三层灵感库 | IA 机械渲染；只对 NM/CBA 做一次聚合；失败不回滚拆文 |
 
 ### Stage 0：章节边界唯一真值
 
@@ -143,8 +144,9 @@ chapter,title,source_locator,char_count,status
 - 过渡章没有独立状态变化时并入相邻块，不为凑覆盖率制造空块。
 - 每个原文范围最多一个语义 owner；成功块不得重读。重试必须在 `retry_reasons` 写明原因。
 - 严禁用首尾句截断、标题改写、摘句拼接或通用占位语生成结构块。证据不足写「未知」，不能假装读过。
-- 同一次结构块提交必须写出 `relationship_delta` 与 `rhythm_anchors`。结构循环本身已经是关键事件节点，不再生成第二套事件摘要。
+- 同一次结构块提交必须顺手写出 `relationship_delta`、`rhythm_anchors`、`inspiration_title`、`inspiration_mechanism`、`inspiration_reader_effect`、`inspiration_transfer_boundary` 与 `inspiration_risk`。结构循环本身已经是关键事件节点，不再生成第二套事件摘要。
 - `rhythm_anchors` 只记录本次已核证的蓄力、峰值、释放或余波章，最多 4 个；不为填满每章而重新通读。
+- `inspiration_*` 必须是去专名后的抽象机制，不得留到 Stage 7 再逐块调用模型。
 
 ### Stage 4–6：先事实，后机制
 

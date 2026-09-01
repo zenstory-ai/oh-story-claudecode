@@ -64,9 +64,28 @@ STRUCTURE_BLOCK_COLUMNS = (
     "description_density",
     "relationship_delta",
     "rhythm_anchors",
+    "inspiration_title",
+    "inspiration_mechanism",
+    "inspiration_reader_effect",
+    "inspiration_transfer_boundary",
+    "inspiration_risk",
     "confidence",
     "status",
 )
+INSPIRATION_INDEX_COLUMNS = (
+    "item_id",
+    "layer",
+    "title",
+    "source_book",
+    "path",
+    "source_ids",
+    "novel_count",
+    "atom_count",
+    "tags",
+    "status",
+)
+
+
 @dataclass(frozen=True)
 class ContractManifest:
     manifest_version: int
@@ -1344,6 +1363,7 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
         (r"structure_blocks\.csv", "analyze-structure-blocks", "long analysis must persist semantic structure blocks"),
         (r"relationship_delta", "analyze-relationship-delta", "structure blocks must retain relationship state transitions from the first semantic read"),
         (r"rhythm_anchors", "analyze-rhythm-anchors", "structure blocks must retain verified rhythm anchors from the first semantic read"),
+        (r"inspiration_mechanism", "analyze-inspiration-fields", "structure blocks must retain pre-abstracted inspiration fields from the first semantic read"),
         (r"六维拆书\.md[^\n]{0,120}(?:自包含|完整)", "analyze-self-contained-six-dimension", "六维拆书.md must be a self-contained global analysis"),
         (r"_progress\.json", "analyze-json-progress", "long analysis must use the JSON checkpoint"),
         (r"_state_snapshot\.json", "analyze-json-snapshot", "long analysis must use the JSON state snapshot"),
@@ -1359,10 +1379,34 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
     ):
         findings.extend(require_pattern(runtime_guard, pattern, code, message))
 
+    inspiration = repo_root / "skills/story-inspiration-distill/SKILL.md"
+    inspiration_contract = repo_root / "skills/story-inspiration-distill/references/inspiration-contract.md"
+    expected_inspiration_header = ",".join(INSPIRATION_INDEX_COLUMNS)
+    for pattern, code, message in (
+        (r"禁止读取[^\n]*原文/[^\n]*chapter_index\.csv", "inspiration-no-raw-reread", "inspiration distillation must not reread raw text or the chapter index"),
+        (r"render-atoms", "inspiration-mechanical-render", "inspiration atoms must be rendered mechanically from structure blocks"),
+        (r"第二次语义读取|二次语义读取", "inspiration-no-second-semantic-pass", "inspiration distillation must forbid a second semantic pass over structure blocks"),
+        (r"原子灵感", "inspiration-atom-layer", "inspiration library must define the atom layer"),
+        (r"单小说灵感合并", "inspiration-novel-merge-layer", "inspiration library must define the single-novel merge layer"),
+        (r"跨书灵感聚合", "inspiration-cross-book-layer", "inspiration library must define the cross-book aggregation layer"),
+        (re.escape(expected_inspiration_header), "inspiration-index-header", "inspiration library must pin its exact public index header"),
+        (r"tags`?\s*留空", "inspiration-tags-cba-only", "IA and NM public tags must remain empty"),
+    ):
+        findings.extend(require_pattern(inspiration, pattern, code, message))
+    for axis in ("题材", "读者需求", "情绪", "剧情功能", "适用阶段", "风险"):
+        findings.extend(
+            require_pattern(
+                inspiration_contract,
+                re.escape(axis),
+                "inspiration-required-tag-axis",
+                "CBA tag contract must include {}".format(axis),
+            )
+        )
     explorer = repo_root / "skills/story-setup/references/templates/agents/story-explorer.md"
     findings.extend(require_pattern(explorer, r"missing_primary_contract", "explorer-primary-failure", "story-explorer must fail closed on missing current benchmark artifacts"))
     findings.extend(require_pattern(explorer, r"repair_action", "explorer-repair-action", "story-explorer must return an explicit repair action"))
     findings.extend(require_pattern(explorer, r"structure_blocks\.csv", "explorer-structure-blocks", "story-explorer must select a semantic structure block before locating raw text"))
+    findings.extend(require_pattern(explorer, r"layer=跨书灵感聚合|active CBA", "explorer-cba-query", "story-explorer must retrieve only active CBA cards"))
 
     long_write = repo_root / "skills/story-long-write/SKILL.md"
     for artifact in manifest.primary_benchmark_artifacts:
@@ -1374,6 +1418,7 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
                 "long writing must require {}".format(artifact),
             )
         )
+    findings.extend(require_pattern(long_write, r"Top 3[–-]8", "long-write-cba-budget", "long writing must bound public inspiration retrieval to Top 3-8"))
     findings.extend(require_pattern(long_write, r"设定/文风\.md[^\n]{0,80}(?:优先级最高|最高优先级)", "long-write-custom-style-priority", "custom project style must remain highest priority"))
     findings.extend(require_pattern(long_write, r"chapter_index\.csv[^\n]{0,100}(?:只负责|定位)", "long-write-index-locator-only", "long writing must use the chapter index only for raw-source location"))
 
@@ -1719,6 +1764,11 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
             "emotion_type",
             "relationship_delta",
             "rhythm_anchors",
+            "inspiration_title",
+            "inspiration_mechanism",
+            "inspiration_reader_effect",
+            "inspiration_transfer_boundary",
+            "inspiration_risk",
         ):
             if not (row.get(field) or "").strip():
                 findings.append(

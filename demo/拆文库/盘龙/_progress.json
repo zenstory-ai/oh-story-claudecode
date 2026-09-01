@@ -14,12 +14,12 @@
   "pending_ranges": [],
   "artifact_checksums": {
     "chapter_index.csv": "91e25ad2d56f092200271f998fc0795d998791686074842373778745040a9556",
-    "structure_blocks.csv": "e3a48b17d8a7de40112047bbd712dbf1b152785fc19e7d173a3424f942aa051b",
+    "structure_blocks.csv": "22d457c6b6a334279a47238384ab82ec8bb4b7998d8c7b26628c795eb50092a7",
     "全局分析/六维拆书.md": "120a9f11f0e86be163e94f45121eddc3d4b751e94b3036303f7593ca780b1834",
     "全局分析/爆款机制.md": "ca25c92fd515cdf05926554515ce92e3c0d9571d28afb1909c059e79627abc26",
     "全局分析/证据与边界.md": "7bd47b0afb49a0f00a88ac1f8aef88bc2c7ebb227ac05f0867f5b9451a57dedb"
   },
   "failed_ranges": [],
   "retry_reasons": [],
-  "next_action": "completed"
+  "next_action": "optional_story_inspiration_distill"
 }
