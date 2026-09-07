@@ -15,6 +15,8 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 > Stage 2 是确定性机械步骤，不调用模型或子代理。Stage 3–6 如需并行，只把一个明确结构块和固定输出 schema 交给一个子代理；支持历史分叉参数的运行时必须使用 `fork_turns=none`，不得复制主会话历史。完整运行纪律见 `/story-runtime-guard`；该守卫不可用时，仍执行本文件的同等硬约束。
 >
 > Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 30` 不一致时（标记缺失、字段缺失/非整数、小于或大于 30）**照常按文件存在性检查并 spawn**，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 30）` 并提示重新运行 `/story-setup` 后新开会话；大于 30 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct；该降级只涉及 Stage 3–6 的语义 worker，Stage 2 始终只运行确定性脚本，不依赖任何 agent。
+>
+> 检测到 `.zcode/`（ZCode 3.3.4）时，因其不执行项目 custom agents，Stage 3–6 的语义工作直接降级为 solo/direct，并报告 `Fallback: project custom agents unavailable -> solo`；Stage 2 仍只运行确定性脚本。
 
 ## 拆解边界声明
 

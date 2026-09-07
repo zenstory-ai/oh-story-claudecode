@@ -172,11 +172,11 @@ steps: 15
    - 任一主契约缺失时保留已读来源后直接返回；不得从概要、黄金三章或索引伪造权威机制/节奏
 6. **读取结构块（权威语义范围）**：
    - `Read {对标书路径}/structure_blocks.csv`
-   - 缺失或无法解析 header 时返回 `gaps.missing_primary_contract: true`、`gaps.structure_blocks_missing: true`，修复动作指向 Stage 3
+   - 缺失或无法解析 header 时返回 `gaps.missing_primary_contract: true`、`gaps.structure_blocks_missing: true`，并用 `gaps.repair_action` 指向 `/story-long-analyze` Stage 3
    - 按本章功能、目标情绪、剧情/情绪强度、描写密度与机制接近度选择一个块
 7. **读取五列机械索引**：
    - `Read {对标书路径}/chapter_index.csv`
-   - header 必须恰为 `chapter,title,source_locator,char_count,status`；否则返回 `chapter_index_missing` 并指向 Stage 2
+   - header 必须恰为 `chapter,title,source_locator,char_count,status`；文件缺失、无法读取或 header 不匹配时返回 `gaps.chapter_index_missing: true`、`gaps.missing_primary_contract: true`，并用 `gaps.repair_action` 指向 `/story-long-analyze` Stage 2
 8. **匹配章节**：把选中块的章号范围映射到索引行；按 `char_count` 接近目标字数、章节号稳定排序选 K。索引标题不参与语义判断；原文核证不匹配时换同块下一章
 9. **原文定位验证**：读取选中行 `source_locator`；路径不存在、越出该书 `原文/` 或内容为空时返回 `gaps.raw_text_unavailable: true` 并停止
 10. **跨书补充**：按长篇写作的多对标召回规则，最多读取 2 本副对标的三个全局文件，各选 1 个补充机制；不读取副对标结构块、索引或原文
