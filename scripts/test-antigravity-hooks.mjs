@@ -41,10 +41,8 @@ function invoke(event, input, shell = false) {
   const handlers = entry.hooks || [entry]
   assert.equal(handlers.length, 1, `${event}: expected one registered handler`)
   const { command } = handlers[0]
-  // Exercise actual registration, not a reconstructed argv that hides quoting bugs.
-  // Shell execution follows the documented command contract. Literal whitespace
-  // tokenization additionally locks portability to hosts that forward quote chars;
-  // it is a compatibility probe, not an emulation of Antigravity's private parser.
+  // Test the registered command through a shell and with quotes preserved in argv.
+  // Literal splitting probes compatibility; it does not model the IDE's parser.
   const [program, ...args] = command.trim().split(/\s+/)
   const result = spawnSync(shell ? command : program, shell ? [] : args, {
     shell,
