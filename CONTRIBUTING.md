@@ -215,7 +215,7 @@ Claude Code 与 ZCode 都发布单一 `oh-story` bundle，bundle 从仓库根暴
 5. `reasonix-plugin.json`
 6. `skills/story/VERSION`
 
-Claude 根 manifest 依赖默认目录发现 `skills/`，不得在 catalog 条目或 `.claude-plugin/plugin.json` 写 `skills`、`agents`、`hooks`、`commands` 过滤器；ZCode 原生 manifest 保持 `skills: "skills"`，其 Commands/Hooks 另由既有 ZCode guard 校验。本次 `0.7.9` 同版本打包修复需要用户刷新 catalog 并重装，不能保证在下一个发布版本前自动更新；不 bump `agents_version`，也不单独写 CHANGELOG。跨运行时兼容采用[升级指南](skills/story-setup/UPGRADING.md#插件打包身份迁移v079-同版本修复)中的显式迁移，不依赖 Claude 可选 rename。
+Claude 根 manifest 依赖默认目录发现 `skills/`，不得在 catalog 条目或 `.claude-plugin/plugin.json` 写 `skills`、`agents`、`hooks`、`commands` 过滤器；ZCode 原生 manifest 保持 `skills: "skills"`，其 Commands/Hooks 另由既有 ZCode guard 校验。同版本打包修复的迁移步骤见[升级指南](skills/story-setup/UPGRADING.md#插件打包身份迁移v079-同版本修复)。
 
 检查步骤：
 
@@ -227,7 +227,7 @@ CLAUDE_REAL_CHECK=1 bash scripts/check-claude-adapter.sh  # 可选：隔离 HOME
 bash scripts/check-zcode-adapter.sh
 ```
 
-格式与命令以 [Claude Code 插件参考](https://code.claude.com/docs/en/plugins-reference)和 [ZCode 插件文档](https://zcode.z.ai/en/docs/plugin)为准。真实 CLI 测试只证明其隔离 fixture 覆盖的安装/更新/卸载结构，不代表 ZCode Desktop 的历史缓存生命周期已被自动修复。
+格式与命令以 [Claude Code 插件参考](https://code.claude.com/docs/en/plugins-reference)和 [ZCode 插件文档](https://zcode.z.ai/en/docs/plugin)为准。生命周期脚本覆盖 Claude CLI；ZCode Desktop 的迁移需在对应桌面版本验证。
 
 ## OpenCode 模板同步
 

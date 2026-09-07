@@ -9,7 +9,7 @@
 
 ## 插件打包身份迁移（v0.7.9 同版本修复）
 
-本节只处理 Claude Code / ZCode marketplace 的旧安装记录，不要求删除作者项目、小说正文或 story-setup 部署物；卸载前先备份需要保留的插件持久化数据。13 个 Skills 没有删除；`npx skills add zenstory-ai/oh-story-claudecode` 路径也不受影响。由于修复前后版本都为 `0.7.9`，旧记录不会被此修复自动治愈，也不能保证客户端在下一个发布版本前自动更新，须显式迁移。
+Claude Code / ZCode 市场改为单一 `oh-story` 插件，仍包含全部 13 个 Skills。此修复仍为 `0.7.9`，旧插件用户需手动迁移；`npx skills` 安装无需迁移。卸载前备份要保留的插件数据，以下操作仅针对旧插件记录，保留写作项目及 story-setup 部署文件。
 
 ### Claude Code
 
@@ -37,13 +37,13 @@
    story-short-write@oh-story-skills
    ```
 
-2. **刷新 catalog 前**，逐个卸载实际存在的旧 ID，并使用列表中原有的 `user`、`project` 或 `local` scope。示例只演示一个 user-scope 记录，不要写成全量清理脚本：
+2. **刷新 catalog 前**，逐个卸载实际存在的旧 ID，并使用列表中原有的 `user`、`project` 或 `local` scope。以下以 user-scope 的 `story` 插件为例：
 
    ```bash
    claude plugin uninstall story@oh-story-skills --scope user --keep-data
    ```
 
-   `--keep-data` 保留该旧插件身份的数据，但不会把它迁移到新的 `oh-story` 身份。不要卸载其他 marketplace 的插件，不要删除作者项目或持久化创作数据。同一旧 ID 若出现在多个 scope，每个 scope 分别执行。
+   `--keep-data` 保留该旧插件身份的数据，但不会把它迁移到新的 `oh-story` 身份。同一旧 ID 若出现在多个 scope，每个 scope 分别执行。
 
 3. 所有实际旧身份卸载完后，刷新已有 catalog；若本机尚未添加该 catalog，则添加仓库：
 
@@ -59,11 +59,11 @@
    claude plugin install oh-story@oh-story-skills --scope user
    ```
 
-5. 新开 Claude Code 会话，使用 `/oh-story:story-setup` 或 `/oh-story:story dashboard`。本次跨运行时修复采用显式迁移；不依赖可选的自动 rename。命令与 manifest 格式见 [Claude Code 插件参考](https://code.claude.com/docs/en/plugins-reference)。
+5. 新开 Claude Code 会话，使用 `/oh-story:story-setup` 或 `/oh-story:story dashboard`。命令与 manifest 格式见 [Claude Code 插件参考](https://code.claude.com/docs/en/plugins-reference)。
 
 ### ZCode
 
-先备份需要保留的受影响插件数据，再使用 Plugin Management 支持的 UI 操作：定向卸载旧版显示的受影响条目，刷新 marketplace；必要时移除后重新添加本仓库，再只安装一个 `oh-story`。核对界面中原有的市场名：不同导入路径可能显示 `oh-story-skills` 或 `oh-story-zcode`，保留其中一个，不要为迁移重复注册/安装另一份。不要手改未公开的 ZCode 缓存 JSON，也不要清空无关插件、作者项目或持久化数据。若 UI 定向卸载后故障记录仍持续，保留备份并附 ZCode 版本与界面现象向官方支持报告；不要用删除全部缓存代替修复。格式与支持面见 [ZCode 插件文档](https://zcode.z.ai/en/docs/plugin)。
+在 Plugin Management 中卸载受影响的旧条目，刷新市场；必要时重新添加本仓库，再安装一个 `oh-story`。沿用界面中的市场名（`oh-story-skills` 或 `oh-story-zcode`），避免重复安装。若无法卸载，保留数据备份，附 ZCode 版本与界面现象联系官方支持，不要清空全部缓存或手改缓存 JSON。操作说明见 [ZCode 插件文档](https://zcode.z.ai/en/docs/plugin)。
 
 ## 升级策略
 

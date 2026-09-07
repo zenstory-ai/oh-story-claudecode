@@ -115,7 +115,7 @@ claude plugin marketplace add https://github.com/zenstory-ai/oh-story-claudecode
 claude plugin install oh-story@oh-story-skills
 ```
 
-安装后使用 `/oh-story:story-setup`、`/oh-story:story dashboard` 等带 bundle 命名空间的命令。曾从旧 catalog 安装独立插件的用户须按[升级指南的插件身份迁移](skills/story-setup/UPGRADING.md#插件打包身份迁移v079-同版本修复)先卸载实际旧身份，再刷新 catalog、安装 bundle；不要清空其他插件或作者项目。此修复仍是 `0.7.9`，因此需要主动刷新并重装，不能保证客户端在下一个发布版本前自动更新。命令详见 [Claude Code 插件参考](https://code.claude.com/docs/en/plugins-reference)。
+安装后使用 `/oh-story:story-setup`、`/oh-story:story dashboard` 等命令。旧插件用户按[升级指南](skills/story-setup/UPGRADING.md#插件打包身份迁移v079-同版本修复)迁移；此修复仍为 `0.7.9`，需主动刷新市场并重装。命令详见 [Claude Code 插件参考](https://code.claude.com/docs/en/plugins-reference)。
 
 **Antigravity 用户：** 先用 `/skills` 或自然语言运行 `story-setup`，选择 `target_cli=antigravity`。它只在当前写作项目创建/更新 13 个 `.agents/skills/` 已知目录、7 个 `.agents/agents/agent-name/agent.md` 已知定义（`agent-name` 替换为实际名称）、`.agents/rules/oh-story.md`、两个 `.agents/hooks/` runtime 文件与 `.agents/hooks.json` 的 `oh-story` 管理组；其他用户 Skills、Agents、Rules、Hooks 和 hook groups 都保留，部署器本身不会写 `~/.gemini/`。项目内 Skills 使用真实目录；若 `.agents/skills` 已是 symlink，会先解释 git diff 并征求明确迁移同意，未同意绝不沿链接写入。Hook 依赖 PATH 中的 `node`；部署后新开 conversation，再分别在 IDE 与交互式 `agy` 中 smoke test。**`agy 1.1.22 -p` 暂不在支持面内**：每次 headless 进程都可能在静默鉴权完成前扫描 workspace，鉴权后又不重载 custom agents/hooks，导致 skill 回退、`subagent not found`，甚至把普通模型输出写到 `~/.gemini/antigravity-cli/scratch/`。命令行写作请从项目目录启动交互式 `agy`，确认 `/skills`、`/agents`、`/hooks` 已发现 oh-story 后再发任务；测试后检查 scratch 没有意外小说产物。
 
@@ -123,7 +123,7 @@ claude plugin install oh-story@oh-story-skills
 
 跑 `$story-setup` 部署到写作项目后，会写入 `.codex/agents/*.toml`、`.codex/hooks.json`、`.codex/hooks/{story_codex_hook.py,run-story-hook.sh,run-story-hook.cmd}` 和 `.codex/skills/story-setup/references/agent-references/`；请信任项目 `.codex/` 配置层并在 `/hooks` review/trust hooks、新开 Codex 会话，让 custom agents 生效。
 
-**ZCode 用户：** 在 Plugin Management 中把本仓库加入 marketplace；根 catalog 名保持 `oh-story-zcode`，其中只有一个与原生 manifest 同名同版本的 `oh-story` bundle。不同导入路径也可能读取 Claude catalog，界面显示 `oh-story-skills`；两者提供同一 bundle，只使用已选中的一个市场，不要重复注册或安装两份。安装后可用 `$story`、`$story-setup` 或 `/` 面板调用 13 个 Skills/Commands。旧版曾显示多个受影响条目时，按[升级指南的插件身份迁移](skills/story-setup/UPGRADING.md#插件打包身份迁移v079-同版本修复)在 UI 中定向卸载后刷新/重加仓库，只安装一个 `oh-story`；不要手改未公开的缓存 JSON。`$story-setup` 选择 `target_cli=zcode` 会部署 `.zcode/skills/`、`.zcode/commands/`、`.zcode/hooks/story_zcode_hook.js`，安全合并 `.zcode/config.json` 与根 `AGENTS.md`；Hook 依赖 PATH 中的 `node`。ZCode 3.3.4 不执行项目/plugin custom agents，也没有 `PreCompact` / `SessionEnd`，相关流程会明确降级 solo/direct，compact 后由 `SessionStart` 恢复上下文。插件格式见 [ZCode 官方文档](https://zcode.z.ai/en/docs/plugin)。
+**ZCode 用户：** 在 Plugin Management 中添加本仓库，安装 `oh-story`，即可调用全部 13 个 Skills/Commands。市场名可能显示 `oh-story-zcode`（根 catalog）或 `oh-story-skills`（Claude catalog）；选择其中一个即可，内容相同。旧版多条目安装按[升级指南](skills/story-setup/UPGRADING.md#插件打包身份迁移v079-同版本修复)迁移。`$story-setup` 选择 `target_cli=zcode` 会部署 `.zcode/skills/`、`.zcode/commands/`、`.zcode/hooks/story_zcode_hook.js`，安全合并 `.zcode/config.json` 与根 `AGENTS.md`；Hook 依赖 PATH 中的 `node`。ZCode 3.3.4 不执行项目/plugin custom agents，也没有 `PreCompact` / `SessionEnd`，相关流程会明确降级 solo/direct，compact 后由 `SessionStart` 恢复上下文。插件格式见 [ZCode 官方文档](https://zcode.z.ai/en/docs/plugin)。
 
 **OpenCode 用户：** 全局安装后 opencode 自动从 `~/.claude/skills/` 发现 skills；首次用自然语言触发 story-setup（如「用 story-setup 部署网文写作环境」），**部署后退出重进 `opencode -c`** 才能用 slash command。部分 hook 行为与 Claude Code 有差异（session-start / session-end / compact 等），详见 [CONTRIBUTING.md](CONTRIBUTING.md) 的 OpenCode 章节。
 
