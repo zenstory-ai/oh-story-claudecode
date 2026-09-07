@@ -217,6 +217,8 @@ bash scripts/check-opencode-adapter.sh
 bash scripts/test-opencode-cli-e2e.sh  # 可选：需要本机已安装 opencode
 ```
 
+权限语义以 Claude 真源的 `tools` / `disallowedTools` 为准：Codex 只读 sandbox 与 OpenCode 创建文件权限从有效能力推导，不按 agent 名字特判。平台工具映射和研究 fallback 保留各端实现。生成器支持行内数组（如 `[Read, Glob, Grep]`，项可加成对引号），其他声明格式报错，不静默当作空权限。Antigravity 没有可映射的有效工具时拒绝生成，不放宽权限。回归命令：`python3 scripts/test-agent-permissions.py`。
+
 脚本会：
 1. 将 `templates/agents/` 下的 Claude Code agent 转换为 opencode 格式，写入 `opencode/agents/`
 2. 将 `CLAUDE.md.tmpl` 复制到 `opencode/AGENTS.md.tmpl`，替换 `.claude/` 路径引用

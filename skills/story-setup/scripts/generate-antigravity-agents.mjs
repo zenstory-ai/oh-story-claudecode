@@ -22,6 +22,8 @@ const TOOL_MAP = new Map([
   ["Edit", ["replace_file_content", "multi_replace_file_content"]],
   ["Bash", ["run_command"]],
 ])
+const CAPABILITY_FIELDS = new Set(["tools", "disallowedTools"])
+const CAPABILITY_NAME_RE = /^[A-Za-z][A-Za-z0-9_-]*$/
 
 function fail(message) {
   process.stderr.write(`generate-antigravity-agents: ${message}\n`)
@@ -63,10 +65,38 @@ function parseFrontmatter(text, source) {
       }
       data[key] = block.join("\n").trim()
     } else {
-      data[key] = rawValue.trim().replace(/^['"]|['"]$/g, "")
+      const value = rawValue.trim()
+      data[key] = CAPABILITY_FIELDS.has(key)
+        ? value
+        : value.replace(/^['"]|['"]$/g, "")
     }
   }
   return { data, body }
+}
+
+function parseCapabilityList(value, field, source) {
+  if (value === undefined) return []
+  if (!value) fail(`${source}: ${field}: empty or block-style capability declarations are unsupported`)
+  const match = String(value).match(/^\[\s*(.*?)\s*\]$/)
+  if (!match) fail(`${source}: ${field}: expected an inline list like [Read, Glob]`)
+  if (!match[1].trim()) return []
+  return match[1].split(",").map((rawItem) => {
+    let item = rawItem.trim()
+    if (!item) fail(`${source}: ${field}: empty capability-list item`)
+    if (item[0] === '"' || item[0] === "'") {
+      const quote = item[0]
+      if (item.length < 2 || item.at(-1) !== quote || item.slice(1, -1).includes(quote)) {
+        fail(`${source}: ${field}: malformed quoted capability ${JSON.stringify(item)}`)
+      }
+      item = item.slice(1, -1)
+    } else if (item.includes('"') || item.includes("'")) {
+      fail(`${source}: ${field}: malformed quoted capability ${JSON.stringify(item)}`)
+    }
+    if (!CAPABILITY_NAME_RE.test(item)) {
+      fail(`${source}: ${field}: invalid capability name ${JSON.stringify(item)}`)
+    }
+    return item
+  })
 }
 
 function parseInlineList(value) {
@@ -130,8 +160,10 @@ function renderAgent(sourceFile) {
     fail(`${sourceFile}: unsafe or mismatched agent name ${JSON.stringify(name)}`)
   }
   if (!data.description) fail(`${sourceFile}: missing description`)
-  const sourceTools = parseInlineList(data.tools)
-  const tools = [...new Set(sourceTools.flatMap((tool) => TOOL_MAP.get(tool) || []))]
+  const sourceTools = parseCapabilityList(data.tools, "tools", sourceFile)
+  const deniedTools = new Set(parseCapabilityList(data.disallowedTools, "disallowedTools", sourceFile))
+  const effectiveSourceTools = sourceTools.filter((tool) => !deniedTools.has(tool))
+  const tools = [...new Set(effectiveSourceTools.flatMap((tool) => TOOL_MAP.get(tool) || []))]
   if (!tools.length) fail(`${sourceFile}: no supported Antigravity tools mapped`)
   const sourceModel = String(data.model || "").toLowerCase()
   const model = sourceModel === "haiku" ? "flash" : "pro"

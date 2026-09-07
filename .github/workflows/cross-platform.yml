@@ -29,6 +29,8 @@ jobs:
         run: bash scripts/check-current-skill-contracts.sh
       - name: Current-only skill contract regression
         run: python3 scripts/test-current-skill-contracts.py
+      - name: Agent permission behavior regression
+        run: python3 scripts/test-agent-permissions.py
       - name: Check hot-path doc budget
         run: bash scripts/check-doc-budget.sh
       - name: Check hook-regex sync
