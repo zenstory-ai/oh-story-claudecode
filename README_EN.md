@@ -1,4 +1,4 @@
-<!-- Last synced with README.md: 2026-08-30 -->
+<!-- Last synced with README.md: 2026-09-07 -->
 
 **English** | [中文](README.md)
 
@@ -103,10 +103,21 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 
 `-g` installs globally (available in every directory); drop `-g` to install only into the current directory. Re-run the same command to update.
 
+This standalone `npx skills` installation path does not use the Claude Code or ZCode marketplace, so the plugin identity change below does not affect it.
+
 On Windows you may occasionally see an `ENOENT ... mkdir` error while the run still ends with `Done!`. That means a skill was only partially installed. If a whole subdirectory of story-setup's reference bundle is missing, `/story-setup` reports an incomplete reference bundle; other forms of partial install may go unreported. Either way, re-run the same install command to fix it.
 
 <details>
-<summary>Antigravity / Codex / ZCode / OpenCode / OpenClaw / Reasonix / Web AI usage notes</summary>
+<summary>Claude Code / Antigravity / Codex / ZCode / OpenCode / OpenClaw / Reasonix / Web AI usage notes</summary>
+
+**Claude Code users:** The marketplace remains named `oh-story-skills`, but now contains one `oh-story` bundle. Claude Code discovers all 13 root Skills from that bundle:
+
+```bash
+claude plugin marketplace add https://github.com/zenstory-ai/oh-story-claudecode
+claude plugin install oh-story@oh-story-skills
+```
+
+After installation, use `/oh-story:story-setup` or `/oh-story:story dashboard`. Existing plugin users should follow the [migration guide](skills/story-setup/UPGRADING.md#插件打包身份迁移v079-同版本修复). This fix remains at `0.7.9`, so refresh the marketplace and reinstall explicitly. See the [Claude Code plugin reference](https://code.claude.com/docs/en/plugins-reference) for commands.
 
 **Antigravity users:** Run `story-setup` from `/skills` or by natural language and select `target_cli=antigravity`. Inside the current writing project it updates only 13 known `.agents/skills/` directories, 7 known `.agents/agents/agent-name/agent.md` definitions (`agent-name` stands for the actual name), `.agents/rules/oh-story.md`, two `.agents/hooks/` runtime files, and the managed `oh-story` group in `.agents/hooks.json`. Other user Skills, Agents, Rules, Hooks, and hook groups are preserved; the deployer itself never writes `~/.gemini/`. Skills are real project-local directories. If `.agents/skills` is already a symlink, setup explains the git-diff impact and requires explicit migration approval; without approval it never writes through the link. Hooks require `node` on PATH. Open a fresh conversation after deployment, then smoke-test both the IDE and interactive `agy`. **`agy 1.1.22 -p` is currently outside the supported surface:** each headless process may scan the workspace before silent authentication finishes, then fail to reload custom agents and hooks. The result can be a skill fallback, `subagent not found`, or ordinary model output under `~/.gemini/antigravity-cli/scratch/`. For CLI writing, start interactive `agy` from the project and confirm `/skills`, `/agents`, and `/hooks` have discovered oh-story before sending the task; check the scratch directory for accidental story output after testing.
 
@@ -114,7 +125,7 @@ On Windows you may occasionally see an `ENOENT ... mkdir` error while the run st
 
 After `$story-setup` deploys into a writing project, it creates `.codex/agents/*.toml`, `.codex/hooks.json`, `.codex/hooks/{story_codex_hook.py,run-story-hook.sh,run-story-hook.cmd}`, and `.codex/skills/story-setup/references/agent-references/`. Trust the project `.codex/` layer, review/trust hooks in `/hooks`, and open a fresh Codex session so custom agents load.
 
-**ZCode users:** Add this repository as a marketplace in Plugin Management and install `oh-story`; then invoke the 13 Skills/Commands through `$story`, `$story-setup`, or the `/` panel. With `target_cli=zcode`, `$story-setup` deploys `.zcode/skills/`, `.zcode/commands/`, and `.zcode/hooks/story_zcode_hook.js`, then safely merges `.zcode/config.json` and the root `AGENTS.md`. Hooks require `node` on PATH. ZCode 3.3.4 does not execute project/plugin custom agents and has no `PreCompact` or `SessionEnd`; affected workflows report a solo/direct fallback, while `SessionStart` restores context after compaction.
+**ZCode users:** Add this repository in Plugin Management and install `oh-story` to access all 13 Skills/Commands. The marketplace may appear as `oh-story-zcode` (root catalog) or `oh-story-skills` (Claude catalog); choose one, since both contain the same bundle. For older installs with multiple entries, follow the [migration guide](skills/story-setup/UPGRADING.md#插件打包身份迁移v079-同版本修复). With `target_cli=zcode`, `$story-setup` deploys `.zcode/skills/`, `.zcode/commands/`, and `.zcode/hooks/story_zcode_hook.js`, then safely merges `.zcode/config.json` and the root `AGENTS.md`. Hooks require `node` on PATH. ZCode 3.3.4 does not execute project/plugin custom agents and has no `PreCompact` or `SessionEnd`; affected workflows report a solo/direct fallback, while `SessionStart` restores context after compaction. See the [official ZCode plugin documentation](https://zcode.z.ai/en/docs/plugin).
 
 **OpenCode users:** After global install, opencode auto-discovers skills from `~/.claude/skills/`; trigger story-setup with natural language on first use (e.g., "use story-setup to deploy the web novel environment"), then **exit and re-enter with `opencode -c`** for slash commands to work. Some hook behaviors differ from Claude Code (session-start / session-end / compact, etc.) — see the OpenCode section in [CONTRIBUTING.md](CONTRIBUTING.md).
 

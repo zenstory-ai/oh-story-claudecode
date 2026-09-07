@@ -22,7 +22,8 @@
 | `check-hook-regex-sync.sh` | `detect-story-gaps.sh` 伏笔状态检测行为 | CI |
 | `check-hook-locale-safety.sh` | 部署 hook 在 Windows 中文 GBK 区域的字节安全 | CI |
 | `check-python-invocation.sh` | 技能文档禁止裸调 `python3`（须 python3→python→py 探测） | CI |
-| `check-claude-adapter.sh` | Claude marketplace 与 13 个 skill 的一一映射；可选真实 CLI strict validate | CI（静态）；`CLAUDE_REAL_CHECK=1`（真实 CLI） |
+| `check-plugin-packaging.py` | Claude/ZCode 两个 catalog 与两个原生 manifest 的单 bundle 身份、版本、默认组件发现和 13 个根 Skills | CI；改 plugin packaging 后 |
+| `check-claude-adapter.sh` | Claude marketplace、根 plugin manifest 与 13 个 skill 自动发现；可选真实 CLI 生命周期 | CI（静态）；`CLAUDE_REAL_CHECK=1`（真实 CLI） |
 | `check-opencode-adapter.sh` | OpenCode 适配层同步 + commands/agents/config 结构 + plugin 行为回归 | CI + sync CI（调 sync-opencode.py） |
 | `check-openclaw-skills.sh` | OpenClaw AgentSkills/frontmatter 兼容性 | CI |
 | `check-codex-adapter.sh` | Codex 适配层：repo skills symlink、agent TOML、hooks 与跨平台 launcher | CI（调 generate-codex-agents.py 验生成确定性） |
@@ -52,6 +53,8 @@
 | `test-codex-hooks.sh` | Codex hook 合成 stdin/stdout 契约 | CI |
 | `test-static-check.py` | 真 frontmatter block、精确路径/锚点、跨 Skill 引用、fence、死 reference、Agent 与章节链接 fixture | CI |
 | `test-current-skill-contracts.py` | current-contract manifest 类型/固定值与主产物 fail-fast 语义 fixture | CI |
+| `test-plugin-packaging.py` | 执行公开 packaging CLI，在临时仓库中变异 catalog/manifest/版本/组件过滤并断言结构化失败 | CI |
+| `test-claude-plugin-lifecycle.py` | 隔离 HOME 后用真实 Claude CLI 演练 13 个旧身份迁移为单 bundle、更新/卸载及无关插件保留 | `CLAUDE_REAL_CHECK=1`，由 `check-claude-adapter.sh` 调用 |
 | `test-shared-assets.py` | 共享资产 manifest 的 drift、sync、路径越界、basename 单一 owner 与未登记重复检测 | CI |
 | `test-shared-references.py` | reference manifest 的别名、目录组、drift/sync、未登记副本与 Agent 消费链回归 | CI |
 | `test-normalize-punctuation.js` | 标点归一化的只读检查、frontmatter/fence、CRLF、引号模式与幂等性 | CI |

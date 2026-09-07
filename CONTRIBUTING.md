@@ -78,7 +78,9 @@ PR 自动运行 `.github/workflows/cross-platform.yml`。static-check job 跑以
 - `scripts/check-scan-runtime-policy.sh` — scraper 本地日期依赖与 CDP 源码策略守卫
 - `python3 scripts/test-scan-runtime-policy.py` — 验证无关/死代码关键词不能骗过 scan/browser 策略守卫
 - `scripts/check-story-setup-deployment.sh` — story-setup 部署完整性
-- `scripts/check-claude-adapter.sh` — Claude marketplace 与 skill 映射检查
+- `python3 scripts/check-plugin-packaging.py` — Claude/ZCode catalog、原生 manifest、统一 bundle 身份、版本与 13 个根 Skills 检查
+- `python3 scripts/test-plugin-packaging.py` — 通过公开 CLI 对 catalog/manifest 做黑盒变异回归
+- `scripts/check-claude-adapter.sh` — Claude marketplace、根 plugin manifest 与 13 个 skill 自动发现检查；可选真实 CLI 生命周期
 - `scripts/check-opencode-adapter.sh` — OpenCode adapter 同步、commands/agents/config 结构与 plugin 真实行为检查
 - `scripts/check-openclaw-skills.sh` — OpenClaw 单行 frontmatter、`metadata.openclaw` 与可选真实 CLI 发现检查
 - `scripts/check-codex-adapter.sh` — Codex repo skills symlink、custom-agent TOML、hook 生成确定性与 launcher 契约
@@ -124,6 +126,8 @@ bash scripts/test-story-continuity.sh
 python3 scripts/test-storyctl.py
 python3 scripts/test-author-memory-commit.py
 bash scripts/check-story-setup-deployment.sh
+python3 scripts/check-plugin-packaging.py
+python3 scripts/test-plugin-packaging.py
 bash scripts/check-claude-adapter.sh
 bash scripts/check-codex-adapter.sh
 bash scripts/check-opencode-adapter.sh
@@ -197,6 +201,33 @@ fork → branch → commit → PR → review → merge
 - 一个 PR 聚焦一个改动
 - commit message 用中文，格式：`类型: 简短描述`
 - 类型：`feat`（新增）/ `fix`（修复）/ `docs`（文档）/ `refactor`（重构）
+
+## Plugin 打包与版本锚点
+
+Claude Code 与 ZCode 都发布单一 `oh-story` bundle，bundle 从仓库根暴露全部 13 个 Skills；不要恢复按 Skill 拆成 13 个 catalog 条目的旧结构。两个 marketplace 自身的名字按平台保持不同：Claude 为 `oh-story-skills`，ZCode 根 catalog 为 `oh-story-zcode`。两边 catalog 都只能有一个 `name: oh-story`、`source: ./` 的条目，其版本须与对应原生 manifest 一致。
+
+发版版本共有 6 个 JSON/VERSION 文件锚点，必须同步：
+
+1. `.claude-plugin/marketplace.json`（`metadata.version` 与唯一条目的 `version`）
+2. `.claude-plugin/plugin.json`
+3. `marketplace.json`（`plugins[0].version`；顶层 `version: 1` 是 schema 版本，不随发布改动）
+4. `.zcode-plugin/plugin.json`
+5. `reasonix-plugin.json`
+6. `skills/story/VERSION`
+
+Claude 根 manifest 依赖默认目录发现 `skills/`，不得在 catalog 条目或 `.claude-plugin/plugin.json` 写 `skills`、`agents`、`hooks`、`commands` 过滤器；ZCode 原生 manifest 保持 `skills: "skills"`，其 Commands/Hooks 另由既有 ZCode guard 校验。同版本打包修复的迁移步骤见[升级指南](skills/story-setup/UPGRADING.md#插件打包身份迁移v079-同版本修复)。
+
+检查步骤：
+
+```bash
+python3 scripts/check-plugin-packaging.py
+python3 scripts/test-plugin-packaging.py
+bash scripts/check-claude-adapter.sh
+CLAUDE_REAL_CHECK=1 bash scripts/check-claude-adapter.sh  # 可选：隔离 HOME 的真实 CLI 生命周期
+bash scripts/check-zcode-adapter.sh
+```
+
+格式与命令以 [Claude Code 插件参考](https://code.claude.com/docs/en/plugins-reference)和 [ZCode 插件文档](https://zcode.z.ai/en/docs/plugin)为准。生命周期脚本覆盖 Claude CLI；ZCode Desktop 的迁移需在对应桌面版本验证。
 
 ## OpenCode 模板同步
 
@@ -323,7 +354,7 @@ node scripts/test-antigravity-hooks.mjs
 
 ZCode 采用「原生 plugin + `story-setup` workspace 部署」双入口：
 
-- `.zcode-plugin/plugin.json` 与根 `marketplace.json` 暴露同一组 13 Skills、13 Commands 和 ZCode Hooks；版本必须与 `skills/story/VERSION` 同步。
+- `.zcode-plugin/plugin.json` 与根 `marketplace.json` 以同名同版本的单一 `oh-story` bundle 暴露 13 Skills、13 Commands 和 ZCode Hooks；catalog 自身名保持 `oh-story-zcode`，条目的插件版本必须与 `skills/story/VERSION` 同步。
 - `skills/story-setup/references/zcode/` 是 workspace 部署模板，包含 `AGENTS.md.tmpl`、Commands、`config.json.patch` 与无第三方依赖的 Node Hook runner。
 - ZCode 3.3.4 只支持 `SessionStart`、`UserPromptSubmit`、`PreToolUse`、`PermissionRequest`、`PostToolUse`、`PostToolUseFailure`、`Stop`。不要复制 Claude 的 `PreCompact`、`PostCompact`、`SessionEnd`、`SubagentStop` 或 `Notification`。
 - Hook stdout 为空表示放行；只要非空就必须满足严格 JSON schema。诊断只写 stderr，异常 fail-open；优先使用 `process` + `node`，不要引入 shell/Python launcher 的跨平台分支。

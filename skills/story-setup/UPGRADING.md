@@ -7,6 +7,64 @@
 
 `.story-deployed` 缺失任一字段，或 `agents_version` 缺失 / 非整数 / 小于 `29`，都视为待更新部署。直接重新运行 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或自然语言点名）；不在运行时逐级兼容历史模板。如项目 `agents_version` 大于 `29`，说明本地 story-setup 比项目旧：先更新 oh-story-claudecode，不得用 v29 降级覆盖。历史版本改动见仓库根目录 `CHANGELOG.md`。
 
+## 插件打包身份迁移（v0.7.9 同版本修复）
+
+Claude Code / ZCode 市场改为单一 `oh-story` 插件，仍包含全部 13 个 Skills。此修复仍为 `0.7.9`，旧插件用户需手动迁移；`npx skills` 安装无需迁移。卸载前备份要保留的插件数据，以下操作仅针对旧插件记录，保留写作项目及 story-setup 部署文件。
+
+### Claude Code
+
+1. 先在受影响的写作项目目录中列出已安装插件，按记录中的 `id` 与 `scope` 核对实际旧身份；`project` / `local` 记录属于各自项目，多个项目须分别核对：
+
+   ```bash
+   claude plugin list --json
+   ```
+
+   只处理列表中确实存在、marketplace 为 `oh-story-skills` 的以下旧 ID：
+
+   ```text
+   browser-cdp@oh-story-skills
+   story@oh-story-skills
+   story-cover@oh-story-skills
+   story-deslop@oh-story-skills
+   story-import@oh-story-skills
+   story-long-analyze@oh-story-skills
+   story-long-scan@oh-story-skills
+   story-long-write@oh-story-skills
+   story-review@oh-story-skills
+   story-setup@oh-story-skills
+   story-short-analyze@oh-story-skills
+   story-short-scan@oh-story-skills
+   story-short-write@oh-story-skills
+   ```
+
+2. **刷新 catalog 前**，逐个卸载实际存在的旧 ID，并使用列表中原有的 `user`、`project` 或 `local` scope。以下以 user-scope 的 `story` 插件为例：
+
+   ```bash
+   claude plugin uninstall story@oh-story-skills --scope user --keep-data
+   ```
+
+   `--keep-data` 保留该旧插件身份的数据，但不会把它迁移到新的 `oh-story` 身份。同一旧 ID 若出现在多个 scope，每个 scope 分别执行。
+
+3. 所有实际旧身份卸载完后，刷新已有 catalog；若本机尚未添加该 catalog，则添加仓库：
+
+   ```bash
+   claude plugin marketplace update oh-story-skills
+   # 仅在 catalog 尚不存在时：
+   claude plugin marketplace add https://github.com/zenstory-ai/oh-story-claudecode
+   ```
+
+4. 在原 scope 安装统一 bundle；多个 scope 分别安装：
+
+   ```bash
+   claude plugin install oh-story@oh-story-skills --scope user
+   ```
+
+5. 新开 Claude Code 会话，使用 `/oh-story:story-setup` 或 `/oh-story:story dashboard`。命令与 manifest 格式见 [Claude Code 插件参考](https://code.claude.com/docs/en/plugins-reference)。
+
+### ZCode
+
+在 Plugin Management 中卸载受影响的旧条目，刷新市场；必要时重新添加本仓库，再安装一个 `oh-story`。沿用界面中的市场名（`oh-story-skills` 或 `oh-story-zcode`），避免重复安装。若无法卸载，保留数据备份，附 ZCode 版本与界面现象联系官方支持，不要清空全部缓存或手改缓存 JSON。操作说明见 [ZCode 插件文档](https://zcode.z.ai/en/docs/plugin)。
+
 ## 升级策略
 
 | 策略 | 适用场景 | 行为 |
