@@ -5,7 +5,10 @@ description: |
   输出格式严格遵循本文件「输出格式」章节；不依赖外部输出模板文件。
 mode: subagent
 permission:
+  "*": deny
   read: allow
+  glob: allow
+  grep: allow
   edit: deny
   bash: deny
 steps: 12

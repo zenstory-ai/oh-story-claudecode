@@ -77,6 +77,8 @@ jobs:
         run: npm install --global opencode-ai@latest
       - name: Run real OpenCode CLI adapter test
         run: bash scripts/test-opencode-cli-e2e.sh
+      - name: Check generated agent permissions with real tools
+        run: python3 scripts/test-agent-permissions.py --opencode "$(command -v opencode)"
 
   openclaw:
     runs-on: ubuntu-latest

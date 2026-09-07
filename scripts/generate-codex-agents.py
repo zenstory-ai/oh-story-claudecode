@@ -16,7 +16,10 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-READ_ONLY_AGENTS = {"chapter-extractor", "consistency-checker", "story-explorer"}
+MUTATING_TOOLS = frozenset({"Write", "Edit", "Bash", "NotebookEdit", "PowerShell"})
+SUPPORTED_TOOLS = MUTATING_TOOLS | {"Read", "Glob", "Grep"}
+CAPABILITY_FIELDS = frozenset({"tools", "disallowedTools"})
+CAPABILITY_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
 NICKNAMES = {
     "chapter-extractor": ["Chapter Extractor", "Scene Splitter"],
     "character-designer": ["Character Designer", "Voice Crafter"],
@@ -60,7 +63,12 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
                 i += 1
             data[key] = "\n".join(block).strip()
             continue
-        data[key] = value.strip().strip('"').strip("'")
+        normalized = value.strip()
+        data[key] = (
+            normalized
+            if key in CAPABILITY_FIELDS
+            else normalized.strip('"').strip("'")
+        )
         i += 1
     return data, body
 
@@ -73,6 +81,57 @@ def toml_basic_string(value: str) -> str:
 
 def toml_list(values: list[str]) -> str:
     return "[" + ", ".join(repr(v).replace("'", '"') for v in values) + "]"
+
+
+def parse_tool_list(value: str, field: str) -> set[str]:
+    """Parse the supported inline capability-list subset or reject it."""
+    if not value:
+        raise ValueError(
+            f"{field}: empty or block-style capability declarations are unsupported"
+        )
+    match = re.fullmatch(r"\[\s*(.*?)\s*\]", value)
+    if not match:
+        raise ValueError(f"{field}: expected an inline list like [Read, Glob]")
+    inner = match.group(1)
+    if not inner.strip():
+        return set()
+    parsed: set[str] = set()
+    for raw_item in inner.split(","):
+        item = raw_item.strip()
+        if not item:
+            raise ValueError(f"{field}: empty capability-list item")
+        if item[0] in {'"', "'"}:
+            quote = item[0]
+            if len(item) < 2 or item[-1] != quote or quote in item[1:-1]:
+                raise ValueError(f"{field}: malformed quoted capability {item!r}")
+            item = item[1:-1]
+        elif '"' in item or "'" in item:
+            raise ValueError(f"{field}: malformed quoted capability {item!r}")
+        if CAPABILITY_NAME_RE.fullmatch(item) is None:
+            raise ValueError(f"{field}: invalid capability name {item!r}")
+        if item not in SUPPORTED_TOOLS:
+            raise ValueError(f"{field}: unsupported Codex capability {item!r}")
+        parsed.add(item)
+    return parsed
+
+
+def is_read_only(meta: dict[str, str]) -> bool:
+    """Derive filesystem confinement from effective canonical capabilities."""
+    declared = (
+        parse_tool_list(meta["tools"], "tools") if "tools" in meta else set()
+    )
+    denied = (
+        parse_tool_list(meta["disallowedTools"], "disallowedTools")
+        if "disallowedTools" in meta
+        else set()
+    )
+    if "tools" not in meta:
+        # Inherited tools can include MCP and other capabilities not listed here.
+        return False
+    effective = declared - denied
+    if not effective:
+        raise ValueError("tools: Codex sandbox_mode cannot represent zero effective tools")
+    return effective.isdisjoint(MUTATING_TOOLS)
 
 
 def adapt_body_for_codex(body: str, name: str) -> str:
@@ -119,7 +178,7 @@ def render_file(src: Path) -> tuple[str, str]:
         f"description = {toml_basic_string(description)}",
         f"nickname_candidates = {toml_list(NICKNAMES.get(name, [name]))}",
     ]
-    if name in READ_ONLY_AGENTS:
+    if is_read_only(meta):
         out.append('sandbox_mode = "read-only"')
     out.append(f"developer_instructions = {toml_basic_string(instructions)}")
     return f"{name}.toml", "\n".join(out) + "\n"

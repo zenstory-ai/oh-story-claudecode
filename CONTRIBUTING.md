@@ -218,6 +218,15 @@ bash scripts/check-opencode-adapter.sh
 bash scripts/test-opencode-cli-e2e.sh  # 可选：需要本机已安装 opencode
 ```
 
+权限从 Claude 真源的 `tools` / `disallowedTools` 推导，禁止项先从声明工具中移除，不按 agent 名字特判。跨端映射有以下边界：
+
+- 三个生成器支持行内数组（如 `[Read, Glob, Grep]`，项可加成对引号）。Claude 官方也支持逗号字符串，但本项目生成器不支持该格式。未知或不支持的工具在发布生成文件前报错。
+- OpenCode V1 支持 Read、Glob、Grep、Write、Edit、Bash。显式 `tools` 先设置 `"*": deny`，再开放声明的能力，未声明的 shell、委派、MCP 等保持禁止；缺省 `tools` 才继承。Read/Glob/Grep 独立映射，空列表生成全禁用配置。Write 或 Edit 任一有效都会开放聚合 `edit` 权限（write/edit/apply_patch），无法保留这几个编辑工具之间的限制；Write 本身也可覆盖文件，并非“只能创建”。
+- Codex 支持上述六种工具，以及 NotebookEdit、PowerShell 的可写能力分类。它只推导文件系统 `sandbox_mode`，不能表达 Claude 的完整工具白名单。显式声明中只有 Read/Glob/Grep 有效时设置 read-only；存在可写能力时继承父会话沙箱。缺省 `tools` 也继承，不根据部分禁止项假定所有继承工具均只读。零有效工具无法由该字段表达，因此拒绝生成。
+- Antigravity 只支持上述六种工具的映射，要求显式非空有效工具列表；不能映射的项报错，不静默丢弃。
+
+回归命令：`python3 scripts/test-agent-permissions.py`；传入 `--opencode /path/to/opencode` 可用真实 OpenCode V1 CLI 验证工具允许/拒绝，无需模型请求。
+
 脚本会：
 1. 将 `templates/agents/` 下的 Claude Code agent 转换为 opencode 格式，写入 `opencode/agents/`
 2. 将 `CLAUDE.md.tmpl` 复制到 `opencode/AGENTS.md.tmpl`，替换 `.claude/` 路径引用
