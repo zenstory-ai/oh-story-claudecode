@@ -23,6 +23,15 @@ BODY_COMMAND_RE = re.compile(r"(?:执行|运行|跑) `([^`]+)`")
 # 委派给别人跑的不算本 agent 的 shell 步骤（「由父流程提示重新运行 X」「提示调用方在主会话跑 X」）。
 # 只在同一行出现委派主语时豁免，避免把「自己跑」写成委派句式蒙混过关。
 BODY_DELEGATION_RE = re.compile(r"(调用方|父流程|主会话|用户|由.{0,6}提示)")
+CAPABILITY_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
+TOOL_PERMISSIONS = {
+    "read": {"Read"},
+    "glob": {"Glob"},
+    "grep": {"Grep"},
+    "edit": {"Write", "Edit"},
+    "bash": {"Bash"},
+}
+SUPPORTED_TOOLS = set().union(*TOOL_PERMISSIONS.values())
 
 
 def body_bash_commands(body: str) -> list[str]:
@@ -108,42 +117,32 @@ def convert_claude_to_opencode(fm: dict, body: str) -> dict:
 
     result["mode"] = "subagent"
 
-    tools = _parse_list(fm.get("tools", ""))
-    disallowed = _parse_list(fm.get("disallowedTools", ""))
+    tools = _parse_list(fm["tools"], "tools") if "tools" in fm else []
+    disallowed = (
+        _parse_list(fm["disallowedTools"], "disallowedTools")
+        if "disallowedTools" in fm
+        else []
+    )
+    denied_tools = set(disallowed)
+    explicit_tools = "tools" in fm
+    effective_tools = (set(tools) if explicit_tools else SUPPORTED_TOOLS) - denied_tools
 
-    perm = {}
-    if any(t in tools for t in ("Read", "Glob", "Grep")):
-        perm["read"] = "allow"
-    has_write = any(t in tools for t in ("Write", "Edit"))
-    has_edit_disallowed = any(t in disallowed for t in ("Write", "Edit"))
-
-    # deny priority: disallowedTools overrides Write/Edit in tools
-    # story-researcher is a known exception — opencode's edit permission controls
-    # both Write and Edit, cannot distinguish. story-researcher needs to create
-    # new files (research output), so set edit: allow
-    if name == "story-researcher":
-        perm["edit"] = "allow"
-    elif has_edit_disallowed:
-        perm["edit"] = "deny"
-    elif has_write:
-        perm["edit"] = "allow"
-
-    # bash 同样走 "disallowedTools 优先"。OpenCode 未声明 bash 权限时默认为 ask；只读 agent
-    # 必须写成标量 deny，让上游 disabled() 直接摘掉 bash 工具。不要加“只读命令”白名单：
-    # shell.ts 只鉴权 command 的直接父节点，`( allowlisted-command ) > 正文.md` 会把外层重定向
-    # 藏在 subshell 外，字面量白名单也守不住文件系统边界。
+    # OpenCode defaults to allow. A declared list must also close unlisted tools,
+    # including task and MCP. Keep the wildcard first: later rules override it.
+    perm = {"*": "deny"} if explicit_tools else {}
+    # edit combines write/edit/apply_patch; either source tool grants mutation.
+    for permission, source_tools in TOOL_PERMISSIONS.items():
+        if explicit_tools:
+            perm[permission] = "allow" if effective_tools & source_tools else "deny"
+        elif source_tools <= denied_tools:
+            perm[permission] = "deny"
     mentioned_bash = body_bash_commands(body)
-    restricted_bash = "Bash" in disallowed
-    if restricted_bash:
-        if mentioned_bash:
-            raise ValueError(
-                f"{name or '<unnamed>'}: 只读 agent 禁止 Bash，但正文要求执行 "
-                + "、".join(f"`{command}`" for command in mentioned_bash)
-                + "；改写正文以使用宿主已提供的工作区和 Read/Glob/Grep，不得开放 shell 例外。"
-            )
-        perm["bash"] = "deny"
-    elif "Bash" in tools:
-        perm["bash"] = "allow"
+    if "Bash" not in effective_tools and mentioned_bash:
+        raise ValueError(
+            f"{name or '<unnamed>'}: agent 未获授权使用 Bash，但正文要求执行 "
+            + "、".join(f"`{command}`" for command in mentioned_bash)
+            + "；改写正文以使用宿主已提供的工作区和 Read/Glob/Grep，不得开放 shell 例外。"
+        )
     if perm:
         result["permission"] = perm
 
@@ -156,13 +155,36 @@ def convert_claude_to_opencode(fm: dict, body: str) -> dict:
     return result
 
 
-def _parse_list(val: str) -> list[str]:
-    """Parse a YAML-like list like '[Read, Glob, Grep]'."""
-    match = re.search(r"\[(.*)\]", val)
+def _parse_list(val: str, field: str) -> list[str]:
+    """Parse the supported inline capability-list subset or reject it."""
+    if not val:
+        raise ValueError(
+            f"{field}: empty or block-style capability declarations are unsupported"
+        )
+    match = re.fullmatch(r"\[\s*(.*?)\s*\]", val)
     if not match:
+        raise ValueError(f"{field}: expected an inline list like [Read, Glob]")
+    inner = match.group(1)
+    if not inner.strip():
         return []
-    items = match.group(1).split(",")
-    return [item.strip().strip("'").strip('"') for item in items if item.strip()]
+    parsed: list[str] = []
+    for raw_item in inner.split(","):
+        item = raw_item.strip()
+        if not item:
+            raise ValueError(f"{field}: empty capability-list item")
+        if item[0] in {'"', "'"}:
+            quote = item[0]
+            if len(item) < 2 or item[-1] != quote or quote in item[1:-1]:
+                raise ValueError(f"{field}: malformed quoted capability {item!r}")
+            item = item[1:-1]
+        elif '"' in item or "'" in item:
+            raise ValueError(f"{field}: malformed quoted capability {item!r}")
+        if CAPABILITY_NAME_RE.fullmatch(item) is None:
+            raise ValueError(f"{field}: invalid capability name {item!r}")
+        if item not in SUPPORTED_TOOLS:
+            raise ValueError(f"{field}: unsupported OpenCode capability {item!r}")
+        parsed.append(item)
+    return parsed
 
 
 def format_frontmatter(fm: dict) -> str:
@@ -180,7 +202,8 @@ def format_frontmatter(fm: dict) -> str:
                     for glob, action in pv.items():
                         lines.append(f'    "{glob}": {action}')
                 else:
-                    lines.append(f"  {pk}: {pv}")
+                    permission_key = '"*"' if pk == "*" else pk
+                    lines.append(f"  {permission_key}: {pv}")
         elif key == "description" and "\n" in value:
             lines.append("description: |")
             for desc_line in value.split("\n"):

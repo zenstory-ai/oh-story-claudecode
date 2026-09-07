@@ -5,7 +5,6 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const storySkillRoot = join(repositoryRoot, "skills", "story");
 
 async function read(relativePath) {
   return readFile(join(repositoryRoot, relativePath), "utf8");
@@ -13,11 +12,16 @@ async function read(relativePath) {
 
 test("Claude Code marketplace exposes the canonical story skill bundle", async () => {
   const marketplace = JSON.parse(await read(".claude-plugin/marketplace.json"));
-  const claudeStory = marketplace.plugins.find((plugin) => plugin.name === "story");
+  const claudeBundle = marketplace.plugins.find((plugin) => plugin.name === "oh-story");
+  const manifest = JSON.parse(await read(".claude-plugin/plugin.json"));
 
-  assert.ok(claudeStory, "Claude Code marketplace must publish the story plugin");
-  assert.deepEqual(claudeStory.skills, ["./skills/story"]);
-  assert.match(claudeStory.description, /\/story dashboard/);
+  assert.ok(claudeBundle, "Claude Code marketplace must publish the oh-story bundle");
+  assert.equal(claudeBundle.source, "./");
+  assert.equal(manifest.name, claudeBundle.name);
+  assert.equal(manifest.version, claudeBundle.version);
+  assert.equal(claudeBundle.skills, undefined, "the catalog must not filter out default skills");
+  assert.equal(manifest.skills, undefined, "the bundle uses default skills/ discovery");
+  const storySkillRoot = join(repositoryRoot, claudeBundle.source, "skills", "story");
 
   for (const relativePath of [
     "SKILL.md",

@@ -23,7 +23,8 @@ fi
 echo "Shared File Governance Check"
 echo "============================"
 "$PYTHON_BIN" "$REPO_ROOT/scripts/sync-shared-assets.py" check
-"$PYTHON_BIN" "$REPO_ROOT/scripts/shared-references.py" check
+"$PYTHON_BIN" "$REPO_ROOT/scripts/shared-references.py" check \
+  --runtime-manifest "$REPO_ROOT/scripts/shared-assets.json"
 "$PYTHON_BIN" "$REPO_ROOT/scripts/check-reference-similarity.py" --root "$REPO_ROOT"
 "$PYTHON_BIN" "$REPO_ROOT/scripts/check-agent-reference-consumers.py" --root "$REPO_ROOT"
 "$PYTHON_BIN" "$REPO_ROOT/scripts/check-short-analysis-scope.py" --root "$REPO_ROOT"

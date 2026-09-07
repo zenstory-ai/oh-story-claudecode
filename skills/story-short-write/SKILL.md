@@ -16,7 +16,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 Phase 2 必须在第一次写入 `设定.md` / `小节大纲.md` 前按顺序完整读取（分块直到 EOF；`rg` 检索或局部摘读不算读完）：
 
-1. `references/writing-workflow.md`、`references/submission-craft.md`、`references/short-craft.md`、`references/short-reversal.md`
+1. `references/workflow-design.md` + `references/writing-workflow.md`、`references/submission-craft.md`、`references/short-craft.md`、`references/short-reversal.md`
 2. 核心 10 题材再读取一个精确的 `references/genre-styles/{题材}.md`；冷门题材改读 `references/genre-writing-formulas.md`
 3. 有反派或真相揭露设计时再读 `references/villain-and-reveal.md`；不适用时在设计校验区写明原因
 
@@ -139,81 +139,9 @@ Phase 2 必须在第一次写入 `设定.md` / `小节大纲.md` 前按顺序完
 
 > **多对标书时**：参 `references/cross-book-recall.md`，副对标 anchor 入「对标摘要」区
 
-#### Agent 调用：story-architect
+#### 构思、设计与验收
 
-构思阶段，如果项目已部署 story-architect agent（查找顺序见顶部），可 spawn `Agent(subagent_type: "story-architect", prompt: "项目目录：{dir}\n任务类型：短篇构思\n查询参数：{情绪目标+题材方向}")` 辅助框架设计。如 agent 不可用，由主线程直接执行。
-
-帮用户确定短篇的核心框架：
-
-```
-## 短篇核心框架
-
-### 基本信息
-- 标题（暂定）：{}
-- 目标字数：{} 字（短篇通常 8000-20000 字）
-- 目标平台：{知乎盐选 / 小程序 / 番茄短篇}（三选一）
-- 情绪目标：{读者读完的感受}
-
-### 一句话梗概
-{主角 + 困境 + 反转 + 情绪落点}
-
-### 核心支点
-- 类型：{身份/视角/动机/时间线/信息/认知反转，或无反转}
-- 核心兑现：{一句话描述主揭示；无反转时写报应或关系兑现}
-- 铺垫/期待：{关键铺垫点；无反转时写读者等待兑现的因果或关系节拍}
-
-### 情绪设计
-- 开头情绪：{}（强度 {1-10}）
-- 中段情绪：{}（强度 {1-10}）
-- 反转情绪：{}（强度 {1-10}，峰值维持 ≥2 节）
-- 结尾情绪：{}（强度 {1-10}）
-- 反转高潮不要骤降：反转前 1 节开始升温，反转节达到峰值，反转后 1 节维持峰值不骤降
-
-### 人设速写
-- 主角：{一句话人设}
-- 关键角色：{一句话人设}
-- 关系：{他们之间的关系}
-```
-
-框架确定后，完成设计任务，然后在工作目录下创建文件。
-
-#### 设计任务（框架确定后执行）
-
-详细步骤和模板见 `references/writing-workflow.md`。构思时从目标情绪反推剧情，不是从灵感正向构建。按顺序完成：
-
-1. 定平台基调 + 加载题材风格包 → 先读 `references/submission-craft.md` 定投稿平台（知乎/小程序/番茄），正文视角、矛盾烈度、章末落点随之切换；再读 `references/genre-styles/{题材}.md`（核心 10 题材）+ 通用底座 `references/short-craft.md`，从招式库选 2-3 个核心招式（如追妻的白月光触发链 / 信物翻转 / 火葬场预告），写入 设定.md「题材招式」区，全程照此招式与腔调写
-2. 设计反派（如有）→ 加载 `villain-and-reveal.md`
-3. 确定揭露方式 → 同上
-4. 编写 小节大纲.md（格式见 writing-workflow.md）：短篇只做轻量蓝图，每节包含结构段/五段功能、人物/关系或其他状态变化、因果/逻辑链、结尾承接/钩子，不套长篇完整章节蓝图。**标出付费点卡在哪一节末**（见 `submission-craft.md`「付费点」：用未完成动作、身份/证据变化或两难选择形成真实断点）；用反推法先想透付费点那一节，再倒排前后。每节可选一个任务卡点，但必须服务情绪升级、证据推进、关系撕裂、反转铺垫或反击动作；没有就不强补
-5. 反转信息差验证（公式见 writing-workflow.md）
-6. 伏笔回查清单（标准见 writing-workflow.md）
-
-`设定.md` 必须包含以下机器可验收字段（内容本身也是后续写作依据，不是读文件回执）：
-
-```markdown
-## Phase 2 设计校验
-- 题材参考：`references/genre-styles/{题材}.md`（冷门题材写 `references/genre-writing-formulas.md`）
-- 核心招式：{招式一}；{招式二}[；{招式三}]
-- 反派设计：不适用（{原因}）
-- 反转类型：{身份/视角/动机/时间线/信息/认知/无反转}
-- 反转位置：第 {X} 节 ÷ 共 {Y} 节 = {Z}%
-- 付费点：第 {N} 节末
-```
-
-有反派时用 `villain-and-reveal.md` 的身份、动机、作恶方式、致命弱点、报应五字段替换“不适用”。`short-reversal.md` 判断确属无反转题材时，写 `反转类型：无反转` 和 `反转位置：不适用（{报应兑现/甜度递进等原因}）`，不要硬编节号。`小节大纲.md` 必须使用 `writing-workflow.md` 规定的固定 12 列 Markdown 表格，并在对应节末明确标出“付费点”。
-
-#### Phase 2 完成门禁
-
-两份文件生成后、向用户声明构思完成或进入 Phase 3 前，运行 `node scripts/check-phase2-contract.js --json {短篇目录}`：
-
-- exit 0：Phase 2 机械契约通过，才可进入下一阶段；这不替代故事质量判断
-- exit 1：只把 `repair_scope` 中的检查 ID、证据、期望、reference 路径和修复范围交给本轮 writer；只改失败字段，再运行同一命令
-- 最多做 2 轮定向 repair；仍失败则停止并报告剩余检查 ID，不得声称 Phase 2 已完成
-- exit 2、脚本缺失或不可执行：报告 verifier 不可用，不得用泛化“自检”替代后继续
-
-#### Agent 调用：character-designer
-
-设计任务完成后，如果项目已部署 character-designer agent（查找顺序见顶部），可 spawn `Agent(subagent_type: "character-designer", prompt: "项目目录：{dir}\n任务类型：角色设定\n查询参数：{人设速写+关系}")` 辅助角色设定和语言风格档案。如 agent 不可用，由主线程直接执行。
+完整步骤见 [references/workflow-design.md](references/workflow-design.md)。按首屏 Reference Gate 读完后执行；两份设计文件通过其中的 Phase 2 完成门禁，才可进入 Phase 3。
 
 ---
 
@@ -226,6 +154,8 @@ Phase 2 必须在第一次写入 `设定.md` / `小节大纲.md` 前按顺序完
 > 术语说明：Phase 3 按「段」划分叙事结构（开头段/铺垫段/升级段/反转段/结尾段），每段包含若干「小节」（数字编号的 beat）。「场景」指写作时的具体画面。
 
 **交付参数先锁定**：用户明确的字数范围优先，逐字取其最小值/最大值与节数；只给单一目标时用目标的 95%-105%；都未给时用 8000-20000 字和大纲节数。后文的默认字数不得覆盖用户范围。
+
+**写前参数验收**：给 Phase 4 的交付命令加 `--check-contract` 先运行。参数通过不算交付；冲突时停在写前，报告字数范围与节数，请用户选择调整项，不代改用户约束。
 
 **写前准备**（每个场景写前执行 2 步，是核心方法的落地：确认情绪目标 → 召回技法模块）：
 - **步骤 1：记忆+召回**：① 本场景目标情绪词？② 借鉴哪个参考文件的哪个技法？③ 具体用在哪个段落？答不出 → 先回读参考再动笔。如有 `对标/` 或 `拆文库/` 结构化产出，按“对标上下文加载”规则检索与当前场景最相关的结构/情绪/反转/写作手法模块作为参考，并写入“拆文召回摘要”
@@ -401,7 +331,7 @@ Phase 2 必须在第一次写入 `设定.md` / `小节大纲.md` 前按顺序完
 
 ## 参考资料
 
-按需加载以下文件。写作时同时加载 ≤ 3 个：
+按当前阶段 Reference Gate 和写前准备加载必需文件，其余按需：
 
 | 文件 | 何时加载 |
 |------|----------|
@@ -410,6 +340,7 @@ Phase 2 必须在第一次写入 `设定.md` / `小节大纲.md` 前按顺序完
 | [references/short-craft.md](references/short-craft.md) | 写作全程参考（短篇通用底座：情绪直接写+后接具体反应、在场叙述、超短章节制） |
 | [references/genre-styles/](references/genre-styles/) | **定方向后必读**：按题材加载对应风格包（追妻火葬场 / 世情打脸 / 复仇打脸 / 总裁豪门 / 宅斗宫斗 / 民俗怪谈 / 悬疑 / 甜宠 / 双男主 / 沙雕脑洞），正文风格随之切换 |
 | [references/short-deslop.md](references/short-deslop.md) | 去AI味时必读（短篇专属，只杀真·AI腔，不杀情绪烈度） |
+| [references/workflow-design.md](references/workflow-design.md) | Phase 2 构思、设计字段、Agent 调用与完成门禁；Phase 3/4 不预加载 |
 | [references/writing-workflow.md](references/writing-workflow.md) | Phase 2 设计任务 + Phase 4 精修 |
 | [references/genre-writing-formulas.md](references/genre-writing-formulas.md) | 冷门题材结构骨架补充（核心 10 题材直接用 genre-styles/） |
 | [references/genre-writing-techniques.md](references/genre-writing-techniques.md) | 跨题材通用技法（震惊场景/三翻四震/感情线四阶段/喜剧flag） |

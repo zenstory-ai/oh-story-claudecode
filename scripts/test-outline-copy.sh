@@ -53,6 +53,11 @@ expect_contains() {
   esac
 }
 
+# 通过 Node 获取 Git Bash 转换后的 Windows 路径。
+expect_path() {
+  expect_contains "$(node -p 'process.argv[1]' "$1")"
+}
+
 expect_missing() {
   case "$OUTPUT" in
   *"$1"*) fail "expected output NOT to contain: $1" ;;
@@ -186,12 +191,14 @@ run --outline "$TMP_DIR/o9.md" "$TMP_DIR/p9.md"
 expect_status 0
 [ -z "$OUTPUT" ] || fail "expected silent output on a clean chapter"
 
-# --- 10. 缺细纲：不可判定时静默退出 0，不得误报 ---
+# --- 10. 自动发现不到细纲：明确跳过但不阻断普通独立正文 ---
 CASE="missing-outline"
 printf '%s。\n' "$COPIED" >"$TMP_DIR/orphan.md"
 run "$TMP_DIR/orphan.md"
 expect_status 0
-[ -z "$OUTPUT" ] || fail "expected silence when no outline can be located"
+expect_contains "跳过"
+expect_path "$TMP_DIR/orphan.md"
+expect_contains "未自动发现细纲"
 
 # --- 11. 收尾复扫按通配传多章：每章各自比对，不得把第二个正文当成细纲 ---
 CASE="multi-prose-batch"
@@ -217,4 +224,171 @@ run "$TMP_DIR/批/正文/第006章_天明.md" "$TMP_DIR/批/正文/第005章_雨
 expect_status 1
 expect_contains "第005章_雨夜.md"
 
-echo "PASS: check-outline-copy.js (12 cases)"
+# --- 13. 显式细纲不存在：报路径并退 2 ---
+CASE="explicit-missing-outline"
+run --outline "$TMP_DIR/不存在的细纲.md" "$TMP_DIR/p9.md"
+expect_status 2
+expect_contains "无法读取显式细纲"
+expect_path "$TMP_DIR/不存在的细纲.md"
+expect_contains "不存在"
+
+# --- 14. 正文不存在：报路径并退 2 ---
+CASE="missing-prose"
+run --outline "$TMP_DIR/o9.md" "$TMP_DIR/不存在的正文.md"
+expect_status 2
+expect_contains "无法读取正文"
+expect_path "$TMP_DIR/不存在的正文.md"
+expect_contains "不存在"
+
+# --- 15–17. 参数错误：缺少 --outline 值、未知选项、没有正文都退 2 ---
+CASE="outline-option-without-value"
+run --outline
+expect_status 2
+expect_contains "--outline 缺少路径"
+
+CASE="unknown-option"
+run --unknown "$TMP_DIR/p9.md"
+expect_status 2
+expect_contains "未知选项: --unknown"
+
+CASE="no-prose"
+run --outline "$TMP_DIR/o9.md"
+expect_status 2
+expect_contains "缺少正文路径"
+
+# --- 18–19. 目录输入：各平台统一报「不是普通文件」 ---
+CASE="outline-is-directory"
+mkdir -p "$TMP_DIR/目录细纲"
+run --outline "$TMP_DIR/目录细纲" "$TMP_DIR/p9.md"
+expect_status 2
+expect_contains "无法读取显式细纲"
+expect_path "$TMP_DIR/目录细纲"
+expect_contains "不是普通文件"
+
+CASE="prose-is-directory"
+mkdir -p "$TMP_DIR/目录正文"
+run --outline "$TMP_DIR/o9.md" "$TMP_DIR/目录正文"
+expect_status 2
+expect_contains "无法读取正文"
+expect_path "$TMP_DIR/目录正文"
+expect_contains "不是普通文件"
+
+# --- 20. 非预期异常：报错并退 2 ---
+CASE="unexpected-exception"
+printf '%s。\n' "$COPIED" >"$TMP_DIR/explode.md"
+cat >"$TMP_DIR/throw-on-basename.js" <<'EOF'
+const path = require('path')
+const originalBasename = path.basename
+path.basename = function basename(file, ...args) {
+  if (originalBasename.call(this, file, ...args) === 'explode.md') throw new Error('synthetic unexpected failure')
+  return originalBasename.call(this, file, ...args)
+}
+EOF
+set +e
+OUTPUT="$(node --require "$TMP_DIR/throw-on-basename.js" "$SCRIPT" "$TMP_DIR/explode.md" 2>&1)"
+STATUS=$?
+set -e
+expect_status 2
+expect_contains "细纲照搬检测异常"
+expect_contains "synthetic unexpected failure"
+
+# --- 21. 自动发现权限错误不能伪装成没有细纲 ---
+CASE="auto-outline-permission-error"
+cat >"$TMP_DIR/throw-on-readdir.js" <<'JS'
+const fs = require('fs')
+const original = fs.readdirSync
+fs.readdirSync = function (dir, ...args) {
+  if (String(dir).endsWith('大纲')) {
+    const error = new Error(`EACCES: cannot read ${dir}`)
+    error.code = 'EACCES'
+    throw error
+  }
+  return original.call(this, dir, ...args)
+}
+JS
+set +e
+OUTPUT="$(node --require "$TMP_DIR/throw-on-readdir.js" "$SCRIPT" "$TMP_DIR/批/正文/第005章_雨夜.md" 2>&1)"
+STATUS=$?
+set -e
+expect_status 2
+expect_contains "EACCES"
+expect_contains "大纲"
+
+# --- 22. 找到路径后读取失败仍然是输入错误，不得跳过 ---
+CASE="discovered-outline-read-error"
+cat >"$TMP_DIR/throw-on-outline-read.js" <<'JS'
+const fs = require('fs')
+const original = fs.readFileSync
+fs.readFileSync = function (file, ...args) {
+  if (String(file).endsWith('细纲_第005章.md')) {
+    const error = new Error(`EACCES: cannot read ${file}`)
+    error.code = 'EACCES'
+    throw error
+  }
+  return original.call(this, file, ...args)
+}
+JS
+set +e
+OUTPUT="$(node --require "$TMP_DIR/throw-on-outline-read.js" "$SCRIPT" "$TMP_DIR/批/正文/第005章_雨夜.md" 2>&1)"
+STATUS=$?
+set -e
+expect_status 2
+expect_contains "EACCES"
+expect_contains "细纲_第005章.md"
+
+# --- 23. 自动发现的目标是目录同样拒绝 ---
+CASE="discovered-outline-is-directory"
+mkdir -p "$TMP_DIR/非文件细纲/小节大纲.md"
+printf '%s。\n' "$COPIED" >"$TMP_DIR/非文件细纲/正文.md"
+run "$TMP_DIR/非文件细纲/正文.md"
+expect_status 2
+expect_contains "不是普通文件"
+
+# --- 24–27. 写后完成记录不是誊抄来源；支持普通/加粗字段与标题子节 ---
+printf '%s。\n' "$COPIED" >"$TMP_DIR/completed-prose.md"
+CASE="completion-heading"
+printf '#### 实际完成情况\n%s。\n' "$COPIED" >"$TMP_DIR/completion.md"
+run --outline "$TMP_DIR/completion.md" "$TMP_DIR/completed-prose.md"
+expect_status 0
+
+CASE="completion-field"
+printf '%s\n' "- 实际完成情况：${COPIED}。" "- 结尾设定：离开。" >"$TMP_DIR/completion.md"
+run --outline "$TMP_DIR/completion.md" "$TMP_DIR/completed-prose.md"
+expect_status 0
+
+CASE="completion-bold-field"
+printf '%s\n' "- **实际完成情况**：" "  ${COPIED}。" "- 结尾设定：离开。" >"$TMP_DIR/completion.md"
+run --outline "$TMP_DIR/completion.md" "$TMP_DIR/completed-prose.md"
+expect_status 0
+
+CASE="completion-nested-heading"
+printf '#### 实际完成情况\n已完成。\n##### 实际落地\n%s。\n' "$COPIED" >"$TMP_DIR/completion.md"
+run --outline "$TMP_DIR/completion.md" "$TMP_DIR/completed-prose.md"
+expect_status 0
+
+# --- 28–31. 排除完成记录不能吞掉记录前、同级/上级标题后或下一字段的真实照搬 ---
+CASE="copy-before-completion"
+printf '#### 情节细化\n%s。\n#### 实际完成情况\n已完成。\n' "$COPIED" >"$TMP_DIR/completion.md"
+run --outline "$TMP_DIR/completion.md" "$TMP_DIR/completed-prose.md"
+expect_status 1
+expect_contains "22 字「${COPIED}」"
+
+CASE="copy-after-completion-peer-heading"
+printf '#### 实际完成情况\n##### 实际落地\n已完成。\n#### 后续情节\n%s。\n' "$COPIED" >"$TMP_DIR/completion.md"
+run --outline "$TMP_DIR/completion.md" "$TMP_DIR/completed-prose.md"
+expect_status 1
+expect_contains "22 字「${COPIED}」"
+
+CASE="copy-after-completion-parent-heading"
+printf '#### 实际完成情况\n##### 实际落地\n已完成。\n## 下一章\n%s。\n' "$COPIED" >"$TMP_DIR/completion.md"
+run --outline "$TMP_DIR/completion.md" "$TMP_DIR/completed-prose.md"
+expect_status 1
+expect_contains "22 字「${COPIED}」"
+
+CASE="copy-after-completion-field"
+printf '%s\n' "- **实际完成情况**：已完成。" "- 结尾设定：${COPIED}。" >"$TMP_DIR/completion.md"
+run --outline "$TMP_DIR/completion.md" "$TMP_DIR/completed-prose.md"
+expect_status 1
+expect_contains "22 字「${COPIED}」"
+
+echo "PASS: check-outline-copy.js (31 cases)"
