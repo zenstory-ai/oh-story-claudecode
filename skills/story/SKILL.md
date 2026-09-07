@@ -30,7 +30,6 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | 检查/更新版本 | 检查更新、有新版本吗、升级、更新工具箱 | 见下方「版本更新检查」 |
 | 切换/列出书目 | 切书、换书、列出我的书、我在写哪几本、切换项目 | 见下方「多书切换」 |
 | 管理作者习惯 | 记住我的写作习惯、作者画像、待确认偏好、忘掉这个偏好 | 见下方「作者记忆」 |
-| 应用注解 | 应用注解、应用评论、应用标注、按批注修改 | 见下方「应用章节批注」 |
 | 查故事资料 | 查角色、查伏笔、查进度、查设定、什么状态、写到哪了 | spawn `story-explorer` agent（结构化 prompt：`项目目录：{dir}\n查询类型：{根据意图选择}\n查询参数：{用户查询}`）；agent 不可用时见下方「查询降级」 |
 | 查资料 | 查资料、帮我查资料、调研、搜索一下、搜一下 | spawn `story-researcher` agent；agent 不可用时见下方「查询降级」 |
 
@@ -74,21 +73,6 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 停止服务时终止对应的 Node 长运行进程即可。若用户只问用法，不要替他启动；给出
 `/story dashboard` / `$story dashboard` 两种平台对应入口。
-
-## 应用章节批注
-
-用户输入「应用注解 / 应用评论 / 应用标注」时，执行批注驱动的定向改写工作流：
-
-1. **扫描待办**：运行 `python3 .agents/skills/story/scripts/check_annotations.py --root .` 检索当前工作区所有未应用的行级批注；
-2. **若无批注**：告知用户“当前没有待处理的行级注解，可在工作台编辑模式下点击行号添加批注”；
-3. **输出待办清单**：向用户列出涉及的章节、行号、原文片段以及修改意见；
-4. **逐条贯彻修改**：
-   - 载入目标章节与对应上下文/白皮书；
-   - 贯彻网文 5 大核心工法（战力压弹簧、反差爽感、具象细节、视线自洽、去AI味）；
-   - 使用 `replace_file_content` 精确更新正文；
-   - 运行质检：`node .agent/skills/story-deslop/scripts/normalize-punctuation.js` 与 `check-ai-patterns.js --fail-on=blocking`；
-5. **清理归档批注**：运行 `python3 .agents/skills/story/scripts/check_annotations.py --root . --chapter "<chapter_path>" --clear`；
-6. **呈现结果报告**：汇总展示各处修改前后的对比报告。
 
 ## 路由流程
 

@@ -5,6 +5,8 @@ const state = {
   originalContent: "",
   dirty: false,
   mode: "edit",
+  restored: false,
+  showLineNumbers: true,
   filter: "",
   loadingFile: false,
   saving: false,
@@ -17,11 +19,6 @@ const state = {
   // 记住作者手动展开/收起过的目录，重绘文件树时不要把人正在翻的章节文件夹关掉
   expandedDirs: new Set(),
   collapsedDirs: new Set(),
-  // 行级批注系统
-  annotations: [],
-  showAnnotationsSidebar: true,
-  currentAnnotatingLine: null,
-  currentAnnotatingText: "",
 };
 
 const elements = {
@@ -60,93 +57,6 @@ const elements = {
   toastRegion: document.querySelector("#toastRegion"),
   conflictDialog: document.querySelector("#conflictDialog"),
   reloadConflictButton: document.querySelector("#reloadConflictButton"),
-  analysisButton: document.querySelector("#analysisButton"),
-  analysisBtnLabel: document.querySelector("#analysisBtnLabel"),
-  analysisDialog: document.querySelector("#analysisDialog"),
-  analysisChapterTitle: document.querySelector("#analysisChapterTitle"),
-  analysisWordCountTag: document.querySelector("#analysisWordCountTag"),
-  analysisScoreBadge: document.querySelector("#analysisScoreBadge"),
-  analysisMethodBadge: document.querySelector("#analysisMethodBadge"),
-  reanalyzeButton: document.querySelector("#reanalyzeButton"),
-  analysisConfigToggle: document.querySelector("#analysisConfigToggle"),
-  closeAnalysisDialogButton: document.querySelector("#closeAnalysisDialogButton"),
-  analysisConfigPanel: document.querySelector("#analysisConfigPanel"),
-  cfgBaseUrl: document.querySelector("#cfgBaseUrl"),
-  cfgModel: document.querySelector("#cfgModel"),
-  cfgApiKey: document.querySelector("#cfgApiKey"),
-  saveConfigButton: document.querySelector("#saveConfigButton"),
-  closeConfigButton: document.querySelector("#closeConfigButton"),
-  analysisEmptyView: document.querySelector("#analysisEmptyView"),
-  analysisLoadingView: document.querySelector("#analysisLoadingView"),
-  analysisLoadingTitle: document.querySelector("#analysisLoadingTitle"),
-  analysisLoadingMsg: document.querySelector("#analysisLoadingMsg"),
-  analysisProgressBar: document.querySelector("#analysisProgressBar"),
-  startAnalysisBtn: document.querySelector("#startAnalysisBtn"),
-  analysisResultView: document.querySelector("#analysisResultView"),
-  analysisTabs: [...document.querySelectorAll(".analysis-tabs button")],
-  tabPanels: {
-    overview: document.querySelector("#tabPanelOverview"),
-    hooks: document.querySelector("#tabPanelHooks"),
-    foreshadows: document.querySelector("#tabPanelForeshadows"),
-    emotion: document.querySelector("#tabPanelEmotion"),
-    characters: document.querySelector("#tabPanelCharacters"),
-    plot_points: document.querySelector("#tabPanelPlotPoints"),
-  },
-  hooksBadge: document.querySelector("#hooksBadge"),
-  foreshadowsBadge: document.querySelector("#foreshadowsBadge"),
-  charactersBadge: document.querySelector("#charactersBadge"),
-  plotPointsBadge: document.querySelector("#plotPointsBadge"),
-  openRegenerateDialogButton: document.querySelector("#openRegenerateDialogButton"),
-  regenerateFromSuggestionsButton: document.querySelector("#regenerateFromSuggestionsButton"),
-  regenPendingNotice: document.querySelector("#regenPendingNotice"),
-  viewPendingMergeButton: document.querySelector("#viewPendingMergeButton"),
-  regenerationDialog: document.querySelector("#regenerationDialog"),
-  regenChapterTitle: document.querySelector("#regenChapterTitle"),
-  closeRegenDialogButton: document.querySelector("#closeRegenDialogButton"),
-  cancelRegenButton: document.querySelector("#cancelRegenButton"),
-  submitRegenButton: document.querySelector("#submitRegenButton"),
-  regenSuggestionsChecklist: document.querySelector("#regenSuggestionsChecklist"),
-  regenSelectAllSuggestionsBtn: document.querySelector("#regenSelectAllSuggestionsBtn"),
-  regenClearSuggestionsBtn: document.querySelector("#regenClearSuggestionsBtn"),
-  regenCustomInstructions: document.querySelector("#regenCustomInstructions"),
-  regenPreservePlot: document.querySelector("#regenPreservePlot"),
-  regenPreserveStyle: document.querySelector("#regenPreserveStyle"),
-  regenStrictDeslop: document.querySelector("#regenStrictDeslop"),
-  regenPreserveLength: document.querySelector("#regenPreserveLength"),
-  regenTargetWordsInput: document.querySelector("#regenTargetWordsInput"),
-  regenStatusFeedback: document.querySelector("#regenStatusFeedback"),
-  regenStatusText: document.querySelector("#regenStatusText"),
-  diffMergeDialog: document.querySelector("#diffMergeDialog"),
-  diffChapterTitle: document.querySelector("#diffChapterTitle"),
-  diffStatsInfo: document.querySelector("#diffStatsInfo"),
-  diffViewFullBtn: document.querySelector("#diffViewFullBtn"),
-  diffViewChangesBtn: document.querySelector("#diffViewChangesBtn"),
-  diffAcceptAllBtn: document.querySelector("#diffAcceptAllBtn"),
-  diffRejectAllBtn: document.querySelector("#diffRejectAllBtn"),
-  closeDiffDialogButton: document.querySelector("#closeDiffDialogButton"),
-  cancelDiffButton: document.querySelector("#cancelDiffButton"),
-  applyMergeButton: document.querySelector("#applyMergeButton"),
-  diffHunksContainer: document.querySelector("#diffHunksContainer"),
-  diffFooterStats: document.querySelector("#diffFooterStats"),
-  diffMergeSpinner: document.querySelector("#diffMergeSpinner"),
-  diffMergeStatusMsg: document.querySelector("#diffMergeStatusMsg"),
-  verifyAiStatus: document.querySelector("#verifyAiStatus"),
-  verifyAiText: document.querySelector("#verifyAiText"),
-  verifyDegenStatus: document.querySelector("#verifyDegenStatus"),
-  verifyDegenText: document.querySelector("#verifyDegenText"),
-  annotationsToggleBtn: document.querySelector("#annotationsToggleBtn"),
-  annotationsCountBadge: document.querySelector("#annotationsCountBadge"),
-  annotationsSidebar: document.querySelector("#annotationsSidebar"),
-  annotationsSidebarBadge: document.querySelector("#annotationsSidebarBadge"),
-  closeAnnotationsSidebarBtn: document.querySelector("#closeAnnotationsSidebarBtn"),
-  annotationsList: document.querySelector("#annotationsList"),
-  annotationPopover: document.querySelector("#annotationPopover"),
-  annotationPopoverTitle: document.querySelector("#annotationPopoverTitle"),
-  annotationLineSnippet: document.querySelector("#annotationLineSnippet"),
-  annotationInput: document.querySelector("#annotationInput"),
-  saveAnnotationBtn: document.querySelector("#saveAnnotationBtn"),
-  cancelAnnotationBtn: document.querySelector("#cancelAnnotationBtn"),
-  closeAnnotationPopoverBtn: document.querySelector("#closeAnnotationPopoverBtn"),
   truncationNotice: null,
 };
 
@@ -572,47 +482,8 @@ async function loadWorkspace({ announce = false } = {}) {
     state.searchResults = [];
     state.searchTruncation = null;
     state.searching = Boolean(state.filter.trim());
-
-    // 恢复路由和选中的视图/文件/模式
-    const routeParams = getRouteParams();
-    const urlView = routeParams.get("view");
-    const urlFile = routeParams.get("file");
-    const urlMode = routeParams.get("mode");
-
-    let savedFile = null;
-    let savedMode = null;
-    let savedView = null;
-    try {
-      savedFile = localStorage.getItem(STORAGE_KEY_LAST_FILE);
-      savedMode = localStorage.getItem(STORAGE_KEY_LAST_MODE);
-      savedView = localStorage.getItem(STORAGE_KEY_LAST_VIEW);
-    } catch {}
-
-    const fileToOpen = urlFile || savedFile;
-    const modeToUse = urlMode || savedMode || (state.mode === "preview" ? "preview" : "edit");
-    let viewToUse = urlView || (fileToOpen ? deduceViewForPath(fileToOpen) : savedView);
-
-    if (!viewToUse) {
-      if (state.workspace.projects?.length > 0 && (!state.workspace.libraries || state.workspace.libraries.length === 0)) {
-        viewToUse = "projects";
-      } else {
-        viewToUse = "libraries";
-      }
-    }
-
-    if (fileToOpen) {
-      expandParentDirs(fileToOpen);
-    }
-
     renderWorkspace();
-    setActiveView(viewToUse, { skipUrlSync: true });
-
-    if (fileToOpen && !state.activeFile) {
-      await openFile(fileToOpen, { force: true, mode: modeToUse, skipUrlSync: true });
-    }
-
-    syncRouteState({ replace: true });
-
+    if (!state.restored) await restoreViewState();
     if (state.filter.trim()) scheduleSearch();
     if (announce) showToast("工作区目录已刷新");
   } catch (error) {
@@ -642,8 +513,6 @@ function syncActionAvailability() {
   const busy = state.loadingFile || state.saving || state.deleting;
   elements.saveButton.disabled = busy || !state.dirty;
   elements.deleteButton.disabled = busy || !state.activeFile;
-  elements.analysisButton.disabled = busy || !state.activeFile;
-  updateAnalysisButtonUi();
 }
 
 function setSaving(saving) {
@@ -681,26 +550,21 @@ function updateDocumentMeta() {
   ].join("  ·  ");
 }
 
-function updateActiveGutterLine() {
-  if (!elements.lineNumbersGutter) return;
-  const content = elements.editorInput.value;
-  const caret = elements.editorInput.selectionStart;
-  const before = content.slice(0, caret);
-  const currentLine = before.split("\n").length;
-  const prevActive = elements.lineNumbersGutter.querySelector(".gutter-line.active");
-  if (prevActive && prevActive.dataset.line === String(currentLine)) return;
-  if (prevActive) prevActive.classList.remove("active");
-  const target = elements.lineNumbersGutter.querySelector(`.gutter-line[data-line='${currentLine}']`);
-  if (target) target.classList.add("active");
-}
-
 function updateCursorPosition() {
   const content = elements.editorInput.value;
   const caret = elements.editorInput.selectionStart;
   const before = content.slice(0, caret);
   const lines = before.split("\n");
+  updateActiveGutterLine(lines.length);
   elements.cursorPosition.textContent = `第 ${lines.length} 行，第 ${[...lines.at(-1)].length + 1} 列`;
-  updateActiveGutterLine();
+}
+
+function updateActiveGutterLine(currentLine) {
+  const prevActive = elements.lineNumbersGutter.querySelector(".gutter-line.active");
+  if (prevActive && prevActive.dataset.line === String(currentLine)) return;
+  if (prevActive) prevActive.classList.remove("active");
+  const target = elements.lineNumbersGutter.querySelector(`.gutter-line[data-line='${currentLine}']`);
+  if (target) target.classList.add("active");
 }
 
 let lineMirror = null;
@@ -714,108 +578,124 @@ function getLineMirror() {
 }
 
 function updateLineNumbers() {
-  if (!state.showLineNumbers || !elements.lineNumbersGutter || !elements.editorContainer || elements.editorContainer.hidden) return;
+  if (!state.showLineNumbers || elements.editorContainer.hidden) return;
   const input = elements.editorInput;
   const text = input.value;
   const lines = text.split("\n");
   const count = lines.length;
 
   const style = window.getComputedStyle(input);
-  const m = getLineMirror();
-  m.style.fontFamily = style.fontFamily;
-  m.style.fontSize = style.fontSize;
-  m.style.fontWeight = style.fontWeight;
-  m.style.fontStyle = style.fontStyle;
-  m.style.lineHeight = style.lineHeight;
-  m.style.letterSpacing = style.letterSpacing;
-  m.style.wordSpacing = style.wordSpacing;
-  m.style.textTransform = style.textTransform;
-  m.style.textIndent = style.textIndent;
-  m.style.whiteSpace = "pre-wrap";
-  m.style.wordBreak = "break-all";
-  m.style.overflowWrap = "break-word";
-  m.style.tabSize = style.tabSize || "4";
+  const mirror = getLineMirror();
+  mirror.style.fontFamily = style.fontFamily;
+  mirror.style.fontSize = style.fontSize;
+  mirror.style.fontWeight = style.fontWeight;
+  mirror.style.fontStyle = style.fontStyle;
+  // 与 textarea 一样使用无单位行高，避免像素小数取整在长文中累积偏移。
+  mirror.style.lineHeight = String(parseFloat(style.lineHeight) / parseFloat(style.fontSize));
+  mirror.style.letterSpacing = style.letterSpacing;
+  mirror.style.wordSpacing = style.wordSpacing;
+  mirror.style.textTransform = style.textTransform;
+  mirror.style.textIndent = style.textIndent;
+  mirror.style.whiteSpace = "pre-wrap";
+  mirror.style.wordBreak = style.wordBreak;
+  mirror.style.overflowWrap = "break-word";
+  mirror.style.tabSize = style.tabSize || "4";
 
   const padLeft = parseFloat(style.paddingLeft) || 0;
   const padRight = parseFloat(style.paddingRight) || 0;
   const innerWidth = input.clientWidth - padLeft - padRight;
   if (innerWidth <= 0) return;
-  m.style.width = `${innerWidth}px`;
+  mirror.style.width = `${innerWidth}px`;
 
-  const gutterWidth = count >= 10000 ? 66 : count >= 1000 ? 56 : 48;
-  elements.lineNumbersGutter.style.width = `${gutterWidth}px`;
-  elements.lineNumbersGutter.style.flex = `0 0 ${gutterWidth}px`;
-
-  m.innerHTML = lines.map((line) => `<div>${escapeHtml(line) || "&#8203;"}</div>`).join("");
+  mirror.innerHTML = lines.map((line) => `<div>${escapeHtml(line) || "&#8203;"}</div>`).join("");
 
   const caret = input.selectionStart || 0;
   const beforeCaret = text.slice(0, caret);
   const activeLineIndex = beforeCaret.split("\n").length - 1;
 
-  const annotatedLines = new Set((state.annotations || []).map((a) => a.line));
-
-  const lineHeight = parseFloat(style.lineHeight) || 34;
-  const children = m.children;
-  const gutterHtml = [];
+  elements.lineNumbersGutter.style.paddingTop = style.paddingTop;
+  elements.lineNumbersGutter.style.paddingBottom = style.paddingBottom;
+  elements.lineNumbersGutter.style.lineHeight = style.lineHeight;
+  const children = mirror.children;
+  const rows = document.createDocumentFragment();
   for (let i = 0; i < count; i++) {
-    const rawH = children[i] ? children[i].offsetHeight : lineHeight;
-    const visualLines = Math.max(1, Math.round(rawH / lineHeight));
-    const h = visualLines * lineHeight;
     const isActive = i === activeLineIndex ? " active" : "";
-    const hasAnn = annotatedLines.has(i + 1) ? " has-annotation" : "";
-    const annTip = annotatedLines.has(i + 1) ? ` title="第 ${i + 1} 行已有批注，点击可添加或查看"` : ` title="点击为第 ${i + 1} 行添加批注"`;
-    gutterHtml.push(`<div class="gutter-line${isActive}${hasAnn}" style="height:${h}px" data-line="${i + 1}"${annTip}>${i + 1}</div>`);
+    const row = document.createElement("div");
+    row.className = `gutter-line${isActive}`;
+    row.dataset.line = String(i + 1);
+    row.textContent = String(i + 1);
+    row.style.height = `${children[i].getBoundingClientRect().height}px`;
+    rows.append(row);
   }
-  elements.lineNumbersGutter.innerHTML = gutterHtml.join("");
+  elements.lineNumbersGutter.replaceChildren(rows);
   elements.lineNumbersGutter.scrollTop = input.scrollTop;
 }
 
-const STORAGE_KEY_LINE_NUMBERS = "story_dashboard_show_line_numbers";
-const STORAGE_KEY_SHOW_ANNOTATIONS = "story_dashboard_show_annotations";
-const STORAGE_KEY_LAST_FILE = "story_dashboard_last_file";
-const STORAGE_KEY_LAST_MODE = "story_dashboard_last_mode";
-const STORAGE_KEY_LAST_VIEW = "story_dashboard_last_view";
-
-function getRouteParams() {
-  let params = new URLSearchParams(window.location.search);
-  if (!params.has("file") && window.location.hash) {
-    const hashQuery = window.location.hash.replace(/^#\??/, "");
-    if (hashQuery.includes("=")) {
-      params = new URLSearchParams(hashQuery);
-    } else {
-      const clean = hashQuery.replace(/^\//, "");
-      if (clean) params.set("file", clean);
-    }
-  }
-  return params;
+let lineNumbersFrame = null;
+function scheduleLineNumbers() {
+  if (lineNumbersFrame !== null) return;
+  lineNumbersFrame = window.requestAnimationFrame(() => {
+    lineNumbersFrame = null;
+    updateLineNumbers();
+  });
 }
 
-function syncRouteState({ replace = true } = {}) {
-  const params = new URLSearchParams();
-  if (state.activeView) {
-    params.set("view", state.activeView);
-    try { localStorage.setItem(STORAGE_KEY_LAST_VIEW, state.activeView); } catch {}
-  }
-  if (state.activeFile?.path) {
-    params.set("file", state.activeFile.path);
-    try { localStorage.setItem(STORAGE_KEY_LAST_FILE, state.activeFile.path); } catch {}
+function setLineNumbersVisible(visible) {
+  state.showLineNumbers = visible;
+  elements.editorBody.classList.toggle("show-line-numbers", visible);
+  elements.lineNumbersButton.setAttribute("aria-pressed", String(visible));
+  scheduleLineNumbers();
+  syncViewState();
+}
+
+function viewStateKey() {
+  return `story_dashboard_view:${state.workspace.workspace.path}`;
+}
+
+function syncViewState() {
+  if (!state.restored) return;
+  const saved = {
+    view: state.activeView,
+    file: state.activeFile?.path || null,
+    mode: state.mode,
+    showLineNumbers: state.showLineNumbers,
+  };
+  try {
+    localStorage.setItem(viewStateKey(), JSON.stringify(saved));
+  } catch {}
+  const url = new URL(window.location.href);
+  url.searchParams.set("view", saved.view);
+  if (saved.file) {
+    url.searchParams.set("file", saved.file);
+    url.searchParams.set("mode", saved.mode);
   } else {
-    try { localStorage.removeItem(STORAGE_KEY_LAST_FILE); } catch {}
+    url.searchParams.delete("file");
+    url.searchParams.delete("mode");
   }
-  if (state.mode && state.activeFile) {
-    params.set("mode", state.mode);
-    try { localStorage.setItem(STORAGE_KEY_LAST_MODE, state.mode); } catch {}
-  }
-  const queryString = params.toString();
-  const newUrl = queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname;
-  const currentUrl = `${window.location.pathname}${window.location.search}`;
-  if (newUrl !== currentUrl) {
-    if (replace) {
-      window.history.replaceState({ file: state.activeFile?.path, mode: state.mode, view: state.activeView }, "", newUrl);
-    } else {
-      window.history.pushState({ file: state.activeFile?.path, mode: state.mode, view: state.activeView }, "", newUrl);
-    }
-  }
+  window.history.replaceState(null, "", url);
+}
+
+async function restoreViewState() {
+  let saved = {};
+  try {
+    saved = JSON.parse(localStorage.getItem(viewStateKey())) || {};
+  } catch {}
+  const params = new URLSearchParams(window.location.search);
+  // 显式链接优先于这个工作区上次打开的文稿。
+  const linked = ["view", "file", "mode"].some((key) => params.has(key));
+  const file = linked ? params.get("file") : saved.file;
+  const mode = (linked ? params.get("mode") : saved.mode) === "preview" ? "preview" : "edit";
+  const requestedView = linked ? params.get("view") : saved.view;
+  const defaultView = state.workspace.libraries.length ? "libraries" : "projects";
+  const view = ["libraries", "projects"].includes(requestedView)
+    ? requestedView
+    : typeof file === "string" ? deduceViewForPath(file) : defaultView;
+  setLineNumbersVisible(saved.showLineNumbers !== false);
+  setMode(mode);
+  if (typeof file === "string" && file) await openFile(file, { force: true });
+  setActiveView(view);
+  state.restored = true;
+  syncViewState();
 }
 
 function expandParentDirs(filePath) {
@@ -831,42 +711,17 @@ function expandParentDirs(filePath) {
 
 function deduceViewForPath(filePath) {
   if (!state.workspace || !filePath) return state.activeView;
-  const firstSegment = filePath.split("/")[0];
-  if (state.workspace.libraries?.some((lib) => lib.path === firstSegment || filePath.startsWith(lib.path + "/"))) {
+  const containsFile = ({ path }) => path === "." || filePath.startsWith(`${path}/`);
+  if (state.workspace.libraries.some(containsFile)) {
     return "libraries";
   }
-  if (state.workspace.projects?.some((proj) => proj.path === firstSegment || filePath.startsWith(proj.path + "/"))) {
+  if (state.workspace.projects.some(containsFile)) {
     return "projects";
   }
   return state.activeView;
 }
 
-function setLineNumbersVisible(visible) {
-  state.showLineNumbers = visible;
-  if (elements.editorBody) {
-    elements.editorBody.classList.toggle("show-line-numbers", visible);
-  }
-  if (elements.lineNumbersButton) {
-    elements.lineNumbersButton.setAttribute("aria-pressed", String(visible));
-  }
-  try {
-    localStorage.setItem(STORAGE_KEY_LINE_NUMBERS, String(visible));
-  } catch {}
-  if (visible && state.mode !== "preview") {
-    window.requestAnimationFrame(() => updateLineNumbers());
-  }
-}
-
-function initLineNumbers() {
-  let stored = true;
-  try {
-    const val = localStorage.getItem(STORAGE_KEY_LINE_NUMBERS);
-    if (val !== null) stored = val === "true";
-  } catch {}
-  setLineNumbersVisible(stored);
-}
-
-async function openFile(path, { force = false, mode = null, skipUrlSync = false } = {}) {
+async function openFile(path, { force = false } = {}) {
   if (state.loadingFile || (!force && !confirmDiscard())) return;
   state.loadingFile = true;
   syncActionAvailability();
@@ -883,30 +738,17 @@ async function openFile(path, { force = false, mode = null, skipUrlSync = false 
     renderBreadcrumbs(file.path);
     setDirty(false);
     expandParentDirs(file.path);
-    const expectedView = deduceViewForPath(file.path);
-    if (expectedView && expectedView !== state.activeView) {
-      setActiveView(expectedView, { skipUrlSync: true });
-    }
-    const targetMode = mode || (state.mode === "preview" ? "preview" : "edit");
-    setMode(targetMode, { skipUrlSync: true });
+    setActiveView(deduceViewForPath(file.path));
+    setMode(state.mode);
     updateDocumentMeta();
     updateCursorPosition();
     elements.editorEmpty.hidden = true;
     elements.editorWorkspace.hidden = false;
     document.body.classList.add("document-open");
     syncActiveRow();
-    if (!skipUrlSync) {
-      syncRouteState({ replace: false });
-    }
-    if (state.showLineNumbers && targetMode !== "preview") {
-      updateLineNumbers();
-      window.requestAnimationFrame(() => updateLineNumbers());
-    }
-    if (targetMode !== "preview") {
-      window.requestAnimationFrame(() => elements.editorInput.focus());
-    }
-    syncChapterAnalysisStatus(file.path);
-    loadChapterAnnotations(file.path);
+    syncViewState();
+    scheduleLineNumbers();
+    if (state.mode === "edit") window.requestAnimationFrame(() => elements.editorInput.focus());
   } catch (error) {
     showToast(error.message, "error");
   } finally {
@@ -952,7 +794,7 @@ function markdownToSafeHtml(markdown) {
     if (line.trim().startsWith("```")) {
       closeList();
       if (inCode) {
-        output.push(`<pre data-line="${codeStartLine}"><code>${codeLines.join("\n")}</code></pre>`);
+        output.push(`<div class="preview-code-block" data-line="${codeStartLine}"><pre><code>${codeLines.join("\n")}</code></pre></div>`);
         codeLines = [];
       } else {
         codeStartLine = lineNum;
@@ -993,38 +835,26 @@ function markdownToSafeHtml(markdown) {
       closeList();
     }
   }
-  if (inCode) output.push(`<pre data-line="${codeStartLine}"><code>${codeLines.join("\n")}</code></pre>`);
+  if (inCode) output.push(`<div class="preview-code-block" data-line="${codeStartLine}"><pre><code>${codeLines.join("\n")}</code></pre></div>`);
   closeList();
   return output.join("");
 }
 
-function setMode(mode, { skipUrlSync = false } = {}) {
+function setMode(mode) {
   state.mode = mode;
   elements.modeButtons.forEach((button) => {
     button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
   });
   const previewing = mode === "preview";
-  if (elements.editorContainer) {
-    elements.editorContainer.hidden = previewing;
-  } else {
-    elements.editorInput.hidden = previewing;
-  }
+  elements.editorContainer.hidden = previewing;
   elements.previewPane.hidden = !previewing;
-  if (elements.editorBody) {
-    elements.editorBody.classList.toggle("show-annotations", !previewing && state.showAnnotationsSidebar);
-  }
   if (previewing) {
     elements.previewPane.innerHTML = markdownToSafeHtml(elements.editorInput.value);
   } else {
-    if (state.showLineNumbers) {
-      updateLineNumbers();
-      window.requestAnimationFrame(() => updateLineNumbers());
-    }
     window.requestAnimationFrame(() => elements.editorInput.focus());
   }
-  if (!skipUrlSync) {
-    syncRouteState({ replace: true });
-  }
+  scheduleLineNumbers();
+  syncViewState();
 }
 
 async function saveFile() {
@@ -1095,7 +925,7 @@ async function deleteFile() {
     elements.editorEmpty.hidden = false;
     document.body.classList.remove("document-open");
     setDirty(false);
-    syncRouteState({ replace: true });
+    syncViewState();
     await loadWorkspace();
     showToast(`已删除《${file.name}》`);
   } catch (error) {
@@ -1157,7 +987,7 @@ function scheduleSearch() {
   state.searchTimer = window.setTimeout(() => searchWorkspace(query, sequence), 180);
 }
 
-function setActiveView(view, { skipUrlSync = false } = {}) {
+function setActiveView(view) {
   state.activeView = view;
   elements.archiveTabs.forEach((tab) => {
     const selected = tab.dataset.view === view;
@@ -1173,9 +1003,7 @@ function setActiveView(view, { skipUrlSync = false } = {}) {
   } else {
     renderTree();
   }
-  if (!skipUrlSync) {
-    syncRouteState({ replace: true });
-  }
+  syncViewState();
 }
 
 elements.archiveTabs.forEach((tab) => {
@@ -1218,64 +1046,19 @@ elements.editorInput.addEventListener("input", () => {
   setDirty(elements.editorInput.value !== state.originalContent);
   updateDocumentMeta();
   updateCursorPosition();
-  if (state.showLineNumbers) {
-    updateLineNumbers();
-  }
+  scheduleLineNumbers();
 });
 
 elements.editorInput.addEventListener("scroll", () => {
-  if (elements.lineNumbersGutter) {
-    elements.lineNumbersGutter.scrollTop = elements.editorInput.scrollTop;
-  }
+  elements.lineNumbersGutter.scrollTop = elements.editorInput.scrollTop;
 }, { passive: true });
 
-if (elements.lineNumbersGutter) {
-  elements.lineNumbersGutter.addEventListener("wheel", (event) => {
-    elements.editorInput.scrollTop += event.deltaY;
-  }, { passive: true });
-}
+elements.lineNumbersButton.addEventListener("click", () => {
+  setLineNumbersVisible(!state.showLineNumbers);
+});
 
-if (elements.lineNumbersGutter) {
-  elements.lineNumbersGutter.addEventListener("click", (event) => {
-    const lineEl = event.target.closest(".gutter-line");
-    if (!lineEl) return;
-    const lineNum = parseInt(lineEl.dataset.line, 10);
-    if (!lineNum) return;
-    const lines = elements.editorInput.value.split("\n");
-    let charIndex = 0;
-    for (let i = 0; i < lineNum - 1; i++) {
-      charIndex += lines[i].length + 1;
-    }
-    elements.editorInput.focus();
-    elements.editorInput.setSelectionRange(charIndex, charIndex);
-    updateCursorPosition();
-
-    // 呼出行级批注添加框
-    const lineText = lines[lineNum - 1] || "";
-    openAnnotationPopover(lineNum, lineText);
-  });
-}
-
-if (elements.lineNumbersButton) {
-  elements.lineNumbersButton.addEventListener("click", () => {
-    setLineNumbersVisible(!state.showLineNumbers);
-  });
-}
-
-if (window.ResizeObserver && elements.editorInput) {
-  const resizeObserver = new ResizeObserver(() => {
-    if (state.showLineNumbers && state.mode !== "preview") {
-      updateLineNumbers();
-    }
-  });
-  resizeObserver.observe(elements.editorInput);
-} else {
-  window.addEventListener("resize", () => {
-    if (state.showLineNumbers && state.mode !== "preview") {
-      updateLineNumbers();
-    }
-  });
-}
+new ResizeObserver(scheduleLineNumbers).observe(elements.editorInput);
+document.fonts.ready.then(scheduleLineNumbers);
 
 ["click", "keyup", "select"].forEach((eventName) => {
   elements.editorInput.addEventListener(eventName, updateCursorPosition);
@@ -1302,10 +1085,6 @@ document.addEventListener("keydown", (event) => {
     elements.treeSearch.focus();
     elements.treeSearch.select();
   }
-  if (modifier && event.key.toLocaleLowerCase() === "l" && event.altKey) {
-    event.preventDefault();
-    setLineNumbersVisible(!state.showLineNumbers);
-  }
 });
 
 window.addEventListener("beforeunload", (event) => {
@@ -1315,1605 +1094,4 @@ window.addEventListener("beforeunload", (event) => {
   }
 });
 
-window.addEventListener("popstate", () => {
-  const params = getRouteParams();
-  const file = params.get("file");
-  const mode = params.get("mode") || "edit";
-  const view = params.get("view");
-  if (view && view !== state.activeView) {
-    setActiveView(view, { skipUrlSync: true });
-  }
-  if (file) {
-    if (file !== state.activeFile?.path) {
-      openFile(file, { force: false, mode, skipUrlSync: true });
-    } else if (mode !== state.mode) {
-      setMode(mode, { skipUrlSync: true });
-    }
-  } else if (state.activeFile) {
-    state.activeFile = null;
-    state.originalContent = "";
-    elements.editorInput.value = "";
-    elements.editorWorkspace.hidden = true;
-    elements.editorEmpty.hidden = false;
-    document.body.classList.remove("document-open");
-    setDirty(false);
-    syncActiveRow();
-  }
-});
-
-// ==========================================
-// 章节剧情分析模块 (Chapter Analysis)
-// ==========================================
-
-const ANALYSIS_PREF_KEY = "oh_story_analysis_preferred_method";
-
-// 全局后台轮询器映射表: filePath -> timerId (即使弹窗关闭也持续在后台轮询)
-const backgroundAnalysisPollers = new Map();
-
-// 本地章节分析状态缓存: filePath -> "none" | "running" | "completed" | "failed"
-const chapterAnalysisStatusCache = new Map();
-
-let currentAnalysisTab = "overview";
-
-function getPreferredAnalysisMethod() {
-  try {
-    return localStorage.getItem(ANALYSIS_PREF_KEY) || null;
-  } catch {
-    return null;
-  }
-}
-
-function setPreferredAnalysisMethod(method) {
-  try {
-    localStorage.setItem(ANALYSIS_PREF_KEY, method);
-  } catch {}
-}
-
-function updateAnalysisButtonUi() {
-  if (!elements.analysisButton) return;
-  if (!state.activeFile) {
-    elements.analysisButton.classList.remove("is-running");
-    if (elements.analysisBtnLabel) elements.analysisBtnLabel.textContent = "剧情分析";
-    elements.analysisButton.title = "剧情深度分析";
-    return;
-  }
-  const currentPath = state.activeFile.path;
-  const status = chapterAnalysisStatusCache.get(currentPath) || "none";
-  const isRunning = status === "running";
-
-  if (isRunning) {
-    elements.analysisButton.classList.add("is-running");
-    if (elements.analysisBtnLabel) elements.analysisBtnLabel.textContent = "正在分析...";
-    elements.analysisButton.title = "剧情深度分析进行中，点击可查看实时进度";
-  } else {
-    elements.analysisButton.classList.remove("is-running");
-    if (elements.analysisBtnLabel) elements.analysisBtnLabel.textContent = "剧情分析";
-    elements.analysisButton.title = "剧情深度分析";
-  }
-}
-
-async function syncChapterAnalysisStatus(filePath) {
-  if (!filePath) return;
-  try {
-    const res = await requestJson(`/api/chapter-analysis/status?path=${encodeURIComponent(filePath)}`);
-    const status = res.status || (res.exists ? "completed" : "none");
-    chapterAnalysisStatusCache.set(filePath, status);
-
-    if (status === "running") {
-      ensureBackgroundAnalysisPolling(filePath, state.activeFile?.name || "");
-    }
-    if (state.activeFile?.path === filePath) {
-      updateAnalysisButtonUi();
-    }
-  } catch {
-    // 忽略轻量状态同步异常
-  }
-}
-
-function ensureBackgroundAnalysisPolling(filePath, fileName = "") {
-  if (backgroundAnalysisPollers.has(filePath)) {
-    return; // 已经在后台轮询中
-  }
-
-  chapterAnalysisStatusCache.set(filePath, "running");
-  if (state.activeFile?.path === filePath) {
-    updateAnalysisButtonUi();
-  }
-
-  const pollInterval = 2500;
-  const pollerId = setInterval(async () => {
-    try {
-      const res = await requestJson(`/api/chapter-analysis/status?path=${encodeURIComponent(filePath)}`);
-      const status = res.status || (res.exists ? "completed" : "none");
-      chapterAnalysisStatusCache.set(filePath, status);
-
-      // 如果弹窗正在展示当前文件，同步更新加载文案
-      if (elements.analysisDialog.open && state.activeFile?.path === filePath) {
-        if (res.message && elements.analysisLoadingMsg) {
-          elements.analysisLoadingMsg.textContent = res.message;
-        }
-      }
-
-      if (status === "completed") {
-        clearInterval(pollerId);
-        backgroundAnalysisPollers.delete(filePath);
-
-        if (state.activeFile?.path === filePath) {
-          updateAnalysisButtonUi();
-          if (elements.analysisDialog.open) {
-            const fullRes = await requestJson(`/api/chapter-analysis?path=${encodeURIComponent(filePath)}`);
-            if (fullRes.exists && fullRes.data) {
-              renderAnalysisData(fullRes.data);
-            }
-          }
-        }
-
-        const title = fileName || filePath.split("/").pop() || "当前章节";
-        showToast(`《${title}》剧情分析已完成！`, "success");
-      } else if (status === "failed") {
-        clearInterval(pollerId);
-        backgroundAnalysisPollers.delete(filePath);
-
-        if (state.activeFile?.path === filePath) {
-          updateAnalysisButtonUi();
-          if (elements.analysisDialog.open) {
-            elements.analysisLoadingView.hidden = true;
-            elements.analysisResultView.hidden = true;
-            elements.analysisEmptyView.hidden = false;
-          }
-        }
-        showToast(res.message || "剧情分析失败，请稍后重试", "error");
-      }
-    } catch {
-      // 容忍网络抖动，继续下一次轮询
-    }
-  }, pollInterval);
-
-  backgroundAnalysisPollers.set(filePath, pollerId);
-}
-
-function switchAnalysisTab(targetTab) {
-  currentAnalysisTab = targetTab;
-  elements.analysisTabs.forEach((tab) => {
-    const isSelected = tab.dataset.tab === targetTab;
-    tab.setAttribute("aria-selected", isSelected ? "true" : "false");
-  });
-  Object.entries(elements.tabPanels).forEach(([key, panel]) => {
-    if (!panel) return;
-    if (key === targetTab) {
-      panel.hidden = false;
-      panel.classList.add("active");
-    } else {
-      panel.hidden = true;
-      panel.classList.remove("active");
-    }
-  });
-}
-
-async function openAnalysisDialog() {
-  if (!state.activeFile) return;
-  const filePath = state.activeFile.path;
-  const fileName = state.activeFile.name;
-
-  elements.analysisChapterTitle.textContent = fileName;
-  const wordCount = (state.activeFile.content || "").replace(/\s+/g, "").length;
-  elements.analysisWordCountTag.textContent = `${formatNumber(wordCount)} 字`;
-  elements.analysisScoreBadge.hidden = true;
-  elements.analysisMethodBadge.hidden = true;
-  elements.analysisConfigPanel.hidden = true;
-
-  const currentStatus = chapterAnalysisStatusCache.get(filePath);
-
-  // 1. 如果已在后台运行中：打开弹窗直接展示进度
-  if (currentStatus === "running") {
-    elements.analysisEmptyView.hidden = true;
-    elements.analysisResultView.hidden = true;
-    elements.analysisLoadingView.hidden = false;
-    elements.analysisLoadingTitle.textContent = "正在进行剧情深度剖析…";
-    elements.analysisLoadingMsg.textContent = "分析任务正在后台运行中，已同步分析进度...";
-    elements.reanalyzeButton.hidden = true;
-    if (!elements.analysisDialog.open) elements.analysisDialog.showModal();
-    ensureBackgroundAnalysisPolling(filePath, fileName);
-    return;
-  }
-
-  // 2. 先展示加载过渡
-  elements.analysisEmptyView.hidden = true;
-  elements.analysisResultView.hidden = true;
-  elements.analysisLoadingView.hidden = false;
-  elements.analysisLoadingTitle.textContent = "正在读取分析数据…";
-  elements.analysisLoadingMsg.textContent = "请稍候，正在获取本章分析状态...";
-  if (!elements.analysisDialog.open) elements.analysisDialog.showModal();
-
-  try {
-    const res = await requestJson(`/api/chapter-analysis/status?path=${encodeURIComponent(filePath)}`);
-    const status = res.status || (res.exists ? "completed" : "none");
-    chapterAnalysisStatusCache.set(filePath, status);
-
-    // 若在异步等待期间用户已切换到其他章节，终止本次UI覆盖
-    if (state.activeFile?.path !== filePath) return;
-
-    if (status === "completed") {
-      updateAnalysisButtonUi();
-      const fullRes = await requestJson(`/api/chapter-analysis?path=${encodeURIComponent(filePath)}`);
-      if (state.activeFile?.path !== filePath) return;
-      if (fullRes.exists && fullRes.data) {
-        renderAnalysisData(fullRes.data);
-      } else {
-        clearAnalysisDataUi();
-        elements.analysisLoadingView.hidden = true;
-        elements.analysisEmptyView.hidden = false;
-      }
-    } else if (status === "running") {
-      clearAnalysisDataUi();
-      updateAnalysisButtonUi();
-      elements.analysisLoadingTitle.textContent = "正在进行剧情深度剖析…";
-      elements.analysisLoadingMsg.textContent = res.message || "任务已通知 Antigravity，正在提取剧情钩子与伏笔细节...";
-      elements.reanalyzeButton.hidden = true;
-      ensureBackgroundAnalysisPolling(filePath, fileName);
-    } else {
-      // 未分析状态 (none)
-      clearAnalysisDataUi();
-      const preferredMethod = getPreferredAnalysisMethod();
-      if (preferredMethod) {
-        // 用户已记住偏好（如 antigravity），自动发起分析任务！
-        await startChapterAnalysis({ force: false });
-      } else {
-        // 首次使用，展示引导选择界面
-        elements.analysisLoadingView.hidden = true;
-        elements.analysisResultView.hidden = true;
-        elements.analysisEmptyView.hidden = false;
-        elements.reanalyzeButton.hidden = true;
-      }
-    }
-  } catch (err) {
-    if (state.activeFile?.path === filePath) {
-      showToast(err.message, "error");
-      elements.analysisLoadingView.hidden = true;
-      elements.analysisEmptyView.hidden = false;
-    }
-  }
-}
-
-async function startChapterAnalysis({ force = false } = {}) {
-  if (!state.activeFile) return;
-  const filePath = state.activeFile.path;
-  const fileName = state.activeFile.name;
-
-  let hasApiKey = false;
-  try {
-    const cfg = await requestJson("/api/ai-config");
-    hasApiKey = Boolean(cfg?.hasApiKey || cfg?.apiKey);
-  } catch {}
-
-  const useAntigravity = !hasApiKey;
-  setPreferredAnalysisMethod(useAntigravity ? "antigravity" : "api");
-
-  elements.analysisEmptyView.hidden = true;
-  elements.analysisResultView.hidden = true;
-  elements.analysisLoadingView.hidden = false;
-  elements.analysisLoadingTitle.textContent = "已发起剧情深度剖析…";
-  elements.analysisLoadingMsg.textContent = useAntigravity
-    ? "任务已发派至 Agent，正在深度梳理全章伏笔、角色状态与钩子设计..."
-    : "正在调用配置的模型接口进行全章深度剧情剖析...";
-  elements.reanalyzeButton.hidden = true;
-
-  // 立即将顶部按钮更新为正在分析中，启动后台轮询
-  chapterAnalysisStatusCache.set(filePath, "running");
-  updateAnalysisButtonUi();
-
-  try {
-    const res = await requestJson("/api/chapter-analysis", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        path: filePath,
-        force,
-        useAntigravity,
-        method: useAntigravity ? "antigravity" : "external_api",
-      }),
-    });
-
-    if (res.status === "completed" && res.data) {
-      chapterAnalysisStatusCache.set(filePath, "completed");
-      if (state.activeFile?.path === filePath) {
-        updateAnalysisButtonUi();
-        if (elements.analysisDialog.open) {
-          renderAnalysisData(res.data);
-        }
-      }
-      showToast(`《${fileName}》剧情分析完成！`, "success");
-    } else {
-      // 启动后台轮询（即使弹窗关闭也不会停止）
-      ensureBackgroundAnalysisPolling(filePath, fileName);
-    }
-  } catch (err) {
-    chapterAnalysisStatusCache.set(filePath, "failed");
-    if (state.activeFile?.path === filePath) {
-      updateAnalysisButtonUi();
-      elements.analysisLoadingView.hidden = true;
-      elements.analysisEmptyView.hidden = false;
-    }
-    showToast(err.message, "error");
-  }
-}
-
-function clearAnalysisDataUi() {
-  currentAnalysisData = null;
-  if (elements.analysisScoreBadge) {
-    elements.analysisScoreBadge.hidden = true;
-    elements.analysisScoreBadge.textContent = "- 分";
-  }
-  if (elements.analysisMethodBadge) {
-    elements.analysisMethodBadge.hidden = true;
-  }
-
-  const scoreOverall = document.querySelector("#scoreOverall");
-  if (scoreOverall) scoreOverall.textContent = "0.0";
-  const scorePacing = document.querySelector("#scorePacing");
-  if (scorePacing) scorePacing.textContent = "0.0";
-  const scoreEngagement = document.querySelector("#scoreEngagement");
-  if (scoreEngagement) scoreEngagement.textContent = "0.0";
-  const scoreCoherence = document.querySelector("#scoreCoherence");
-  if (scoreCoherence) scoreCoherence.textContent = "0.0";
-
-  const meterOverall = document.querySelector("#meterOverall");
-  if (meterOverall) meterOverall.style.width = "0%";
-  const meterPacing = document.querySelector("#meterPacing");
-  if (meterPacing) meterPacing.style.width = "0%";
-  const meterEngagement = document.querySelector("#meterEngagement");
-  if (meterEngagement) meterEngagement.style.width = "0%";
-  const meterCoherence = document.querySelector("#meterCoherence");
-  if (meterCoherence) meterCoherence.style.width = "0%";
-
-  const justEl = document.querySelector("#analysisJustification");
-  if (justEl) justEl.textContent = "";
-  const repEl = document.querySelector("#analysisSummaryReport");
-  if (repEl) repEl.textContent = "";
-
-  const suggestionsList = document.querySelector("#analysisSuggestionsList");
-  if (suggestionsList) suggestionsList.replaceChildren();
-
-  if (elements.regenPendingNotice) {
-    elements.regenPendingNotice.hidden = true;
-  }
-
-  const hooksList = document.querySelector("#hooksList");
-  if (hooksList) hooksList.replaceChildren();
-  if (elements.hooksBadge) elements.hooksBadge.textContent = "0";
-
-  const foreshadowsList = document.querySelector("#foreshadowsList");
-  if (foreshadowsList) foreshadowsList.replaceChildren();
-  if (elements.foreshadowsBadge) elements.foreshadowsBadge.textContent = "0";
-
-  const charactersList = document.querySelector("#charactersList");
-  if (charactersList) charactersList.replaceChildren();
-  if (elements.charactersBadge) elements.charactersBadge.textContent = "0";
-
-  const plotPointsList = document.querySelector("#plotPointsList");
-  if (plotPointsList) plotPointsList.replaceChildren();
-  if (elements.plotPointsBadge) elements.plotPointsBadge.textContent = "0";
-}
-
-async function checkPendingRegenerationNotice(filePath) {
-  if (!elements.regenPendingNotice || !filePath) return;
-  try {
-    const res = await requestJson(`/api/chapter-regenerate/status?path=${encodeURIComponent(filePath)}`);
-    if (res.exists && res.status === "completed" && res.newContent) {
-      elements.regenPendingNotice.hidden = false;
-      if (elements.viewPendingMergeButton) {
-        elements.viewPendingMergeButton.onclick = () => {
-          openDiffMergeDialog(res.originalContent || state.activeFile?.content || "", res.newContent);
-        };
-      }
-    } else {
-      elements.regenPendingNotice.hidden = true;
-    }
-  } catch {
-    elements.regenPendingNotice.hidden = true;
-  }
-}
-
-function renderAnalysisData(data) {
-  currentAnalysisData = data;
-  elements.analysisEmptyView.hidden = true;
-  elements.analysisLoadingView.hidden = true;
-  elements.analysisResultView.hidden = false;
-  elements.reanalyzeButton.hidden = false;
-
-  checkPendingRegenerationNotice(state.activeFile?.path);
-
-  const analysis = data.analysis || {};
-  const scores = analysis.scores || {};
-
-  if (scores.overall !== undefined) {
-    elements.analysisScoreBadge.hidden = false;
-    elements.analysisScoreBadge.textContent = `${scores.overall} 分`;
-  }
-  if (data.method) {
-    elements.analysisMethodBadge.hidden = false;
-    elements.analysisMethodBadge.textContent = data.method === "antigravity" ? "⚡️ Antigravity" : "🌐 API";
-  }
-
-  const scoreOverall = Number(scores.overall || 0);
-  const scorePacing = Number(scores.pacing || 0);
-  const scoreEngagement = Number(scores.engagement || 0);
-  const scoreCoherence = Number(scores.coherence || 0);
-
-  document.querySelector("#scoreOverall").textContent = scoreOverall.toFixed(1);
-  document.querySelector("#scorePacing").textContent = scorePacing.toFixed(1);
-  document.querySelector("#scoreEngagement").textContent = scoreEngagement.toFixed(1);
-  document.querySelector("#scoreCoherence").textContent = scoreCoherence.toFixed(1);
-
-  document.querySelector("#meterOverall").style.width = `${Math.min(100, scoreOverall * 10)}%`;
-  document.querySelector("#meterPacing").style.width = `${Math.min(100, scorePacing * 10)}%`;
-  document.querySelector("#meterEngagement").style.width = `${Math.min(100, scoreEngagement * 10)}%`;
-  document.querySelector("#meterCoherence").style.width = `${Math.min(100, scoreCoherence * 10)}%`;
-
-  document.querySelector("#analysisJustification").textContent = scores.score_justification || "暂无简评";
-  document.querySelector("#analysisSummaryReport").textContent = analysis.analysis_report || "";
-
-  const suggestionsList = document.querySelector("#analysisSuggestionsList");
-  suggestionsList.replaceChildren();
-  const suggestions = analysis.suggestions || [];
-  if (suggestions.length === 0) {
-    const li = document.createElement("li");
-    li.textContent = "本章完成度极高，未发现明显阻滞问题，继续保持节奏！";
-    suggestionsList.append(li);
-  } else {
-    suggestions.forEach((s) => {
-      const li = document.createElement("li");
-      li.textContent = s;
-      suggestionsList.append(li);
-    });
-  }
-
-  const hooks = analysis.hooks || [];
-  elements.hooksBadge.textContent = String(hooks.length);
-  const hooksList = document.querySelector("#hooksList");
-  hooksList.replaceChildren();
-  if (hooks.length === 0) {
-    hooksList.innerHTML = '<p class="tree-message">本章暂未识别到显著钩子</p>';
-  } else {
-    hooks.forEach((hook) => {
-      const card = document.createElement("div");
-      card.className = "item-card";
-      card.innerHTML = `
-        <div class="item-card-header">
-          <div class="item-card-badges">
-            <span class="pill-tag blue">${escapeHtml(hook.type || "钩子")}</span>
-            <span class="pill-tag amber">${escapeHtml(hook.position || "中段")}</span>
-            <span class="pill-tag red">强度 ${hook.strength || 8}/10</span>
-          </div>
-        </div>
-        <p class="item-description">${escapeHtml(hook.content || "")}</p>
-        ${hook.keyword ? `<div class="quote-snippet"><b>原文锚点：</b>"${escapeHtml(hook.keyword)}"</div>` : ""}
-      `;
-      hooksList.append(card);
-    });
-  }
-
-  const foreshadows = analysis.foreshadows || [];
-  elements.foreshadowsBadge.textContent = String(foreshadows.length);
-  const foreshadowsList = document.querySelector("#foreshadowsList");
-  foreshadowsList.replaceChildren();
-  if (foreshadows.length === 0) {
-    foreshadowsList.innerHTML = '<p class="tree-message">本章暂未识别到伏笔</p>';
-  } else {
-    foreshadows.forEach((f) => {
-      const card = document.createElement("div");
-      card.className = "item-card";
-      const isPlanted = f.type === "planted";
-      card.innerHTML = `
-        <div class="item-card-header">
-          <div class="item-card-badges">
-            <span class="pill-tag ${isPlanted ? "green" : "purple"}">${isPlanted ? "已埋下" : "已回收"}</span>
-            <span class="pill-tag gray">强度 ${f.strength || 8}/10</span>
-            <span class="pill-tag gray">隐藏度 ${f.subtlety || 7}/10</span>
-            ${f.reference_chapter ? `<span class="pill-tag blue">呼应第${f.reference_chapter}章</span>` : ""}
-          </div>
-        </div>
-        <div class="item-title">${escapeHtml(f.title || "未命名伏笔")}</div>
-        <p class="item-description">${escapeHtml(f.content || "")}</p>
-        ${f.keyword ? `<div class="quote-snippet"><b>原文锚点：</b>"${escapeHtml(f.keyword)}"</div>` : ""}
-      `;
-      foreshadowsList.append(card);
-    });
-  }
-
-  const emotional = analysis.emotional_arc || {};
-  document.querySelector("#primaryEmotion").textContent = emotional.primary_emotion || "平静";
-  document.querySelector("#emotionIntensity").textContent = `${emotional.intensity || 5} / 10`;
-  document.querySelector("#emotionCurve").textContent = emotional.curve || "平缓起伏";
-  const secondaryEmotionsEl = document.querySelector("#secondaryEmotions");
-  secondaryEmotionsEl.replaceChildren();
-  (emotional.secondary_emotions || []).forEach((e) => {
-    const span = document.createElement("span");
-    span.className = "pill-tag blue";
-    span.textContent = e;
-    secondaryEmotionsEl.append(span);
-  });
-
-  const conflict = analysis.conflict || {};
-  document.querySelector("#conflictLevel").textContent = `${conflict.level || 5} / 10`;
-  document.querySelector("#conflictProgress").textContent = `${Math.round((conflict.resolution_progress || 0) * 100)}%`;
-  const conflictTypesEl = document.querySelector("#conflictTypes");
-  conflictTypesEl.replaceChildren();
-  (conflict.types || []).forEach((t) => {
-    const span = document.createElement("span");
-    span.className = "pill-tag red";
-    span.textContent = t;
-    conflictTypesEl.append(span);
-  });
-  const conflictPartiesEl = document.querySelector("#conflictParties");
-  conflictPartiesEl.replaceChildren();
-  (conflict.parties || []).forEach((p) => {
-    const span = document.createElement("span");
-    span.className = "pill-tag amber";
-    span.textContent = p;
-    conflictPartiesEl.append(span);
-  });
-  document.querySelector("#conflictDescription").textContent = conflict.description || "无显著冲突";
-
-  const characters = analysis.character_states || [];
-  elements.charactersBadge.textContent = String(characters.length);
-  const charactersList = document.querySelector("#charactersList");
-  charactersList.replaceChildren();
-  if (characters.length === 0) {
-    charactersList.innerHTML = '<p class="tree-message">本章暂未提取到角色状态变动</p>';
-  } else {
-    characters.forEach((char) => {
-      const card = document.createElement("div");
-      card.className = "character-state-card";
-      let relHtml = "";
-      if (char.relationship_changes && Object.keys(char.relationship_changes).length > 0) {
-        relHtml = Object.entries(char.relationship_changes)
-          .map(([name, change]) => `<span class="pill-tag blue">与 ${escapeHtml(name)}: ${escapeHtml(change)}</span>`)
-          .join(" ");
-      }
-      card.innerHTML = `
-        <div class="char-header">
-          <span class="char-name">${escapeHtml(char.character_name || "未知角色")}</span>
-          ${char.survival_status ? `<span class="pill-tag red">${escapeHtml(char.survival_status)}</span>` : ""}
-        </div>
-        <div class="char-flow">
-          <span class="char-state-tag">${escapeHtml(char.state_before || "初始")}</span>
-          <span class="char-arrow">➔</span>
-          <span class="char-state-tag"><strong>${escapeHtml(char.state_after || "蜕变")}</strong></span>
-        </div>
-        ${char.psychological_change ? `<div class="char-detail-row"><strong>心理演变：</strong>${escapeHtml(char.psychological_change)}</div>` : ""}
-        ${char.key_event ? `<div class="char-detail-row"><strong>核心诱因：</strong>${escapeHtml(char.key_event)}</div>` : ""}
-        ${relHtml ? `<div class="char-detail-row" style="margin-top: 8px;"><strong>关系变化：</strong>${relHtml}</div>` : ""}
-      `;
-      charactersList.append(card);
-    });
-  }
-
-  const plotPoints = analysis.plot_points || [];
-  elements.plotPointsBadge.textContent = String(plotPoints.length);
-  const plotPointsList = document.querySelector("#plotPointsList");
-  plotPointsList.replaceChildren();
-  if (plotPoints.length === 0) {
-    plotPointsList.innerHTML = '<p class="tree-message">本章暂无情节点数据</p>';
-  } else {
-    plotPoints.forEach((point, index) => {
-      const card = document.createElement("div");
-      card.className = "item-card";
-      card.innerHTML = `
-        <div class="item-card-header">
-          <div class="item-card-badges">
-            <span class="pill-tag blue">节点 ${index + 1}</span>
-            <span class="pill-tag amber">${escapeHtml(point.type || "情节")}</span>
-            <span class="pill-tag green">关键度 ${Math.round((point.importance || 0.8) * 100)}%</span>
-          </div>
-        </div>
-        <div class="item-title">${escapeHtml(point.content || "")}</div>
-        ${point.impact ? `<p class="item-description"><strong>故事影响：</strong>${escapeHtml(point.impact)}</p>` : ""}
-        ${point.keyword ? `<div class="quote-snippet"><b>原文锚点：</b>"${escapeHtml(point.keyword)}"</div>` : ""}
-      `;
-      plotPointsList.append(card);
-    });
-  }
-
-  switchAnalysisTab("overview");
-}
-
-async function loadAiConfig() {
-  try {
-    const config = await requestJson("/api/ai-config");
-    elements.cfgBaseUrl.value = config.baseUrl || "";
-    elements.cfgModel.value = config.model || "";
-    elements.cfgApiKey.value = config.apiKey || "";
-  } catch {}
-}
-
-async function saveAiConfig() {
-  try {
-    await requestJson("/api/ai-config", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        baseUrl: elements.cfgBaseUrl.value.trim(),
-        model: elements.cfgModel.value.trim(),
-        apiKey: elements.cfgApiKey.value.trim(),
-      }),
-    });
-    elements.analysisConfigPanel.hidden = true;
-    showToast("模型配置已保存！", "success");
-  } catch (err) {
-    showToast(err.message, "error");
-  }
-}
-
-// 绑定分析弹窗事件
-elements.analysisButton.addEventListener("click", () => {
-  openAnalysisDialog();
-});
-
-elements.closeAnalysisDialogButton.addEventListener("click", () => {
-  elements.analysisDialog.close();
-});
-
-// 关闭弹窗时保持后台任务与轮询继续执行，不中断分析进程
-elements.analysisDialog.addEventListener("close", () => {
-  // 保持后台轮询 (backgroundAnalysisPollers) 继续运作
-});
-
-elements.reanalyzeButton.addEventListener("click", () => {
-  startChapterAnalysis({ force: true });
-});
-
-elements.startAnalysisBtn.addEventListener("click", () => {
-  startChapterAnalysis({ force: false });
-});
-
-elements.analysisConfigToggle.addEventListener("click", () => {
-  elements.analysisConfigPanel.hidden = !elements.analysisConfigPanel.hidden;
-  if (!elements.analysisConfigPanel.hidden) {
-    loadAiConfig();
-  }
-});
-
-elements.closeConfigButton.addEventListener("click", () => {
-  elements.analysisConfigPanel.hidden = true;
-});
-
-elements.saveConfigButton.addEventListener("click", () => {
-  saveAiConfig();
-});
-
-let currentAnalysisData = null;
-let currentDiffChunks = [];
-let currentDiffOriginalText = "";
-let currentDiffNewText = "";
-let regenPollIntervalId = null;
-let verifyPrecheckTimer = null;
-
-function computeLineDiff(originalText, newText) {
-  const origLines = (originalText || "").split(/\r?\n/);
-  const newLines = (newText || "").split(/\r?\n/);
-  const n = origLines.length;
-  const m = newLines.length;
-
-  const dp = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < m; j++) {
-      if (origLines[i] === newLines[j]) {
-        dp[i + 1][j + 1] = dp[i][j] + 1;
-      } else {
-        dp[i + 1][j + 1] = Math.max(dp[i + 1][j], dp[i][j + 1]);
-      }
-    }
-  }
-
-  let i = n;
-  let j = m;
-  const edits = [];
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && origLines[i - 1] === newLines[j - 1]) {
-      edits.unshift({ type: "equal", line: origLines[i - 1] });
-      i--;
-      j--;
-    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      edits.unshift({ type: "insert", line: newLines[j - 1] });
-      j--;
-    } else {
-      edits.unshift({ type: "delete", line: origLines[i - 1] });
-      i--;
-    }
-  }
-
-  const chunks = [];
-  let currentChunk = null;
-  for (let idx = 0; idx < edits.length; idx++) {
-    const edit = edits[idx];
-    if (edit.type === "equal") {
-      if (currentChunk && currentChunk.type !== "equal") {
-        chunks.push(currentChunk);
-        currentChunk = null;
-      }
-      if (!currentChunk) {
-        currentChunk = { type: "equal", lines: [] };
-      }
-      currentChunk.lines.push(edit.line);
-    } else {
-      if (currentChunk && currentChunk.type !== "modified") {
-        chunks.push(currentChunk);
-        currentChunk = null;
-      }
-      if (!currentChunk) {
-        currentChunk = { type: "modified", origLines: [], newLines: [] };
-      }
-      if (edit.type === "delete") {
-        currentChunk.origLines.push(edit.line);
-      } else if (edit.type === "insert") {
-        currentChunk.newLines.push(edit.line);
-      }
-    }
-  }
-  if (currentChunk) {
-    chunks.push(currentChunk);
-  }
-
-  let hunkCounter = 0;
-  let origLineCursor = 1;
-  let newLineCursor = 1;
-
-  chunks.forEach((chunk) => {
-    if (chunk.type === "equal") {
-      chunk.origStartLine = origLineCursor;
-      chunk.newStartLine = newLineCursor;
-      origLineCursor += chunk.lines.length;
-      newLineCursor += chunk.lines.length;
-    } else {
-      hunkCounter++;
-      chunk.hunkId = hunkCounter;
-      chunk.origStartLine = origLineCursor;
-      chunk.origEndLine = origLineCursor + Math.max(0, chunk.origLines.length - 1);
-      chunk.newStartLine = newLineCursor;
-      chunk.newEndLine = newLineCursor + Math.max(0, chunk.newLines.length - 1);
-      chunk.accepted = true; // 默认采纳修改，作者可逐块按需取消或一键全选/全不选
-
-      origLineCursor += chunk.origLines.length;
-      newLineCursor += chunk.newLines.length;
-    }
-  });
-
-  return chunks;
-}
-
-function buildMergedText(chunks) {
-  const resultLines = [];
-  for (const chunk of chunks) {
-    if (chunk.type === "equal") {
-      resultLines.push(...chunk.lines);
-    } else {
-      if (chunk.accepted) {
-        resultLines.push(...chunk.newLines);
-      } else {
-        resultLines.push(...chunk.origLines);
-      }
-    }
-  }
-  return resultLines.join("\n");
-}
-
-let diffViewMode = "full"; // "full" | "changes"
-
-function createEqualRow(origLineNum, newLineNum, text) {
-  const row = document.createElement("div");
-  row.className = "diff-row diff-row-equal";
-  row.innerHTML = `
-    <div class="diff-cell diff-cell-orig">
-      <span class="diff-line-num">${origLineNum}</span>
-      <span class="diff-line-text">${escapeHtml(text || " ")}</span>
-    </div>
-    <div class="diff-cell diff-cell-new">
-      <span class="diff-line-num">${newLineNum}</span>
-      <span class="diff-line-text">${escapeHtml(text || " ")}</span>
-    </div>
-  `;
-  return row;
-}
-
-function updateHunkVisualState(chunk) {
-  const controlRow = document.getElementById(`hunk-control-${chunk.hunkId}`);
-  if (controlRow) {
-    controlRow.className = `diff-hunk-control-row ${chunk.accepted ? "accepted" : "rejected"}`;
-    const statusSpan = controlRow.querySelector(".diff-hunk-status");
-    if (statusSpan) statusSpan.textContent = chunk.accepted ? "✓ 已采纳修改" : "✕ 保留原稿";
-    const toggleBtn = controlRow.querySelector(".diff-hunk-toggle-btn");
-    if (toggleBtn) toggleBtn.textContent = chunk.accepted ? "✕ 放弃此块（保留原稿）" : "✓ 采纳此块修改";
-  }
-
-  const rows = elements.diffHunksContainer.querySelectorAll(`.diff-row-modified[data-hunk-id="${chunk.hunkId}"]`);
-  rows.forEach((row) => {
-    row.className = `diff-row diff-row-modified ${chunk.accepted ? "accepted" : "rejected"}`;
-  });
-}
-
-function openDiffMergeDialog(origText, newText) {
-  currentDiffOriginalText = origText || "";
-  currentDiffNewText = newText || "";
-  currentDiffChunks = computeLineDiff(currentDiffOriginalText, currentDiffNewText);
-
-  elements.diffChapterTitle.textContent = `文本对比与合并 · ${state.activeFile?.name || "当前章节"}`;
-  elements.diffMergeSpinner.hidden = true;
-  elements.diffMergeStatusMsg.textContent = "";
-  elements.applyMergeButton.disabled = false;
-
-  if (elements.diffViewFullBtn && elements.diffViewChangesBtn) {
-    if (diffViewMode === "full") {
-      elements.diffViewFullBtn.classList.add("active");
-      elements.diffViewChangesBtn.classList.remove("active");
-    } else {
-      elements.diffViewChangesBtn.classList.add("active");
-      elements.diffViewFullBtn.classList.remove("active");
-    }
-  }
-
-  renderDiffHunks();
-  updateDiffStats();
-
-  if (elements.diffHunksContainer) {
-    elements.diffHunksContainer.scrollTop = 0;
-  }
-
-  if (!elements.diffMergeDialog.open) {
-    elements.diffMergeDialog.showModal();
-  }
-  triggerVerificationPrecheck();
-}
-
-function renderDiffHunks() {
-  const container = elements.diffHunksContainer;
-  container.replaceChildren();
-
-  const modifiedHunks = currentDiffChunks.filter((c) => c.type === "modified");
-  if (modifiedHunks.length === 0) {
-    const emptyHint = document.createElement("div");
-    emptyHint.className = "diff-empty-hint";
-    emptyHint.textContent = "原稿与重构版本文本完全一致，未检测到行级修改。";
-    container.append(emptyHint);
-    return;
-  }
-
-  currentDiffChunks.forEach((chunk) => {
-    if (chunk.type === "equal") {
-      const lines = chunk.lines;
-      if (diffViewMode === "changes" && lines.length > 6) {
-        // 渲染前 2 行上下文
-        for (let i = 0; i < 2; i++) {
-          container.append(createEqualRow(chunk.origStartLine + i, chunk.newStartLine + i, lines[i]));
-        }
-
-        // 折叠提示条
-        const collapsedBanner = document.createElement("div");
-        collapsedBanner.className = "diff-collapsed-banner";
-        collapsedBanner.title = "点击展开此段未改动正文";
-        collapsedBanner.textContent = `⋯ 展开 ${lines.length - 4} 行未修改正文 ⋯`;
-        collapsedBanner.addEventListener("click", () => {
-          const fragment = document.createDocumentFragment();
-          for (let i = 2; i < lines.length - 2; i++) {
-            fragment.append(createEqualRow(chunk.origStartLine + i, chunk.newStartLine + i, lines[i]));
-          }
-          collapsedBanner.replaceWith(fragment);
-        });
-        container.append(collapsedBanner);
-
-        // 渲染后 2 行上下文
-        for (let i = lines.length - 2; i < lines.length; i++) {
-          container.append(createEqualRow(chunk.origStartLine + i, chunk.newStartLine + i, lines[i]));
-        }
-      } else {
-        // 全景模式：渲染全部相同行
-        for (let i = 0; i < lines.length; i++) {
-          container.append(createEqualRow(chunk.origStartLine + i, chunk.newStartLine + i, lines[i]));
-        }
-      }
-    } else if (chunk.type === "modified") {
-      // 变动块粘性控制栏
-      const controlRow = document.createElement("div");
-      controlRow.className = `diff-hunk-control-row ${chunk.accepted ? "accepted" : "rejected"}`;
-      controlRow.id = `hunk-control-${chunk.hunkId}`;
-      controlRow.innerHTML = `
-        <div class="diff-hunk-meta">
-          <span class="diff-hunk-badge">变动块 #${chunk.hunkId}</span>
-          <span class="diff-hunk-range">原稿 L${chunk.origStartLine}-${chunk.origEndLine} ➔ 重写 L${chunk.newStartLine}-${chunk.newEndLine}</span>
-          <span class="diff-hunk-status">${chunk.accepted ? "✓ 已采纳修改" : "✕ 保留原稿"}</span>
-        </div>
-        <button type="button" class="diff-hunk-toggle-btn" data-hunk-id="${chunk.hunkId}">
-          ${chunk.accepted ? "✕ 放弃此块（保留原稿）" : "✓ 采纳此块修改"}
-        </button>
-      `;
-
-      const toggleBtn = controlRow.querySelector(".diff-hunk-toggle-btn");
-      toggleBtn.addEventListener("click", () => {
-        chunk.accepted = !chunk.accepted;
-        updateHunkVisualState(chunk);
-        updateDiffStats();
-        triggerVerificationPrecheck();
-      });
-
-      container.append(controlRow);
-
-      // 逐行严格水平基线对齐渲染
-      const origLines = chunk.origLines;
-      const newLines = chunk.newLines;
-      const maxRows = Math.max(origLines.length, newLines.length);
-
-      for (let r = 0; r < maxRows; r++) {
-        const hasOrig = r < origLines.length;
-        const hasNew = r < newLines.length;
-        const origText = hasOrig ? origLines[r] : "";
-        const newText = hasNew ? newLines[r] : "";
-        const origNum = hasOrig ? chunk.origStartLine + r : "";
-        const newNum = hasNew ? chunk.newStartLine + r : "";
-
-        const row = document.createElement("div");
-        row.className = `diff-row diff-row-modified ${chunk.accepted ? "accepted" : "rejected"}`;
-        row.dataset.hunkId = String(chunk.hunkId);
-
-        const origCellClass = hasOrig ? "diff-cell diff-cell-orig has-del" : "diff-cell diff-cell-orig is-empty";
-        const newCellClass = hasNew ? "diff-cell diff-cell-new has-add" : "diff-cell diff-cell-new is-empty";
-
-        row.innerHTML = `
-          <div class="${origCellClass}">
-            <span class="diff-line-num">${hasOrig ? origNum : ""}</span>
-            <span class="diff-line-text">${hasOrig ? escapeHtml(origText || " ") : '<span class="diff-empty-placeholder"></span>'}</span>
-          </div>
-          <div class="${newCellClass}">
-            <span class="diff-line-num">${hasNew ? newNum : ""}</span>
-            <span class="diff-line-text">${hasNew ? escapeHtml(newText || " ") : '<span class="diff-empty-placeholder"></span>'}</span>
-          </div>
-        `;
-        container.append(row);
-      }
-    }
-  });
-}
-
-function updateDiffStats() {
-  const modifiedHunks = currentDiffChunks.filter((c) => c.type === "modified");
-  const acceptedCount = modifiedHunks.filter((c) => c.accepted).length;
-  const mergedText = buildMergedText(currentDiffChunks);
-  const origWords = countCharacters(currentDiffOriginalText);
-  const mergedWords = countCharacters(mergedText);
-  const delta = mergedWords - origWords;
-  const deltaSign = delta > 0 ? `+${delta}` : `${delta}`;
-
-  const statsStr = `原字数: ${formatNumber(origWords)} | 合并后: ${formatNumber(mergedWords)} (${deltaSign}) | 变动块: ${acceptedCount}/${modifiedHunks.length} 已采纳`;
-  elements.diffStatsInfo.textContent = statsStr;
-  elements.diffFooterStats.textContent = statsStr;
-}
-
-function triggerVerificationPrecheck() {
-  clearTimeout(verifyPrecheckTimer);
-  verifyPrecheckTimer = setTimeout(async () => {
-    if (!elements.diffMergeDialog.open || !state.activeFile) return;
-    const mergedText = buildMergedText(currentDiffChunks);
-    try {
-      const res = await requestJson("/api/chapter-verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: state.activeFile.path, content: mergedText }),
-      });
-      if (res.verification) {
-        const v = res.verification;
-        const aiItem = elements.verifyAiStatus;
-        if (v.aiPatterns?.blocking?.length > 0) {
-          aiItem.className = "diff-verify-item error";
-          aiItem.querySelector(".verify-icon").textContent = "✕";
-          elements.verifyAiText.textContent = `去 AI 味机检：发现 ${v.aiPatterns.blocking.length} 个阻断项`;
-        } else {
-          aiItem.className = "diff-verify-item";
-          aiItem.querySelector(".verify-icon").textContent = "✓";
-          elements.verifyAiText.textContent = "去 AI 味机检：0 阻断项";
-        }
-
-        const degenItem = elements.verifyDegenStatus;
-        if (!v.degeneration?.ok) {
-          degenItem.className = "diff-verify-item warning";
-          degenItem.querySelector(".verify-icon").textContent = "⚠️";
-          elements.verifyDegenText.textContent = "文本退化：检出轻微重复";
-        } else {
-          degenItem.className = "diff-verify-item";
-          degenItem.querySelector(".verify-icon").textContent = "✓";
-          elements.verifyDegenText.textContent = "文本退化排查：正常";
-        }
-      }
-    } catch {}
-  }, 400);
-}
-
-function openRegenerationDialog(precheckAll = false) {
-  if (!state.activeFile) return;
-  elements.regenChapterTitle.textContent = `根据建议重新生成 · ${state.activeFile.name}`;
-  elements.regenStatusFeedback.hidden = true;
-  elements.submitRegenButton.disabled = false;
-  elements.regenCustomInstructions.value = "";
-
-  const container = elements.regenSuggestionsChecklist;
-  container.replaceChildren();
-
-  const suggestions = currentAnalysisData?.analysis?.suggestions || [];
-  if (suggestions.length === 0) {
-    const p = document.createElement("p");
-    p.className = "regen-empty-hint";
-    p.textContent = "当前章节暂无显式修改建议，您可在下方输入作者微调指令并保留要素重写。";
-    container.append(p);
-  } else {
-    suggestions.forEach((s, idx) => {
-      const label = document.createElement("label");
-      label.className = "regen-suggestion-item";
-      label.innerHTML = `
-        <input type="checkbox" data-index="${idx}" ${precheckAll ? "checked" : ""}>
-        <span>${escapeHtml(s)}</span>
-      `;
-      container.append(label);
-    });
-  }
-
-  const baseChars = countCharacters(state.activeFile.content || "");
-  elements.regenTargetWordsInput.value = "";
-  elements.regenTargetWordsInput.placeholder = `原章节约 ${formatNumber(baseChars)} 字`;
-
-  if (!elements.regenerationDialog.open) {
-    elements.regenerationDialog.showModal();
-  }
-}
-
-async function submitChapterRegeneration() {
-  if (!state.activeFile) return;
-  const filePath = state.activeFile.path;
-  const checkedBoxes = elements.regenSuggestionsChecklist.querySelectorAll('input[type="checkbox"]:checked');
-  const selectedSuggestions = [];
-  const allSuggestions = currentAnalysisData?.analysis?.suggestions || [];
-  checkedBoxes.forEach((cb) => {
-    const idx = Number(cb.dataset.index);
-    if (allSuggestions[idx]) {
-      selectedSuggestions.push(allSuggestions[idx]);
-    }
-  });
-
-  const customInstructions = elements.regenCustomInstructions.value.trim();
-  const preserveElements = {
-    preserveStructure: elements.regenPreservePlot.checked,
-    preserveCharacterTraits: elements.regenPreserveStyle.checked,
-    deslopStrict: elements.regenStrictDeslop.checked,
-  };
-  const targetWordCount = elements.regenTargetWordsInput.value ? Number(elements.regenTargetWordsInput.value) : undefined;
-
-  elements.submitRegenButton.disabled = true;
-  elements.regenStatusFeedback.hidden = false;
-  elements.regenStatusText.textContent = "正在提交重构指令并派发任务...";
-
-  let hasApiKey = false;
-  try {
-    const cfg = await requestJson("/api/ai-config");
-    hasApiKey = Boolean(cfg?.hasApiKey || cfg?.apiKey);
-  } catch {}
-  const useAntigravity = !hasApiKey;
-
-  try {
-    const res = await requestJson("/api/chapter-regenerate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        path: filePath,
-        selectedSuggestions,
-        customInstructions,
-        preserveElements,
-        targetWordCount,
-        useAntigravity,
-        method: useAntigravity ? "antigravity" : "external_api",
-      }),
-    });
-
-    if (res.status === "completed" && res.data?.new_content) {
-      elements.regenerationDialog.close();
-      openDiffMergeDialog(res.data.original_content || state.activeFile.content, res.data.new_content);
-      return;
-    }
-
-    elements.regenStatusText.textContent = "重构任务正在后台处理中，即将唤起 Git 式双栏差异比对...";
-    ensureRegenStatusPolling(filePath);
-  } catch (err) {
-    elements.submitRegenButton.disabled = false;
-    elements.regenStatusFeedback.hidden = true;
-    showToast(err.message, "error");
-  }
-}
-
-function ensureRegenStatusPolling(filePath) {
-  if (regenPollIntervalId) clearInterval(regenPollIntervalId);
-  const pollInterval = 1200;
-  regenPollIntervalId = setInterval(async () => {
-    try {
-      const res = await requestJson(`/api/chapter-regenerate/status?path=${encodeURIComponent(filePath)}`);
-      if (res.status === "completed" && res.newContent) {
-        const orig = (res.originalContent || state.activeFile?.content || "").trim();
-        // 若重写文稿与原稿完全一字不差，说明 Agent 实际上仍在生成处理中，保持等待并更新提示
-        if (res.newContent.trim() === orig) {
-          if (elements.regenStatusText) {
-            elements.regenStatusText.textContent = "Agent 正在根据建议深度创作重构正文，请稍候...";
-          }
-          return;
-        }
-        clearInterval(regenPollIntervalId);
-        regenPollIntervalId = null;
-        elements.regenerationDialog.close();
-        openDiffMergeDialog(res.originalContent || state.activeFile?.content || "", res.newContent);
-        showToast("章节定向重写已完成，已载入差异合并器！", "success");
-      } else if (res.status === "failed") {
-        clearInterval(regenPollIntervalId);
-        regenPollIntervalId = null;
-        elements.submitRegenButton.disabled = false;
-        elements.regenStatusFeedback.hidden = true;
-        showToast(res.error || "重写生成失败，请重试", "error");
-      } else if (res.message && elements.regenStatusText) {
-        elements.regenStatusText.textContent = res.message;
-      }
-    } catch {}
-  }, pollInterval);
-}
-
-async function applyMergedResult() {
-  if (!state.activeFile) return;
-  const filePath = state.activeFile.path;
-  const mergedContent = buildMergedText(currentDiffChunks);
-
-  elements.applyMergeButton.disabled = true;
-  elements.diffMergeSpinner.hidden = false;
-  elements.diffMergeStatusMsg.className = "diff-status-msg";
-  elements.diffMergeStatusMsg.textContent = "正在执行工程化机检与标点规整落盘...";
-
-  try {
-    const res = await requestJson("/api/chapter-apply-merge", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        path: filePath,
-        content: mergedContent,
-        force: false,
-      }),
-    });
-
-    if (res.blocked) {
-      elements.diffMergeSpinner.hidden = true;
-      elements.applyMergeButton.disabled = false;
-      elements.diffMergeStatusMsg.className = "diff-status-msg error";
-      elements.diffMergeStatusMsg.textContent = res.message || "落盘被阻断项拦截";
-      showToast(res.message || "落盘被阻断项拦截", "error");
-      return;
-    }
-
-    const savedContent = res.savedContent || mergedContent;
-    elements.editorInput.value = savedContent;
-    state.originalContent = savedContent;
-    if (state.activeFile) {
-      state.activeFile.content = savedContent;
-      if (res.file) {
-        state.activeFile.version = res.file.version;
-        state.activeFile.mtimeMs = res.file.mtimeMs;
-        state.activeFile.size = res.file.size;
-      }
-    }
-    setDirty(false);
-    updateDocumentMeta();
-    updateCursorPosition();
-    if (state.mode === "preview") {
-      elements.previewPane.innerHTML = markdownToSafeHtml(savedContent);
-    } else if (state.showLineNumbers) {
-      updateLineNumbers();
-    }
-
-    elements.diffMergeSpinner.hidden = true;
-    elements.applyMergeButton.disabled = false;
-    elements.diffMergeDialog.close();
-
-    // 重点：章节根据建议重新生成并合并后，彻底清理过时的旧分析记录；不自动发起新分析，按需由作者手动触发
-    chapterAnalysisStatusCache.delete(filePath);
-    currentAnalysisData = null;
-    clearAnalysisDataUi();
-    updateAnalysisButtonUi();
-    if (elements.analysisDialog && elements.analysisDialog.open) {
-      elements.analysisDialog.close();
-    }
-
-    showToast("✓ 章节合并已成功落盘！已清理旧版剧情分析记录。", "success");
-  } catch (err) {
-    elements.diffMergeSpinner.hidden = true;
-    elements.applyMergeButton.disabled = false;
-    elements.diffMergeStatusMsg.className = "diff-status-msg error";
-    elements.diffMergeStatusMsg.textContent = err.message || "合并保存失败";
-    showToast(err.message, "error");
-  }
-}
-
-// 绑定重写与差异合并事件
-if (elements.openRegenerateDialogButton) {
-  elements.openRegenerateDialogButton.addEventListener("click", () => {
-    openRegenerationDialog(false);
-  });
-}
-
-elements.regenerateFromSuggestionsButton.addEventListener("click", () => {
-  openRegenerationDialog(true);
-});
-
-elements.closeRegenDialogButton.addEventListener("click", () => {
-  elements.regenerationDialog.close();
-});
-
-elements.cancelRegenButton.addEventListener("click", () => {
-  elements.regenerationDialog.close();
-});
-
-elements.regenSelectAllSuggestionsBtn.addEventListener("click", () => {
-  elements.regenSuggestionsChecklist.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
-    cb.checked = true;
-  });
-});
-
-elements.regenClearSuggestionsBtn.addEventListener("click", () => {
-  elements.regenSuggestionsChecklist.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
-    cb.checked = false;
-  });
-});
-
-document.querySelectorAll(".regen-chip").forEach((chip) => {
-  chip.addEventListener("click", () => {
-    const tag = chip.dataset.tag || chip.textContent.trim();
-    const current = elements.regenCustomInstructions.value.trim();
-    if (current) {
-      elements.regenCustomInstructions.value = `${current}；${tag}`;
-    } else {
-      elements.regenCustomInstructions.value = tag;
-    }
-    elements.regenCustomInstructions.focus();
-  });
-});
-
-elements.submitRegenButton.addEventListener("click", () => {
-  submitChapterRegeneration();
-});
-
-elements.diffAcceptAllBtn.addEventListener("click", () => {
-  currentDiffChunks.forEach((chunk) => {
-    if (chunk.type === "modified") {
-      chunk.accepted = true;
-      updateHunkVisualState(chunk);
-    }
-  });
-  updateDiffStats();
-  triggerVerificationPrecheck();
-});
-
-elements.diffRejectAllBtn.addEventListener("click", () => {
-  currentDiffChunks.forEach((chunk) => {
-    if (chunk.type === "modified") {
-      chunk.accepted = false;
-      updateHunkVisualState(chunk);
-    }
-  });
-  updateDiffStats();
-  triggerVerificationPrecheck();
-});
-
-if (elements.diffViewFullBtn) {
-  elements.diffViewFullBtn.addEventListener("click", () => {
-    if (diffViewMode === "full") return;
-    diffViewMode = "full";
-    elements.diffViewFullBtn.classList.add("active");
-    elements.diffViewChangesBtn?.classList.remove("active");
-    renderDiffHunks();
-  });
-}
-
-if (elements.diffViewChangesBtn) {
-  elements.diffViewChangesBtn.addEventListener("click", () => {
-    if (diffViewMode === "changes") return;
-    diffViewMode = "changes";
-    elements.diffViewChangesBtn.classList.add("active");
-    elements.diffViewFullBtn?.classList.remove("active");
-    renderDiffHunks();
-  });
-}
-
-elements.closeDiffDialogButton.addEventListener("click", () => {
-  elements.diffMergeDialog.close();
-});
-
-elements.cancelDiffButton.addEventListener("click", () => {
-  elements.diffMergeDialog.close();
-});
-
-elements.applyMergeButton.addEventListener("click", () => {
-  applyMergedResult();
-});
-
-elements.analysisTabs.forEach((tab) => {
-  tab.addEventListener("click", () => {
-    switchAnalysisTab(tab.dataset.tab);
-  });
-});
-
-// ============================================================================
-// 章节行级注解模块 (Chapter Line Annotations)
-// ============================================================================
-
-function formatAnnotationTime(timestamp) {
-  if (!timestamp) return "";
-  const d = new Date(timestamp);
-  const pad = (n) => String(n).padStart(2, "0");
-  const month = pad(d.getMonth() + 1);
-  const day = pad(d.getDate());
-  const hours = pad(d.getHours());
-  const minutes = pad(d.getMinutes());
-  return `${month}-${day} ${hours}:${minutes}`;
-}
-
-async function loadChapterAnnotations(chapterPath) {
-  if (!chapterPath) {
-    state.annotations = [];
-    renderAnnotationsSidebar();
-    return;
-  }
-  try {
-    const res = await requestJson(`/api/annotations?path=${encodeURIComponent(chapterPath)}`);
-    state.annotations = Array.isArray(res.annotations) ? res.annotations : [];
-  } catch (error) {
-    console.warn("[story-dashboard] 加载批注失败:", error);
-    state.annotations = [];
-  }
-  renderAnnotationsSidebar();
-  if (state.showLineNumbers && state.mode !== "preview") {
-    updateLineNumbers();
-  }
-}
-
-function renderAnnotationsSidebar() {
-  const count = (state.annotations || []).length;
-  if (elements.annotationsCountBadge) {
-    elements.annotationsCountBadge.textContent = count;
-    elements.annotationsCountBadge.hidden = count === 0;
-  }
-  if (elements.annotationsSidebarBadge) {
-    elements.annotationsSidebarBadge.textContent = count;
-  }
-
-  if (!elements.annotationsList) return;
-
-  if (count === 0) {
-    elements.annotationsList.innerHTML = `
-      <div class="annotations-empty">
-        <svg viewBox="0 0 24 24" aria-hidden="true" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-        </svg>
-        <strong>暂无行级注解</strong>
-        <p>在编辑模式下，点击正文左侧的行号，即可为此行快速添加批注意见。</p>
-      </div>
-    `;
-    return;
-  }
-
-  const html = state.annotations.map((item) => {
-    const timeStr = item.created_at ? formatAnnotationTime(item.created_at) : "";
-    const quoteHtml = item.line_text
-      ? `<div class="annotation-line-quote" title="${escapeHtml(item.line_text)}">“${escapeHtml(item.line_text)}”</div>`
-      : "";
-
-    return `
-      <div class="annotation-card" data-id="${item.id}" data-line="${item.line}">
-        <div class="annotation-card-header">
-          <span class="annotation-line-badge">第 ${item.line} 行</span>
-          <button class="annotation-card-del-btn" data-id="${item.id}" type="button" title="删除本条注解" aria-label="删除本条注解">
-            <svg viewBox="0 0 24 24" aria-hidden="true" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M18 6 6 18M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-        ${quoteHtml}
-        <div class="annotation-comment-text">${escapeHtml(item.comment)}</div>
-        ${timeStr ? `<div class="annotation-time">${timeStr}</div>` : ""}
-      </div>
-    `;
-  }).join("");
-
-  elements.annotationsList.innerHTML = html;
-}
-
-function openAnnotationPopover(lineNum, lineText) {
-  state.currentAnnotatingLine = lineNum;
-  state.currentAnnotatingText = lineText || "";
-
-  if (elements.annotationPopoverTitle) {
-    elements.annotationPopoverTitle.textContent = `添加第 ${lineNum} 行注解`;
-  }
-  if (elements.annotationLineSnippet) {
-    const clean = (lineText || "").trim();
-    elements.annotationLineSnippet.textContent = clean ? `“${clean.slice(0, 50)}${clean.length > 50 ? "..." : ""}”` : "(空行)";
-  }
-  if (elements.annotationInput) {
-    elements.annotationInput.value = "";
-  }
-  if (elements.annotationPopover) {
-    elements.annotationPopover.showModal();
-    if (elements.annotationInput) {
-      setTimeout(() => elements.annotationInput.focus(), 60);
-    }
-  }
-}
-
-function closeAnnotationPopover() {
-  if (elements.annotationPopover && elements.annotationPopover.open) {
-    elements.annotationPopover.close();
-  }
-  state.currentAnnotatingLine = null;
-  state.currentAnnotatingText = "";
-}
-
-async function saveCurrentAnnotation() {
-  if (!state.activeFile) return;
-  const comment = (elements.annotationInput?.value || "").trim();
-  if (!comment) {
-    showToast("请输入修改意见或批注内容", "error");
-    elements.annotationInput?.focus();
-    return;
-  }
-
-  const lineNum = state.currentAnnotatingLine;
-  try {
-    const res = await requestJson("/api/annotations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chapterPath: state.activeFile.path,
-        line: lineNum,
-        lineText: state.currentAnnotatingText,
-        comment,
-      }),
-    });
-
-    state.annotations = res.annotations || [];
-    renderAnnotationsSidebar();
-    if (state.showLineNumbers && state.mode !== "preview") {
-      updateLineNumbers();
-    }
-    closeAnnotationPopover();
-    showToast(`✓ 第 ${lineNum} 行注解已保存`, "success");
-  } catch (err) {
-    showToast(`保存批注失败: ${err.message}`, "error");
-  }
-}
-
-async function deleteAnnotation(id) {
-  if (!state.activeFile || !id) return;
-  try {
-    const res = await requestJson("/api/annotations", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chapterPath: state.activeFile.path,
-        id,
-      }),
-    });
-
-    state.annotations = res.annotations || [];
-    renderAnnotationsSidebar();
-    if (state.showLineNumbers && state.mode !== "preview") {
-      updateLineNumbers();
-    }
-    showToast("注解已删除", "success");
-  } catch (err) {
-    showToast(`删除批注失败: ${err.message}`, "error");
-  }
-}
-
-function jumpToLine(lineNum) {
-  if (!lineNum || !elements.editorInput) return;
-  const lines = elements.editorInput.value.split("\n");
-  let charIndex = 0;
-  for (let i = 0; i < Math.min(lineNum - 1, lines.length); i++) {
-    charIndex += lines[i].length + 1;
-  }
-  elements.editorInput.focus();
-  elements.editorInput.setSelectionRange(charIndex, charIndex);
-  updateCursorPosition();
-
-  const style = elements.editorInput ? window.getComputedStyle(elements.editorInput) : null;
-  const lineHeight = style ? (parseFloat(style.lineHeight) || 34) : 34;
-  const targetScroll = Math.max(0, (lineNum - 5) * lineHeight);
-  elements.editorInput.scrollTo({ top: targetScroll, behavior: "smooth" });
-}
-
-function setAnnotationsSidebarVisible(visible) {
-  state.showAnnotationsSidebar = visible;
-  if (elements.editorBody) {
-    elements.editorBody.classList.toggle("show-annotations", visible);
-  }
-  if (elements.annotationsToggleBtn) {
-    elements.annotationsToggleBtn.setAttribute("aria-pressed", visible ? "true" : "false");
-  }
-  try {
-    localStorage.setItem(STORAGE_KEY_SHOW_ANNOTATIONS, visible ? "1" : "0");
-  } catch {}
-}
-
-function initAnnotations() {
-  let saved = null;
-  try {
-    saved = localStorage.getItem(STORAGE_KEY_SHOW_ANNOTATIONS);
-  } catch {}
-  const shouldShow = saved === null ? true : saved === "1";
-  setAnnotationsSidebarVisible(shouldShow);
-
-  if (elements.annotationsToggleBtn) {
-    elements.annotationsToggleBtn.addEventListener("click", () => {
-      setAnnotationsSidebarVisible(!state.showAnnotationsSidebar);
-    });
-  }
-
-  if (elements.closeAnnotationsSidebarBtn) {
-    elements.closeAnnotationsSidebarBtn.addEventListener("click", () => {
-      setAnnotationsSidebarVisible(false);
-    });
-  }
-
-  if (elements.annotationsList) {
-    elements.annotationsList.addEventListener("click", (e) => {
-      const delBtn = e.target.closest(".annotation-card-del-btn");
-      if (delBtn) {
-        e.stopPropagation();
-        const id = delBtn.dataset.id;
-        if (id) deleteAnnotation(id);
-        return;
-      }
-
-      const card = e.target.closest(".annotation-card");
-      if (card) {
-        const lineNum = parseInt(card.dataset.line, 10);
-        if (lineNum) jumpToLine(lineNum);
-      }
-    });
-  }
-
-  if (elements.saveAnnotationBtn) {
-    elements.saveAnnotationBtn.addEventListener("click", () => {
-      saveCurrentAnnotation();
-    });
-  }
-
-  if (elements.cancelAnnotationBtn) {
-    elements.cancelAnnotationBtn.addEventListener("click", () => {
-      closeAnnotationPopover();
-    });
-  }
-
-  if (elements.closeAnnotationPopoverBtn) {
-    elements.closeAnnotationPopoverBtn.addEventListener("click", () => {
-      closeAnnotationPopover();
-    });
-  }
-
-  if (elements.annotationInput) {
-    elements.annotationInput.addEventListener("keydown", (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-        e.preventDefault();
-        saveCurrentAnnotation();
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        closeAnnotationPopover();
-      }
-    });
-  }
-}
-
-initLineNumbers();
-initAnnotations();
 loadWorkspace();
-window.__openDiffMergeDialog = openDiffMergeDialog;
-window.__openAnnotationPopover = openAnnotationPopover;
-
-

@@ -19,7 +19,6 @@ OpenClaw 会从项目 `skills/` 目录发现 `SKILL.md`。优先通过 OpenClaw 
 | `/skill story-review`、审查 | story-review | 多视角审查；OpenClaw Phase 1 默认 solo/soft-fallback |
 | `/skill story-import`、导入 | story-import | 逆向导入已有小说到项目结构 |
 | `/skill story`、网文 | story | 工具箱路由 · 模糊意图自动分发 |
-| 应用注解、应用评论、应用标注 | story | 运行 check_annotations.py 扫描并执行行级批注修改 |
 | `/skill story-setup`、准备写书 | story-setup | 环境部署 · 多 CLI 配置入口 |
 | `/skill browser-cdp` | browser-cdp | 浏览器 CDP 工具 |
 
@@ -57,13 +56,3 @@ OpenClaw 会从项目 `skills/` 目录发现 `SKILL.md`。优先通过 OpenClaw 
 4. 当前章节的情绪/节奏目标
 
 如果存在 `{书名}/追踪/上下文.md`，compact 后首先读取该文件恢复上下文。
-
-## 应用章节批注
-
-用户输入「应用注解 / 应用评论 / 应用标注」时：
-1. 运行 `python3 .agents/skills/story/scripts/check_annotations.py --root .` 扫描当前工作区所有未应用的行级批注；
-2. 若无批注，告知用户“当前没有待处理的行级注解，可在工作台编辑模式下点击行号添加批注”；
-3. 输出待办清单（章节、行号、原文片段、修改意见）；
-4. 逐条贯彻修改（对齐白皮书与网文核心法则，使用精确文件编辑工具）；
-5. 运行 `python3 .agents/skills/story/scripts/check_annotations.py --root . --chapter "<chapter_path>" --clear` 归档并清理已应用批注；
-6. 汇总展示各处修改前后的对比报告。

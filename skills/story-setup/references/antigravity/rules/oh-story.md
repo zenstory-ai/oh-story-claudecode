@@ -19,7 +19,6 @@ load its references only when that skill instructs you to do so.
 - Import an existing story: `story-import`
 - Cover generation: `story-cover`
 - Ambiguous story intent: `story`
-- Apply chapter annotations ("应用注解" / "应用评论" / "应用标注"): run `python3 .agents/skills/story/scripts/check_annotations.py`, list pending line comments across chapters, execute targeted novel craft revisions, clear annotations (`--clear`), and present diff report
 - Project deployment/update: `story-setup`
 - Reuse an authenticated Chrome session: `browser-cdp`
 

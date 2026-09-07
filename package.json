@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dashboard": "node skills/story/scripts/dashboard-server.mjs",
-    "test:dashboard": "node --test tests/dashboard-server.test.mjs tests/dashboard-bundle-contract.test.mjs tests/dashboard-annotations-and-analysis.test.mjs",
+    "test:dashboard": "node --test tests/dashboard-server.test.mjs tests/dashboard-bundle-contract.test.mjs",
     "test:dashboard:e2e": "playwright test",
     "test": "npm run test:dashboard && npm run test:dashboard:e2e"
   },

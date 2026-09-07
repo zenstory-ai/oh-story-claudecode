@@ -19,7 +19,6 @@ Reasonix 会从项目 `.agents/skills`（部署时创建的指向 `skills/` 的 
 | 审查 | story-review | 多视角审查；Reasonix 默认 solo/direct fallback |
 | 导入 | story-import | 逆向导入已有小说到项目结构 |
 | 网文工具箱 | story | 模糊意图自动分发 |
-| 应用注解、应用评论、应用标注 | story | 运行 check_annotations.py 扫描并执行行级批注修改 |
 | 准备写书 / 部署 | story-setup | 项目结构与 skill 使用入口 |
 | 浏览器登录态 / 抓取 | browser-cdp | 浏览器 CDP 工具；需平台允许本地脚本/浏览器控制 |
 
@@ -59,13 +58,3 @@ Reasonix 会从项目 `.agents/skills`（部署时创建的指向 `skills/` 的 
 4. 当前章节的情绪/节奏目标
 
 如果存在 `{书名}/追踪/上下文.md`，compact 后首先读取该文件恢复上下文。
-
-## 应用章节批注
-
-用户输入「应用注解 / 应用评论 / 应用标注」时：
-1. 运行 `python3 .agents/skills/story/scripts/check_annotations.py --root .` 扫描当前工作区所有未应用的行级批注；
-2. 若无批注，告知用户“当前没有待处理的行级注解，可在工作台编辑模式下点击行号添加批注”；
-3. 输出待办清单（章节、行号、原文片段、修改意见）；
-4. 逐条贯彻修改（对齐白皮书与网文核心法则，使用精确文件编辑工具）；
-5. 运行 `python3 .agents/skills/story/scripts/check_annotations.py --root . --chapter "<chapter_path>" --clear` 归档并清理已应用批注；
-6. 汇总展示各处修改前后的对比报告。
