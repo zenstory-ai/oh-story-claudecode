@@ -70,6 +70,32 @@ function hanOnly(s) {
   return s.replace(/[^一-鿿]/g, '')
 }
 
+// 写后回填的完成记录不是誊抄来源。标题块包含子标题；字段块止于下一字段或标题。
+function stripCompletionRecord(outline) {
+  let headingLevel = 0
+  let inField = false
+  return outline.split('\n').filter((line) => {
+    const heading = line.match(/^ {0,3}(#{1,6})[\t ]+(.*)$/)
+    if (headingLevel) {
+      if (!heading || heading[1].length > headingLevel) return false
+      headingLevel = 0
+    }
+    if (inField) {
+      if (!heading && !/^[-*+][\t ]+/.test(line)) return false
+      inField = false
+    }
+    if (heading && heading[2].includes('实际完成情况')) {
+      headingLevel = heading[1].length
+      return false
+    }
+    if (/^[-*+][\t ]+(?:\*\*|__)?实际完成情况[^：:]*[：:]/.test(line)) {
+      inField = true
+      return false
+    }
+    return true
+  }).join('\n')
+}
+
 /**
  * 抽出细纲「复沓锚句」字段下的原话，一行一条。
  * 只认这一个字段，不扫情节点序列——锚句集中在固定区块，情节点保持只写「要发生什么」。
@@ -203,7 +229,7 @@ function checkOne(proseFile, explicitOutline) {
 
   // 正文去掉标题行后比对
   const P = hanOnly(prose.replace(/^#.*$/gm, ''))
-  const O = hanOnly(outline)
+  const O = hanOnly(stripCompletionRecord(outline))
   if (P.length < MIN_RUN || O.length < MIN_RUN) return 0
 
   // 复沓锚句列出的原话允许逐字落地，命中后计入豁免、不判誊抄
