@@ -107,6 +107,8 @@ This standalone `npx skills` installation path does not use the Claude Code or Z
 
 On Windows you may occasionally see an `ENOENT ... mkdir` error while the run still ends with `Done!`. That means a skill was only partially installed. If a whole subdirectory of story-setup's reference bundle is missing, `/story-setup` reports an incomplete reference bundle; other forms of partial install may go unreported. Either way, re-run the same install command to fix it.
 
+To diagnose an installed environment, ask your agent to use story-setup to check your writing environment, or invoke the skill with the `check` argument. It checks the target CLI's deployment checklist and reports next steps without changing the project. Repairs use the existing setup workflow.
+
 <details>
 <summary>Claude Code / Antigravity / Codex / ZCode / OpenCode / OpenClaw / Reasonix / Web AI usage notes</summary>
 

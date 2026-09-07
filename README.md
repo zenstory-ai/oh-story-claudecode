@@ -105,6 +105,8 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 
 Windows 上偶尔会看到 `ENOENT ... mkdir` 报错但末尾仍显示 `Done!`，这是有技能没装全。story-setup 的参考资料目录整个缺了一块时，跑 `/story-setup` 会提示参考资料包不完整；其它形式的残缺不一定有提示。无论有没有报错，重跑同一条安装命令即可修复。
 
+排查已安装环境时，向 Agent 说「用 story-setup 检查写作环境」，或给 story-setup 传入 `check` 参数。它按目标 CLI 的部署清单检查并给出处理建议；仅检查不会改动项目，需要修复时仍走原来的 setup 流程。
+
 <details>
 <summary>Claude Code / Antigravity / Codex / ZCode / OpenCode / OpenClaw / Reasonix / Web AI 使用说明</summary>
 

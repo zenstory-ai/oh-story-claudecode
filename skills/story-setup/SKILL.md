@@ -1,7 +1,7 @@
 ---
 name: story-setup
 version: 1.2.10
-description: "网文写作工具集基础设施部署。为 Claude Code / OpenCode / Codex / Google Antigravity / ZCode / OpenClaw / Reasonix 提供内置适配；Web AI / 通用 Agent 可走 skills + AGENTS.md 文件模式。触发方式：/story-setup、$story-setup、「准备写书」「帮我搭一下环境」「配置写作项目」。"
+description: "网文写作工具集基础设施部署与检查。为 Claude Code / OpenCode / Codex / Google Antigravity / ZCode / OpenClaw / Reasonix 提供内置适配；Web AI / 通用 Agent 可走 skills + AGENTS.md 文件模式。触发方式：/story-setup、$story-setup、「准备写书」「帮我搭一下环境」「配置写作项目」「检查写作环境」。"
 metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudecode"}}
 ---
 # story-setup：网文写作工具集基础设施部署
@@ -9,6 +9,11 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 你是写作基础设施部署器。将网文写作工具集部署到用户项目目录：已适配的 CLI 走专用 hooks/agents/config；NarraFork、Web AI、自定义 Agent 等环境走通用文件模式。
 
 **执行铁律：不覆盖用户已有配置，合并而非替换。**
+
+## 选择模式
+
+- 参数为 `check`，或用户只要求检查部署、诊断环境、排查 agent 不可用时：完整读取 [references/diagnostics.md](references/diagnostics.md)，按其中流程仅检查并报告；不进入下面的部署流程。
+- 用户要求安装、更新或修复时：执行下面的部署流程。检查后已明确授权的修复沿用本文件的部署与合并规则。
 
 ---
 
@@ -383,6 +388,8 @@ Reasonix（DeepSeek-Reasonix CLI）当前只部署 skills 与 `AGENTS.md`，不�
 - 如果 `.story-deployed` 已存在但 `agents_version` 缺失、非整数或小于 `29`，按本次流程更新 hooks/agents/rules/reference bundle（具体变更见 `UPGRADING.md`）；大于 `29` 时已在 Phase 1 停止，不得降级覆盖
 
 ## Phase 3：验证安装
+
+按 `.story-deployed.target_cli` 选择对应端的检查；第 1–4 项仅用于 Claude Code，第 5 项是所有端共有的部署标记检查。仅检查模式也复用这些验证项，不执行部署或创建标记。
 
 1. 验证 hooks 注册：
    - 检查 `.claude/settings.local.json` 中的 hooks 字段是否正确
