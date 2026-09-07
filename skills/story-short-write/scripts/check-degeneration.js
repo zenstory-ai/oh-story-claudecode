@@ -48,10 +48,10 @@ const QUOTED_SPAN_PATTERNS = [
   /『[^』]*』/g,
   /【[^】]*】/g,
   /“[^”]*”/g,
-  // 单引号开符不得紧跟拉丁词字符，否则 don't ... John's / don‘t ... John’s 会被误配成台词跨度。
-  /(?<![A-Za-z0-9_])‘[^’]*’/g,
+  // 单引号须成对；词内撇号（don't、O’Connor）不作为开闭引号。
+  /(?<![A-Za-z0-9_])‘(?:[^’]|(?<=[A-Za-z0-9_])’(?=[A-Za-z0-9_]))*(?!(?<=[A-Za-z0-9_])’[A-Za-z0-9_])’/g,
   /"[^"]*"/g,
-  /(?<![A-Za-z0-9_])'[^']*'/g,
+  /(?<![A-Za-z0-9_])'(?:[^']|(?<=[A-Za-z0-9_])'(?=[A-Za-z0-9_]))*(?!(?<=[A-Za-z0-9_])'[A-Za-z0-9_])'/g,
 ];
 
 // 工程词泄漏（正文元信息扫描的确定性版）：弱模型把写作工程词漏进正文，破坏代入感
@@ -161,8 +161,7 @@ function isContent(trimmed) {
   return trimmed && !trimmed.startsWith('#') && !/^-{3,}$/.test(trimmed);
 }
 
-// 成对引号内可能是角色台词、系统播报或引用文本；只把这些闭合片段等长遮住，保留引号外
-// 文本及其原始索引。未闭合/跨行引号不豁免，避免一次坏引号吞掉后续正文里的真实退化信号。
+// 等长遮住成对引号内的内容以保留列号；未闭合引号不豁免。
 function maskQuotedSpans(text) {
   let masked = text;
   for (const pattern of QUOTED_SPAN_PATTERNS) {

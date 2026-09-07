@@ -64,6 +64,12 @@ run_functional() {
   "refuse_mixed_curly_apostrophe_contractions": "don‘t 作为AI，我无法继续创作。 John’s!",
   "refuse_single_quoted_ok": "他说：'作为AI，我无法继续创作。'然后关了门。",
   "refuse_curly_single_quoted_ok": "他说：‘作为AI，我无法继续创作。’然后关了门。",
+  "refuse_name_in_single_quote_ok": "'读完 O'Connor 的信，我无法继续写下去。'她合上笔记本。",
+  "refuse_name_in_curly_quote_ok": "‘读完 O’Connor 的信，我无法继续写下去。’她合上笔记本。",
+  "refuse_contraction_in_single_quote_ok": "'I can't write. 作为AI，我无法继续创作。'她放下了笔。",
+  "refuse_contraction_in_curly_quote_ok": "‘I can’t write. 作为AI，我无法继续创作。’她放下了笔。",
+  "refuse_unclosed_apostrophe": "'作为AI，我无法继续创作。 O'Connor 沉默了。",
+  "refuse_quote_before_name_ok": "‘我无法继续写下去。’O’Connor 合上了笔记本。",
   "ai_selfref_model": "夜色压下来。\n作为一个AI语言模型，我需要提醒您接下来的情节包含暴力描写。",
   "ai_selfref_assistant": "他推门进来。\n作为一个AI助手，这段内容涉及敏感话题。",
   "ai_selfref_era_ok": "作为一个人工智能时代的产物，他对孤独习以为常。\n他把灯关了。",
@@ -148,6 +154,10 @@ JS
   grep -q '^refuse_mixed_curly_apostrophe_contractions | 第1行 元信息泄漏（AI 自指）' "$tmp/py.txt" || { echo "FAIL: 左/右弯撇号被误配成引号跨度，吞掉 AI 自指" >&2; return 3; }
   grep -q '^refuse_single_quoted_ok | $' "$tmp/py.txt" || { echo "FAIL: ASCII 单引号内合法角色台词被误报" >&2; return 3; }
   grep -q '^refuse_curly_single_quoted_ok | $' "$tmp/py.txt" || { echo "FAIL: 弯单引号内合法角色台词被误报" >&2; return 3; }
+  grep -q '^refuse_unclosed_apostrophe | 第1行 元信息泄漏（AI 自指）' "$tmp/py.txt" || { echo "FAIL: 词内撇号不应闭合未完成台词" >&2; return 3; }
+  for name in refuse_quote_before_name_ok refuse_name_in_single_quote_ok refuse_name_in_curly_quote_ok refuse_contraction_in_single_quote_ok refuse_contraction_in_curly_quote_ok; do
+    grep -q "^$name | $" "$tmp/py.txt" || { echo "FAIL: $name 台词内撇号被当成闭引号" >&2; return 3; }
+  done
   grep -q '^english_ai | 第2行 元信息泄漏（英文 AI 腔）' "$tmp/py.txt" || { echo "FAIL: 英文 AI 腔未命中" >&2; return 3; }
   grep -q '^engword | 第2行 工程词泄漏' "$tmp/py.txt" || { echo "FAIL: 工程词泄漏未命中" >&2; return 3; }
   grep -q '^placeholder | 第2行 占位符' "$tmp/py.txt" || { echo "FAIL: 占位符未命中" >&2; return 3; }

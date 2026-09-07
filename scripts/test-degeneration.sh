@@ -125,6 +125,12 @@ don’t 作为AI，我无法继续创作。 John’s!
 don‘t 作为AI，我无法继续创作。 John’s!
 他说：'作为AI，我无法继续创作。'然后关了门。
 他说：‘作为AI，我无法继续创作。’然后关了门。
+'读完 O'Connor 的信，我无法继续写下去。'她合上笔记本。
+‘读完 O’Connor 的信，我无法继续写下去。’她合上笔记本。
+'I can't write. 作为AI，我无法继续创作。'她放下了笔。
+‘I can’t write. 作为AI，我无法继续创作。’她放下了笔。
+'作为AI，我无法继续创作。 O'Connor 沉默了。
+‘我无法继续写下去。’O’Connor 合上了笔记本。
 EOF
 set +e
 node "$SCRIPT" --json "$QUOTE_SCOPE" > "$OUT"
@@ -147,6 +153,7 @@ const expected = new Map([
   [8, { column: 7, label: 'AI 自指' }],
   [9, { column: 7, label: 'AI 自指' }],
   [10, { column: 7, label: 'AI 自指' }],
+  [17, { column: 2, label: 'AI 自指' }],
 ]);
 if (leaks.length !== expected.size) {
   throw new Error(`expected ${expected.size} quote-scope leaks, got ${leaks.length}: ${JSON.stringify(leaks)}`);
@@ -293,7 +300,10 @@ cat > "$TIER1_MIXED" <<'EOF'
 “别急。”按照字数目标，他还差六千字没写。
 “字数目标别改。”他却按照细纲继续写。
 EOF
-printf '“今天的字数目标是六千字。”他盯着屏幕。\n' > "$TIER1_QUOTED"
+cat > "$TIER1_QUOTED" <<'EOF'
+“今天的字数目标是六千字。”他盯着屏幕。
+‘O’Connor 的字数目标是六千字。’他盯着屏幕。
+EOF
 
 set +e
 node "$SCRIPT" --json --fail-on=blocking "$TIER1_MIXED" > "$OUT"
@@ -330,7 +340,7 @@ fi
 node - "$OUT" <<'NODE'
 const fs = require('fs');
 const findings = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')).findings.filter((f) => f.type === 'meta-leak');
-if (findings.length !== 1 || findings[0].severity !== 'advisory' || findings[0].column !== 5) {
+if (findings.length !== 2 || !findings.every((f) => f.severity === 'advisory') || findings[0].column !== 5 || findings[1].column !== 12) {
   throw new Error('成对引号内 tier1 应保留 advisory 与原位置: ' + JSON.stringify(findings));
 }
 NODE
