@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"hooks/story_antigravity_hook.js\" pre-tool-use",
+            "command": "node hooks/story_antigravity_hook.js pre-tool-use",
             "timeout": 15
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"hooks/story_antigravity_hook.js\" post-tool-use",
+            "command": "node hooks/story_antigravity_hook.js post-tool-use",
             "timeout": 15
           }
         ]
@@ -27,14 +27,14 @@
     "PreInvocation": [
       {
         "type": "command",
-        "command": "node \"hooks/story_antigravity_hook.js\" pre-invocation",
+        "command": "node hooks/story_antigravity_hook.js pre-invocation",
         "timeout": 15
       }
     ],
     "Stop": [
       {
         "type": "command",
-        "command": "node \"hooks/story_antigravity_hook.js\" stop",
+        "command": "node hooks/story_antigravity_hook.js stop",
         "timeout": 10
       }
     ]
