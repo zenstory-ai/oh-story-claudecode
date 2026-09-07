@@ -344,4 +344,51 @@ run "$TMP_DIR/非文件细纲/正文.md"
 expect_status 2
 expect_contains "不是普通文件"
 
-echo "PASS: check-outline-copy.js (23 cases)"
+# --- 24–27. 写后完成记录不是誊抄来源；支持普通/加粗字段与标题子节 ---
+printf '%s。\n' "$COPIED" >"$TMP_DIR/completed-prose.md"
+CASE="completion-heading"
+printf '#### 实际完成情况\n%s。\n' "$COPIED" >"$TMP_DIR/completion.md"
+run --outline "$TMP_DIR/completion.md" "$TMP_DIR/completed-prose.md"
+expect_status 0
+
+CASE="completion-field"
+printf '%s\n' "- 实际完成情况：${COPIED}。" "- 结尾设定：离开。" >"$TMP_DIR/completion.md"
+run --outline "$TMP_DIR/completion.md" "$TMP_DIR/completed-prose.md"
+expect_status 0
+
+CASE="completion-bold-field"
+printf '%s\n' "- **实际完成情况**：" "  ${COPIED}。" "- 结尾设定：离开。" >"$TMP_DIR/completion.md"
+run --outline "$TMP_DIR/completion.md" "$TMP_DIR/completed-prose.md"
+expect_status 0
+
+CASE="completion-nested-heading"
+printf '#### 实际完成情况\n已完成。\n##### 实际落地\n%s。\n' "$COPIED" >"$TMP_DIR/completion.md"
+run --outline "$TMP_DIR/completion.md" "$TMP_DIR/completed-prose.md"
+expect_status 0
+
+# --- 28–31. 排除完成记录不能吞掉记录前、同级/上级标题后或下一字段的真实照搬 ---
+CASE="copy-before-completion"
+printf '#### 情节细化\n%s。\n#### 实际完成情况\n已完成。\n' "$COPIED" >"$TMP_DIR/completion.md"
+run --outline "$TMP_DIR/completion.md" "$TMP_DIR/completed-prose.md"
+expect_status 1
+expect_contains "22 字「${COPIED}」"
+
+CASE="copy-after-completion-peer-heading"
+printf '#### 实际完成情况\n##### 实际落地\n已完成。\n#### 后续情节\n%s。\n' "$COPIED" >"$TMP_DIR/completion.md"
+run --outline "$TMP_DIR/completion.md" "$TMP_DIR/completed-prose.md"
+expect_status 1
+expect_contains "22 字「${COPIED}」"
+
+CASE="copy-after-completion-parent-heading"
+printf '#### 实际完成情况\n##### 实际落地\n已完成。\n## 下一章\n%s。\n' "$COPIED" >"$TMP_DIR/completion.md"
+run --outline "$TMP_DIR/completion.md" "$TMP_DIR/completed-prose.md"
+expect_status 1
+expect_contains "22 字「${COPIED}」"
+
+CASE="copy-after-completion-field"
+printf '%s\n' "- **实际完成情况**：已完成。" "- 结尾设定：${COPIED}。" >"$TMP_DIR/completion.md"
+run --outline "$TMP_DIR/completion.md" "$TMP_DIR/completed-prose.md"
+expect_status 1
+expect_contains "22 字「${COPIED}」"
+
+echo "PASS: check-outline-copy.js (31 cases)"
