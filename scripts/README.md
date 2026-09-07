@@ -14,7 +14,7 @@
 | `check-current-skill-contracts.sh` + `.py` + `current-contract.json` | 从结构化 manifest 校验当前版本、Phase、schema、主产物与细纲契约；保留 legacy/path 守卫并拦截缺主产物后的静默替代 | CI |
 | `check-shared-files.sh` | 调两个显式 manifest 验 runtime/reference 副本，拦截未声明 exact/near-copy，并检查 setup profile 契约与消费可达性 | CI |
 | `check-reference-similarity.py` | 对跨 Skill Markdown 做行级 Jaccard/containment 近似扫描；高相似派生关系必须在 `shared-references.json` 的 `derived_groups` 说明来源与分化原因 | CI（由 check-shared-files 调用） |
-| `check-agent-reference-consumers.py` | 从 story-setup Agent 模板做引用可达性遍历，同时验证唯一 profile 清单、long/short 所有权与 story-architect 不维护第二份 inventory | CI（由 check-shared-files 调用） |
+| `check-agent-reference-consumers.py` | 检查 Agent 模板的已部署资料引用全前缀并报告文件/行号，遍历引用可达性，验证唯一 profile 清单、long/short 所有权与 story-architect 不维护第二份 inventory；不证明实际读取行为 | CI（由 check-shared-files 调用） |
 | `check-short-analysis-scope.py` | 保证 story-short-analyze 只路由短篇源文观察标尺，拦截旧混合手册、长篇结构口令和推荐百分比回流 | CI（由 check-shared-files 调用） |
 | `check-scan-runtime-policy.sh` | scraper 输出文件名依赖本地日期 helper；CDP 探测/Windows 监听解析的源码策略 | CI；这些依赖方向无法由隔离 helper 测试证明 |
 | `check-story-setup-deployment.sh` | story-setup 部署/运行时回归（慢，>2min） | CI |

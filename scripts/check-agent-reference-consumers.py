@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Validate deployed story-setup reference reachability and profile ownership."""
+"""Validate agent reference prefixes, reachability and profile ownership.
+
+Template scanning enforces source policy only, not actual model read behavior.
+"""
 
 from __future__ import annotations
 
@@ -13,11 +16,42 @@ from pathlib import Path
 AGENT_REF_RE = re.compile(r"agent-references/([^`\s)】」]+?\.md)")
 LOCAL_MD_RE = re.compile(r"(?<![A-Za-z0-9_.-])([\w\-./\u0080-\uffff]+\.md)")
 PROFILE_LINK_RE = re.compile(r"\[[^]]+\]\(([^)]+\.md)\)")
+CANONICAL_PREFIX = "story-setup/references/agent-references/"
+URL_RE = re.compile(r"https?://[^\s`<>)]+")
 PROFILE_HEADINGS = {
     "## Common": "common",
     "## Long profile": "long",
     "## Short profile": "short",
 }
+
+
+def template_prefix_errors(
+    text: str, references: set[str], url_spans: list[tuple[int, int]],
+) -> list[tuple[int, str]]:
+    """Inspect reference tokens, not arbitrary project artifact filenames."""
+    names = sorted(references | {Path(name).name for name in references}, key=lambda name: (-len(name), name))
+    patterns = [AGENT_REF_RE.pattern, r"genre-prose-cards/\{[^}\n]+\}\.md"]
+    if names:
+        patterns.append(
+            r"(?<![A-Za-z0-9_./-])(?:" + "|".join(re.escape(name) for name in names)
+            + r")(?![A-Za-z0-9_-]|\.[A-Za-z0-9_-])"
+        )
+    tokens = re.compile("|".join(patterns))
+    canonical = re.compile(
+        r"(?<![A-Za-z0-9_.-])" + re.escape(CANONICAL_PREFIX) + r"[^`\s)】」]+?\.md"
+    )
+    ignored = [match.span() for match in canonical.finditer(text)]
+    ignored.extend(url_spans)
+    # Link labels are display text; their destinations are scanned normally.
+    ignored.extend(
+        match.span(1) for match in re.finditer(r"\[([^]\n]*)\]\(([^)\n]+)\)", text)
+    )
+    errors = []
+    for match in tokens.finditer(text):
+        if any(start <= match.start() and match.end() <= end for start, end in ignored):
+            continue
+        errors.append((text.count("\n", 0, match.start()) + 1, match.group(0)))
+    return errors
 
 
 def local_references(path: Path, references_dir: Path) -> set[Path]:
@@ -37,7 +71,7 @@ def local_references(path: Path, references_dir: Path) -> set[Path]:
 
 
 def profile_contract(path: Path) -> dict[str, set[str]]:
-    sections = {name: set() for name in PROFILE_HEADINGS.values()}
+    sections: dict[str, set[str]] = {name: set() for name in PROFILE_HEADINGS.values()}
     current: str | None = None
     for line in path.read_text(encoding="utf-8").splitlines():
         heading = line.strip()
@@ -63,12 +97,20 @@ def main() -> int:
         print("ERROR: story-setup agent templates or references directory missing", file=sys.stderr)
         return 2
 
-    all_references = {path.resolve() for path in references_dir.rglob("*.md")}
+    reference_files = set(references_dir.rglob("*.md"))
+    all_references = {path.resolve() for path in reference_files}
+    reference_names = {path.relative_to(references_dir).as_posix() for path in reference_files}
     roots: set[Path] = set()
     missing_roots: set[str] = set()
-    for agent in agents_dir.glob("*.md"):
+    prefix_errors: list[str] = []
+    for agent in sorted(agents_dir.glob("*.md")):
         text = agent.read_text(encoding="utf-8")
+        url_spans = [match.span() for match in URL_RE.finditer(text)]
+        for line, reference in template_prefix_errors(text, reference_names, url_spans):
+            prefix_errors.append(f"{agent.relative_to(root)}:{line}: {reference}")
         for match in AGENT_REF_RE.finditer(text):
+            if any(start <= match.start() and match.end() <= end for start, end in url_spans):
+                continue
             raw = match.group(1)
             if "{" in raw or "}" in raw:
                 continue
@@ -78,10 +120,16 @@ def main() -> int:
             else:
                 missing_roots.add(raw)
 
+    if prefix_errors:
+        print(f"INVALID AGENT REFERENCE PREFIX: require {CANONICAL_PREFIX}")
+        for error in prefix_errors:
+            print(f"  {error}")
+        return 1
+
     if missing_roots:
         print("MISSING DEPLOYED AGENT REFERENCES")
-        for path in sorted(missing_roots):
-            print(f"  {path}")
+        for missing in sorted(missing_roots):
+            print(f"  {missing}")
         return 1
 
     profile_path = references_dir / "agent-reference-profiles.md"

@@ -19,6 +19,7 @@ from typing import Any
 
 
 IGNORED_DIRS = frozenset({".git", ".omc", "__pycache__", "node_modules", ".venv"})
+MARKDOWN_SUFFIXES = frozenset({".md", ".mdx"})
 
 
 class ManifestError(ValueError):
@@ -43,6 +44,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--root", type=Path, default=script_dir.parent)
     parser.add_argument(
         "--manifest", type=Path, default=script_dir / "shared-references.json"
+    )
+    parser.add_argument(
+        "--runtime-manifest",
+        type=Path,
+        help="optional runtime asset manifest used to reject cross-manifest ownership",
     )
     return parser.parse_args()
 
@@ -71,7 +77,9 @@ def string_list(raw: object, field: str) -> list[str]:
     return raw
 
 
-def load_groups(root: Path, manifest_path: Path) -> list[Group]:
+def load_groups(
+    root: Path, manifest_path: Path, *, runtime_manifest: bool = False
+) -> list[Group]:
     try:
         data: Any = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -130,16 +138,43 @@ def load_groups(root: Path, manifest_path: Path) -> list[Group]:
             relative = Path(filename)
             if relative.is_absolute() or ".." in relative.parts:
                 raise ManifestError(f"{name}.files entry is unsafe: {filename}")
+            source = inside_root(
+                root,
+                (source_dir.relative_to(root) / relative).as_posix(),
+                f"{name}.files[{filename}].source",
+            )
+            targets = tuple(
+                inside_root(
+                    root,
+                    (target.relative_to(root) / relative).as_posix(),
+                    f"{name}.files[{filename}].targets",
+                )
+                for target in target_dirs
+            )
             groups.append(
                 Group(
                     f"{name}:{relative.as_posix()}",
-                    (source_dir / relative).resolve(),
-                    tuple((target / relative).resolve() for target in target_dirs),
+                    source,
+                    targets,
                 )
             )
 
     if not groups:
         raise ManifestError("manifest must declare at least one reference group")
+
+    for group in groups:
+        for managed_path in group.paths:
+            is_markdown = managed_path.suffix.lower() in MARKDOWN_SUFFIXES
+            if runtime_manifest and is_markdown:
+                raise ManifestError(
+                    f"{group.name}: runtime manifest cannot manage Markdown path "
+                    f"{managed_path.relative_to(root)}"
+                )
+            if not runtime_manifest and not is_markdown:
+                raise ManifestError(
+                    f"{group.name}: reference manifest may manage only Markdown paths; "
+                    f"got {managed_path.relative_to(root)}"
+                )
 
     source_owners: dict[Path, str] = {}
     target_owners: dict[Path, str] = {}
@@ -166,6 +201,34 @@ def load_groups(root: Path, manifest_path: Path) -> list[Group]:
             f"managed path {path.relative_to(root)} is both source and target"
         )
     return groups
+
+
+def validate_cross_manifest_ownership(
+    root: Path,
+    reference_manifest: Path,
+    groups: list[Group],
+    runtime_manifest: Path,
+) -> None:
+    reference_owners = {
+        managed_path: group.name
+        for group in groups
+        for managed_path in group.paths
+    }
+    runtime_groups = load_groups(root, runtime_manifest, runtime_manifest=True)
+    runtime_owners = {
+        managed_path: group.name
+        for group in runtime_groups
+        for managed_path in group.paths
+    }
+    overlap = sorted(reference_owners.keys() & runtime_owners.keys())
+    if not overlap:
+        return
+    managed_path = overlap[0]
+    raise ManifestError(
+        f"cross-manifest owner conflict for {managed_path.relative_to(root)}: "
+        f"{reference_manifest.name}[{reference_owners[managed_path]}] and "
+        f"{runtime_manifest.name}[{runtime_owners[managed_path]}]"
+    )
 
 
 def digest(path: Path) -> str:
@@ -215,7 +278,12 @@ def reference_files(root: Path) -> list[Path]:
         for raw in result.stdout.split(b"\0"):
             if not raw:
                 continue
-            path = (root / os.fsdecode(raw)).resolve()
+            relative = os.fsdecode(raw)
+            path = inside_root(
+                root,
+                relative,
+                f"discovered reference {relative}",
+            )
             if path.is_file() and not any(part in IGNORED_DIRS for part in path.parts):
                 paths.append(path)
         return sorted(set(paths))
@@ -223,8 +291,16 @@ def reference_files(root: Path) -> list[Path]:
     paths = []
     for ref_dir in sorted((root / "skills").glob("*/references")):
         for path in ref_dir.rglob("*"):
-            if path.is_file() and not any(part in IGNORED_DIRS for part in path.parts):
-                paths.append(path.resolve())
+            if not path.is_file():
+                continue
+            relative = path.relative_to(root).as_posix()
+            confined = inside_root(
+                root,
+                relative,
+                f"discovered reference {relative}",
+            )
+            if not any(part in IGNORED_DIRS for part in confined.parts):
+                paths.append(confined)
     return sorted(set(paths))
 
 
@@ -297,6 +373,13 @@ def main() -> int:
     manifest = args.manifest.resolve()
     try:
         groups = load_groups(root, manifest)
+        if args.runtime_manifest is not None:
+            validate_cross_manifest_ownership(
+                root,
+                manifest,
+                groups,
+                args.runtime_manifest.resolve(),
+            )
         return run(args.command, root, groups)
     except ManifestError as exc:
         print(f"MANIFEST ERROR: {exc}", file=sys.stderr)
