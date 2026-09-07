@@ -166,6 +166,7 @@ python3 scripts/skill-numbering.py check
 - runtime 脚本的唯一源/目标定义在 `scripts/shared-assets.json`；先改 `source`，再运行 `python3 scripts/sync-shared-assets.py sync`。
 - 同名 runtime 脚本只能属于一个 canonical group，且每个 target 必须保留 source basename；禁止用改名 target 绕过单一 owner。
 - reference 文档的 canonical source、部署副本与目录镜像显式定义在 `scripts/shared-references.json`；先改 source，再运行 `python3 scripts/shared-references.py sync`。reference target 可用语义别名，但必须在 manifest 逐路径登记。
+- `check-shared-files.sh` 同时验证两个 manifest 的管理路径不重叠；reference 文档只登记在 `shared-references.json`。
 - `shared-references.py check` 还会按内容哈希扫描未登记的跨 Skill 精确副本；目录镜像的 `files` 必须完整覆盖 source tree，新增文件不能绕过 manifest。
 - `check-reference-similarity.py` 会扫描跨 Skill 近似副本；仍需独立演化的历史派生文件必须在 `derived_groups` 登记成员与分化理由。新增副本必须选择“登记同步”或“形成真正独立内容”，不能靠改名绕过 owner。
 - `story-short-analyze` 的 `analysis-short-*` 是源文观察标尺，不是写作 playbook；禁止重新引入长篇节点、卷级循环、推荐结构百分比或“每章必备”口令。由 `check-short-analysis-scope.py` 守卫。

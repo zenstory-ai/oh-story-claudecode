@@ -714,6 +714,7 @@ function proseBlockReason(root, absolute) {
 // 】 是章尾系统播报模板的收束符（agent-references/long-chapter-hooks.md 章尾实战模板一/四），ASCII "
 // 是 normalize-punctuation.js --quote-mode ascii 的合法收引号，两者都不该被判「疑似截断」。
 const TERMINAL = new Set(Array.from("。！？…”』」）)!?.~—】\""))
+// 保留导出以兼容 adapter。
 const QUOTE_OPENERS = new Set(["「", "“", "‘", "『", '"'])
 const SOFT_PATTERNS = [
   // 型号后缀（AI语言模型/AI助手/人工智能语言模型/AI模型/AI大模型）必须可选吃掉：否则前视断言
@@ -742,7 +743,8 @@ function skippableLine(line) {
 // 的行整行跳过。js↔py 同构实现（codex
 // story_codex_hook.py）由 scripts/check-hook-regex-sync.sh（规范串逐字锁）与
 // scripts/test-prose-net-parity.sh（fixture 逐字 diff）锁 parity，文案以本核为准。
-const TOXIC_QUOTE_SPANS = [/「[^」]*」/g, /『[^』]*』/g, /【[^】]*】/g, /“[^”]*”/g, /‘[^’]*’/g, /"[^"]*"/g, /'[^']*'/g]
+// 单引号须成对；词内撇号（don't、O’Connor）不作为开闭引号。
+const TOXIC_QUOTE_SPANS = [/「[^」]*」/g, /『[^』]*』/g, /【[^】]*】/g, /“[^”]*”/g, /(?<![A-Za-z0-9_])‘(?:[^’]|(?<=[A-Za-z0-9_])’(?=[A-Za-z0-9_]))*(?!(?<=[A-Za-z0-9_])’[A-Za-z0-9_])’/g, /"[^"]*"/g, /(?<![A-Za-z0-9_])'(?:[^']|(?<=[A-Za-z0-9_])'(?=[A-Za-z0-9_]))*(?!(?<=[A-Za-z0-9_])'[A-Za-z0-9_])'/g]
 const TOXIC_QUOTE_CHARS = new Set(Array.from("「」『』【】“”‘’\"'"))
 // 分句起点边界（前一字符属于它才认「是A，不是B」的分句首「是」）；同时用作确认语的右边界。
 const TOXIC_CLAUSE_BOUNDARY = new Set(Array.from("，,。.！!？?；;：:、…—~ \t　"))
@@ -864,14 +866,14 @@ function proseNetFindings(text) {
     const lineNo = index + 1
     content.push([lineNo, line])
     let hit = false
-    if (!QUOTE_OPENERS.has(line[0])) {
-      for (const [regex, label] of SOFT_PATTERNS) {
-        const match = line.match(regex)
-        if (match) {
-          findings.push(`第${lineNo}行 元信息泄漏（${label}）：「${codePointSlice(match[0], 0, 20)}」`)
-          hit = true
-          break
-        }
+    // 只豁免成对引号内的内容，继续检查引号外叙述。
+    const outsideQuotes = maskQuotedSpans(line)
+    for (const [regex, label] of SOFT_PATTERNS) {
+      const match = outsideQuotes.match(regex)
+      if (match) {
+        findings.push(`第${lineNo}行 元信息泄漏（${label}）：「${codePointSlice(match[0], 0, 20)}」`)
+        hit = true
+        break
       }
     }
     if (hit) return
