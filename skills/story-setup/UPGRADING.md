@@ -3,9 +3,9 @@
 ## 当前版本
 
 - `setup_skill_version: 1.2.10`
-- `agents_version: 32`
+- `agents_version: 29`
 
-`.story-deployed` 缺失任一字段，或 `agents_version` 缺失 / 非整数 / 小于 `32`，都视为待更新部署。直接重新运行 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或自然语言点名）；不在运行时逐级兼容历史模板。如项目 `agents_version` 大于 `32`，说明本地 story-setup 比项目旧：先更新 oh-story-claudecode，不得用 v32 降级覆盖。历史版本改动见仓库根目录 `CHANGELOG.md`。
+`.story-deployed` 缺失任一字段，或 `agents_version` 缺失 / 非整数 / 小于 `29`，都视为待更新部署。直接重新运行 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或自然语言点名）；不在运行时逐级兼容历史模板。如项目 `agents_version` 大于 `29`，说明本地 story-setup 比项目旧：先更新 oh-story-claudecode，不得用 v29 降级覆盖。历史版本改动见仓库根目录 `CHANGELOG.md`。
 
 ## 升级策略
 
@@ -52,25 +52,7 @@ OpenClaw / Reasonix / generic 三条路径的 skill 副本在项目 `skills/` �
 - `{书名}/设定/`、`大纲/`、`追踪/`
 - `.active-book`
 
-## v32 当前契约
-
-- 三遍法与 narrative-writer inline 去味仅执行调用方选定 Gate；刷新部署的 anti-ai-writing reference，主会话以最终文件复扫验收。
-
-重新部署后需新开会话。
-
-## v31 历史契约
-
-- 正文退化检测与各端 Hook 只豁免成对引号内部；引号外拒绝语与工程词继续扫描，保留正常角色台词。
-
-重新部署后需新开会话。
-
-## v30 历史契约
-
-- Antigravity 四个 Hook 命令改用无引号的相对脚本路径，避免 Windows 宿主把引号作为文件名字符传给 Node。重跑 setup 会替换 `oh-story` 管理组并保留其他用户 Hooks；不要删除整个 `.agents/hooks.json`。
-
-重新部署后需**新开会话**，custom agent 与 hooks 才会重新注册。
-
-## v29 历史契约
+## v29 当前契约
 
 - narrative-writer 模板去掉逐段配额：「展开子事件」改为「展开推进单元」，删除「详写的子事件合计 ≥100-150 字」；情弦理论不再要求「每节至少拨一次」，任务、推理、手艺或等待链可连续展开。三端（Claude / OpenCode / Codex）产物同步。
 - 短篇 reference bundle 改按场景功能判断篇幅与节奏：`short-genre-formulas.md` 去掉钩子密度的固定节距、「爽文章节 500-800 字/节」和「打脸密度每 3-5 节一次」；`short-emotional-methods.md` 去掉固定节距的情绪转向与打脸节拍；`short-suspense.md` 不再给每类小节设最低悬念等级；`short-reversal.md` 甜宠线不再要求每节一个甜点。
@@ -156,7 +138,7 @@ OpenClaw / Reasonix / generic 三条路径的 skill 副本在项目 `skills/` �
 ## 升级步骤
 
 1. 在项目根目录重新运行 story-setup。
-2. 确认 `.story-deployed` 写入 `agents_version: 32` 与 `setup_skill_version: 1.2.10`。
+2. 确认 `.story-deployed` 写入 `agents_version: 29` 与 `setup_skill_version: 1.2.10`。
 3. 确认目标 CLI 的 agents、hooks/rules 和 reference bundle 都通过安装验证。
 4. 新开会话，使 custom agents 与 hooks 按当前文件重新注册。
 5. **长篇在写项目必做**：检查每本书的 `追踪/_tracking-state.json` 是否存在。不存在就是旧追踪结构，按下方「追踪模型迁移」重建，否则写下一章会被拦。
