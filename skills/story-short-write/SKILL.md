@@ -170,7 +170,7 @@ Phase 2 必须在第一次写入 `设定.md` / `小节大纲.md` 前按顺序完
 - 主语节奏：段首或主语重置时可点名；同一动作链内优先代词/省略；关键转折再点名。
 - 标点跟语气走：质问用问号，爆发处少量感叹；犹豫、未尽、打断用动作停顿、短句或换行处理，正文不使用 `……` / `——` / `—` / `--`。
 - 短篇默认第一人称在场：受虐段可直白宣泄，反击段可冷静审判；只删中立无情绪的作者讲解，不删带主角偏色的审判/预告。
-- 情绪可以直写，但后面要接场景里特有的动作或物件；没有具体承接的情绪总结句才删。
+- 情绪可以直写，按 `references/short-craft.md` 第 2 节检查上下文支撑，不逐句补动作或物件。
 - 任务卡点也可以承接情绪，但必须直接加重羞辱、误会、背叛、证据、反击或心死节点；删掉后情绪/证据/关系无损就压缩。
 - 情绪宁烈不温，冲突前置、爽点具体、台词带刺；心死/余韵等以克制为爽感的桥段按题材包收敛。
 
@@ -337,7 +337,7 @@ Phase 2 必须在第一次写入 `设定.md` / `小节大纲.md` 前按顺序完
 |------|----------|
 | [references/short-format.md](references/short-format.md) | 写作前必读（短篇正文格式，两平台模板） |
 | [references/submission-craft.md](references/submission-craft.md) | 投稿前必读（平台基调 知乎/小程序/番茄 · 导语门面 · 付费点断点） |
-| [references/short-craft.md](references/short-craft.md) | 写作全程参考（短篇通用底座：情绪直接写+后接具体反应、在场叙述、超短章节制） |
+| [references/short-craft.md](references/short-craft.md) | 写作全程参考（短篇通用底座：情绪直写与场景支撑、在场叙述、超短章节制） |
 | [references/genre-styles/](references/genre-styles/) | **定方向后必读**：按题材加载对应风格包（追妻火葬场 / 世情打脸 / 复仇打脸 / 总裁豪门 / 宅斗宫斗 / 民俗怪谈 / 悬疑 / 甜宠 / 双男主 / 沙雕脑洞），正文风格随之切换 |
 | [references/short-deslop.md](references/short-deslop.md) | 去AI味时必读（短篇专属，只杀真·AI腔，不杀情绪烈度） |
 | [references/workflow-design.md](references/workflow-design.md) | Phase 2 构思、设计字段、Agent 调用与完成门禁；Phase 3/4 不预加载 |
@@ -366,7 +366,7 @@ Phase 2 必须在第一次写入 `设定.md` / `小节大纲.md` 前按顺序完
 
 | 主题 | 权威文件（先读） | 配套文件（按角度补充） |
 |------|-----------------|----------------------|
-| 情绪外化（怎么写情绪） | **`references/short-craft.md` 第2节**（情绪直接写+后接具体反应、三段对照、改写四步——替代旧机械替换表） | 各 `genre-styles/` 包的「情绪烈度与模式」 |
+| 情绪落地（怎么写情绪） | **`references/short-craft.md` 第2节**（情绪直写、场景支撑与重复说明取舍） | 各 `genre-styles/` 包的「情绪烈度与模式」 |
 | 情绪设计（情感结构） | **`references/emotional-methods.md`**（情感三板斧 + 拉扯节奏 + 失败模式） | `references/genre-writing-techniques.md`（情绪操控核心法则 / 情绪三层次） |
 | 反转 | **`references/short-reversal.md`**（反转类型 / 铺垫 / 揭示位置 / 有效性自检） | `references/villain-and-reveal.md`（真相揭露机制 / 反转有效性自检） |
 | 反派揭露 | **`references/villain-and-reveal.md`**（反派模板 / 揭露机制 / 报应设计） | `references/short-reversal.md` |
@@ -375,7 +375,7 @@ Phase 2 必须在第一次写入 `设定.md` / `小节大纲.md` 前按顺序完
 | 女频写作 | **对应 `genre-styles/{题材}.md`**（追妻火葬场 / 总裁豪门 / 宅斗宫斗 / 甜宠 / 世情打脸的题材声线、虐爽比例、招式） | `references/genre-writing-techniques.md`（女频读者心理与写作技法 / 感情线四阶段推进法）· `references/emotional-methods.md`（情绪拉扯） |
 | 题材风格 | **`references/genre-styles/{题材}.md`**（核心 10 题材的腔调/开篇/钩子/情绪烈度/招式/收尾，corpus-grounded） | `references/genre-writing-formulas.md`（冷门题材结构骨架）· `references/genre-writing-techniques.md`（核心梗 / 卖点 / 通用技法） |
 | 开头 | **各 `genre-styles/{题材}.md` 的「开篇范式」**（关系锚 + 全弧剧透导语 + 火葬场预告，真实开篇范例）+ `short-craft.md` 第12节（开头事件密度） | `references/hooks-chapter.md`（开篇钩子类型）· `references/hooks-paragraph.md`（段钩密度） |
-| 格式与节奏 | **`references/short-format.md`**（短篇正文格式，两平台模板） | `references/short-craft.md`（情绪直接写+后接具体反应/三维度揉进/疏密）· `references/writing-workflow.md`（设计/精修工作流） |
+| 格式与节奏 | **`references/short-format.md`**（短篇正文格式，两平台模板） | `references/short-craft.md`（情绪落地/三维度揉进/疏密）· `references/writing-workflow.md`（设计/精修工作流） |
 | 对话 | **`references/dialogue-mastery.md`**（对话技法主文件：差异化/潜台词/对话节奏） | `references/short-craft.md`（三类台词与对话权力博弈）· 各 `genre-styles/` 包的真实金句库 |
 | 去AI味 | **`references/short-deslop.md`**（短篇专属：只杀真·AI腔，不杀情绪烈度/审判句/火葬场预告） | `references/banned-words.md`（禁用词扫描）· `scripts/check-ai-patterns.js`（AI句式复扫）· `references/short-prose-quality.md`（成稿检查） |
 
