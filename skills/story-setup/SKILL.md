@@ -389,7 +389,7 @@ Reasonix（DeepSeek-Reasonix CLI）当前只部署 skills 与 `AGENTS.md`，不�
 
 ## Phase 3：验证安装
 
-按 `.story-deployed.target_cli` 选择对应端的检查；第 1–4 项仅用于 Claude Code，第 5 项是所有端共有的部署标记检查。仅检查模式也复用这些验证项，不执行部署或创建标记。
+按 `.story-deployed.target_cli` 选择对应端的检查：第 1–4 项仅用于 Claude Code，第 5 项是所有端共有的部署标记检查，第 6 项是部署报告，第 7–13 项按目标端各选其一。仅检查模式复用第 1–5 项与对应端的第 7–13 项，跳过第 6 项，且其中要求实际执行 hook 或写入 fixture 的子项改为只做静态校验（文件存在、语法有效、注册项齐全），不运行会写入项目的 hook，也不创建部署标记。
 
 1. 验证 hooks 注册：
    - 检查 `.claude/settings.local.json` 中的 hooks 字段是否正确
