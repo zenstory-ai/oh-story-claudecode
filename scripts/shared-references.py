@@ -19,6 +19,7 @@ from typing import Any
 
 
 IGNORED_DIRS = frozenset({".git", ".omc", "__pycache__", "node_modules", ".venv"})
+MARKDOWN_SUFFIXES = frozenset({".md", ".mdx"})
 
 
 class ManifestError(ValueError):
@@ -43,6 +44,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--root", type=Path, default=script_dir.parent)
     parser.add_argument(
         "--manifest", type=Path, default=script_dir / "shared-references.json"
+    )
+    parser.add_argument(
+        "--runtime-manifest",
+        type=Path,
+        help="optional runtime asset manifest used to reject cross-manifest ownership",
     )
     return parser.parse_args()
 
@@ -71,7 +77,9 @@ def string_list(raw: object, field: str) -> list[str]:
     return raw
 
 
-def load_groups(root: Path, manifest_path: Path) -> list[Group]:
+def load_groups(
+    root: Path, manifest_path: Path, *, runtime_manifest: bool = False
+) -> list[Group]:
     try:
         data: Any = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -130,16 +138,43 @@ def load_groups(root: Path, manifest_path: Path) -> list[Group]:
             relative = Path(filename)
             if relative.is_absolute() or ".." in relative.parts:
                 raise ManifestError(f"{name}.files entry is unsafe: {filename}")
+            source = inside_root(
+                root,
+                (source_dir.relative_to(root) / relative).as_posix(),
+                f"{name}.files[{filename}].source",
+            )
+            targets = tuple(
+                inside_root(
+                    root,
+                    (target.relative_to(root) / relative).as_posix(),
+                    f"{name}.files[{filename}].targets",
+                )
+                for target in target_dirs
+            )
             groups.append(
                 Group(
                     f"{name}:{relative.as_posix()}",
-                    (source_dir / relative).resolve(),
-                    tuple((target / relative).resolve() for target in target_dirs),
+                    source,
+                    targets,
                 )
             )
 
     if not groups:
         raise ManifestError("manifest must declare at least one reference group")
+
+    for group in groups:
+        for managed_path in group.paths:
+            is_markdown = managed_path.suffix.lower() in MARKDOWN_SUFFIXES
+            if runtime_manifest and is_markdown:
+                raise ManifestError(
+                    f"{group.name}: runtime manifest cannot manage Markdown path "
+                    f"{managed_path.relative_to(root)}"
+                )
+            if not runtime_manifest and not is_markdown:
+                raise ManifestError(
+                    f"{group.name}: reference manifest may manage only Markdown paths; "
+                    f"got {managed_path.relative_to(root)}"
+                )
 
     source_owners: dict[Path, str] = {}
     target_owners: dict[Path, str] = {}
@@ -215,7 +250,12 @@ def reference_files(root: Path) -> list[Path]:
         for raw in result.stdout.split(b"\0"):
             if not raw:
                 continue
-            path = (root / os.fsdecode(raw)).resolve()
+            relative = os.fsdecode(raw)
+            path = inside_root(
+                root,
+                relative,
+                f"discovered reference {relative}",
+            )
             if path.is_file() and not any(part in IGNORED_DIRS for part in path.parts):
                 paths.append(path)
         return sorted(set(paths))
@@ -223,8 +263,16 @@ def reference_files(root: Path) -> list[Path]:
     paths = []
     for ref_dir in sorted((root / "skills").glob("*/references")):
         for path in ref_dir.rglob("*"):
-            if path.is_file() and not any(part in IGNORED_DIRS for part in path.parts):
-                paths.append(path.resolve())
+            if not path.is_file():
+                continue
+            relative = path.relative_to(root).as_posix()
+            confined = inside_root(
+                root,
+                relative,
+                f"discovered reference {relative}",
+            )
+            if not any(part in IGNORED_DIRS for part in confined.parts):
+                paths.append(confined)
     return sorted(set(paths))
 
 
@@ -297,6 +345,9 @@ def main() -> int:
     manifest = args.manifest.resolve()
     try:
         groups = load_groups(root, manifest)
+        if args.runtime_manifest is not None:
+            # Disjoint file types keep the two manifests from owning the same path.
+            load_groups(root, args.runtime_manifest.resolve(), runtime_manifest=True)
         return run(args.command, root, groups)
     except ManifestError as exc:
         print(f"MANIFEST ERROR: {exc}", file=sys.stderr)

@@ -365,7 +365,7 @@ echo "  OK agent templates"
 
 # frontmatter 解析必须锚定独占一行的 `---`（值里的三连字符不得截断 permission/steps），
 # 且 disallowedTools 里的 Bash 必须落成真正的标量 deny：OpenCode 未声明 bash 权限时
-# evaluate() 返回 ask（不是 deny），只有 edit: deny 的只读 agent 仍能借 shell 重定向写正文。
+# 默认允许 bash，只有 edit: deny 的只读 agent 仍能借 shell 重定向写正文。
 # 不给任何“只读命令”例外：上游 shell.ts 只把 command 的**直接父节点** redirected_statement
 # 纳入鉴权，`( allowlisted-command ) > 正文.md` 的 command 直接父节点是 subshell，能绕过字面量白名单。
 python3 - "scripts/sync-opencode.py" <<'PY'

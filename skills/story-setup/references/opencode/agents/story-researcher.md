@@ -5,7 +5,10 @@ description: |
   被 story-long-write（Phase 4）、story-review、story skill 路由调用。
 mode: subagent
 permission:
+  "*": deny
   read: allow
+  glob: allow
+  grep: allow
   edit: allow
   bash: allow
 steps: 20
