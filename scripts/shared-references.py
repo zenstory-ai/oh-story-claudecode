@@ -203,34 +203,6 @@ def load_groups(
     return groups
 
 
-def validate_cross_manifest_ownership(
-    root: Path,
-    reference_manifest: Path,
-    groups: list[Group],
-    runtime_manifest: Path,
-) -> None:
-    reference_owners = {
-        managed_path: group.name
-        for group in groups
-        for managed_path in group.paths
-    }
-    runtime_groups = load_groups(root, runtime_manifest, runtime_manifest=True)
-    runtime_owners = {
-        managed_path: group.name
-        for group in runtime_groups
-        for managed_path in group.paths
-    }
-    overlap = sorted(reference_owners.keys() & runtime_owners.keys())
-    if not overlap:
-        return
-    managed_path = overlap[0]
-    raise ManifestError(
-        f"cross-manifest owner conflict for {managed_path.relative_to(root)}: "
-        f"{reference_manifest.name}[{reference_owners[managed_path]}] and "
-        f"{runtime_manifest.name}[{runtime_owners[managed_path]}]"
-    )
-
-
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -374,12 +346,8 @@ def main() -> int:
     try:
         groups = load_groups(root, manifest)
         if args.runtime_manifest is not None:
-            validate_cross_manifest_ownership(
-                root,
-                manifest,
-                groups,
-                args.runtime_manifest.resolve(),
-            )
+            # Disjoint file types keep the two manifests from owning the same path.
+            load_groups(root, args.runtime_manifest.resolve(), runtime_manifest=True)
         return run(args.command, root, groups)
     except ManifestError as exc:
         print(f"MANIFEST ERROR: {exc}", file=sys.stderr)

@@ -205,9 +205,7 @@ def test_cross_manifest_ownership() -> None:
         assert "skills/z/references/cards/one.md" in result.stderr
         assert "runtime-tree:one.md" in result.stderr
 
-        # Custom/standalone fixtures stay isolated unless the caller explicitly
-        # opts into a second manifest. A same-directory runtime manifest must not
-        # be guessed and applied behind the caller's back.
+        # A neighboring runtime manifest is ignored unless explicitly selected.
         runtime_manifest(
             root,
             [
@@ -392,15 +390,14 @@ def test_tree_file_symlink_cannot_escape_root() -> None:
                     target_dir = root / "skills/b/scripts/cards"
                 source_dir.mkdir(parents=True)
                 target_dir.mkdir(parents=True)
-                write(source_dir / "one.md", "outside\n")
-                write(target_dir / "one.md", "outside\n")
+                write(source_dir / "one.md", "source\n")
+                write(target_dir / "one.md", "target\n")
                 escaped = (source_dir if escaped_role == "source" else target_dir) / "one.md"
                 escaped.unlink()
                 try:
                     escaped.symlink_to(outside_file)
                 except (NotImplementedError, OSError):
-                    # Some Windows runners do not grant symlink creation. The
-                    # same actual-CLI cases still run on symlink-capable lanes.
+                    # Symlink creation may be unavailable on Windows.
                     return
 
                 tree_name = f"{manifest_kind}-{escaped_role}-escape"
@@ -418,14 +415,7 @@ def test_tree_file_symlink_cannot_escape_root() -> None:
                         ),
                         encoding="utf-8",
                     )
-                    result = run(
-                        CHECKER,
-                        "check",
-                        "--root",
-                        str(root),
-                        "--manifest",
-                        str(references),
-                    )
+                    extra_args = []
                 else:
                     write(root / "skills/r/references/guide.md", "reference\n")
                     write(root / "skills/s/references/guide.md", "reference\n")
@@ -446,20 +436,17 @@ def test_tree_file_symlink_cannot_escape_root() -> None:
                         encoding="utf-8",
                     )
                     runtime = runtime_manifest(root, [], [tree])
-                    result = run(
-                        CHECKER,
-                        "check",
-                        "--root",
-                        str(root),
-                        "--manifest",
-                        str(references),
-                        "--runtime-manifest",
-                        str(runtime),
-                    )
+                    extra_args = ["--runtime-manifest", str(runtime)]
 
-                assert result.returncode == 2, result.stdout + result.stderr
-                assert "escapes repository root" in result.stderr
-                assert tree_name in result.stderr
+                for command in ("check", "sync"):
+                    result = run(
+                        CHECKER, command, "--root", str(root),
+                        "--manifest", str(references), *extra_args,
+                    )
+                    assert result.returncode == 2, result.stdout + result.stderr
+                    assert "escapes repository root" in result.stderr
+                    assert tree_name in result.stderr
+                    assert outside_file.read_text(encoding="utf-8") == "outside\n"
 
 
 def test_undeclared_reference_symlink_cannot_escape_root() -> None:
@@ -560,8 +547,7 @@ def test_agent_reference_reachability() -> None:
         result = run(CONSUMERS, "--root", str(root))
         assert result.returncode == 0, result.stdout + result.stderr
 
-        # Exercise the static guard's public CLI against deployed artifacts.
-        # This validates source policy, not model reference-reading behavior.
+        # Check prefixes through the public CLI against deployed templates.
         write(base / "agent-references/genre-prose-cards/都市.md", "card\n")
         write(base / "agent-references/index.md", "[detail](details/detail.md)\n[card](genre-prose-cards/都市.md)\n")
         writer = base / "templates/agents/narrative-writer.md"
@@ -584,6 +570,10 @@ def test_agent_reference_reachability() -> None:
 
         for snippet, line in [
             ("读 `index.md`。", 2),
+            ("读 `references/index.md`。", 2),
+            ("读 `./index.md`。", 2),
+            ("读 `../references/index.md`。", 2),
+            ("读 `references/details/detail.md`。", 2),
             ("参照（index.md）。", 2),
             ("`agent-references/index.md`", 2),
             ("`references/agent-references/index.md`", 2),

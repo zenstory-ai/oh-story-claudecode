@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""Validate agent reference prefixes, reachability and profile ownership.
-
-Template scanning enforces source policy only, not actual model read behavior.
-"""
+"""Validate agent reference prefixes, reachability and profile ownership."""
 
 from __future__ import annotations
 
@@ -33,7 +30,7 @@ def template_prefix_errors(
     patterns = [AGENT_REF_RE.pattern, r"genre-prose-cards/\{[^}\n]+\}\.md"]
     if names:
         patterns.append(
-            r"(?<![A-Za-z0-9_./-])(?:" + "|".join(re.escape(name) for name in names)
+            r"(?<![A-Za-z0-9_./-])(?:\.{1,2}/)*(?:references/)?(?:" + "|".join(re.escape(name) for name in names)
             + r")(?![A-Za-z0-9_-]|\.[A-Za-z0-9_-])"
         )
     tokens = re.compile("|".join(patterns))
