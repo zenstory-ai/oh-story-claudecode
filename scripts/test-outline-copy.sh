@@ -53,8 +53,7 @@ expect_contains() {
   esac
 }
 
-# Git Bash 会把传给 Node 的 /tmp/... 参数转换成 Windows 原生路径。
-# 按同一公共进程边界取得预期路径，不把 POSIX 拼写当作 CLI 输出契约。
+# 通过 Node 获取 Git Bash 转换后的 Windows 路径。
 expect_path() {
   expect_contains "$(node -p 'process.argv[1]' "$1")"
 }
@@ -225,7 +224,7 @@ run "$TMP_DIR/批/正文/第006章_天明.md" "$TMP_DIR/批/正文/第005章_雨
 expect_status 1
 expect_contains "第005章_雨夜.md"
 
-# --- 13. 显式细纲不存在：不是「干净」，必须准确报错并退 2 ---
+# --- 13. 显式细纲不存在：报路径并退 2 ---
 CASE="explicit-missing-outline"
 run --outline "$TMP_DIR/不存在的细纲.md" "$TMP_DIR/p9.md"
 expect_status 2
@@ -233,7 +232,7 @@ expect_contains "无法读取显式细纲"
 expect_path "$TMP_DIR/不存在的细纲.md"
 expect_contains "不存在"
 
-# --- 14. 正文不存在：必须准确报出正文路径并退 2 ---
+# --- 14. 正文不存在：报路径并退 2 ---
 CASE="missing-prose"
 run --outline "$TMP_DIR/o9.md" "$TMP_DIR/不存在的正文.md"
 expect_status 2
@@ -241,7 +240,7 @@ expect_contains "无法读取正文"
 expect_path "$TMP_DIR/不存在的正文.md"
 expect_contains "不存在"
 
-# --- 15. 参数错误：缺少 --outline 值、未知选项、没有正文都退 2 ---
+# --- 15–17. 参数错误：缺少 --outline 值、未知选项、没有正文都退 2 ---
 CASE="outline-option-without-value"
 run --outline
 expect_status 2
@@ -257,7 +256,7 @@ run --outline "$TMP_DIR/o9.md"
 expect_status 2
 expect_contains "缺少正文路径"
 
-# --- 16. 目录不是可读文本文件：跨平台稳定拒绝，不能依赖 EISDIR 文案 ---
+# --- 18–19. 目录输入：各平台统一报「不是普通文件」 ---
 CASE="outline-is-directory"
 mkdir -p "$TMP_DIR/目录细纲"
 run --outline "$TMP_DIR/目录细纲" "$TMP_DIR/p9.md"
@@ -274,7 +273,7 @@ expect_contains "无法读取正文"
 expect_path "$TMP_DIR/目录正文"
 expect_contains "不是普通文件"
 
-# --- 17. 非预期异常：顶层不得吞掉异常后伪装成成功 ---
+# --- 20. 非预期异常：报错并退 2 ---
 CASE="unexpected-exception"
 printf '%s。\n' "$COPIED" >"$TMP_DIR/explode.md"
 cat >"$TMP_DIR/throw-on-basename.js" <<'EOF'
