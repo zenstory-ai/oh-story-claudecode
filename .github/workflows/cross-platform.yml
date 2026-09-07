@@ -79,6 +79,8 @@ jobs:
         run: python3 scripts/test-author-memory-commit.py
       - name: Check story-setup deployment
         run: bash scripts/check-story-setup-deployment.sh
+      - name: Plugin packaging regression
+        run: python3 scripts/test-plugin-packaging.py
       - name: Check Claude Code adapter
         run: bash scripts/check-claude-adapter.sh
       - name: Check Codex adapter
@@ -130,6 +132,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
+      - name: Cross-runtime plugin packaging
+        shell: bash
+        run: |
+          python3 scripts/check-plugin-packaging.py
+          python3 scripts/test-plugin-packaging.py
       - name: AI-pattern detector regression
         shell: bash
         run: bash scripts/test-ai-patterns.sh
@@ -214,6 +221,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
+      - name: Cross-runtime plugin packaging
+        shell: bash
+        run: |
+          python3 scripts/check-plugin-packaging.py
+          python3 scripts/test-plugin-packaging.py
       - name: AI-pattern detector regression
         run: bash scripts/test-ai-patterns.sh
       - name: Outline-copy detector regression

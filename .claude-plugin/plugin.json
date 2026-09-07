@@ -1,0 +1,8 @@
+{
+  "name": "oh-story",
+  "version": "0.7.9",
+  "description": "网络小说创作工具箱：13 个 Skills，覆盖扫榜、拆文、写作、审查、去 AI 味和封面生成。",
+  "author": {
+    "name": "zenstory-ai"
+  }
+}
