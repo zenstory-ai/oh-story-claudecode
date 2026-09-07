@@ -3,9 +3,9 @@
 ## 当前版本
 
 - `setup_skill_version: 1.2.10`
-- `agents_version: 30`
+- `agents_version: 31`
 
-`.story-deployed` 缺失任一字段，或 `agents_version` 缺失 / 非整数 / 小于 `30`，都视为待更新部署。直接重新运行 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或自然语言点名）；不在运行时逐级兼容历史模板。如项目 `agents_version` 大于 `30`，说明本地 story-setup 比项目旧：先更新 oh-story-claudecode，不得用 v30 降级覆盖。历史版本改动见仓库根目录 `CHANGELOG.md`。
+`.story-deployed` 缺失任一字段，或 `agents_version` 缺失 / 非整数 / 小于 `31`，都视为待更新部署。直接重新运行 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或自然语言点名）；不在运行时逐级兼容历史模板。如项目 `agents_version` 大于 `31`，说明本地 story-setup 比项目旧：先更新 oh-story-claudecode，不得用 v31 降级覆盖。历史版本改动见仓库根目录 `CHANGELOG.md`。
 
 ## 升级策略
 
@@ -52,7 +52,13 @@ OpenClaw / Reasonix / generic 三条路径的 skill 副本在项目 `skills/` �
 - `{书名}/设定/`、`大纲/`、`追踪/`
 - `.active-book`
 
-## v30 当前契约
+## v31 当前契约
+
+- 正文退化检测与各端 Hook 只豁免成对引号内部；引号外拒绝语与工程词继续扫描，保留正常角色台词。
+
+重新部署后需新开会话。
+
+## v30 历史契约
 
 - Antigravity 四个 Hook 命令改用无引号的相对脚本路径，避免 Windows 宿主把引号作为文件名字符传给 Node。重跑 setup 会替换 `oh-story` 管理组并保留其他用户 Hooks；不要删除整个 `.agents/hooks.json`。
 
@@ -144,7 +150,7 @@ OpenClaw / Reasonix / generic 三条路径的 skill 副本在项目 `skills/` �
 ## 升级步骤
 
 1. 在项目根目录重新运行 story-setup。
-2. 确认 `.story-deployed` 写入 `agents_version: 30` 与 `setup_skill_version: 1.2.10`。
+2. 确认 `.story-deployed` 写入 `agents_version: 31` 与 `setup_skill_version: 1.2.10`。
 3. 确认目标 CLI 的 agents、hooks/rules 和 reference bundle 都通过安装验证。
 4. 新开会话，使 custom agents 与 hooks 按当前文件重新注册。
 5. **长篇在写项目必做**：检查每本书的 `追踪/_tracking-state.json` 是否存在。不存在就是旧追踪结构，按下方「追踪模型迁移」重建，否则写下一章会被拦。

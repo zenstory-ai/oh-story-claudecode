@@ -52,6 +52,18 @@ run_functional() {
   "truncate": "江晨握紧拳头慢慢走向门口。\n江晨冲过去一拳砸在",
   "truncate_astral": "他继续往前走。\n开头😀😀😀😀😀😀😀😀😀😀😀😀😀X",
   "refuse": "夜色压下来。\n作为AI我无法继续创作这部分内容。",
+  "refuse_after_quote": "“任务完成。”作为AI，我无法继续创作。",
+  "refuse_before_quote": "作为AI，我无法继续创作。“你别怕。”",
+  "refuse_after_multiple_quotes": "“甲说完了。”“乙也点头。”我无法继续创作。",
+  "refuse_quoted_ok": "“作为AI，我无法继续创作。”",
+  "refuse_quoted_with_prefix_ok": "他说：“作为AI，我无法继续创作。”",
+  "refuse_english_quoted_ok": "“I cannot continue writing this scene.”",
+  "refuse_unclosed_quote": "“任务完成。作为AI，我无法继续创作。",
+  "refuse_apostrophe_contractions": "don't 作为AI，我无法继续创作。 John's!",
+  "refuse_curly_apostrophe_contractions": "don’t 作为AI，我无法继续创作。 John’s!",
+  "refuse_mixed_curly_apostrophe_contractions": "don‘t 作为AI，我无法继续创作。 John’s!",
+  "refuse_single_quoted_ok": "他说：'作为AI，我无法继续创作。'然后关了门。",
+  "refuse_curly_single_quoted_ok": "他说：‘作为AI，我无法继续创作。’然后关了门。",
   "ai_selfref_model": "夜色压下来。\n作为一个AI语言模型，我需要提醒您接下来的情节包含暴力描写。",
   "ai_selfref_assistant": "他推门进来。\n作为一个AI助手，这段内容涉及敏感话题。",
   "ai_selfref_era_ok": "作为一个人工智能时代的产物，他对孤独习以为常。\n他把灯关了。",
@@ -124,6 +136,18 @@ JS
   # 基础规则必须对真实输入产生预期结果；不能只证明三端一起输出了同样的空数组。
   grep -q '^clean | $' "$tmp/py.txt" || { echo "FAIL: 干净正文被误报" >&2; return 3; }
   grep -q '^refuse | 第2行 元信息泄漏（AI 自指）' "$tmp/py.txt" || { echo "FAIL: 中文 AI 自指未命中" >&2; return 3; }
+  grep -q '^refuse_after_quote | 第1行 元信息泄漏（AI 自指）' "$tmp/py.txt" || { echo "FAIL: 对话后的 AI 自指被整行豁免" >&2; return 3; }
+  grep -q '^refuse_before_quote | 第1行 元信息泄漏（AI 自指）' "$tmp/py.txt" || { echo "FAIL: 对话前的 AI 自指被整行豁免" >&2; return 3; }
+  grep -q '^refuse_after_multiple_quotes | 第1行 元信息泄漏（生成拒绝语）' "$tmp/py.txt" || { echo "FAIL: 多段对话后的生成拒绝语被整行豁免" >&2; return 3; }
+  grep -q '^refuse_quoted_ok | $' "$tmp/py.txt" || { echo "FAIL: 成对引号内的合法角色台词被误报" >&2; return 3; }
+  grep -q '^refuse_quoted_with_prefix_ok | $' "$tmp/py.txt" || { echo "FAIL: 带叙述前缀的成对引号台词被误报" >&2; return 3; }
+  grep -q '^refuse_english_quoted_ok | $' "$tmp/py.txt" || { echo "FAIL: 成对引号内的英文角色台词被误报" >&2; return 3; }
+  grep -q '^refuse_unclosed_quote | 第1行 元信息泄漏（AI 自指）' "$tmp/py.txt" || { echo "FAIL: 未闭合引号不应跨行/整行豁免" >&2; return 3; }
+  grep -q '^refuse_apostrophe_contractions | 第1行 元信息泄漏（AI 自指）' "$tmp/py.txt" || { echo "FAIL: ASCII 缩写撇号被误配成引号跨度，吞掉 AI 自指" >&2; return 3; }
+  grep -q '^refuse_curly_apostrophe_contractions | 第1行 元信息泄漏（AI 自指）' "$tmp/py.txt" || { echo "FAIL: 弯撇号缩写吞掉 AI 自指" >&2; return 3; }
+  grep -q '^refuse_mixed_curly_apostrophe_contractions | 第1行 元信息泄漏（AI 自指）' "$tmp/py.txt" || { echo "FAIL: 左/右弯撇号被误配成引号跨度，吞掉 AI 自指" >&2; return 3; }
+  grep -q '^refuse_single_quoted_ok | $' "$tmp/py.txt" || { echo "FAIL: ASCII 单引号内合法角色台词被误报" >&2; return 3; }
+  grep -q '^refuse_curly_single_quoted_ok | $' "$tmp/py.txt" || { echo "FAIL: 弯单引号内合法角色台词被误报" >&2; return 3; }
   grep -q '^english_ai | 第2行 元信息泄漏（英文 AI 腔）' "$tmp/py.txt" || { echo "FAIL: 英文 AI 腔未命中" >&2; return 3; }
   grep -q '^engword | 第2行 工程词泄漏' "$tmp/py.txt" || { echo "FAIL: 工程词泄漏未命中" >&2; return 3; }
   grep -q '^placeholder | 第2行 占位符' "$tmp/py.txt" || { echo "FAIL: 占位符未命中" >&2; return 3; }
@@ -673,7 +697,7 @@ run_functional
 rc=$?
 set -e
 case "$rc" in
-  0) echo "功能 parity：codex python 网 == opencode TS 网 == zcode JS 网（44 fixtures，含毒句式正反例/AI 自指/截断收尾、豁免标记与 storyctl 字数职责分离）。" ;;
+  0) echo "功能 parity：codex python 网 == opencode TS 网 == zcode JS 网（扩展 fixtures，含毒句式正反例/AI 自指/截断收尾、豁免标记与 storyctl 字数职责分离）。" ;;
   2) echo "功能 parity：codex python 网 == zcode JS 网；OpenCode plugin 直跑跳过（无 TS 运行时）。" ;;
   *) fails=$((fails + 1)) ;;
 esac

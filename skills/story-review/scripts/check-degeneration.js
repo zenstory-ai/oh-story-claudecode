@@ -43,6 +43,17 @@ const PLACEHOLDER_PATTERNS = [
   { re: /我(无法|不能)(继续(写|创作|生成|下去)|生成(内容|文本|正文)?|创作|续写|完成(这个|本)?(章|篇|创作|请求))/, label: '元信息泄漏（生成拒绝语）', hard: false },
 ];
 
+const QUOTED_SPAN_PATTERNS = [
+  /「[^」]*」/g,
+  /『[^』]*』/g,
+  /【[^】]*】/g,
+  /“[^”]*”/g,
+  // 单引号开符不得紧跟拉丁词字符，否则 don't ... John's / don‘t ... John’s 会被误配成台词跨度。
+  /(?<![A-Za-z0-9_])‘[^’]*’/g,
+  /"[^"]*"/g,
+  /(?<![A-Za-z0-9_])'[^']*'/g,
+];
+
 // 工程词泄漏（正文元信息扫描的确定性版）：弱模型把写作工程词漏进正文，破坏代入感
 // （DeepSeek-v4 这类会在对话里冒「该到下一章了」）。漏词的模型自己发现不了，靠脚本兜。
 // tier1 = 纯写作流水线术语，正文里几乎永不合法；tier2 = 章节结构/歧义词，角色在故事内
@@ -150,21 +161,24 @@ function isContent(trimmed) {
   return trimmed && !trimmed.startsWith('#') && !/^-{3,}$/.test(trimmed);
 }
 
-function isDialogueLike(trimmed) {
-  return /[“”"'‘’「」『』【】]/.test(trimmed);
+// 成对引号内可能是角色台词、系统播报或引用文本；只把这些闭合片段等长遮住，保留引号外
+// 文本及其原始索引。未闭合/跨行引号不豁免，避免一次坏引号吞掉后续正文里的真实退化信号。
+function maskQuotedSpans(text) {
+  let masked = text;
+  for (const pattern of QUOTED_SPAN_PATTERNS) {
+    masked = masked.replace(pattern, (match) => ' '.repeat(match.length));
+  }
+  return masked;
 }
 
 // 去掉成对引号内的片段（台词/系统词/引用物件），只留引号外叙述。复读判定用：重复台词是体裁
 // 手法（豁免），但「叙述 + 引号内物件/短台词」混合行里引号外叙述的复读仍是退化，不能整行豁免。
 function stripQuoted(text) {
-  return text
-    .replace(/「[^」]*」/g, '')
-    .replace(/『[^』]*』/g, '')
-    .replace(/【[^】]*】/g, '')
-    .replace(/“[^”]*”/g, '')
-    .replace(/‘[^’]*’/g, '')
-    .replace(/"[^"]*"/g, '')
-    .replace(/'[^']*'/g, '');
+  let stripped = text;
+  for (const pattern of QUOTED_SPAN_PATTERNS) {
+    stripped = stripped.replace(pattern, '');
+  }
+  return stripped;
 }
 
 function visibleLength(text) {
@@ -253,18 +267,19 @@ function findPlaceholders(content) {
   const findings = [];
   for (const { trimmed, lineNo } of content) {
     if (!isContent(trimmed)) continue;
-    const dialogue = isDialogueLike(trimmed);
+    const outsideQuotes = maskQuotedSpans(trimmed);
     for (const { re, label, hard } of PLACEHOLDER_PATTERNS) {
-      if (!hard && dialogue) continue; // soft 拒绝语在对话行里可能是正常台词，豁免
-      const m = re.exec(trimmed);
+      // hard 信号仍扫描整行；soft 自指/拒绝语只扫描成对引号外，且遮罩等长以保留列号。
+      const m = re.exec(hard ? trimmed : outsideQuotes);
       if (m) {
+        const index = m.index || 0;
         findings.push({
           line: lineNo,
-          column: (m.index || 0) + 1,
+          column: index + 1,
           type: 'placeholder-leak',
           severity: 'blocking',
           message: `${label}：正文混入元信息/拒绝语/占位符，重写本段干净落地。`,
-          excerpt: compact(trimmed.slice(Math.max(0, (m.index || 0) - 4), (m.index || 0) + 20)),
+          excerpt: compact(trimmed.slice(Math.max(0, index - 4), index + 20)),
         });
         break; // one finding per line is enough
       }
@@ -283,17 +298,22 @@ function findMetaLeak(content) {
       // 标题行（第N章 章名，无 ## 前缀时也算）属「标题行以外的正文」之外，排除
       if (/^第[一二三四五六七八九十百千万两0-9]+章/.test(trimmed)) continue;
     }
-    const dialogue = isDialogueLike(trimmed);
-    let m = META_TIER1_RE.exec(trimmed);
+    const outsideQuotes = maskQuotedSpans(trimmed);
+    let m = META_TIER1_RE.exec(outsideQuotes);
+    let quotedTier1 = false;
+    if (!m) {
+      m = META_TIER1_RE.exec(trimmed);
+      quotedTier1 = Boolean(m);
+    }
     if (m) {
       // tier1 纯工程词正文里几乎永不合法→blocking；但写手/编剧题材里角色在故事内真讨论创作，
-      // 台词（对话行）里可能合法，降级为 advisory（仍报告，交人/LLM 判，不强制回炉）。
+      // 且命中实际位于成对引号内时可能合法，降级为 advisory。同一行别处出现引号不影响判定。
       findings.push({
         line: lineNo,
         column: m.index + 1,
         type: 'meta-leak',
-        severity: dialogue ? 'advisory' : 'blocking',
-        message: `工程词泄漏：「${m[0]}」是写作流水线术语，正文里不该出现；改成角色/场景内表达。${dialogue ? '例外：角色为作者/编剧、在故事内真实讨论创作时，台词里可能合法。' : ''}`,
+        severity: quotedTier1 ? 'advisory' : 'blocking',
+        message: `工程词泄漏：「${m[0]}」是写作流水线术语，正文里不该出现；改成角色/场景内表达。${quotedTier1 ? '例外：角色为作者/编剧、在故事内真实讨论创作时，台词里可能合法。' : ''}`,
         excerpt: compact(trimmed.slice(Math.max(0, m.index - 6), m.index + 18)),
       });
       continue; // tier1 命中即可，不再叠 tier2

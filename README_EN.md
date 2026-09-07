@@ -18,7 +18,7 @@ Professional authors follow a three-step method:
 
 Built around four pillars: reverse-engineering hits · plot modularization · layered state management · human-AI collaboration.
 
-The current source tree uses deployment contract `agents_version: 30`. Rerun `/story-setup` after upgrading; multi-agent configuration takes effect in a new session. Contracts for published versions are listed in the release summaries below.
+The current source tree uses deployment contract `agents_version: 31`. Rerun `/story-setup` after upgrading; multi-agent configuration takes effect in a new session. Contracts for published versions are listed in the release summaries below.
 
 <details>
 <summary>Antigravity support preview</summary>

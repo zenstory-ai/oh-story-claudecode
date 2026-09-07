@@ -110,6 +110,58 @@ if (!leaks.every((f) => f.message.includes('AI 自指'))) {
 }
 NODE
 
+# --- 软拒绝语只豁免成对引号内部：混合行的引号外泄漏必须命中，合法台词仍静默 ---
+QUOTE_SCOPE="$TMP_DIR/quote-scope.md"
+cat > "$QUOTE_SCOPE" <<'EOF'
+“任务完成。”作为AI，我无法继续创作。
+作为AI，我无法继续创作。“你别怕。”
+“甲说完了。”“乙也点头。”我无法继续创作。
+“作为AI，我无法继续创作。”
+他说：“作为AI，我无法继续创作。”
+“任务完成。作为AI，我无法继续创作。
+“I cannot continue writing this scene.”
+don't 作为AI，我无法继续创作。 John's!
+don’t 作为AI，我无法继续创作。 John’s!
+don‘t 作为AI，我无法继续创作。 John’s!
+他说：'作为AI，我无法继续创作。'然后关了门。
+他说：‘作为AI，我无法继续创作。’然后关了门。
+EOF
+set +e
+node "$SCRIPT" --json "$QUOTE_SCOPE" > "$OUT"
+quote_scope_status=$?
+set -e
+if [ "$quote_scope_status" -ne 1 ]; then
+  echo "FAIL: 引号外/未闭合引号内的退化文本应退出 1，实际 $quote_scope_status" >&2
+  cat "$OUT" >&2 || true
+  exit 1
+fi
+node - "$OUT" <<'NODE'
+const fs = require('fs');
+const report = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const leaks = report.findings.filter((f) => f.type === 'placeholder-leak');
+const expected = new Map([
+  [1, { column: 8, label: 'AI 自指' }],
+  [2, { column: 1, label: 'AI 自指' }],
+  [3, { column: 15, label: '生成拒绝语' }],
+  [6, { column: 7, label: 'AI 自指' }],
+  [8, { column: 7, label: 'AI 自指' }],
+  [9, { column: 7, label: 'AI 自指' }],
+  [10, { column: 7, label: 'AI 自指' }],
+]);
+if (leaks.length !== expected.size) {
+  throw new Error(`expected ${expected.size} quote-scope leaks, got ${leaks.length}: ${JSON.stringify(leaks)}`);
+}
+for (const finding of leaks) {
+  const want = expected.get(finding.line);
+  if (!want) throw new Error(`纯引号台词被误报: ${JSON.stringify(finding)}`);
+  if (finding.column !== want.column) throw new Error(`line ${finding.line} column expected ${want.column}, got ${finding.column}`);
+  if (!finding.message.includes(want.label)) throw new Error(`line ${finding.line} expected ${want.label}: ${finding.message}`);
+  if (!finding.excerpt.includes(finding.line === 3 ? '我无法继续创作' : '作为AI')) {
+    throw new Error(`line ${finding.line} evidence 未指向真实泄漏: ${finding.excerpt}`);
+  }
+}
+NODE
+
 # --- 工程词泄漏 meta-leak（issue #173 comment 4814607240）---
 META_POS="$TMP_DIR/meta-positive.md"
 META_NEG="$TMP_DIR/meta-negative.md"
@@ -232,6 +284,55 @@ const dlg = meta.find((f) => f.line === 1);
 const nar = meta.find((f) => f.line === 2);
 if (!dlg || dlg.severity !== 'advisory') throw new Error('tier1 在对话行应为 advisory: ' + JSON.stringify(dlg));
 if (!nar || nar.severity !== 'blocking') throw new Error('tier1 在叙述行应为 blocking: ' + JSON.stringify(nar));
+NODE
+
+# --- tier1 引号范围：只降级实际落在成对引号内的匹配，不因同一行别处有引号而整行降级 ---
+TIER1_MIXED="$TMP_DIR/tier1-mixed-quote.md"
+TIER1_QUOTED="$TMP_DIR/tier1-pure-quote.md"
+cat > "$TIER1_MIXED" <<'EOF'
+“别急。”按照字数目标，他还差六千字没写。
+“字数目标别改。”他却按照细纲继续写。
+EOF
+printf '“今天的字数目标是六千字。”他盯着屏幕。\n' > "$TIER1_QUOTED"
+
+set +e
+node "$SCRIPT" --json --fail-on=blocking "$TIER1_MIXED" > "$OUT"
+tier1_mixed_status=$?
+set -e
+if [ "$tier1_mixed_status" -ne 1 ]; then
+  echo "FAIL: 混合行引号外 tier1 应以 blocking 退出 1，实际 $tier1_mixed_status" >&2
+  cat "$OUT" >&2 || true
+  exit 1
+fi
+node - "$OUT" <<'NODE'
+const fs = require('fs');
+const findings = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')).findings.filter((f) => f.type === 'meta-leak');
+if (findings.length !== 2 || !findings.every((finding) => finding.severity === 'blocking')) {
+  throw new Error('混合行引号外 tier1 必须 blocking: ' + JSON.stringify(findings));
+}
+if (findings[0].line !== 1 || findings[0].column !== 8 || !findings[0].excerpt.includes('字数目标')) {
+  throw new Error('混合行 tier1 的位置/证据错误: ' + JSON.stringify(findings[0]));
+}
+if (findings[1].line !== 2 || findings[1].column !== 14 || !findings[1].excerpt.includes('细纲')) {
+  throw new Error('引号内 tier1 不得抢先遮住引号外 tier1: ' + JSON.stringify(findings[1]));
+}
+NODE
+
+set +e
+node "$SCRIPT" --json --fail-on=blocking "$TIER1_QUOTED" > "$OUT"
+tier1_quoted_status=$?
+set -e
+if [ "$tier1_quoted_status" -ne 0 ]; then
+  echo "FAIL: 成对引号内 tier1 仅 advisory，--fail-on=blocking 应退出 0，实际 $tier1_quoted_status" >&2
+  cat "$OUT" >&2 || true
+  exit 1
+fi
+node - "$OUT" <<'NODE'
+const fs = require('fs');
+const findings = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')).findings.filter((f) => f.type === 'meta-leak');
+if (findings.length !== 1 || findings[0].severity !== 'advisory' || findings[0].column !== 5) {
+  throw new Error('成对引号内 tier1 应保留 advisory 与原位置: ' + JSON.stringify(findings));
+}
 NODE
 
 # --- wiring：携带 check-degeneration.js 副本的 skill 必须在自己的工作流文本里实际调用它 ---

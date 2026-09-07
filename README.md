@@ -16,7 +16,7 @@
 
 围绕四条线展开：爆款逆向 · 剧情模块化重组 · 上下文状态分层管理 · 人机协同。
 
-当前源码的部署契约为 `agents_version: 30`。升级后重跑 `/story-setup`；多 Agent 配置需新开会话才生效。已发布版本的契约号见下方版本摘要。
+当前源码的部署契约为 `agents_version: 31`。升级后重跑 `/story-setup`；多 Agent 配置需新开会话才生效。已发布版本的契约号见下方版本摘要。
 
 <details>
 <summary>Antigravity 支持预览</summary>

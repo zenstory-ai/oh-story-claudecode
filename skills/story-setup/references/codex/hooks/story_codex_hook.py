@@ -174,7 +174,6 @@ def hook_context(event: str, text: str) -> dict[str, Any]:
 # 】 是章尾系统播报模板的收束符（agent-references/long-chapter-hooks.md 章尾实战模板一/四），ASCII "
 # 是 normalize-punctuation.js --quote-mode ascii 的合法收引号，两者都不该被判「疑似截断」。
 _NET_TERMINAL = set("。！？…”』」）)!?.~—】\"")
-_NET_QUOTE_OPENERS = ("「", "“", "‘", "『", '"')
 _NET_SOFT_PATTERNS = [
     # 型号后缀（AI语言模型/AI助手/人工智能语言模型/AI模型/AI大模型）必须可选吃掉：否则前视断言
     # 紧跟在「AI」后面看到的是「语」/「助」/「模」，最典型的退化开场整类漏检。
@@ -209,7 +208,8 @@ def _net_is_skippable(stripped: str) -> bool:
 # 占位后仍残留引号字符（跨行对话/未闭合）的行整行跳过。
 # js↔py 由 scripts/check-hook-regex-sync.sh（规范串逐字锁）与
 # scripts/test-prose-net-parity.sh（fixture 逐字 diff）锁 parity。
-_TOXIC_QUOTE_SPANS = [re.compile(r"「[^」]*」"), re.compile(r"『[^』]*』"), re.compile(r"【[^】]*】"), re.compile(r"“[^”]*”"), re.compile(r"‘[^’]*’"), re.compile(r'"[^"]*"'), re.compile(r"'[^']*'")]
+# 单引号开符不得紧跟拉丁词字符，否则 don't ... John's / don‘t ... John’s 会被误配成台词跨度。
+_TOXIC_QUOTE_SPANS = [re.compile(r"「[^」]*」"), re.compile(r"『[^』]*』"), re.compile(r"【[^】]*】"), re.compile(r"“[^”]*”"), re.compile(r"(?<![A-Za-z0-9_])‘[^’]*’"), re.compile(r'"[^"]*"'), re.compile(r"(?<![A-Za-z0-9_])'[^']*'")]
 _TOXIC_QUOTE_CHARS = set("「」『』【】“”‘’\"'")
 # 分句起点边界（前一字符属于它才认「是A，不是B」的分句首「是」）；同时用作确认语的右边界。
 _TOXIC_CLAUSE_BOUNDARY = set("，,。.！!？?；;：:、…—~ \t　")
@@ -334,15 +334,16 @@ def prose_net_findings(text: str) -> list[str]:
         if _net_is_skippable(s):
             continue
         content.append((i, s))
-        is_dialogue = s[0] in _NET_QUOTE_OPENERS
         hit = False
-        if not is_dialogue:
-            for rx, label in _NET_SOFT_PATTERNS:
-                m = rx.search(s)
-                if m:
-                    findings.append(f"第{i}行 元信息泄漏（{label}）：「{m.group(0)[:20]}」")
-                    hit = True
-                    break
+        # 只豁免成对引号内部的角色台词/系统播报；混合行的引号外叙述继续扫描。等长遮罩
+        # 保留位置，未闭合/跨行引号则保守地不豁免，避免坏引号吞掉真实退化信号。
+        outside_quotes = _toxic_mask_quoted(s)
+        for rx, label in _NET_SOFT_PATTERNS:
+            m = rx.search(outside_quotes)
+            if m:
+                findings.append(f"第{i}行 元信息泄漏（{label}）：「{m.group(0)[:20]}」")
+                hit = True
+                break
         if hit:
             continue
         for rx, label in _NET_HARD_PATTERNS:
