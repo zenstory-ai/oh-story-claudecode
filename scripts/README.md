@@ -102,3 +102,9 @@ bash scripts/test-skill-numbering.sh              # 隔离 fixture 回归
 - `Step N.M` / `Phase N.M` / `Stage N.M`、直接 `skills/*/SKILL.md` 中的裸小数标题及 bullet 小数子步骤由 `check` 报错，但不做猜测式自动修改。
 - `references/` 手册本身的 `3.1` 章节/列表编号不属于工作流标签，不检查、不改写。如果管道 ID 需要插入中间阶段，使用语义名称或 `Stage 2A`，不用小数。
 - 可在命令末尾传文件或目录做局部审计，例如 `... audit skills/story-cover/SKILL.md`；合入前仍须跑默认全量 `check`。
+
+## 真实去味评测
+
+`python3 scripts/test-deslop-eval.py` 离线验证评测工程隔离、失败分类与结果留存，不调用模型。
+
+- `python3 scripts/run-deslop-eval.py --source-root {规则仓库} --output {新结果目录}`：显式运行真实 Codex 去味评测，每个输入默认两次；需要本机已有鉴权，默认不进入 CI。不指定模型，使用当前 CLI 默认并记录 CLI 版本及执行证据。样例为仓库自写虚构片段；基线和候选须使用不同结果目录和同一 CLI 环境。`completed` 要求 CLI 成功结束、无失败事件且正文和报告均非空；`changed` 仅记录正文是否变化，无需修改也可完成。质量结论还需随机编号盲评，不能由退出码、改动量或扫描命中数代替。

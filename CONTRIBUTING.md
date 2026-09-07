@@ -369,3 +369,7 @@ bash scripts/test-codex-hooks.sh
 - **PreToolUse 不完整拦截**：Codex 官方说明当前 shell/edit 拦截不是完备安全边界；story hooks 只作为写作流程 guardrail，不能替代版本控制和人工审查。
 - **agent 文件格式**：Codex custom agents 是 `.codex/agents/{name}.toml`，必需 `name`、`description`、`developer_instructions`；只读 agent 使用 `sandbox_mode = "read-only"`。
 - **custom-agent 运行时注册**：`$story-setup` 写入 `.codex/agents/*.toml` 后，需要 trust 项目 `.codex/` 配置层并新开 Codex 会话。若当前 Codex 运行时仍返回 `unknown agent_type`（本地 `codex exec 0.141.0` 临时项目烟测可复现），skill 必须降级 solo/direct 并报告 fallback；自动化硬门槛是 TOML schema 与文件部署检查。
+
+## 本地实验产物
+
+模型实验的 prompt 快照、生成正文、评分和报告统一放在 `demo/*-eval/` 或已忽略的本地运行目录，不提交到 Git remote；不要使用 `git add -f` 绕过忽略规则。可复用的评测脚本与自写回归 fixtures 仍放在 `scripts/`、`tests/fixtures/` 并正常版本管理。已跟踪的实验目录应仅取消索引跟踪、保留本地文件；这不清除既有远端提交历史。
