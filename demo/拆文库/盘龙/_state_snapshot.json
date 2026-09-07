@@ -1,0 +1,50 @@
+{
+  "schema_version": 4,
+  "source_sha256": "c59f763d16f308d969121665e55a983720426e912a3f5fe7800123364b86b4d5",
+  "chapter_boundaries": [
+    {"chapter": 1, "title": "小镇早晨", "start_line": 1, "end_line": 159, "char_count": 7974, "source_locator": "原文/原文.txt:L1-L159", "status": "ok"},
+    {"chapter": 2, "title": "龙血战士家族（上）", "start_line": 160, "end_line": 235, "char_count": 3263, "source_locator": "原文/原文.txt:L160-L235", "status": "ok"},
+    {"chapter": 3, "title": "龙血战士家族（下）", "start_line": 236, "end_line": 300, "char_count": 3183, "source_locator": "原文/原文.txt:L236-L300", "status": "ok"},
+    {"chapter": 4, "title": "成长（上）", "start_line": 301, "end_line": 368, "char_count": 3013, "source_locator": "原文/原文.txt:L301-L368", "status": "ok"},
+    {"chapter": 5, "title": "成长（下）", "start_line": 369, "end_line": 422, "char_count": 2319, "source_locator": "原文/原文.txt:L369-L422", "status": "ok"},
+    {"chapter": 6, "title": "盘龙戒指（上）", "start_line": 423, "end_line": 469, "char_count": 2115, "source_locator": "原文/原文.txt:L423-L469", "status": "ok"},
+    {"chapter": 7, "title": "盘龙戒指（下）", "start_line": 470, "end_line": 521, "char_count": 2015, "source_locator": "原文/原文.txt:L470-L521", "status": "ok"},
+    {"chapter": 8, "title": "魔兽‘迅猛龙’（上）", "start_line": 522, "end_line": 574, "char_count": 2328, "source_locator": "原文/原文.txt:L522-L574", "status": "ok"},
+    {"chapter": 9, "title": "魔兽‘迅猛龙’（下）", "start_line": 575, "end_line": 627, "char_count": 2211, "source_locator": "原文/原文.txt:L575-L627", "status": "ok"},
+    {"chapter": 10, "title": "火蛇之舞（上）", "start_line": 628, "end_line": 678, "char_count": 2038, "source_locator": "原文/原文.txt:L628-L678", "status": "ok"},
+    {"chapter": 11, "title": "火蛇之舞（下）", "start_line": 679, "end_line": 737, "char_count": 2405, "source_locator": "原文/原文.txt:L679-L737", "status": "ok"},
+    {"chapter": 12, "title": "强者之心（上）", "start_line": 738, "end_line": 795, "char_count": 2157, "source_locator": "原文/原文.txt:L738-L795", "status": "ok"},
+    {"chapter": 13, "title": "强者之心（下）", "start_line": 796, "end_line": 848, "char_count": 2690, "source_locator": "原文/原文.txt:L796-L848", "status": "ok"},
+    {"chapter": 14, "title": "天空中的战斗（上）", "start_line": 849, "end_line": 903, "char_count": 2543, "source_locator": "原文/原文.txt:L849-L903", "status": "ok"},
+    {"chapter": 15, "title": "天空中的战斗（下）", "start_line": 904, "end_line": 956, "char_count": 2230, "source_locator": "原文/原文.txt:L904-L956", "status": "ok"},
+    {"chapter": 16, "title": "灾难（上）", "start_line": 957, "end_line": 1018, "char_count": 2498, "source_locator": "原文/原文.txt:L957-L1018", "status": "ok"},
+    {"chapter": 17, "title": "灾难（下）", "start_line": 1019, "end_line": 1070, "char_count": 2268, "source_locator": "原文/原文.txt:L1019-L1070", "status": "ok"},
+    {"chapter": 18, "title": "盘龙之灵（上）", "start_line": 1071, "end_line": 1129, "char_count": 2320, "source_locator": "原文/原文.txt:L1071-L1129", "status": "ok"},
+    {"chapter": 19, "title": "盘龙之灵（下）", "start_line": 1130, "end_line": 1185, "char_count": 2364, "source_locator": "原文/原文.txt:L1130-L1185", "status": "ok"},
+    {"chapter": 20, "title": "地系魔法（上）", "start_line": 1186, "end_line": 1241, "char_count": 2471, "source_locator": "原文/原文.txt:L1186-L1241", "status": "ok"},
+    {"chapter": 21, "title": "地系魔法（下）", "start_line": 1242, "end_line": 1288, "char_count": 2211, "source_locator": "原文/原文.txt:L1242-L1288", "status": "ok"},
+    {"chapter": 22, "title": "春去秋来（上）", "start_line": 1289, "end_line": 1344, "char_count": 2646, "source_locator": "原文/原文.txt:L1289-L1344", "status": "ok"},
+    {"chapter": 23, "title": "春去秋来（下）", "start_line": 1345, "end_line": 1418, "char_count": 2945, "source_locator": "原文/原文.txt:L1345-L1418", "status": "ok"}
+  ],
+  "aliases": {
+    "林雷": ["林雷·巴鲁克"],
+    "德林柯沃特": ["德林爷爷", "盘龙之灵"]
+  },
+  "block_progress": {
+    "completed": ["SB-001", "SB-002", "SB-003", "SB-004", "SB-005", "SB-006"],
+    "pending": []
+  },
+  "unresolved_information": [
+    "影鼠的身份与后续作用",
+    "盘龙戒指更深层能力",
+    "林雷的长期魔法成长上限"
+  ],
+  "evidence_locators": [
+    "原文/原文.txt:L1-L300",
+    "原文/原文.txt:L301-L521",
+    "原文/原文.txt:L522-L848",
+    "原文/原文.txt:L849-L1070",
+    "原文/原文.txt:L1071-L1288",
+    "原文/原文.txt:L1289-L1418"
+  ]
+}

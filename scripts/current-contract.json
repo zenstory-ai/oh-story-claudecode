@@ -1,12 +1,12 @@
 {
   "manifest_version": 1,
-  "setup_skill_version": "1.2.10",
-  "agents_version": 29,
+  "setup_skill_version": "1.2.12",
+  "agents_version": 31,
   "topic_decision_phase": 5,
-  "progress_schema_version": 2,
+  "progress_schema_version": 4,
   "primary_benchmark_artifacts": [
-    "剧情/情绪模块.md",
-    "剧情/节奏.md"
+    "全局分析/爆款机制.md",
+    "全局分析/六维拆书.md"
   ],
   "required_outline_sections": [
     {

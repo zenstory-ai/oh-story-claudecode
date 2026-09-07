@@ -14,7 +14,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > Agent 兼容性：只检查当前运行时的 canonical 目录：Claude `.claude/agents/{agent}.md`、OpenCode `.opencode/agents/{agent}.md`、Codex `.codex/agents/{agent}.toml`、Antigravity `.agents/agents/agent-name/agent.md`（`agent-name` 为目标 agent 名），不得因其他端文件存在而误判。Codex 使用同名 `agent_type`；Antigravity 使用 `invoke_subagent` + `TypeName`。对应运行时未暴露 custom-agent registry / `invoke_subagent` 或返回未知 agent 时，必须降级 solo/direct。检测到 `.zcode/` 时同样直接 solo/direct，因为 ZCode 3.3.4 不执行项目 custom agents；报告 `Fallback: project custom agents unavailable -> solo`。Claude/OpenCode 兼容面保留 `subagent_type`。
 >
-> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 29` 不一致时（标记缺失、字段缺失/非整数、小于或大于 29）**照常按文件存在性检查并 spawn**，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 29）` 并提示重新运行 `/story-setup` 后新开会话；大于 29 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct，报告 `Fallback: ... -> solo`。
+> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 31` 不一致时（标记缺失、字段缺失/非整数、小于或大于 31）**照常按文件存在性检查并 spawn**，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 31）` 并提示重新运行 `/story-setup` 后新开会话；大于 31 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct，报告 `Fallback: ... -> solo`。
 
 ## 核心原则
 
@@ -99,22 +99,9 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ### Step 5：环境检测前置
 
-在进入 Phase 2 之前，先检测项目是否已部署 story-setup 基础设施：
+在进入 Phase 2 之前读取 `.story-deployed` 并执行顶部 Spawn 版本提示。长篇 Stage 2 由确定性脚本一次生成五列 `chapter_index.csv`，不调用 `chapter-extractor`、通用子代理或主会话语义分析。Stage 3 以后需要并行时遵守 `/story-runtime-guard`，每个结构块独立、`fork_turns=none`。
 
-- 先读取 `.story-deployed` 并执行顶部 Spawn 版本门禁；旧版 `chapter-extractor` 文件即使仍在磁盘上也不可复用。
-- 只有 `agents_version: 28` 通过后，才在当前运行时的 canonical 目录检查 Phase 2 `chapter-extractor`：Claude/OpenCode/Antigravity 为同名 Markdown，Codex 为同名 TOML。
-- 如果 `.story-deployed` 的 `target_cli` 包含 `zcode`，项目 agents 缺失是 ZCode 3.3.4 的预期状态：不要提示重复部署，直接以串行 solo/direct 进入分析并报告 fallback。
-
-**部署标记缺失、版本无效/过期，或当前端的 agent 不可用，且不是已部署 ZCode 项目时**，提示用户：
-
-> 「检测到当前项目尚未部署写作基础设施。建议先运行 `/story-setup` 再回来导入，否则深度分析阶段无法使用并行 chapter-extractor agent。」
-
-给用户两个选择：
-
-1. **先去 setup**：暂停导入，运行 `/story-setup`，部署完成后重新触发 `/story-import`；
-2. **继续导入**：接受 Phase 2 降级为串行处理（长篇逐章摘要不并行，速度较慢，但产物完整）。
-
-用户选择记入上下文，Phase 2 据此决定是否走并行模式。
+story-setup 仍是 hooks、写作 agents 与后续日更的推荐基础设施；未部署时提示用户导入可以继续，但项目激活后应补跑 `/story-setup`。不要因为缺少 `chapter-extractor` 暂停或向用户增加选择题。
 
 ### Step 6：原文备份
 
@@ -135,15 +122,15 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 #### 长篇：自动续跑过 Stage 1 停靠点
 
-story-long-analyze 在 Stage 0+1（黄金三章）后会**自动停靠**并用 AskUserQuestion 询问是否继续全量拆解（对应 story-long-analyze 的「Stage 1 停靠点」）。但导入场景需要 Stage 2-6 的全套产物（逐章摘要 / 聚合分析 / `剧情/节奏.md` / `剧情/情绪模块.md` / 设定关系 / 汇总报告 / 文风），缺一不可——否则 Phase 3 迁移会拿到半成品。
+story-long-analyze 在 Stage 0+1（黄金三章）后会**自动停靠**并询问是否继续全量拆解。但导入场景需要 Stage 2-6 的 JSON checkpoint schema v4、分析契约 v5.0 全套产物：五列 `chapter_index.csv`、25 列 `structure_blocks.csv` 与 `全局分析/` 下三个文件。
 
-**当前拆文契约**：`_progress.md` 必须是 `schema_version: 2`，且 `剧情/节奏.md` 与 `剧情/情绪模块.md` 是导入必备权威产物。任一缺失都先修复或重跑对应 Stage，不得用摘要文件拼出看似完整的导入工程。
+**当前拆文契约**：`_progress.json` 必须是 `schema_version: 4`、`contract_version: "5.0"` 且源/边界哈希有效；主契约还包括 `structure_blocks.csv`、`全局分析/爆款机制.md` 和含完整关系、双时间线、三维节奏章节的 `全局分析/六维拆书.md`。任一缺失都先修复对应 Stage，不得从历史逐章摘要、旧拆分全局文件或旧二十列索引拼出导入工程。
 
 因此调用 story-long-analyze 时**必须在一开始就以「完整拆解、一次跑完、不要停下询问」模式驱动管道**，命中其「跳过询问」路径（用户开头明确说「完整拆解 / 一次跑完 / 系统拆解 / 别问」时不停靠），让管道自动从 Stage 2 续跑到 Stage 6。
 
 - 措辞示例：启动深度分析时声明「以『完整拆解、一次跑完、不要停下询问』模式拆解本书，确保 Stage 2-6 全部产出」。
 - **兜底**：若运行环境实际仍停在 Stage 1 询问处，story-import 自动选择「继续全量拆解」，**绝不把停靠询问甩给用户**。
-- 环境检测（Phase 1）发现未部署 chapter-extractor agent 且用户选择「继续导入」时，Stage 2 逐章摘要降级为串行处理，产物仍完整，仅速度变慢。
+- Stage 2 只运行确定性索引脚本；同源同边界索引直接复用，不允许重复写入。
 
 #### 短篇：单一全量管道
 
@@ -154,7 +141,7 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 | Step 1：拿到原文 | 用 story-import Phase 1 已确认的源文件，不重新问 |
 | Step 2：字数检查（长短篇路由） | 篇幅已在 story-import Phase 1 判定并经用户确认，直接答「按短篇继续」，不重新路由 |
 | Step 3：题材识别 | **照常跑**，题材标尺必须加载；story-import Phase 1 Step 4 已确认的题材类型直接代入，不重复提问 |
-| Step 4：续跑检查（`拆文库/{导入书名}/_meta.json` 已存在时三选一） | 先看旧产出是否可直接复用：`stages_completed` 已含 6 且 `拆文报告.md` / `情节节点.md` / `写作手法.md` / `原文/` 均非空、来源与本次导入源一致 → 直接进 Phase 3，不重跑也不归档。否则本轮首次进入 Phase 2 → 按 (a) 覆盖：先把旧产出归档到 `拆文库/{导入书名}/_archive_{时间戳}/`，再从 Stage 2 重跑；同一轮导入内重试同一本书 → 按 (b) 续跑。不把三选一甩给用户，也不跳过归档 |
+| Step 4：续跑检查 | 读取 `_progress.json` 与 `_state_snapshot.json`：schema v4、源/边界哈希、五列索引、结构块和三个全局文件均有效时从 `next_action` 继续；同一来源但有未提交块时只重试该块；哈希变化或旧 schema 时保留旧文件为只读 legacy，明确重建当前契约，不从 `_meta.json` 或旧逐章摘要恢复 |
 
 `_meta.json` 的 `genre_detected` 由 Step 3 产出，是拆文契约的阻断级必填字段，下游 story-short-write 靠它选题材标尺——**不要跳过 Step 3 直接从原文备份起跑**。
 
@@ -174,24 +161,17 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 ├── 概要.md
 ├── 章节/
 │   ├── 第1章_深度拆解.md
-│   ├── 第1章_摘要.md
-│   └── ...               # 每章同时有 第N章_深度拆解.md 和 第N章_摘要.md
+│   ├── 第2章_深度拆解.md
+│   └── 第3章_深度拆解.md  # 仅黄金三章
 ├── 快速预览.md
-├── 角色/
-│   ├── {角色名}.md
-│   └── 角色关系.md
-├── 剧情/
-│   ├── {剧情标题}.md
-│   ├── 故事线.md
-│   ├── 节奏.md          # 关键信息推进 / 情绪触动点 / 爆发节奏
-│   ├── 情绪模块.md      # 读者需求 / 情绪引擎 / 可复现模块
-│   └── 散落情节.md
-├── 设定/
-│   ├── 世界观/         # 背景设定.md / 力量体系.md / 地理.md / 金手指.md（子目录形态）
-│   └── 势力/           # {势力名}.md（每势力一文件）
-├── 拆文报告.md
-├── 文风.md          # Stage 6 文风：写作技法视图 + 原文范例锚点
-└── _progress.md
+├── chapter_index.csv    # 五列机械定位索引
+├── structure_blocks.csv # 可变长度语义结构块
+├── 全局分析/
+│   ├── 六维拆书.md
+│   ├── 爆款机制.md
+│   └── 证据与边界.md
+├── _progress.json
+└── _state_snapshot.json
 ```
 
 #### 短篇拆文库结构
@@ -214,13 +194,13 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 
 | 阶段 | 名称 | 输入 | 输出 | 完成标志 |
 |------|------|------|------|----------|
-| 0 | 概要提取 | 原始文本 | 概要.md + 章节索引 | 章节结构识别完成 |
+| 0 | 概要提取 | 原始文本 | 概要.md + 章节边界 | 章节结构识别完成 |
 | 1 | 黄金三章 | 前 3 章原文 | 第1章_深度拆解.md / 第2章_深度拆解.md / 第3章_深度拆解.md → **停靠产出快速预览.md**（导入场景自动续跑，不停下询问） | 3 章拆解完成 |
-| 2 | 逐章摘要 | 分块章节文本 | 章节摘要.md（含情节点+角色+**关键信息与扩写技法**）。每章10-40情节点（密度150-200字/个，按字数动态调节）。角色过滤（龙套不提取、别名归类）。**并行 chapter-extractor agent 模式**（未部署 agent 时降级串行）。**计数验证：摘要数 == 章节数**。 | 所有章节处理完成 |
-| 3 | 聚合分析 | 全部章节摘要 | `剧情/*.md` + `剧情/README.md` + `剧情/故事线.md` + **`剧情/节奏.md` + `剧情/情绪模块.md`**。**故事框架识别**（前置）。**两步法剧情聚合**（先从摘要识别剧情大纲，再按大纲分配情节点）。**关键信息推进索引**、**情绪触动点与爆发节奏**、**读者需求 / 情绪引擎 / 可复现模块**。**角色合并**（跨章节去重+别名归一）。**角色分级**（主角/反派/核心配角/功能角色）。**散落情节兜底**（6步，含覆盖率验证）。**质量检查**（置信度>=0.85/覆盖率85%-95%/重叠率<=35%）。 | 质量检查通过 |
-| 4 | 设定+关系 | 阶段 3 合并后角色数据+情节点 | 设定/*.md + 角色/*.md。**两阶段角色模型**。**别名解析**（置信度≥0.85自动合并）。 | 设定和关系提取完成 |
-| 5 | 汇总报告 | 全部输出 | 拆文报告.md（含「读者需求 / 情绪引擎」「关键信息与扩写技法总览」「节奏与情绪触动点」「可复现模块」，并指向 `剧情/节奏.md` / `剧情/情绪模块.md`） | 报告生成完成 |
-| 6 | 文风 | 拆文报告.md + 章节/第1-3章_深度拆解.md + 章节/*_摘要.md + 原文/原文.txt | 文风.md（本书历史写法分析） | 文风落盘 `拆文库/{导入书名}/文风.md`，保留为导入分析，不复制到本书 `对标/` |
+| 2 | 一次机械索引 | 章节边界 | 五列 `chapter_index.csv`；不含任何语义字段 | 索引行数 == 章节数，locator 可回读 |
+| 3 | 结构块 | 信号章 + 定点原文 | 25 列 `structure_blocks.csv` | 同次语义读取完成循环、关系迁移、节奏锚点与灵感预抽象 |
+| 4 | 完整六维拆书 | 结构块 + 定点原文 | `六维拆书.md` | 人物、关系、冲突、双时间线、伏笔、三维节奏均在单文件中自包含 |
+| 5 | 爆款机制 | 结构块 + 六维拆书 | `爆款机制.md` | 机制可核证、可迁移边界明确 |
+| 6 | 证据与边界 | 全部全局结论 + 原文定位 | `证据与边界.md`：A/B/C 证据等级、反例、边界与待验证项 | 三个全局文件通过交叉引用审计 |
 
 ### 短篇拆文管道
 
@@ -228,7 +208,7 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 
 短篇为单一全量管道（Stage 2-6 严格串行），产物落盘 `拆文库/{导入书名}/`：Stage 2 结构+情节节点 → Stage 3 情感线+爆点 → Stage 4 反转+写作手法 → Stage 5 人物+开头结尾 → Stage 6 综合评估，最终汇总为 `拆文报告.md`、`情节节点.md`、`写作手法.md`，另有 `_meta.json` 记管道元数据与结构计数。
 
-长篇分块沿用 story-long-analyze：Stage 2 用 chapter-extractor agent 并行，其余阶段按该 skill「分块策略」的章数阈值执行，story-import 不另定一套。
+长篇分块沿用 story-long-analyze：Stage 2 不分块、不调用模型；Stage 3 以结构块为语义单位，后续只消费结构块与定点证据。
 
 ### 恢复机制
 
@@ -291,11 +271,9 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 
 #### Step 3：角色文件迁移
 
-将 `拆文库/{导入书名}/角色/{角色名}.md` 迁移到 `设定/角色/{角色名}.md`。
+从 `六维拆书.md` 的人物维度与“人物关系图谱”章节提取角色候选，用其证据章节和 `structure_blocks.csv` 缩小范围，再用五列 `chapter_index.csv` 映射 locator 并回读原文。CSV 没有人物出场字段，禁止通过标题或邻章猜测。
 
-迁移时按 `references/structure-mapping-long.md` 的「角色文件迁移模板」补齐 story-long-write 角色模板字段。
-
-角色分级（沿用 story-long-analyze 标准）：
+角色分级：
 
 | 等级 | 标准 | 迁移策略 |
 |------|------|---------|
@@ -306,18 +284,18 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 
 #### Step 4：关系文件迁移
 
-将 `拆文库/{导入书名}/角色/角色关系.md` 转换为 `设定/关系.md`，按 [structure-mapping-long.md](references/structure-mapping-long.md)「关系文件转换规则」的目标格式模板输出。
+将 `拆文库/{导入书名}/全局分析/六维拆书.md` 的“人物关系图谱”章节转换为 `设定/关系.md`。保留关系方向、关系动词、变化章节和证据等级；关系图谱中的推断若没有原文证据，不得写成本书既成事实。
 
 #### Step 5：同步世界观设定
 
-当前拆文契约已按主题输出 `拆文库/{导入书名}/设定/世界观/*.md` 与 `设定/势力/*.md`。导入时原样同步到项目；`世界观/` 必须包含 `背景设定.md`。`力量体系.md` 小于 200 字并已并入 `背景设定.md` 时可省略；否则缺失当前必需产物时停止并提示重跑 story-long-analyze Stage 4。不再现场拆分扁平文件。
+从 `六维拆书.md` 提取设定候选，依结论证据/结构块范围选章，再用五列索引回读原文。CSV 本身不能证明世界规则；B/C 级结论必须标注 `[待补充]` 或排除。
 
 #### Step 6：大纲生成
 
-**大纲.md**（卷级结构）：从 `剧情/故事线.md`、`剧情/*.md` 和 `快速预览.md` 反推。**卷划分采用用户确认制**，规则见 [structure-mapping-long.md](references/structure-mapping-long.md)「大纲反推规则」：
+**大纲.md**（卷级结构）：从 `六维拆书.md`（含双时间线与信息差、三维节奏）、`爆款机制.md` 与 `structure_blocks.csv` 反推；五列 `chapter_index.csv` 只负责定位。
 
 - **原文有明确卷界**（存在「第一卷」「卷一」等卷级标题）→ 按原文卷界直接划分，无需询问。
-- **原文无明确卷界** → **不机械按「每卷 20-40 章」硬切**。根据故事线/场景切换/大型时间跳跃检测候选卷边界，向用户展示候选划分方案，**等待用户确认后**才写定卷纲；用户确认前 `大纲/大纲.md` 只记录候选方案。
+- **原文无明确卷界** → 不机械硬切。根据结构块边界、双时间线的大型跳跃和三维节奏阶段检测候选卷界，等待用户确认后写定卷纲。
 
 ```markdown
 # 全书大纲
@@ -330,9 +308,9 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 - 起始状态 → 结束状态：{从角色弧线推断}
 ```
 
-**卷纲**：卷划分确认后，从剧情文件聚合生成 `大纲/卷纲_第X卷.md`，按 [structure-mapping-long.md](references/structure-mapping-long.md)「卷纲反推」模板格式。
+**卷纲**：卷划分确认后，从六维结构、双时间线、三维节奏、爆款机制和索引范围聚合生成 `大纲/卷纲_第X卷.md`，按 [structure-mapping-long.md](references/structure-mapping-long.md)「卷纲反推」模板格式。
 
-**细纲**：从章节摘要反推生成 `大纲/细纲_第XXX章.md`：
+**细纲**：`chapter_index.csv` 只提供本章 `source_locator`；每一章必须回读对应原文后才生成 `大纲/细纲_第XXX章.md`。不得从 CSV 标题、结构块概括或全局结论凭空重建本章历史状态：
 
 每章先通过 story-long-write 的 Wordcount Core 运行 `wordcount measure`，将 JSON 的 `actual` 作为已写章节的历史长度快照。这里记录的是原文在 `visible_chars_v1` 下的实际长度，不是让模型重新决定创作目标。依次探测 `python3`、`python`、`py -3`；找不到 Python 3 或 CLI 时返回 `TOOL_UNAVAILABLE` 并停止导入，不得用模型估算或静默跳过。
 
@@ -346,7 +324,7 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 ## 细纲（第 N 章）
 
 ### 第 N 章：{章名}
-- 核心事件：{从摘要中提取}
+- 核心事件：{只从本章原文核证}
 - 字数目标：{storyctl 返回的 actual} 字
 - 字数口径：visible_chars_v1
 - 目标情绪：{从章节基调/情绪曲线提取；未知写 [待补充]}
@@ -361,19 +339,19 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 - 结尾：{原文最后落在什么动作/画面/台词上；未知写 [待补充]}
 
 #### 情节安排（多线）
-- 主线推进：{从剧情单元索引/摘要反推}
+- 主线推进：{从本章原文反推}
 - 辅线推进：{无证据写“无”或 [待补充]}
 - 事件线 / 任务线：{外部事件链}
 - 感情线 / 关系线：{有证据才写；否则“无显性”或 [待补充]}
 - 逻辑线：原因 → 行动 → 结果 → 后果/新问题
 
 #### 人物关系和出场顺序
-- 出场顺序：{摘要中角色/势力/关键物件出现顺序}
+- 出场顺序：{从原文核证的角色/势力/关键物件出现顺序}
 - 人物关系变化：{本章前 → 本章后；未知写 [待补充]}
 - 视角/信息差：{谁知道什么；读者知道什么；主角误判什么；未知写 [待补充]}
 
 #### 情节细化
-- 情节点序列（逐行填下表；从摘要情节点反推）：
+- 情节点序列（逐行填下表；从 `source_locator` 原文反推）：
 
 | # | 情节点（谁做了什么） | 功能标签 | 执行边界 |
 |---|---|---|---|
@@ -385,7 +363,7 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 - 章尾钩子：[待补充]
 ```
 
-> 钩子、人物关系变化、辅线/感情线、行动成本/收益归属等无法由原文摘要稳定判断的字段统一标 `[待补充]`；story-import 只反推有证据的蓝图，不为补齐字段编造关系或副线。
+> 钩子、人物关系变化、辅线/感情线、行动成本/收益归属等无法由原文稳定判断的字段统一标 `[待补充]`；索引只证明读取范围，不提供答案。
 
 #### Step 7：追踪文件生成
 
@@ -425,7 +403,7 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 
 #### Step 8：题材定位生成
 
-从拆文报告中提取核心发现，生成 `设定/题材定位.md`（按 [structure-mapping-long.md](references/structure-mapping-long.md)「题材定位生成」模板格式）。
+从 `全局分析/六维拆书.md`（含“三维节奏”章节）、`爆款机制.md` 与 `证据与边界.md` 提取核心发现，生成 `设定/题材定位.md`（按 [structure-mapping-long.md](references/structure-mapping-long.md)「题材定位生成」模板格式）。
 
 `设定/题材定位.md` 的本书题材、核心梗、情绪与节奏摘要来自 `拆文库/{导入书名}/`，但这些字段不是对标登记。只有 Phase 1 已明确绑定外部对标时，才追加「对标书清单 + 主对标书」段；主对标书最多 1 本，副对标 / 参考对标不限制数量。未绑定时省略整个对标登记段，不得用 `{导入书名}` 补位。该段格式见上述「题材定位生成」模板的「对标书清单」。
 
@@ -437,17 +415,12 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 
 **缺失处理**：
 
-- 已选外部对标缺 `剧情/节奏.md` 或 `剧情/情绪模块.md` → 不登记、不生成半套对标视图；报告 `module_or_rhythm_required_missing` 并提示对 `{对标书名}` 重跑 `/story-long-analyze` Stage 3+。本书核心工程迁移不因此回滚。
+- 已选外部对标缺 `爆款机制.md`、`六维拆书.md`（或其中“三维节奏”章节）、`structure_blocks.csv` 或五列 `chapter_index.csv` → 不登记、不生成半套对标视图；报告 `global_analysis_or_index_required_missing`。
 - 其它结构化子目录缺失 → 按既有导入缺失项提示，不阻塞项目创建
 
-#### Step 10：文风同步
+#### Step 10：召回契约验证
 
-外部对标已通过 Step 9 校验时，把 `拆文库/{对标书名}/文风.md` 复制到 `{项目}/对标/{对标书名}/文风.md`。纯复制，不重新生成；未绑定外部对标时跳过。
-
-**缺失处理**：
-
-- 拆文库没有文风文件（analyze 未跑 Stage 6）→ 导入报告提示用户重跑 `/story-long-analyze` 后再同步；日更前文风缺失会被 fail-fast 拦截
-- 项目对标已有旧文风文件 → 覆盖（最新拆文产物优先），在导入报告告知
+外部对标已通过 Step 9 同步后，验证三个全局文件、`structure_blocks.csv`、五列索引、原文与黄金三章可回读。后续日更先选结构块，再用索引定位原文。作者自定义 `设定/文风.md` 仍拥有最高优先级。
 
 ---
 
@@ -575,9 +548,9 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 
 超过 200 章的作品，**拆解可以分批，追踪初始化必须一次覆盖全部已写章节**：
 
-1. **拆解分批**：首期只深拆前 50 章 + 全书概要，后续按需补拆更多章节到 `拆文库/`。
+1. **拆解分批**：全部章节只进入五列机械索引；结构块与三个全局分析覆盖故事结构。原文核证按块读取，不生成简化逐章摘要。
 2. **追踪一次到位**：初始化事务的 `last_chapter` 写**最后一个已写完的章号 N**，不是首期拆解的 50。`imported_through_chapter` 由 `init` 一次写定、之后不再推进，逐章事务只接受 N+1 起的章号；第 1..N 章不伪造逐章记录，续写从 N+1 开始。若 init 时误写成 50，第 51..N 章仍可逐章 `append` 补上（一章一份事务，章号必须连续），只是要为已写好的旧章逐章构造事务；不要删 `追踪/` 重来——`_旧追踪存档/` 也在里面。
-3. **上下文摘要**：未深拆的章节生成简化摘要（200 字/章），供反推当前状态用。
+3. **按需回读**：反推当前状态或历史细纲时，先从全局结论与结构块缩小范围，再由五列索引把章号映射为 `source_locator` 并读取原文；不得用 CSV 字段代替完整事实证据。
 
 ---
 

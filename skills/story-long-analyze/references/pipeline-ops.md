@@ -1,80 +1,106 @@
-# 管道运维参考
+# 全局拆书管道运维
 
-story-long-analyze 拆解管道的运维工具文档：`_progress.md` 模板、错误处理、恢复机制操作步骤。
+## 状态文件
 
-> 质量阈值（置信度 / 覆盖率 / 重叠率）见 [material-decomposition.md 质量阈值体系](material-decomposition.md)。
+JSON checkpoint schema v4 使用两个状态文件，不再把章节边界、批次与断点混写进 Markdown。当前固定为 `schema_version: 4`，分析契约还必须同时满足 `contract_version: 5.0`。
 
----
+### `_progress.json`
 
-## _progress.md 模板
-
-```markdown
-# 深度拆解进度：{书名}
-- 小说：{标题} | 总章数：{N} | 输出目录：{路径} | 开始：{日期}
-- 最终状态：{pending/paused_after_stage1/completed/completed_with_errors}
-- schema_version: 2
-## 管道进度
-| 阶段 | 状态 | 进度 | 备注 |
-|------|------|------|------|
-## 章节边界（Stage 0 章节边界子步骤产物，唯一权威）
-| 章号 | 标题 | 起始行 | 字数 |
-|------|------|--------|------|
-## 分块进度
-| 块 | 章节 | 状态 |
-## 失败记录
-| 类型 | 章节/阶段 | 错误信息 | 重试状态 |
-|------|----------|---------|---------|
-## 质量检查
-| 检查项 | 阶段 | 结果 | 修正 |
-## 角色合并
-| 合并前 | 合并后 | 依据 | 确认 |
-## 断点
-- 最后处理：第{N}章 | 当前阶段 | 下一操作
+```json
+{
+  "schema_version": 4,
+  "contract_version": "5.0",
+  "source_sha256": "<64 hex>",
+  "boundary_sha256": "<64 hex>",
+  "current_stage": "stage_3_structure_blocks",
+  "final_status": "pending",
+  "last_committed_batch": "SB-004",
+  "completed_ranges": ["1-3", "4-9"],
+  "pending_ranges": ["10-17"],
+  "artifact_checksums": {
+    "chapter_index.csv": "<sha256>",
+    "structure_blocks.csv": "<sha256>"
+  },
+  "failed_ranges": [],
+  "retry_reasons": [],
+  "next_action": "analyze candidate block 10-17"
+}
 ```
 
-**schema_version 说明**：
+### `_state_snapshot.json`
 
-| 版本 | 含义 |
-|------|------|
-| 2 | 当前契约：含「章节边界」表（Stage 0 章节边界子步骤产物）。Stage 1/2/6 全部以该表为切片真值，不再各自跑 regex |
+```json
+{
+  "schema_version": 4,
+  "source_sha256": "<64 hex>",
+  "chapter_boundaries": [],
+  "aliases": {},
+  "block_progress": {},
+  "unresolved_information": [],
+  "evidence_locators": []
+}
+```
 
-缺少 `schema_version: 2` 或「章节边界」表时不得续跑；从 Stage 0 章节边界子步骤重建 `_progress.md` 后再恢复。
+状态快照只保存恢复所需的紧凑事实，不保存对话历史、完整原文、逐章摘要或机械摘句。
 
-**最终状态值说明**：
+## 原子提交
 
-| 状态值 | 含义 |
-|--------|------|
-| `pending` | 管道进行中，尚未跑完 |
-| `paused_after_stage1` | Stage 1 停靠点暂停——Stage 0/1 已完成，已产出 `快速预览.md`，等待用户决定是否继续 Stage 2-6。续跑时跳过 Stage 0/1，从 Stage 2 开始 |
-| `completed` | 全管道 Stage 0-6 完成 |
-| `completed_with_errors` | 全管道完成，但有单章/单阶段失败（详见「失败记录」表，拆文报告中注明） |
+每个批次固定执行：
 
----
+1. 写同目录临时文件。
+2. 校验 schema、章号/范围、定位、数值范围与 UTF-8。
+3. 计算产物 SHA-256。
+4. 用原子替换提交正式产物。
+5. 最后原子更新 `_progress.json`。
 
-## 剧情单元清单补建（存量书）
+第 5 步失败时，下一次先按 `artifact_checksums` 对账；校验通过则补提交进度，不重复读取原文。禁止直接 append 半个 CSV 批次。
 
-触发：用户说「补剧情单元清单」，或写作侧检索发现 `剧情/README.md` 无「剧情单元清单」表。
+## schema 版本
 
-动作：读存量 `拆文库/{书名}/剧情/*.md`（或 `对标/{书名}/剧情/*.md`）各剧情单元表头的 标题 / 类型 / 桥段标签 / 章节范围 字段，按 output-templates.md「剧情单元清单」表模板机械重建 `剧情/README.md` 的清单表；项目 `对标/{书名}/` 视图存在时同步一份。不读原文、不重跑任何 Stage、不改剧情单元内容、不动 `节奏.md` / `情绪模块.md`。旧剧情单元「章节范围」行没有字数信息时，体量列只写「共{N}章」、字数记「未知」，不得编造。
+| 版本 | 含义 | 恢复规则 |
+|---:|---|---|
+| 1/缺失 | 旧逐章拆解，无统一章节边界 | 不续跑；从 Stage 0 重建 |
+| 2 | A 旧管道：章节摘要、剧情/角色/设定、报告、文风 | 可保留原文与黄金三章；重建 v4 |
+| 3 | A+B 初版：二十列逐章语义索引 + 六个拆分全局文件 | 可保留原文和黄金三章作只读参考；五列索引与结构块必须重建 |
+| 4 + contract 4.0 | 前一候选：五列机械索引 + 旧结构块 + 六个拆分全局文件 | 原文、黄金三章和机械索引可保留；重建 enriched `structure_blocks.csv` 与三个全局文件 |
+| 4 + contract 5.0 | 当前管道：黄金三章 + 五列机械索引 + enriched 结构块 + 三个全局文件 | 按哈希、contract version 和最近原子提交恢复 |
 
-写作侧消费点对无清单的书自动回退逐文件检索（见 story-long-write 的 outline-structure-theory.md「对标节奏迁移」步骤 1），补建只是加速，不是阻塞项。
+旧文件不静默删除。用户明确要求整理时才移动到 `_legacy/`。
+
+## 恢复步骤
+
+1. 读取 `_progress.json` 和 `_state_snapshot.json`。
+2. 检查 `contract_version`；不是 `5.0` 时不得按当前断点直接续跑旧结构块契约。
+3. 已有产物保留为只读 legacy；经用户明确启动重建后，可复用同源五列机械索引，重建 enriched 结构块与三个全局文件。
+4. 重新计算备份原文的 `source_sha256`；不一致则停止，报告 `source_changed`，等待显式重建。
+5. 重算边界哈希；不一致则停止，报告 `boundary_changed`。
+6. 校验 `artifact_checksums`。已提交产物有效时直接复用；无效产物回滚到最近一个校验通过的批次。
+7. `paused_after_stage1` 从 Stage 2 开始，不重跑 Stage 0/1。
+8. Stage 2 已有同哈希五列索引时不写入；进入 Stage 3。
+9. Stage 3 从 `pending_ranges` 的首个范围开始；`completed_ranges` 禁止再读。
+10. Stage 4–6 缺哪个当前全局文件就从对应阶段整份重做，不拼接半份结论，不回扫所有成功结构块。
+
+同一范围只有记录了明确 `retry_reasons` 才能重读；原因必须属于执行失败、定位失败、schema 失败或证据冲突，不能写“为了更准确”。
 
 ## 错误处理
 
 | 场景 | 处理 |
-|------|------|
-| 章节识别失败 | 提示确认格式；支持自定义正则 |
-| 分块中断 | 读 _progress.md 断点恢复 |
-| 聚合质量不达标 | 孤立情节二次分类；阈值放宽至 0.5 |
-| 角色合并冲突 | 记录待确认列表 |
-| 输出目录冲突 | 追加不覆盖；冲突标 `[重新分析]` |
+|---|---|
+| 章节识别失败 | 提示确认格式；支持自定义正则；不进入 Stage 1 |
+| 目录块误识别 | 剔除开头密集标题块，重跑连续性校验 |
+| 多卷重复章号 | 保留卷名消歧，全局连续重编号 |
+| CSV 部分写入 | 丢弃临时文件，保留上一个正式文件 |
+| 源或边界哈希变化 | 停止续跑；显式 `--rebuild` 后整体重建 Stage 2–6 |
+| 结构块证据不足 | 合并相邻块或标 failed；不使用首尾句/标题补写 |
+| 别名冲突 | 分开实体，记录待确认 |
+| 双时间线矛盾 | 两种解释并列写入边界，不补写原作 |
+| 全局文件缺失 | 阻断 completed；从对应 Stage 整份重做 |
 
----
+## 完成状态
 
-## 恢复机制操作步骤
+- `completed`：五列索引、enriched 结构块和三个全局文件通过质量门。
+- `completed_with_errors`：存在 failed 结构块或输入缺口，但影响边界已传播到 `证据与边界.md`。
+- `paused_after_stage1`：只完成 Stage 0/1。
+- `pending`：其他进行中状态。
 
-1. 管道启动时检查输出目录是否已有 `_progress.md`
-2. 校验 `schema_version: 2` 与「章节边界」表；任一缺失即停止，并提示从 Stage 0 章节边界子步骤重建进度文件
-3. 读取断点信息（最后处理章节 + 当前阶段 + 最终状态）
-4. **断点状态为 `paused_after_stage1`**（Stage 1 停靠点）→ 跳过 Stage 0/1，直接从 Stage 2 续跑逐章摘要，不重跑已完成的概要与黄金三章
-5. 其他断点状态 → 从断点所在块的起始章节恢复，覆盖该块已有输出
+完成前确认本轮没有生成非黄金章逐章摘要、逐章语义 CSV、剧情/角色/设定拆分目录、拆文报告或文风文件。

@@ -16,8 +16,12 @@
 
 围绕四条线展开：爆款逆向 · 剧情模块化重组 · 上下文状态分层管理 · 人机协同。
 
-> **Antigravity 支持预览**：`story-setup` 可把 13 个 Skills、7 个 custom agents、Always-On Rule 和 workspace Hooks 完整部署到项目 `.agents/`。部署器不修改 `~/.gemini/`，不依赖全局目录或 symlink；`.agents/hooks.json` 只替换顶层 `oh-story` 管理组并保留用户组。本契约沿用 `agents_version: 29`，部署后需新开 Antigravity conversation；IDE 与交互式 `agy` 建议分别试用。
+> **Antigravity 支持预览**：`story-setup` 可把 15 个 Skills、7 个 custom agents、Always-On Rule 和 workspace Hooks 完整部署到项目 `.agents/`。部署器不修改 `~/.gemini/`，不依赖全局目录或 symlink；`.agents/hooks.json` 只替换顶层 `oh-story` 管理组并保留用户组。本契约使用 `agents_version: 31`，部署后需新开 Antigravity conversation；IDE 与交互式 `agy` 建议分别试用。
 
+> **候选能力 — 三层灵感库**：六维拆书在结构块首次语义读取中同步保存五个去专名灵感字段，后处理阶段机械生成原子层，再聚合为单小说层和带标签的跨书层；不会二次阅读全文。升级后需重跑 `/story-setup`、新开会话；候选契约 `agents_version` 为 31。
+>
+> **候选重构 — 六维拆书**：长篇拆文保留黄金三章，将全文阶段收敛为五列机械索引、20 列结构块与三个自包含全局分析，并新增断点守卫。本分支包含该前置重构；当前组合契约以上述 `agents_version: 31` 为准。
+>
 > **v0.7.9 — 短篇按场景功能校准**：短篇移除逐节最低字数、每节 3-5 个子事件、对白占比和固定钩子节距等机械配额，改按「本场是否改变风险、信息、关系、资源、决定、行动或读者理解」判断；导语作为正文第一场，第 1 章从其后果或新行动继续。新增细纲结构验收，细纲的目标情绪与主角关键选择不再接受占位符。升级后需重跑 `/story-setup`、新开会话；本版 `agents_version` 为 29。[完整变更](CHANGELOG.md#079---2026-08-30)
 >
 > **v0.7.8 — 参考拆分与门禁**：长短篇参考资料按消费者拆开改名，写正文与短篇构思前新增会阻断的 Reference Gate，短篇 Phase 2 与交付各加一个确定性 verifier；短篇总字数以用户给的范围为准。升级后需重跑 `/story-setup`、新开会话；本版 `agents_version` 为 28。[完整变更](CHANGELOG.md#078---2026-08-28)
@@ -106,23 +110,23 @@ Windows 上偶尔会看到 `ENOENT ... mkdir` 报错但末尾仍显示 `Done!`�
 <details>
 <summary>Antigravity / Codex / ZCode / OpenCode / OpenClaw / Reasonix / Web AI 使用说明</summary>
 
-**Antigravity 用户：** 先用 `/skills` 或自然语言运行 `story-setup`，选择 `target_cli=antigravity`。它只在当前写作项目创建/更新 13 个 `.agents/skills/` 已知目录、7 个 `.agents/agents/agent-name/agent.md` 已知定义（`agent-name` 替换为实际名称）、`.agents/rules/oh-story.md`、两个 `.agents/hooks/` runtime 文件与 `.agents/hooks.json` 的 `oh-story` 管理组；其他用户 Skills、Agents、Rules、Hooks 和 hook groups 都保留，部署器本身不会写 `~/.gemini/`。项目内 Skills 使用真实目录；若 `.agents/skills` 已是 symlink，会先解释 git diff 并征求明确迁移同意，未同意绝不沿链接写入。Hook 依赖 PATH 中的 `node`；部署后新开 conversation，再分别在 IDE 与交互式 `agy` 中 smoke test。**`agy 1.1.22 -p` 暂不在支持面内**：每次 headless 进程都可能在静默鉴权完成前扫描 workspace，鉴权后又不重载 custom agents/hooks，导致 skill 回退、`subagent not found`，甚至把普通模型输出写到 `~/.gemini/antigravity-cli/scratch/`。命令行写作请从项目目录启动交互式 `agy`，确认 `/skills`、`/agents`、`/hooks` 已发现 oh-story 后再发任务；测试后检查 scratch 没有意外小说产物。
+**Antigravity 用户：** 先用 `/skills` 或自然语言运行 `story-setup`，选择 `target_cli=antigravity`。它只在当前写作项目创建/更新 15 个 `.agents/skills/` 已知目录、7 个 `.agents/agents/agent-name/agent.md` 已知定义（`agent-name` 替换为实际名称）、`.agents/rules/oh-story.md`、两个 `.agents/hooks/` runtime 文件与 `.agents/hooks.json` 的 `oh-story` 管理组；其他用户 Skills、Agents、Rules、Hooks 和 hook groups 都保留，部署器本身不会写 `~/.gemini/`。项目内 Skills 使用真实目录；若 `.agents/skills` 已是 symlink，会先解释 git diff 并征求明确迁移同意，未同意绝不沿链接写入。Hook 依赖 PATH 中的 `node`；部署后新开 conversation，再分别在 IDE 与交互式 `agy` 中 smoke test。**`agy 1.1.22 -p` 暂不在支持面内**：每次 headless 进程都可能在静默鉴权完成前扫描 workspace，鉴权后又不重载 custom agents/hooks，导致 skill 回退、`subagent not found`，甚至把普通模型输出写到 `~/.gemini/antigravity-cli/scratch/`。命令行写作请从项目目录启动交互式 `agy`，确认 `/skills`、`/agents`、`/hooks` 已发现 oh-story 后再发任务；测试后检查 scratch 没有意外小说产物。
 
-**Codex 用户：** repo 内直接使用：Codex 会扫描 `$REPO_ROOT/.agents/skills`（指向 `skills/` 的 symlink）发现 13 个 skill；用 `$story`、`$story-setup` 或 `/skills` 调用。Windows 上 git 需开 `core.symlinks=true`，否则 symlink 失效，改走下方 `$story-setup` 部署。
+**Codex 用户：** repo 内直接使用：Codex 会扫描 `$REPO_ROOT/.agents/skills`（指向 `skills/` 的 symlink）发现 15 个 skill；用 `$story`、`$story-setup` 或 `/skills` 调用。Windows 上 git 需开 `core.symlinks=true`，否则 symlink 失效，改走下方 `$story-setup` 部署。
 
 跑 `$story-setup` 部署到写作项目后，会写入 `.codex/agents/*.toml`、`.codex/hooks.json`、`.codex/hooks/{story_codex_hook.py,run-story-hook.sh,run-story-hook.cmd}` 和 `.codex/skills/story-setup/references/agent-references/`；请信任项目 `.codex/` 配置层并在 `/hooks` review/trust hooks、新开 Codex 会话，让 custom agents 生效。
 
-**ZCode 用户：** 在 Plugin Management 中把本仓库加入 marketplace，安装 `oh-story` 后可用 `$story`、`$story-setup` 或 `/` 面板调用 13 个 Skills/Commands。`$story-setup` 选择 `target_cli=zcode` 会部署 `.zcode/skills/`、`.zcode/commands/`、`.zcode/hooks/story_zcode_hook.js`，安全合并 `.zcode/config.json` 与根 `AGENTS.md`；Hook 依赖 PATH 中的 `node`。ZCode 3.3.4 不执行项目/plugin custom agents，也没有 `PreCompact` / `SessionEnd`，相关流程会明确降级 solo/direct，compact 后由 `SessionStart` 恢复上下文。
+**ZCode 用户：** 在 Plugin Management 中把本仓库加入 marketplace，安装 `oh-story` 后可用 `$story`、`$story-setup` 或 `/` 面板调用 15 个 Skills/Commands。`$story-setup` 选择 `target_cli=zcode` 会部署 `.zcode/skills/`、`.zcode/commands/`、`.zcode/hooks/story_zcode_hook.js`，安全合并 `.zcode/config.json` 与根 `AGENTS.md`；Hook 依赖 PATH 中的 `node`。ZCode 3.3.4 不执行项目/plugin custom agents，也没有 `PreCompact` / `SessionEnd`，相关流程会明确降级 solo/direct，compact 后由 `SessionStart` 恢复上下文。
 
 **OpenCode 用户：** 全局安装后 opencode 自动从 `~/.claude/skills/` 发现 skills；首次用自然语言触发 story-setup（如「用 story-setup 部署网文写作环境」），**部署后退出重进 `opencode -c`** 才能用 slash command。部分 hook 行为与 Claude Code 有差异（session-start / session-end / compact 等），详见 [CONTRIBUTING.md](CONTRIBUTING.md) 的 OpenCode 章节。
 
-**OpenClaw 用户：** 当前支持 skills-only：OpenClaw 可从 workspace `skills/`、`.agents/skills`、`~/.agents/skills`、`~/.openclaw/skills` 等 skill root 发现本项目 13 个 skill；`SKILL.md` 已按 OpenClaw 要求使用单行 `name` / `description` 与单行 JSON `metadata.openclaw`。`story-setup` 选择 `target_cli=openclaw` 时会把 skills 复制到项目 `skills/` 并写入 OpenClaw 版 `AGENTS.md`；agents/hooks 暂不部署，写正文前大纲守卫在 OpenClaw 下是 skill 内软约束。部署后如未显示新 skills，请新开 OpenClaw session 或等待 watcher 刷新。
+**OpenClaw 用户：** 当前支持 skills-only：OpenClaw 可从 workspace `skills/`、`.agents/skills`、`~/.agents/skills`、`~/.openclaw/skills` 等 skill root 发现本项目 15 个 skill；`SKILL.md` 已按 OpenClaw 要求使用单行 `name` / `description` 与单行 JSON `metadata.openclaw`。`story-setup` 选择 `target_cli=openclaw` 时会把 skills 复制到项目 `skills/` 并写入 OpenClaw 版 `AGENTS.md`；agents/hooks 暂不部署，写正文前大纲守卫在 OpenClaw 下是 skill 内软约束。部署后如未显示新 skills，请新开 OpenClaw session 或等待 watcher 刷新。
 
-**Reasonix 用户：** 当前支持 skills + 原生 plugin manifest：Reasonix 原生扫描项目 skill root（`.agents/skills` 等，指向 `skills/` 的 symlink）发现 13 个 skill，用 `reasonix doctor capabilities` 校验；也可用根 `reasonix-plugin.json` 走 `reasonix plugin install`。`story-setup` 选择 `target_cli=reasonix` 时会把 skills 复制到项目 `skills/` 并写入 Reasonix 版 `AGENTS.md`；hooks/custom agents 暂不部署，涉及专业 Agent 的 skill 走 solo/direct fallback。Windows 未启用 symlink 时改走原生 plugin。
+**Reasonix 用户：** 当前支持 skills + 原生 plugin manifest：Reasonix 原生扫描项目 skill root（`.agents/skills` 等，指向 `skills/` 的 symlink）发现 15 个 skill，用 `reasonix doctor capabilities` 校验；也可用根 `reasonix-plugin.json` 走 `reasonix plugin install`。`story-setup` 选择 `target_cli=reasonix` 时会把 skills 复制到项目 `skills/` 并写入 Reasonix 版 `AGENTS.md`；hooks/custom agents 暂不部署，涉及专业 Agent 的 skill 走 solo/direct fallback。Windows 未启用 symlink 时改走原生 plugin。
 
 **Web AI / 通用 Agent 用户：** 平台能读取 GitHub 仓库或项目文件时，可让 Agent 读取 `skills/*/SKILL.md` 与对应 `references/`；需要本地副本时，`story-setup` 可选 `target_cli=generic`，只写通用 `AGENTS.md` 和 `skills/`。无本项目 hooks/custom agents 的环境按 skill 内软约束或 solo/direct fallback 执行。
 
-**OpenClaw / Reasonix / 通用路径的目录残留要手动清：** 这三条路径的 skill 副本在项目 `skills/` 里，重跑 `/story-setup` 执行的就是项目里那份，自动清理到不了。项目里若出现 `skills/story-setup/references/agent-references/agent-references/`（可能嵌了多层）或 `skills/story-setup/skills/`，手动删掉。要让项目里的 skill 文本本身更新，还需要重新安装本项目后，用新包覆盖项目 `skills/` 下这 13 个目录。
+**OpenClaw / Reasonix / 通用路径的目录残留要手动清：** 这三条路径的 skill 副本在项目 `skills/` 里，重跑 `/story-setup` 执行的就是项目里那份，自动清理到不了。项目里若出现 `skills/story-setup/references/agent-references/agent-references/`（可能嵌了多层）或 `skills/story-setup/skills/`，手动删掉。要让项目里的 skill 文本本身更新，还需要重新安装本项目后，用新包覆盖项目 `skills/` 下这 15 个目录。
 
 </details>
 
@@ -142,6 +146,8 @@ Windows 上偶尔会看到 `ENOENT ... mkdir` 报错但末尾仍显示 `Done!`�
 | `story` | `/story` `$story` `/story dashboard` | 工具箱路由 · 模糊意图分发 + 作者习惯管理 + 本地拆文/项目 Dashboard |
 | `story-long-write` | `/story-long-write` `/写长篇` | 长篇写作 · 大纲搭建、人物设定、正文输出 |
 | `story-long-analyze` | `/story-long-analyze` | 长篇拆文 · 黄金三章、爽点设计、节奏分析 |
+| `story-inspiration-distill` | `/story-inspiration-distill` | 灵感抽象 · 原子灵感、单小说合并、带标签的跨书聚合 |
+| `story-runtime-guard` | `/story-runtime-guard` | 长任务守卫 · 空历史分叉、断点续跑、禁止重复读取 |
 | `story-long-scan` | `/story-long-scan` | 长篇扫榜 · 起点/番茄/晋江市场趋势 |
 | `story-short-write` | `/story-short-write` | 短篇写作 · 情绪设计、反转构思、精修出稿 |
 | `story-short-analyze` | `/story-short-analyze` | 短篇拆文 · 故事核、结构分析、情感线、反转设计、写作手法、共鸣分析 |
@@ -184,36 +190,21 @@ Windows 上偶尔会看到 `ENOENT ... mkdir` 报错但末尾仍显示 `Done!`�
 
 ```
 demo/拆文库/盘龙/
-├── 概要.md              # 全书概要 + 章节索引
-├── 拆文报告.md           # 五维评分 + 爽点密度 + 可借鉴套路
-├── 文风.md              # 句长/标点/对话潜台词/情绪节奏 + 原文锚点
-├── 章节/
-│   ├── 第1章_深度拆解.md … 第3章_深度拆解.md  # 黄金三章逐章深度分析
-│   └── 第1章_摘要.md … 第23章_摘要.md          # 每章一个摘要文件
-├── 角色/
-│   ├── 林雷.md           # 主角完整档案
-│   ├── 霍格.md           # 核心配角
-│   ├── 希尔曼.md         # 核心配角
-│   ├── 希里.md           # 功能角色
-│   ├── 德林柯沃特.md      # 核心配角
-│   ├── 沃顿.md           # 功能角色
-│   └── 角色关系.md        # 关系网络
-├── 剧情/
-│   ├── 故事线.md          # 框架识别 + 4剧情 + 2故事线
-│   ├── 强者过境与魔法启蒙.md 等  # 五个分场景剧情单元
-│   ├── 节奏.md            # 节奏/关键信息递进/情绪触发爆发节律
-│   └── 情绪模块.md        # 读者需求/情绪引擎/可复用写作模块
-└── 设定/
-    ├── 世界观/
-    │   ├── 背景设定.md    # 核心规则 + 特殊设定
-    │   ├── 力量体系.md    # 战气 + 魔法 + 等级
-    │   ├── 地理.md        # 安达卢西亚 + 玉兰大陆
-    │   └── 金手指.md      # 盘龙戒指 + 德林柯沃特
-    └── 势力/
-        └── 巴鲁克家族.md  # 龙血血脉家族档案
+├── 原文/原文.txt
+├── 概要.md
+├── 快速预览.md
+├── 章节/第1章_深度拆解.md … 第3章_深度拆解.md
+├── chapter_index.csv     # 五列机械定位索引
+├── structure_blocks.csv  # 可变长度戏剧结构块
+├── 全局分析/
+│   ├── 六维拆书.md       # 含完整关系图谱、双时间线和三维节奏
+│   ├── 爆款机制.md
+│   └── 证据与边界.md
+├── _progress.json
+└── _state_snapshot.json
 ```
 
-长篇拆文会额外生成 `文风.md`，并在 `剧情/` 下产出 `节奏.md`（节奏/关键信息递进/情绪触发爆发节律）和 `情绪模块.md`（读者需求/情绪引擎/可复用写作模块）；日更写作会通过 `对标/{书名}/剧情/` 读取这些素材，避免文风、节奏和情绪模块偏离对标书。
+旧逐章摘要、旧角色/剧情/设定、旧拆分全局文件和旧报告仍留在 demo 中作为只读兼容遗留，不属于当前分析契约 v5.0。日更先读爆款机制、六维拆书中的三维节奏和结构块，再由五列索引定点回读主对标原文；作者自定义 `设定/文风.md` 始终优先。
 
 </details>
 

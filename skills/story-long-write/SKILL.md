@@ -25,7 +25,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > 内置适配 Claude Code / OpenCode / Codex / Antigravity / ZCode / OpenClaw。专业 agent 只查当前端 canonical 目录（`.claude/agents`、`.opencode/agents`、`.codex/agents` TOML、`.agents/agents`）；Antigravity 用 `invoke_subagent` + 同名 `TypeName`。文件或运行时能力缺失、返回 unknown agent，或当前为不执行 custom agents 的 ZCode 3.3.4 时，报告 fallback 并 solo/direct 执行。
 >
-> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 29` 不一致时（标记缺失、字段缺失/非整数、小于或大于 29）**照常按文件存在性检查并 spawn**，但只检查当前运行时的 canonical 目录；同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 29）` 并提示重新运行 `/story-setup` 后新开会话；大于 29 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct，报告 `Fallback: ... -> solo`。
+> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 31` 不一致时（标记缺失、字段缺失/非整数、小于或大于 31）**照常按文件存在性检查并 spawn**，但只检查当前运行时的 canonical 目录；同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 31）` 并提示重新运行 `/story-setup` 后新开会话；大于 31 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct，报告 `Fallback: ... -> solo`。
 
 ## 核心方法
 
@@ -84,7 +84,9 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ### 路径与术语约定
 
-> **拆文库/对标关系**：`拆文库/` = analyze skill 的原始产出，是数据源。`对标/` = 写作项目的引用视图，存放与本项目相关的对标数据子集。首次引用对标书时，从 `拆文库/{书名}/` 复制相关子目录（章节/角色/剧情/设定）、`剧情/节奏.md`、`剧情/情绪模块.md`、`文风.md` 和 `拆文报告.md` 到 `对标/{书名}/`。
+> **拆文库/对标关系**：`拆文库/` = analyze skill 的原始产出，是数据源。`对标/` = 写作项目的引用视图。首次引用对标书时，从 `拆文库/{书名}/` 复制 `章节/`（仅黄金三章）、五列 `chapter_index.csv`、`structure_blocks.csv`、`全局分析/` 与 `原文/` 到 `对标/{书名}/`；不再同步旧逐章摘要、剧情/角色/设定拆分目录、拆文报告或文风文件。
+>
+> **公共灵感库**：按任务标签从 `灵感库/灵感索引.csv` 只读 Top 3–8 张 CBA，不读 IA/NM。预算见 [references/cross-book-recall.md](references/cross-book-recall.md)。
 >
 > **对标书路径查找**：优先 `{项目}/对标/{书名}/`，不存在则回退 `拆文库/{书名}/`。下文所有对标数据加载均使用此规则。
 
@@ -143,27 +145,17 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 ├── 正文/
 │   ├── 第001章_章名.md
 │   └── ...
-├── 对标/                          ← 拆文产出的结构化资产
+├── 对标/                          ← 拆文产出的全局结构化资产
 │   └── {对标书名}/
 │       ├── 原文/
-│       │   ├── 第001章_章名.md
-│       │   └── ...
-│       ├── 角色/                  ← 从拆文库/结构化输出同步
-│       │   └── {角色名}.md
-│       ├── 剧情/                  ← 从拆文库/结构化输出同步
-│       │   ├── {剧情单元名}.md
-│       │   ├── 故事线.md
-│       │   ├── 节奏.md             # 关键信息推进 + 情绪触动点 + 爆发节奏（权威节奏索引）
-│       │   └── 情绪模块.md         # 读者需求/情绪引擎 + 可复现模块（权威模块索引）
-│       ├── 设定/                  ← 从拆文库/结构化输出同步
-│       │   ├── 世界观/             ← 按主题拆分到子目录
-│       │   │   ├── 背景设定.md
-│       │   │   ├── 力量体系.md
-│       │   │   ├── 地理.md
-│       │   │   └── 金手指.md
-│       │   └── 势力/
-│       │       └── {势力名}.md
-│       └── 拆文报告.md
+│       │   └── 原文.txt
+│       ├── 章节/                  # 仅黄金三章深度拆解
+│       ├── chapter_index.csv      # 五列机械定位；无语义字段
+│       ├── structure_blocks.csv   # 可变长度剧情单元与三维强度
+│       └── 全局分析/
+│           ├── 六维拆书.md        # 关系/双时间线/三维节奏权威
+│           ├── 爆款机制.md        # selected_hit_mechanism 权威
+│           └── 证据与边界.md
 ├── 追踪/
 │   ├── _tracking-state.json        ← 唯一结构化权威状态
 │   ├── 上下文.md                  ← 派生续写状态卡（固定 7 栏），≤12KB
@@ -183,37 +175,37 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | 设定/题材定位.md（含 `主对标书` 字段，多对标时必填） | 全书 | Phase 2 | Phase 3 大纲、每卷开始前、Phase 4 写前召回 |
 | 设定/题材正文提示卡.md | 全书/题材 | Phase 2（缺失则 Phase 4 写前即时生成） | Phase 4 每章写作前：按 `genre-prose-cards.md` 索引匹配后读取 `genre-prose-cards/` 目录对应单题材卡优先、`style-genre-modules.md` 通用模块兜底，与通用正文要求、情绪/节奏召回和文风一起组装 prompt |
 | 设定/角色/{角色名}.md、设定/势力/{名}.md | 角色/势力 | Phase 3 细纲后增量补全（首批含主角/主要角色） | Phase 4 状态筛选/写作 |
-| 设定/文风.md（自定义文风·优先级最高） | 本书 | 用户自写（Claude Code 可代写）；导入/拆解不覆盖 | Phase 4 每章写作前：含实质内容则取代对标文风作权威风格基 |
-| 对标/{书名}/文风.md | 对标书 | analyze Stage 6 输出 → story-import 显式绑定或本 skill 首次引用时同步 | Phase 4 每章写作前（文风召回；有自定义文风时降为参考/句长兜底） |
+| 设定/文风.md（自定义文风·优先级最高） | 本书 | 用户自写（Claude Code 可代写）；导入/拆解不覆盖 | Phase 4 每章写作前：含实质内容时作为权威风格基 |
 | 大纲/卷纲_第X卷.md | 卷 | Phase 3 | Phase 4 写卷首章前 |
 | 追踪/_tracking-state.json | 全书 | Phase 3 初始化 | 唯一结构化权威，不进正文 prompt；每章运行 `tracking_commit.py check` 读取章号和修订号 |
 | 追踪/伏笔.md | 全书当前视图 | Phase 3 初始化 | 续写状态卡缺项时按 ID 定点查询；每 ID 只一行 |
 | 追踪/时间线/{作者真相.md,读者已知.md} | 全书当前事实/认知派生视图 | Phase 3 初始化 | 按作者真相或读者认知的实际问题选择视图 |
-| 对标/{书名}/拆文报告.md | 对标书 | 用户手动+analyze | Phase 2 核心设定、Phase 3 大纲、Phase 4 写作 |
+| 对标/{书名}/全局分析/六维拆书.md | 对标书 | analyze Stage 4 → 同步 | Phase 2 核心设定、Phase 3 大纲、Phase 4 关系/双时间线/三维节奏召回 |
 | 追踪/逐章记录/第NNN章.md | 章 | Phase 4 每章事务 | 日更不读；目标 ≤1536 字节、硬上限 3072 字节，按需查询历史原因 |
 | 追踪/上下文.md（续写状态卡，≤12KB） | 全书当前状态 | Phase 3 初始化 | 日更每章整份读；由事务工具整份重建，固定 7 栏 |
 | 参考资料/{topic}.md | 按需 | Phase 4（story-researcher 输出） | Phase 4 后续章节写作时复用 |
 | 追踪/角色状态/{角色名}.md | 核心角色 | 首次进入正文或导入初始化 | 久别角色按名读取一个小快照；目标 ≤4096 字节、硬上限 8192 字节；静态人设仍读 `设定/角色/` |
-| 对标/{书名}/角色/{角色名}.md | 对标书 | analyze 输出 | Phase 4 模块召回（角色参考） |
-| 对标/{书名}/剧情/{剧情单元名}.md | 对标书 | analyze 输出 | Phase 3 卷纲选段与细纲成批（剧情单元卡「对标剧情参照」）、Phase 4 模块召回（剧情模块参考） |
-| 对标/{书名}/剧情/情绪模块.md | 对标书 | analyze Stage 3 输出 → story-import 显式绑定或本 skill 首次引用时同步 | Phase 2 核心设定、Phase 3 大纲、Phase 4 每章写作前（读者需求 / 情绪引擎、可复现模块选择） |
-| 对标/{书名}/剧情/节奏.md | 对标书 | analyze Stage 3 输出 → story-import 显式绑定或本 skill 首次引用时同步 | Phase 3 大纲、Phase 4 每章写作前（关键信息推进、情绪触动点、爆发节奏参考） |
-| 对标/{书名}/设定/*.md | 对标书 | analyze 输出 | Phase 2 设定参考、Phase 4 世界观约束 |
+| 对标/{书名}/chapter_index.csv | 对标书 | analyze Stage 2 → 同步 | Phase 3/4 把已选结构块的章号展开为 locator，再读取原文 |
+| 对标/{书名}/structure_blocks.csv | 对标书 | analyze Stage 3 → 同步 | Phase 3/4 按功能/情绪选结构块，再把章号映射到 locator |
+| 对标/{书名}/全局分析/爆款机制.md | 对标书 | analyze Stage 5 → 同步 | Phase 2–4 选择 `selected_hit_mechanism` |
+| 对标/{书名}/全局分析/证据与边界.md | 对标书 | analyze Stage 6 → 同步 | 校验置信度、输入缺口与不可迁移边界 |
 
 **缺失文件处理**：当前主产物缺失时显式修复，不拼装降级结果：
 1. **角色状态文件缺失** → 当前协议项目先运行 `tracking_commit.py check`，再重跑产生该状态的完整事务；已有正文但 `_tracking-state.json` 缺失时重新 `/story-import`。不得从前文临时推断后直接手写快照。
-2. **角色、普通剧情单元或设定等非主产物子目录缺失** → 按「对标书路径查找」查找项目视图与根目录数据源，仍缺失则跳过该可选模块。本条不适用于 `剧情/情绪模块.md` 和 `剧情/节奏.md`。
-3. **`剧情/情绪模块.md` / `剧情/节奏.md` 缺失** → 写前准备必须停下，设置 `missing_primary_contract: true` 并给出 `repair_action`：重跑 `/story-long-analyze` Stage 3+ 或重新 `/story-import`，不得用摘要文件假装已召回权威模块。
-4. **有对标书但 `文风.md` 缺失** → 若有 `设定/文风.md`（含实质内容）走自定义文风模式继续；否则日更文风召回 fail-fast，提示先运行 `/story-long-analyze` Stage 6 并 `/story-import` 同步。**完全无对标项目**则跳过文风召回、不阻塞（有 `设定/文风.md` 时用它写作）。情绪/节奏轴（`missing_primary_contract`）独立，自定义文风模式不豁免其 fail-fast。
+2. **`全局分析/六维拆书.md` 缺少“人物关系图谱”“双时间线与信息差”或“三维节奏”章节** → 设置 `missing_primary_contract: true`，给出重跑 `/story-long-analyze` Stage 4 的 `repair_action`；不得从旧拆分文件、剧情/角色目录或逐章摘要拼接。
+3. **`全局分析/爆款机制.md` 或 `全局分析/六维拆书.md` 缺失** → 写前准备必须停下，设置 `missing_primary_contract: true` 并给出 `repair_action`：重跑 `/story-long-analyze` 对应 Stage（六维 Stage 4、机制 Stage 5）或重新 `/story-import`，不得用旧拆文报告、章节摘要、故事线或通用理论假装已召回对标权威。
+4. **有对标书但 `chapter_index.csv`、`structure_blocks.csv` 或 `原文/` 缺失** → 结构块选择、章节定位、事实核证与原文召回 fail-fast，提示重跑 `/story-long-analyze` Stage 2–4 并同步。存在 `设定/文风.md` 只覆盖风格指令，不豁免这些结构证据，也不能豁免上条爆款机制/六维主契约。**完全无对标项目**则跳过对标召回，不阻塞。
 5. **伏笔/时间线文件缺失** → 视为当前语义检查点损坏，停止写正文；先运行 `tracking_commit.py check`，再用事务修复。卷纲/大纲中的计划不能代替已发生事实的当前检查点。
 6. **`设定/题材正文提示卡.md` 缺失** → 不阻塞；写前从 `设定/题材定位.md` 精确匹配 `references/genre-prose-cards.md` 索引，并只读取 `references/genre-prose-cards/` 中对应题材单卡（高/中/低置信照原卡标注），无命中再用 `references/style-genre-modules.md` 通用流派模块即时生成短 `genre_prose_card`。只有 `设定/题材定位.md` 也缺失时，退回细纲和目标平台做低置信题材卡，并在意图确认写明。
 
 **对标分析权威优先级（权威读取顺序）**：
-1. `剧情/情绪模块.md` 是读者需求 / 情绪引擎、爽文套路框架、可复现模块和重组指南的权威来源。
-2. `剧情/节奏.md` 是关键信息推进、章节扩写技法聚合、情绪触动点和爆发节奏的权威来源。
-3. `文风.md` 只管句长、标点、对话潜台词、原文锚点等风格；它不能覆盖情绪模块或节奏意图。**自定义文风 `设定/文风.md`（用户自写、不被导入/拆解覆盖）优先级高于对标 `文风.md`**：含实质内容时作权威风格基，对标文风降为参考与句长数值兜底；命中硬安全线的写法（`……` / 破折号 / 段间空行 / 碎句）仍按 narrative-writer 归一，自定义只接管句长 / 软标点 / 潜台词 / 情绪交替。
-4. `章节/第K章_摘要.md` 是具体章节证据，用来校验和补足权威索引，不反向覆盖 `情绪模块.md` / `节奏.md`。
-5. `拆文报告.md`、`剧情/故事线.md` 是投影/摘要；若与 `剧情/情绪模块.md` 或 `剧情/节奏.md` 冲突，写作以两个权威文件为准，并在写前准备 `gaps.conflict` 记录冲突来源。
+1. `全局分析/爆款机制.md` 是核心阅读承诺、读者心理机制、可迁移原则与误用风险的权威来源。
+2. `全局分析/六维拆书.md` 的“三维节奏”章节是剧情强度、情绪强度、描写密度、关键信息推进与节奏循环的权威来源。
+3. 同一文件的“双时间线与信息差”章节管真实时间、披露顺序、信息差与伏笔回收；“人物关系图谱”章节管有向关系动作；其余章节管全局事实与功能诊断。
+4. `structure_blocks.csv` 提供可变长度剧情单元、功能与三维强度候选；`chapter_index.csv` 只把块内章号映射到 `source_locator`。五列索引不能按情绪、事件或人物检索，也不能覆盖原文事实。
+5. `全局分析/证据与边界.md` 决定结论的 A/B/C 置信度与可迁移边界；写作不得把 C 暂定当作原作事实。
+6. **公共灵感召回**按任务标签选 3–8 张 CBA；不传 IA/NM，也不把灵感卡当风格样本。
+7. **自定义文风 `设定/文风.md`** 是权威风格基；缺失时才按结构块和五列索引定位主对标原文，即时提炼文风。硬安全线始终优先。
 
 **文件组织原则：**
 - **人物一个一个文件**：`角色/角色名.md`，方便按需读取
@@ -323,8 +315,8 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | 主题 | 权威文件（先读） | 配套文件（按角度补充） |
 |------|-----------------|----------------------|
 | 爽点（按意图分流） | **`references/plot-emotion-system.md`**（爽点设计体系：本质/六种类型/倒推法——"怎么设计爽点"先读这个） | 翻盘/高潮式爽点→`references/plot-core-methods.md`（假胜→崩解）· 打脸/装逼释放→`references/style-combat-face.md`· 题材声线与长线约束→`references/genre-prose-cards.md`· 爽文循环/多层→`references/outline-methods.md`·`references/outline-conflict.md` |
-| 情绪模块 | **`对标/{书名}/剧情/情绪模块.md`（项目/书级权威）**；无对标或设计新模块时再读 `references/plot-emotion-system.md` | `references/outline-rhythm.md` 只作理论参考；不得覆盖对标书权威模块 |
-| 节奏 | **`对标/{书名}/剧情/节奏.md`（项目/书级权威）**；无对标或设计新节奏时再读 `references/outline-rhythm.md` | `references/plot-core-methods.md` 只作理论参考；不得覆盖对标书权威节奏 |
+| 爆款机制 | **`对标/{书名}/全局分析/爆款机制.md`（项目/书级权威）**；无对标或设计新机制时再读 `references/plot-emotion-system.md` | 通用理论不得覆盖对标书的证据化机制 |
+| 节奏 | **`对标/{书名}/全局分析/六维拆书.md` 的“三维节奏”章节（项目/书级权威）**；无对标或设计新节奏时再读 `references/outline-rhythm.md` | `references/plot-core-methods.md` 只作理论参考；不得合并剧情/情绪/密度三条曲线 |
 | 高潮 | **`references/plot-core-methods.md`**（高潮构建公式：蓄能→假胜→崩解） | `references/outline-rhythm.md`（高潮分类与反推）· `references/outline-methods.md`（八节点故事结构：结构定位） |
 | 金手指 | **`references/plot-special-topics.md`**（金手指拆分理解与战力防崩 + 进阶设计） | `references/outline-conflict.md`（金手指与身份：四点统一） |
 | 感情线 | **`references/character-relations.md`**（好感度体系/四阶段 + 男女频差异） | `references/outline-conflict.md`（感情线设计）· `references/style-combat-face.md`（后宫文女主 / 男频极简爱情线构型）· `references/plot-special-topics.md`（爱情线提纯策略） |

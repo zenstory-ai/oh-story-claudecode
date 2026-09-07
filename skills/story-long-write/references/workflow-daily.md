@@ -41,7 +41,7 @@
 
 ### 续写状态卡与追踪事务
 
-`追踪/上下文.md` 不是历史档案，而是当前语义检查点中的续写状态卡；顶层只能有以下 7 个栏目：`当前位置 / 长期约束 / 核心角色状态 / 活跃伏笔 / 近三章速记 / 下一章承诺 / 连贯性风险`。目标 8192 字节，硬上限 12288 字节。文风每章从 `设定/文风.md` / 对标文风读取；质量计数、普通待办、文件行数索引、参照章使用记录、去 AI 味统计都不进入续写状态卡。
+`追踪/上下文.md` 不是历史档案，而是当前语义检查点中的续写状态卡；顶层只能有以下 7 个栏目：`当前位置 / 长期约束 / 核心角色状态 / 活跃伏笔 / 近三章速记 / 下一章承诺 / 连贯性风险`。目标 8192 字节，硬上限 12288 字节。文风每章从 `设定/文风.md` 或主对标索引命中原文即时提炼；质量计数、普通待办、文件行数索引、参照章使用记录、去 AI 味统计都不进入续写状态卡。
 
 所有追踪文件的 schema、事务 JSON、初始化和失败修复统一见 [tracking-transaction.md](tracking-transaction.md)。每章只向工具提交一次结构化事务，由 `scripts/tracking_commit.py` 确定性生成逐章增量、角色快照、伏笔当前视图、作者/读者时间线和续写状态卡；主会话和子 agent 都不得分别直接改这些最终文件。
 
@@ -76,16 +76,15 @@
    - **上一章欠账检查**：写本章正文前，确认上一章正文无未清 blocking 毒句式欠账（写前 hook 会自动拦；hook 不可用时对上一章跑 `node scripts/check-ai-patterns.js --check --fail-on=blocking`）；有欠账先清完再写本章，除非上一章标了 `<!-- 去味:跳过 -->`（用户显式豁免）
    - **状态来源纪律**：不要为取状态/章号把完整 `_tracking-state.json` 加载进 prompt；缺失内容按下方「旧信息查找步骤」定点查询，不得用未标明来源的聊天记忆替代，也不得为了方便通读所有逐章记录。
    - **久别角色交叉检查**：本章细纲列出的核心复用角色若不在 `## 核心角色状态`，直接读取小文件 `追踪/角色状态/{名}.md`；不存在即视为当前检查点损坏，运行 `tracking_commit.py check` 并通过完整事务修复，不能临时扫描增量后手写替代。`设定/角色/{名}.md` 只有静态原始人设，不能替代动态快照。角色重新活跃后，把名字放进本章事务 `context.active_character_names`，由工具更新续写状态卡。
-   - **story-explorer 召回的 gaps 分支**（用 `benchmark_style_load` query_type 一次拿到 `{style_profile_path, style_profile_summary, selected_emotion_module, rhythm_reference, module_source_path, rhythm_source_path, matched_chapter_K, matched_chapter_techniques, anchor_excerpts, gaps}` 后按此分流）：
-     - 若 `gaps.no_benchmark: true` → `custom_style` 为真则进入「自定义文风模式」（用 `设定/文风.md` 写作；无对标可召回，情绪 / 节奏目标改从本书细纲「目标情绪」、卷纲、`设定/题材定位.md` 等内部材料取，`selected_emotion_module` / `rhythm_reference` 记为「无」，不声称从对标召回）；否则跳过文风召回，在「意图确认」标记"无对标参考"
-     - 若 `gaps.missing_primary_contract: true` → 停止本章准备，按 `repair_action` 提示重跑 `/story-long-analyze` Stage 3+ 或重新 `/story-import`；不得进入 narrative-writer（情绪 / 节奏轴独立于文风轴，**自定义文风模式不豁免此停止**——补 `剧情/情绪模块.md` / `剧情/节奏.md`，而非写 `设定/文风.md`）
+   - **story-explorer 召回的 gaps 分支**（用 `benchmark_style_load` query_type 一次拿到 `{global_analysis_paths, structure_blocks_path, chapter_index_path, selected_inspiration_aggregates, selected_hit_mechanism, rhythm_reference, matched_chapter_K, source_locator, transient_style_directives, matched_chapter_techniques, anchor_excerpts, gaps}` 后按此分流）：
+     - 若 `gaps.no_benchmark: true` → `custom_style` 为真则进入「自定义文风模式」（用 `设定/文风.md` 写作；无对标可召回，机制 / 节奏目标改从本书细纲、卷纲、`设定/题材定位.md` 等内部材料取，`selected_hit_mechanism` / `rhythm_reference` 记为「无」，不声称从对标召回）；否则跳过对标召回，在「意图确认」标记"无对标参考"
+     - 若 `gaps.missing_primary_contract: true` → 停止本章准备，按 `repair_action` 提示重跑 `/story-long-analyze` 对应 Stage 或重新 `/story-import`；不得进入 narrative-writer（机制 / 节奏 / 结构块 / 索引独立于文风轴，**自定义文风模式不豁免此停止**）
      - 若 `gaps.benchmark_book_missing: true` → 停止，核对 `expected_path` 与 题材定位.md 登记名（逐字一致）后重查；不得换书
-     - 若 `gaps.conflict` 或 `gaps.module_rhythm_conflict: true` → 意图确认必须说明冲突并按 `剧情/情绪模块.md` / `剧情/节奏.md` 的权威优先级执行；不得让 `文风.md` 覆盖情绪/节奏目标
-     - 若 `gaps.profile_missing: true` → `custom_style` 为真则进入自定义文风模式继续；否则按上文 fail-fast 流程停止
-     - 若 `gaps.profile_degenerate: true`（对标文风不可用） → `custom_style` 为真则用 `设定/文风.md` 写作；否则跳过文风、回到默认 Gates 写作
-     - 若 `gaps.tone_match_failed: true` → 仅用整书文风写作，不喂 matched_chapter
-     - 否则原样传给 `style_profile_path`、`style_profile_summary`、`selected_emotion_module`、`rhythm_reference`、`module_source_path`、`rhythm_source_path`、`matched_chapter_K`、`matched_chapter_techniques`、`anchor_excerpts` 和 `genre_prose_card` 给 Step 2 末尾的 narrative-writer spawn prompt；其中 `selected_emotion_module` 必须进入情绪目标，`rhythm_reference` 必须进入节奏/爆发安排，`genre_prose_card` 必须进入题材取舍，`matched_chapter_techniques` 必须进入「文风召回指令」。写前准备记录必须保留 `gaps` 原值，尤其 `gaps.module_missing`、`gaps.rhythm_missing`、`gaps.conflict`、`gaps.matched_deep_dive_missing`；若 `matched_deep_dive_missing` 为 true，文风召回指令中明确写“同章深度拆解缺失，已回退黄金三章/文风技巧”，不得在后续报告中反转为 false
-     - **无 story-explorer 时直接执行**：主会话按 workflow-chapter.md 写前准备 (a)-(f) 手动依次召回情绪模块、节奏、题材卡、文风与匹配章 K；模块或节奏文件缺失时设置 `missing_primary_contract` 并停止修复
+- 若 `gaps.conflict` 或 `gaps.mechanism_rhythm_conflict: true` → 意图确认必须说明冲突并按 `全局分析/爆款机制.md` / `全局分析/六维拆书.md`“三维节奏”章节的权威优先级执行；不得让自定义或临时文风覆盖机制/节奏目标
+     - 若 `gaps.raw_text_unavailable: true` → 停止本章准备，修复 `chapter_index.csv` 的 `source_locator` 或补齐主对标原文；不得根据索引概述伪造文风锚点
+     - 若 `gaps.tone_match_failed: true` → 使用 `selected_hit_mechanism` 与 `rhythm_reference`，但不传原文锚点；有自定义 `设定/文风.md` 时仍照常使用
+     - 否则原样传给 `global_analysis_paths`、`structure_blocks_path`、`chapter_index_path`、`selected_inspiration_aggregates`、`selected_hit_mechanism`、`rhythm_reference`、`matched_chapter_K`、`source_locator`、`transient_style_directives`、`matched_chapter_techniques`、`anchor_excerpts` 和 `genre_prose_card`。CBA 只进入机制选择，不进入文风；自定义文风继续最高优先。写前准备记录保留 `gaps` 原值，尤其 `inspiration_library_missing`、`inspiration_tag_no_match`、`structure_blocks_missing`、`chapter_index_missing`、`raw_text_unavailable`
+     - **无 story-explorer 时直接执行**：主会话按 workflow-chapter.md 写前准备手动做标签召回、爆款机制、三维节奏、题材卡、结构块选择、五列索引定位、主对标原文与临时文风；主契约缺失时设置 `missing_primary_contract` 并停止修复
    - **写后清零不拖到批末**：写后 hook 推回的毒句式命中当轮清零，不得攒到 Step 3。
    - 每章写完后**立即提交一次追踪事务**：
      1. 从刚落盘的正文、细纲和上一版续写状态卡提取 `result / character_changes / foreshadow_changes / timeline_events / constraints / next_chapter_commitments`。只记录会影响未来章节的变化；过程日志、质检计数、参照章和去 AI 味统计全部排除。

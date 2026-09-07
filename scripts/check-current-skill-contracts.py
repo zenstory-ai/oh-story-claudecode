@@ -10,6 +10,8 @@ walks and actionable findings rather than a chain of shell grep calls.
 from __future__ import annotations
 
 import argparse
+import csv
+import hashlib
 import json
 import re
 import sys
@@ -31,6 +33,57 @@ EXPECTED_MANIFEST_KEYS = {
 }
 SEMVER_RE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
 ARTIFACT_PATH_RE = re.compile(r"(?:[^/\s]+/)+[^/\s]+\.md")
+LONG_ANALYSIS_GLOBAL_ARTIFACTS = (
+    "六维拆书.md",
+    "爆款机制.md",
+    "证据与边界.md",
+)
+CHAPTER_INDEX_COLUMNS = (
+    "chapter",
+    "title",
+    "source_locator",
+    "char_count",
+    "status",
+)
+STRUCTURE_BLOCK_COLUMNS = (
+    "block_id",
+    "chapter_range",
+    "block_name",
+    "initial_gap",
+    "goal",
+    "pressure",
+    "turning_point",
+    "payoff",
+    "remaining_hook",
+    "state_change",
+    "main_characters",
+    "evidence_locator",
+    "plot_intensity",
+    "emotion_type",
+    "emotion_intensity",
+    "description_density",
+    "relationship_delta",
+    "rhythm_anchors",
+    "inspiration_title",
+    "inspiration_mechanism",
+    "inspiration_reader_effect",
+    "inspiration_transfer_boundary",
+    "inspiration_risk",
+    "confidence",
+    "status",
+)
+INSPIRATION_INDEX_COLUMNS = (
+    "item_id",
+    "layer",
+    "title",
+    "source_book",
+    "path",
+    "source_ids",
+    "novel_count",
+    "atom_count",
+    "tags",
+    "status",
+)
 
 
 @dataclass(frozen=True)
@@ -1066,19 +1119,22 @@ SCHEMA_VERSION_PIN_RE = re.compile(r"schema_version:\s*([0-9]+)")
 
 
 def progress_schema_pin_findings(repo_root: Path, expected: int) -> List[Finding]:
-    """每个字面 `schema_version: N` 锚点都必须是当前续跑契约版本。
+    """当前 Markdown 锚点和 JSON 断点都必须使用同一续跑契约版本。
 
     续跑契约同时写在 analyze 的写入/恢复段、import 的当前拆文契约、UPGRADING 当前契约段和
-    demo 基准进度文件里。只核对 pipeline-ops.md 会让 bump 之后其余文件静默留在旧版本——技能
-    包自相矛盾、续跑拒收自己写出的 `_progress.md`，而 CI 全绿。参照 `agents_version` 的做法
-    （见 upgrading_version_findings）：任何写成 `schema_version: N` 的行都必须是当前值。
+    demo 的 `_progress.json` / `_state_snapshot.json` 里。只核对 pipeline-ops.md 会让 bump 之后
+    其余文件静默留在旧版本。旧 `_progress.md` 是只读兼容遗留，不再参与当前契约校验。
     仓库根的 CHANGELOG.md 是历史记录，故意不在扫描范围内；版本说明表的 `| 2 | 当前契约… |`
     不写成锚点形式，本规则也不会误伤。
     """
     findings: List[Finding] = []
     paths: List[Path] = []
     for root in (repo_root / "skills", repo_root / "demo"):
-        paths.extend(path for path in iter_files(root) if path.suffix.lower() == ".md")
+        paths.extend(
+            path
+            for path in iter_files(root)
+            if path.suffix.lower() == ".md" and path.name != "_progress.md"
+        )
     # iter_files 按名字跳过 UPGRADING.md（历史章节不该被当前值约束），但 `## v21 当前契约`
     # 段里的续跑契约陈述与 agents_version 同理，bump 时必须跟着改。
     paths.append(repo_root / "skills/story-setup/UPGRADING.md")
@@ -1099,6 +1155,32 @@ def progress_schema_pin_findings(repo_root: Path, expected: int) -> List[Finding
                         path,
                         line_number,
                         line_text,
+                    )
+                )
+    for root in (repo_root / "skills", repo_root / "demo"):
+        for path in iter_files(root):
+            if path.name not in {"_progress.json", "_state_snapshot.json"}:
+                continue
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+                findings.append(
+                    Finding(
+                        "progress-schema-json-readable",
+                        "cannot parse current checkpoint JSON: {}".format(exc),
+                        path,
+                    )
+                )
+                continue
+            actual = payload.get("schema_version") if isinstance(payload, dict) else None
+            if actual != expected:
+                findings.append(
+                    Finding(
+                        "progress-schema-version",
+                        "every current checkpoint schema_version must equal {} (found {!r})".format(
+                            expected, actual
+                        ),
+                        path,
                     )
                 )
     return findings
@@ -1220,9 +1302,111 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
     # 不剔就一路错到底。剔除步骤和落表前的连续性校验都必须留在 Stage 0。
     findings.extend(require_pattern(long_analyze, r"先剔掉目录块", "stage0-toc-block-removal", "Stage 0 must drop the leading table-of-contents block before building the chapter table"))
     findings.extend(require_pattern(long_analyze, r"落表前校验章号连续", "stage0-chapter-table-validation", "Stage 0 must validate chapter numbers before writing the boundary table"))
+    findings.extend(
+        require_pattern(
+            long_analyze,
+            r"chapter_index\.csv`?\s*是唯一逐章持久化产物",
+            "chapter-index-only-persisted-chapter-artifact",
+            "story-long-analyze must keep chapter_index.csv as the only persisted per-chapter artifact",
+        )
+    )
+    findings.extend(
+        require_pattern(
+            long_analyze,
+            r"以下旧产物不再生成",
+            "legacy-analysis-outputs-disabled",
+            "story-long-analyze must explicitly disable legacy per-chapter and split analysis outputs",
+        )
+    )
+    analyze_text = read_text(long_analyze) or ""
+    output_templates = repo_root / "skills/story-long-analyze/references/output-templates.md"
+    output_template_text = read_text(output_templates) or ""
+    for artifact in LONG_ANALYSIS_GLOBAL_ARTIFACTS:
+        expected_path = "全局分析/{}".format(artifact)
+        if expected_path not in analyze_text:
+            findings.append(
+                Finding(
+                    "long-analysis-global-artifact",
+                    "story-long-analyze must declare {}".format(expected_path),
+                    long_analyze,
+                )
+            )
+        if artifact not in output_template_text:
+            findings.append(
+                Finding(
+                    "long-analysis-global-template",
+                    "output templates must define {}".format(artifact),
+                    output_templates,
+                )
+            )
+    expected_csv_header = ",".join(CHAPTER_INDEX_COLUMNS)
+    if expected_csv_header not in output_template_text:
+        findings.append(
+            Finding(
+                "chapter-index-template-header",
+                "output templates must pin the exact chapter_index.csv header",
+                output_templates,
+            )
+        )
+    expected_block_header = ",".join(STRUCTURE_BLOCK_COLUMNS)
+    if expected_block_header not in output_template_text:
+        findings.append(
+            Finding(
+                "structure-block-template-header",
+                "output templates must pin the exact structure_blocks.csv header",
+                output_templates,
+            )
+        )
+    for pattern, code, message in (
+        (r"Stage 2[^\n]{0,100}(?:不调用模型|不调用[^\n]{0,20}子代理)", "stage2-deterministic", "Stage 2 must be deterministic and model-free"),
+        (r"fork_turns=none", "analyze-empty-history-fork", "semantic workers must not inherit the main conversation"),
+        (r"structure_blocks\.csv", "analyze-structure-blocks", "long analysis must persist semantic structure blocks"),
+        (r"relationship_delta", "analyze-relationship-delta", "structure blocks must retain relationship state transitions from the first semantic read"),
+        (r"rhythm_anchors", "analyze-rhythm-anchors", "structure blocks must retain verified rhythm anchors from the first semantic read"),
+        (r"inspiration_mechanism", "analyze-inspiration-fields", "structure blocks must retain pre-abstracted inspiration fields from the first semantic read"),
+        (r"六维拆书\.md[^\n]{0,120}(?:自包含|完整)", "analyze-self-contained-six-dimension", "六维拆书.md must be a self-contained global analysis"),
+        (r"_progress\.json", "analyze-json-progress", "long analysis must use the JSON checkpoint"),
+        (r"_state_snapshot\.json", "analyze-json-snapshot", "long analysis must use the JSON state snapshot"),
+    ):
+        findings.extend(require_pattern(long_analyze, pattern, code, message))
+
+    runtime_guard = repo_root / "skills/story-runtime-guard/SKILL.md"
+    for pattern, code, message in (
+        (r"fork_turns=none", "runtime-empty-history-fork", "runtime guard must prohibit inherited conversation history"),
+        (r"一个范围只有一个语义 owner|一个 agent 只交一个产物", "runtime-single-owner", "runtime guard must assign one bounded output owner"),
+        (r"已成功范围不得重读|禁止重复读取", "runtime-read-ledger", "runtime guard must prevent repeated successful reads"),
+        (r"原子", "runtime-atomic-commit", "runtime guard must require atomic commits"),
+    ):
+        findings.extend(require_pattern(runtime_guard, pattern, code, message))
+
+    inspiration = repo_root / "skills/story-inspiration-distill/SKILL.md"
+    inspiration_contract = repo_root / "skills/story-inspiration-distill/references/inspiration-contract.md"
+    expected_inspiration_header = ",".join(INSPIRATION_INDEX_COLUMNS)
+    for pattern, code, message in (
+        (r"禁止读取[^\n]*原文/[^\n]*chapter_index\.csv", "inspiration-no-raw-reread", "inspiration distillation must not reread raw text or the chapter index"),
+        (r"render-atoms", "inspiration-mechanical-render", "inspiration atoms must be rendered mechanically from structure blocks"),
+        (r"第二次语义读取|二次语义读取", "inspiration-no-second-semantic-pass", "inspiration distillation must forbid a second semantic pass over structure blocks"),
+        (r"原子灵感", "inspiration-atom-layer", "inspiration library must define the atom layer"),
+        (r"单小说灵感合并", "inspiration-novel-merge-layer", "inspiration library must define the single-novel merge layer"),
+        (r"跨书灵感聚合", "inspiration-cross-book-layer", "inspiration library must define the cross-book aggregation layer"),
+        (re.escape(expected_inspiration_header), "inspiration-index-header", "inspiration library must pin its exact public index header"),
+        (r"tags`?\s*留空", "inspiration-tags-cba-only", "IA and NM public tags must remain empty"),
+    ):
+        findings.extend(require_pattern(inspiration, pattern, code, message))
+    for axis in ("题材", "读者需求", "情绪", "剧情功能", "适用阶段", "风险"):
+        findings.extend(
+            require_pattern(
+                inspiration_contract,
+                re.escape(axis),
+                "inspiration-required-tag-axis",
+                "CBA tag contract must include {}".format(axis),
+            )
+        )
     explorer = repo_root / "skills/story-setup/references/templates/agents/story-explorer.md"
     findings.extend(require_pattern(explorer, r"missing_primary_contract", "explorer-primary-failure", "story-explorer must fail closed on missing current benchmark artifacts"))
     findings.extend(require_pattern(explorer, r"repair_action", "explorer-repair-action", "story-explorer must return an explicit repair action"))
+    findings.extend(require_pattern(explorer, r"structure_blocks\.csv", "explorer-structure-blocks", "story-explorer must select a semantic structure block before locating raw text"))
+    findings.extend(require_pattern(explorer, r"layer=跨书灵感聚合|active CBA", "explorer-cba-query", "story-explorer must retrieve only active CBA cards"))
 
     long_write = repo_root / "skills/story-long-write/SKILL.md"
     for artifact in manifest.primary_benchmark_artifacts:
@@ -1234,6 +1418,9 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
                 "long writing must require {}".format(artifact),
             )
         )
+    findings.extend(require_pattern(long_write, r"Top 3[–-]8", "long-write-cba-budget", "long writing must bound public inspiration retrieval to Top 3-8"))
+    findings.extend(require_pattern(long_write, r"设定/文风\.md[^\n]{0,80}(?:优先级最高|最高优先级)", "long-write-custom-style-priority", "custom project style must remain highest priority"))
+    findings.extend(require_pattern(long_write, r"chapter_index\.csv[^\n]{0,100}(?:只负责|定位)", "long-write-index-locator-only", "long writing must use the chapter index only for raw-source location"))
 
     for relative in (
         "skills/story-import/SKILL.md",
@@ -1257,6 +1444,11 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
                 "story-import must name external benchmarks independently",
             )
         )
+    import_skill = repo_root / "skills/story-import/SKILL.md"
+    findings.extend(require_pattern(import_skill, r"structure_blocks\.csv", "story-import-structure-blocks", "long import must consume semantic structure blocks"))
+    findings.extend(require_pattern(import_skill, r"chapter_index\.csv[^\n]{0,100}只提供[^\n]*source_locator", "story-import-index-locator-only", "long import must use the chapter index only as a locator"))
+    findings.extend(require_pattern(import_skill, r"回读[^\n]*原文", "story-import-reread-source", "long import must reread raw source before reconstructing project state"))
+    findings.extend(require_pattern(import_skill, r"不得从 CSV|CSV[^\n]{0,80}(?:不能|禁止)", "story-import-no-csv-history", "long import must not reconstruct historical state from CSV"))
 
     # 长篇的「对标发现」随 Phase 1-3 从 SKILL.md 搬进 workflow-setup.md（#269 减无条件加载），
     # 断言跟着内容走；短篇的对标发现仍在自己的 SKILL.md 里。
@@ -1285,30 +1477,29 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
             "story-explorer must report and ignore self-benchmark candidates",
         )
     )
-    # 「书在但缺文风」必须落到 profile_missing，不能被 benchmark_book_missing 吞掉——
-    # 前者调用方可按 custom_style 降级续写，后者是硬停。两者混用是功能回退，不是措辞问题。
+    # 书目录存在性与 v3 主契约完整性分开：目录用任意文件探，机制/节奏/索引逐项 fail closed。
     findings.extend(
         require_pattern(
             explorer_template,
             r"对标/\{书名\}/\*\*/\*",
             "explorer-book-dir-probe",
-            "story-explorer must probe book-dir validity with any file under it, not 文风.md",
+            "story-explorer must probe book-dir validity with any file under it",
         )
     )
     findings.extend(
         require_pattern(
             explorer_template,
-            r"不得改填\s*`?benchmark_book_missing",
-            "explorer-profile-missing-distinct",
-            "story-explorer must keep profile_missing distinct from benchmark_book_missing",
+            r"chapter_index_missing",
+            "explorer-chapter-index-gap",
+            "story-explorer must report a missing v3 chapter index distinctly",
         )
     )
     findings.extend(
         require_pattern(
             repo_root / "skills/story-long-write/references/workflow-daily.md",
-            r"profile_missing[^\n]{0,60}custom_style[^\n]{0,40}继续",
-            "daily-profile-missing-custom-style",
-            "workflow-daily must keep the profile_missing + custom_style continuation branch",
+            r"raw_text_unavailable[^\n]{0,120}(?:停止|修复)",
+            "daily-source-locator-fail-closed",
+            "workflow-daily must stop when a matched source locator cannot be read",
         )
     )
 
@@ -1340,6 +1531,510 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
             findings.append(
                 Finding("demo-primary-artifact", "demo deconstruction is missing non-empty {}".format(artifact), artifact_path)
             )
+    for artifact in LONG_ANALYSIS_GLOBAL_ARTIFACTS:
+        artifact_path = demo_root / "全局分析" / artifact
+        artifact_text = read_text(artifact_path) or ""
+        try:
+            has_content = artifact_path.is_file() and artifact_path.stat().st_size > 0
+        except OSError:
+            has_content = False
+        if not has_content:
+            findings.append(
+                Finding(
+                    "demo-global-analysis-artifact",
+                    "demo deconstruction is missing non-empty 全局分析/{}".format(artifact),
+                    artifact_path,
+                )
+            )
+        elif not re.search(r"SB-[0-9]{3,}", artifact_text) or not re.search(
+            r"原文/[^:\s|；]+:L[0-9]+-L[0-9]+", artifact_text
+        ):
+            findings.append(
+                Finding(
+                    "demo-global-analysis-evidence-link",
+                    "each global analysis must link a structure block to an original-source locator",
+                    artifact_path,
+                )
+            )
+
+    demo_index = demo_root / "chapter_index.csv"
+    try:
+        with demo_index.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            rows = list(reader)
+            actual_header = tuple(reader.fieldnames or ())
+    except (OSError, UnicodeError, csv.Error) as exc:
+        findings.append(
+            Finding(
+                "demo-chapter-index-readable",
+                "cannot parse demo chapter_index.csv: {}".format(exc),
+                demo_index,
+            )
+        )
+        rows = []
+        actual_header = ()
+    if actual_header != CHAPTER_INDEX_COLUMNS:
+        findings.append(
+            Finding(
+                "demo-chapter-index-header",
+                "demo chapter_index.csv header does not match the v4 contract",
+                demo_index,
+            )
+        )
+    seen_chapters = set()
+    source_line_counts = {}
+    source_lines = {}
+    chapter_line_ranges: dict[int, tuple[str, int, int]] = {}
+    for line_number, row in enumerate(rows, start=2):
+        chapter = (row.get("chapter") or "").strip()
+        locator = (row.get("source_locator") or "").strip().replace("\\", "/")
+        if not chapter.isdigit() or chapter in seen_chapters:
+            findings.append(
+                Finding(
+                    "demo-chapter-index-number",
+                    "chapter must be a unique positive integer",
+                    demo_index,
+                    line_number,
+                )
+            )
+        seen_chapters.add(chapter)
+        if not locator.startswith("原文/") or ".." in locator.split("/"):
+            findings.append(
+                Finding(
+                    "demo-chapter-index-locator",
+                    "source_locator must stay under 原文/",
+                    demo_index,
+                    line_number,
+                    locator,
+                )
+            )
+        locator_match = re.fullmatch(r"(原文/[^:]+):L([0-9]+)-L([0-9]+)", locator)
+        if locator_match is None:
+            findings.append(
+                Finding(
+                    "demo-chapter-index-locator-format",
+                    "source_locator must include an explicit Lstart-Lend range",
+                    demo_index,
+                    line_number,
+                    locator,
+                )
+            )
+        else:
+            relative_source, start_text, end_text = locator_match.groups()
+            source_path = demo_root / Path(relative_source)
+            if source_path not in source_line_counts:
+                source_text = read_text(source_path)
+                source_lines[source_path] = source_text.splitlines() if source_text is not None else []
+                source_line_counts[source_path] = (
+                    len(source_lines[source_path])
+                )
+            start_line, end_line = int(start_text), int(end_text)
+            if chapter.isdigit():
+                chapter_line_ranges[int(chapter)] = (relative_source, start_line, end_line)
+            if not (1 <= start_line <= end_line <= source_line_counts[source_path]):
+                findings.append(
+                    Finding(
+                        "demo-chapter-index-locator-range",
+                        "source_locator range must resolve inside the backed-up original",
+                        demo_index,
+                        line_number,
+                        locator,
+                    )
+                )
+        status = (row.get("status") or "").strip()
+        if status not in {"ok", "failed"}:
+            findings.append(
+                Finding(
+                    "demo-chapter-index-status",
+                    "status must be ok or failed",
+                    demo_index,
+                    line_number,
+                )
+            )
+        try:
+            char_count = int((row.get("char_count") or "").strip())
+        except ValueError:
+            char_count = 0
+        if char_count <= 0:
+            findings.append(
+                Finding(
+                    "demo-chapter-index-char-count",
+                    "char_count must be a positive integer",
+                    demo_index,
+                    line_number,
+                )
+            )
+        elif locator_match is not None:
+            relative_source, start_text, end_text = locator_match.groups()
+            source_path = demo_root / Path(relative_source)
+            lines_for_source = source_lines.get(source_path, [])
+            start_line, end_line = int(start_text), int(end_text)
+            actual_chars = len(re.sub(r"\s+", "", "\n".join(lines_for_source[start_line - 1 : end_line])))
+            if char_count != actual_chars:
+                findings.append(
+                    Finding(
+                        "demo-chapter-index-char-count-source",
+                        "char_count must equal the whitespace-stripped locator slice",
+                        demo_index,
+                        line_number,
+                    )
+                )
+    expected_chapters = {str(number) for number in range(1, len(rows) + 1)}
+    if rows and seen_chapters != expected_chapters:
+        findings.append(
+            Finding(
+                "demo-chapter-index-continuity",
+                "chapter numbers must be continuous from 1 through the row count",
+                demo_index,
+            )
+        )
+
+    demo_blocks = demo_root / "structure_blocks.csv"
+    try:
+        with demo_blocks.open("r", encoding="utf-8-sig", newline="") as handle:
+            block_reader = csv.DictReader(handle)
+            block_rows = list(block_reader)
+            actual_block_header = tuple(block_reader.fieldnames or ())
+    except (OSError, UnicodeError, csv.Error) as exc:
+        findings.append(
+            Finding(
+                "demo-structure-blocks-readable",
+                "cannot parse demo structure_blocks.csv: {}".format(exc),
+                demo_blocks,
+            )
+        )
+        block_rows = []
+        actual_block_header = ()
+    if actual_block_header != STRUCTURE_BLOCK_COLUMNS:
+        findings.append(
+            Finding(
+                "demo-structure-blocks-header",
+                "demo structure_blocks.csv header does not match the analysis contract v5",
+                demo_blocks,
+            )
+        )
+    seen_blocks: set[str] = set()
+    covered_chapters: set[int] = set()
+    for line_number, row in enumerate(block_rows, start=2):
+        block_id = (row.get("block_id") or "").strip()
+        if not re.fullmatch(r"SB-[0-9]{3,}", block_id) or block_id in seen_blocks:
+            findings.append(
+                Finding(
+                    "demo-structure-block-id",
+                    "block_id must be a unique SB-NNN identifier",
+                    demo_blocks,
+                    line_number,
+                )
+            )
+        seen_blocks.add(block_id)
+        range_match = re.fullmatch(r"([0-9]+)-([0-9]+)", (row.get("chapter_range") or "").strip())
+        if range_match is None:
+            findings.append(
+                Finding(
+                    "demo-structure-block-range",
+                    "chapter_range must use start-end",
+                    demo_blocks,
+                    line_number,
+                )
+            )
+        else:
+            start, end = (int(value) for value in range_match.groups())
+            chapter_set = set(range(start, end + 1))
+            if start < 1 or end < start or (rows and end > len(rows)) or chapter_set & covered_chapters:
+                findings.append(
+                    Finding(
+                        "demo-structure-block-range",
+                        "chapter ranges must be ordered, in bounds, and non-overlapping",
+                        demo_blocks,
+                        line_number,
+                    )
+                )
+            covered_chapters.update(chapter_set)
+        for field in (
+            "block_name",
+            "initial_gap",
+            "goal",
+            "pressure",
+            "turning_point",
+            "payoff",
+            "remaining_hook",
+            "state_change",
+            "main_characters",
+            "evidence_locator",
+            "emotion_type",
+            "relationship_delta",
+            "rhythm_anchors",
+            "inspiration_title",
+            "inspiration_mechanism",
+            "inspiration_reader_effect",
+            "inspiration_transfer_boundary",
+            "inspiration_risk",
+        ):
+            if not (row.get(field) or "").strip():
+                findings.append(
+                    Finding(
+                        "demo-structure-block-required-field",
+                        "{} must not be empty".format(field),
+                        demo_blocks,
+                        line_number,
+                    )
+                )
+        block_locator = (row.get("evidence_locator") or "").strip().replace("\\", "/")
+        block_locator_parts = [part.strip() for part in block_locator.split("；") if part.strip()]
+        if not 1 <= len(block_locator_parts) <= 5:
+            findings.append(
+                Finding(
+                    "demo-structure-block-locator",
+                    "evidence_locator must contain 1-5 original-source ranges separated by Chinese semicolons",
+                    demo_blocks,
+                    line_number,
+                    block_locator,
+                )
+            )
+        for locator_part in block_locator_parts:
+            block_locator_match = re.fullmatch(r"(原文/[^:]+):L([0-9]+)-L([0-9]+)", locator_part)
+            if block_locator_match is None:
+                findings.append(
+                    Finding(
+                        "demo-structure-block-locator",
+                        "every evidence locator must use 原文/...:Lstart-Lend",
+                        demo_blocks,
+                        line_number,
+                        locator_part,
+                    )
+                )
+                continue
+            relative_source, start_text, end_text = block_locator_match.groups()
+            source_path = demo_root / Path(relative_source)
+            if source_path not in source_line_counts:
+                source_text = read_text(source_path)
+                source_line_counts[source_path] = len(source_text.splitlines()) if source_text is not None else 0
+            start_line, end_line = int(start_text), int(end_text)
+            if not (1 <= start_line <= end_line <= source_line_counts[source_path]):
+                findings.append(
+                    Finding(
+                        "demo-structure-block-locator-range",
+                        "evidence_locator must stay inside the backed-up original",
+                        demo_blocks,
+                        line_number,
+                        locator_part,
+                    )
+                )
+            if range_match is not None:
+                chapter_start, chapter_end = (int(value) for value in range_match.groups())
+                envelopes = [chapter_line_ranges.get(number) for number in range(chapter_start, chapter_end + 1)]
+                if all(envelopes):
+                    expected_source = envelopes[0][0]
+                    envelope_start = min(item[1] for item in envelopes if item)
+                    envelope_end = max(item[2] for item in envelopes if item)
+                    if relative_source != expected_source or not (envelope_start <= start_line <= end_line <= envelope_end):
+                        findings.append(
+                            Finding(
+                                "demo-structure-block-locator-alignment",
+                                "evidence locator must stay inside the block chapter_range envelope",
+                                demo_blocks,
+                                line_number,
+                                locator_part,
+                            )
+                        )
+        for field, low, high in (
+            ("plot_intensity", 1, 5),
+            ("emotion_intensity", 1, 5),
+            ("description_density", 1, 3),
+        ):
+            try:
+                value = int((row.get(field) or "").strip())
+            except ValueError:
+                value = low - 1
+            if not low <= value <= high:
+                findings.append(
+                    Finding(
+                        "demo-structure-block-score",
+                        "{} must be in {}-{}".format(field, low, high),
+                        demo_blocks,
+                        line_number,
+                    )
+                )
+        if (row.get("confidence") or "").strip() not in {"A 明确", "B 强推断", "C 暂定"}:
+            findings.append(
+                Finding(
+                    "demo-structure-block-confidence",
+                    "confidence must use the A/B/C evidence enum",
+                    demo_blocks,
+                    line_number,
+                )
+            )
+        if (row.get("status") or "").strip() not in {"ok", "failed"}:
+            findings.append(
+                Finding(
+                    "demo-structure-block-status",
+                    "status must be ok or failed",
+                    demo_blocks,
+                    line_number,
+                )
+            )
+    if rows and block_rows and covered_chapters != set(range(1, len(rows) + 1)):
+        findings.append(
+            Finding(
+                "demo-structure-block-coverage",
+                "valid structure blocks must cover every indexed demo chapter exactly once",
+                demo_blocks,
+            )
+        )
+
+    expected_rhythm_ranges = {
+        (row.get("block_id") or "").strip(): (row.get("chapter_range") or "").strip()
+        for row in block_rows
+        if (row.get("status") or "").strip() == "ok"
+    }
+    rhythm_path = demo_root / "全局分析/六维拆书.md"
+    rhythm_text = read_text(rhythm_path) or ""
+    rhythm_ranges: dict[str, str] = {}
+    for match in re.finditer(
+        r"^\|\s*(SB-[0-9]{3,})(?:/RH-[0-9]{3,})?\s*\|\s*([0-9]+-[0-9]+)\s*\|",
+        rhythm_text,
+        re.MULTILINE,
+    ):
+        rhythm_ranges[match.group(1)] = match.group(2)
+    if rhythm_ranges != expected_rhythm_ranges:
+        findings.append(
+            Finding(
+                "demo-rhythm-structure-block-parity",
+                "六维拆书.md 的三维节奏章节 must score each valid structure block once without recutting chapter ranges",
+                rhythm_path,
+            )
+        )
+
+    evidence_path = demo_root / "全局分析/证据与边界.md"
+    evidence_text = read_text(evidence_path) or ""
+    evidence_header = "| 结论ID | 文件/章节 | 结论 | 证据章节 | 原文定位关键词 | 置信度 | 反证/其他解释 |"
+    if evidence_header not in evidence_text:
+        findings.append(
+            Finding(
+                "demo-evidence-table-header",
+                "证据与边界 must use the conclusion audit table contract",
+                evidence_path,
+            )
+        )
+    evidence_rows = [
+        line for line in evidence_text.splitlines() if re.match(r"^\|\s*C-[0-9]{3,}\s*\|", line)
+    ]
+    if not evidence_rows:
+        findings.append(
+            Finding("demo-evidence-table-empty", "证据与边界 must contain audited conclusions", evidence_path)
+        )
+    for line_number, line in enumerate(evidence_text.splitlines(), start=1):
+        if not re.match(r"^\|\s*C-[0-9]{3,}\s*\|", line):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) != 7 or not re.search(r"SB-[0-9]{3,}", cells[1]) or not re.search(
+            r"原文/[^:\s；]+:L[0-9]+-L[0-9]+", cells[3]
+        ) or not cells[4]:
+            findings.append(
+                Finding(
+                    "demo-evidence-row-contract",
+                    "each conclusion must link an SB ID, original locator and grep keyword",
+                    evidence_path,
+                    line_number,
+                    line,
+                )
+            )
+
+    demo_progress = demo_root / "_progress.json"
+    demo_snapshot = demo_root / "_state_snapshot.json"
+    try:
+        progress_payload = json.loads(demo_progress.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        findings.append(Finding("demo-progress-readable", "cannot parse demo _progress.json: {}".format(exc), demo_progress))
+        progress_payload = {}
+    required_progress_keys = {
+        "schema_version",
+        "contract_version",
+        "source_sha256",
+        "boundary_sha256",
+        "current_stage",
+        "final_status",
+        "last_committed_batch",
+        "completed_ranges",
+        "pending_ranges",
+        "artifact_checksums",
+        "failed_ranges",
+        "retry_reasons",
+        "next_action",
+    }
+    missing_progress_keys = required_progress_keys - set(progress_payload) if isinstance(progress_payload, dict) else required_progress_keys
+    if missing_progress_keys:
+        findings.append(Finding("demo-progress-fields", "demo progress is missing: {}".format(", ".join(sorted(missing_progress_keys))), demo_progress))
+    checksums = progress_payload.get("artifact_checksums", {}) if isinstance(progress_payload, dict) else {}
+    if isinstance(checksums, dict):
+        required_checkpointed = {
+            "chapter_index.csv",
+            "structure_blocks.csv",
+            *(f"全局分析/{name}" for name in LONG_ANALYSIS_GLOBAL_ARTIFACTS),
+        }
+        missing_checkpointed = required_checkpointed - set(checksums)
+        if missing_checkpointed:
+            findings.append(
+                Finding(
+                    "demo-progress-artifact-missing",
+                    "completed demo must checkpoint every terminal artifact: {}".format(
+                        ", ".join(sorted(missing_checkpointed))
+                    ),
+                    demo_progress,
+                )
+            )
+        for relative, expected_hash in checksums.items():
+            artifact_path = demo_root / Path(relative)
+            try:
+                actual_hash = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+            except OSError as exc:
+                findings.append(Finding("demo-progress-artifact", "cannot read checkpointed artifact: {}".format(exc), artifact_path))
+                continue
+            if actual_hash != expected_hash:
+                findings.append(Finding("demo-progress-checksum", "checkpoint checksum does not match artifact", artifact_path))
+    if isinstance(progress_payload, dict):
+        final_status = progress_payload.get("final_status")
+        pending_ranges = progress_payload.get("pending_ranges") or []
+        failed_ranges = progress_payload.get("failed_ranges") or []
+        failed_artifacts = [
+            row for row in rows + block_rows if (row.get("status") or "").strip() == "failed"
+        ]
+        if final_status == "completed" and (pending_ranges or failed_ranges or failed_artifacts):
+            findings.append(
+                Finding(
+                    "demo-progress-final-status",
+                    "completed requires no pending or failed ranges/artifacts",
+                    demo_progress,
+                )
+            )
+        if final_status == "completed_with_errors" and not (failed_ranges or failed_artifacts):
+            findings.append(
+                Finding(
+                    "demo-progress-final-status",
+                    "completed_with_errors requires an explicit failed range/artifact",
+                    demo_progress,
+                )
+            )
+    try:
+        snapshot_payload = json.loads(demo_snapshot.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        findings.append(Finding("demo-snapshot-readable", "cannot parse demo _state_snapshot.json: {}".format(exc), demo_snapshot))
+        snapshot_payload = {}
+    boundaries = snapshot_payload.get("chapter_boundaries", []) if isinstance(snapshot_payload, dict) else []
+    if rows and len(boundaries) != len(rows):
+        findings.append(Finding("demo-snapshot-boundaries", "snapshot boundary count must match chapter index rows", demo_snapshot))
+    elif rows:
+        for row, boundary in zip(rows, boundaries):
+            if (
+                not isinstance(boundary, dict)
+                or str(boundary.get("chapter")) != row.get("chapter")
+                or boundary.get("source_locator") != row.get("source_locator")
+                or str(boundary.get("char_count")) != row.get("char_count")
+                or boundary.get("title") != row.get("title")
+                or boundary.get("status") != row.get("status")
+            ):
+                findings.append(Finding("demo-snapshot-boundaries", "snapshot boundaries must mirror the mechanical index", demo_snapshot))
+                break
 
     outline_dir = repo_root / "demo/长篇/让你管账号，你高燃混剪炸全网/大纲"
     outlines = sorted(outline_dir.glob("细纲_第*.md"))

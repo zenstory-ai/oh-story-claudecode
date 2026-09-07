@@ -34,8 +34,8 @@ version = Path('skills/story/VERSION').read_text().strip()
 assert manifest['version'] == version, f"version {manifest['version']!r} must match skills/story/VERSION {version!r}"
 # The manifest promises the skills under `skills`; keep it honest.
 skills = sorted(Path('skills').glob('*/SKILL.md'))
-assert len(skills) == 13, f'expected 13 skills, got {len(skills)}'
+assert len(skills) == 15, f'expected 15 skills, got {len(skills)}'
 PY
-echo "  OK reasonix-plugin.json (schema + version pin + 13 Skills)"
+echo "  OK reasonix-plugin.json (schema + version pin + 15 Skills)"
 echo ""
 echo "OK: Reasonix adapter checks passed"

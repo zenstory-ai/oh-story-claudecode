@@ -26,6 +26,18 @@ def make_source(root: Path) -> Path:
     return source
 
 
+def can_create_symlink(root: Path) -> bool:
+    target = root / "symlink-probe-target"
+    link = root / "symlink-probe"
+    target.write_text("probe\n", encoding="utf-8")
+    try:
+        link.symlink_to(target)
+    except OSError:
+        return False
+    link.unlink()
+    return True
+
+
 def main() -> None:
     with tempfile.TemporaryDirectory(prefix="oh-story-antigravity-skills-") as directory:
         root = Path(directory)
@@ -37,34 +49,40 @@ def main() -> None:
         (destination / "user-skill/SKILL.md").write_text("keep\n", encoding="utf-8")
         outside = root / "outside.md"
         outside.write_text("do not touch\n", encoding="utf-8")
-        (destination / "story-cover").symlink_to(outside)
+        symlink_supported = can_create_symlink(root)
+        if symlink_supported:
+            (destination / "story-cover").symlink_to(outside)
 
         assert MODULE.deploy(source, destination, migrate_symlink=False) == "materialized"
         assert not destination.is_symlink()
         assert (destination / "user-skill/SKILL.md").read_text() == "keep\n"
         assert (destination / "story/SKILL.md").read_text().endswith("new\n")
+        assert len([path for path in destination.iterdir() if (path / "SKILL.md").is_file()]) == len(MODULE.KNOWN_SKILLS) + 1
         assert outside.read_text() == "do not touch\n"
 
-        linked_target = root / "shared-skills"
-        (linked_target / "user-skill").mkdir(parents=True)
-        (linked_target / "user-skill/SKILL.md").write_text("shared keep\n", encoding="utf-8")
-        linked = root / "linked-project/.agents/skills"
-        linked.parent.mkdir(parents=True)
-        linked.symlink_to(os.path.relpath(linked_target, linked.parent), target_is_directory=True)
-        try:
-            MODULE.deploy(source, linked, migrate_symlink=False)
-        except MODULE.DeployError:
-            pass
-        else:
-            raise AssertionError("symlink destination must require explicit migration")
-        assert linked.is_symlink()
-        assert not (linked_target / "story").exists()
+        if symlink_supported:
+            linked_target = root / "shared-skills"
+            (linked_target / "user-skill").mkdir(parents=True)
+            (linked_target / "user-skill/SKILL.md").write_text("shared keep\n", encoding="utf-8")
+            linked = root / "linked-project/.agents/skills"
+            linked.parent.mkdir(parents=True)
+            linked.symlink_to(os.path.relpath(linked_target, linked.parent), target_is_directory=True)
+            try:
+                MODULE.deploy(source, linked, migrate_symlink=False)
+            except MODULE.DeployError:
+                pass
+            else:
+                raise AssertionError("symlink destination must require explicit migration")
+            assert linked.is_symlink()
+            assert not (linked_target / "story").exists()
 
-        assert MODULE.deploy(source, linked, migrate_symlink=True) == "materialized"
-        assert linked.is_dir() and not linked.is_symlink()
-        assert (linked / "user-skill/SKILL.md").read_text() == "shared keep\n"
-        assert not (linked_target / "story").exists(), "migration must not write through the old symlink"
-        assert MODULE.deploy(linked, linked, migrate_symlink=False) == "same-object no-op"
+            assert MODULE.deploy(source, linked, migrate_symlink=True) == "materialized"
+            assert linked.is_dir() and not linked.is_symlink()
+            assert (linked / "user-skill/SKILL.md").read_text() == "shared keep\n"
+            assert not (linked_target / "story").exists(), "migration must not write through the old symlink"
+            assert MODULE.deploy(linked, linked, migrate_symlink=False) == "same-object no-op"
+        else:
+            print("SKIP: Windows symlink privilege unavailable; symlink migration branch not exercised")
 
     print("Antigravity skill deployment tests passed.")
 

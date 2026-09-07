@@ -438,7 +438,7 @@ cmp -s "$TMP_DIR/claude-v25.json" "$TMP_DIR/claude-v25-again.json" \
 
 # 重部署时 sentinel 的 target_cli 是权威：不认它就会每次重问，且 skills-only 三端根本无从探测。
 assert_grep '已部署项目以 sentinel 里的值为准' "$SKILL_FILE" "story-setup must reuse the deployed target_cli on redeploy"
-# metadata.openclaw 在 13 个 skill 上全都有，拿它判定会把 reasonix / generic 项目误认成 OpenClaw。
+# metadata.openclaw 在 14 个 skill 上全都有，拿它判定会把 reasonix / generic 项目误认成 OpenClaw。
 assert_no_grep '中的 `metadata\.openclaw`' "$SKILL_FILE" "story-setup must not detect OpenClaw from the skills bundle it deploys itself"
 assert_grep '不作 OpenClaw 信号' "$SKILL_FILE" "story-setup must explain why metadata.openclaw is not a detection signal"
 # skills-only 三端只能靠各自 AGENTS.md 的标题行区分；SKILL.md 引用的标记必须在模板里真的存在。
@@ -477,7 +477,7 @@ CTX
 touch "$root/拆文库/sample/_progress.md"
 # 负向 fixture：已拆完的书不得再被报成「未完成」（裸数 _progress.md 会永久误报）。
 mkdir -p "$root/拆文库/done"
-printf '# 深度拆解进度：done\n\n- 最终状态：completed\n- schema_version: 2\n' > "$root/拆文库/done/_progress.md"
+printf '# 深度拆解进度：done\n\n- 最终状态：completed\n- schema_version: 3\n' > "$root/拆文库/done/_progress.md"
 
 out_start="$(run_from_nested "$root" session-start.sh || true)"
 echo "$out_start" | grep -q '当前位置' || fail "session-start did not resolve active book from project root"
@@ -740,8 +740,9 @@ for ref_dir in "$SKILL_DIR"/references/*/; do
 done
 ref_dir_count="$(find "$SKILL_DIR/references" -maxdepth 1 -mindepth 1 -type d | wc -l | tr -d ' ')"
 [ "$ref_dir_count" -eq 9 ] || fail "story-setup references/ now has $ref_dir_count subdirs (expected 9); update the Phase 1 self-check list and this assertion"
-assert_grep '剧情/情绪模块\.md.*missing_primary_contract|missing_primary_contract.*剧情/情绪模块\.md' "$SKILL_DIR/references/templates/agents/story-explorer.md" "story-explorer must require the current emotion-module artifact"
-assert_grep '剧情/节奏\.md.*missing_primary_contract|missing_primary_contract.*剧情/节奏\.md' "$SKILL_DIR/references/templates/agents/story-explorer.md" "story-explorer must require the current rhythm artifact"
+assert_grep '全局分析/爆款机制\.md' "$SKILL_DIR/references/templates/agents/story-explorer.md" "story-explorer must require the current hit-mechanism artifact"
+assert_grep '全局分析/六维拆书\.md.*三维节奏|三维节奏.*全局分析/六维拆书\.md' "$SKILL_DIR/references/templates/agents/story-explorer.md" "story-explorer must require the three-axis rhythm section in the current six-dimension artifact"
+assert_grep 'chapter_index_missing.*missing_primary_contract|missing_primary_contract.*chapter_index_missing' "$SKILL_DIR/references/templates/agents/story-explorer.md" "story-explorer must fail closed on a missing chapter index"
 assert_no_grep 'legacy_deconstruction|contract_version.*legacy|pre-v12' "$SKILL_DIR/references/templates/agents/story-explorer.md" "story-explorer must not keep legacy benchmark branches"
 assert_grep 'missing_primary_contract: true|missing_primary_contract": true' "$SKILL_DIR/references/templates/agents/story-explorer.md" "story-explorer must emit missing_primary_contract for broken canonical artifacts"
 assert_grep 'repair_action.*Stage 3|Stage 3.*repair_action|重跑 /story-long-analyze Stage 3' "$SKILL_DIR/references/templates/agents/story-explorer.md" "story-explorer must provide a repair action instead of silent fallback"

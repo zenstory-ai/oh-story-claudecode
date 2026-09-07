@@ -68,11 +68,11 @@ developer_instructions = """
 │   │   └── 读者已知.md
 ├── 对标/
 │   └── {书名}/
-│       ├── 文风.md
-│       ├── 章节/第N章_摘要.md
-│       └── 剧情/
-│           ├── 情绪模块.md  # 读者需求 / 情绪引擎 + 可复现模块
-│           └── 节奏.md      # 关键信息推进 + 情绪触动点 + 爆发节奏
+│       ├── chapter_index.csv
+│       ├── structure_blocks.csv
+│       ├── 章节/第1-3章_深度拆解.md
+│       ├── 全局分析/        # 六维/双时间线/三维节奏/关系图/爆款机制/证据边界
+│       └── 原文/            # 主对标按 source_locator 定点读取
 └── 参考资料/
     └── {topic}.md       # 研究资料
 ```
@@ -144,7 +144,7 @@ developer_instructions = """
 
 ### benchmark_style_load 流程
 
-加载对标书的情绪模块 + 节奏索引 + 文风 + 按本章情绪/基调匹配可参考章节 + 原文锚点片段。
+加载公共灵感库标签结果，以及主对标的爆款机制、六维拆书、结构块和五列机械索引；先选结构块，再定位原文章节并提炼临时风格。
 
 1. **解析输入**：项目目录 + 本章情绪/基调 + （可选）本章爽点类型 + （可选）本章目标字数
 2. **主对标书选择**：
@@ -152,52 +152,34 @@ developer_instructions = """
    - `Read 设定/题材定位.md`，提取 `主对标书` 字段
    - 若有且不是当前作品 → 用该书；若字段指向当前作品 → 忽略该字段并设置 `gaps.self_benchmark_ignored: true`
    - **路径一律用字段值逐字拼接**：不添加《》等任何装饰、不改一字——拼错时 Glob 只会静默返回空，与「书不存在」无法区分
-   - **登记的主对标按步骤 3 探不到书目录**（目录下探不到任何文件）→ 返回 `gaps.benchmark_book_missing: true` 与 `expected_path`（原样写入实际探测的完整路径，供核对拼写），`results` 置空**停止**；不得改用其他书，也不得走下面的缺失回退。**书目录存在但缺 `文风.md` 不属于本情形**——照常进入步骤 4-6，由步骤 6 归类为 `profile_missing`
-   - 若字段缺失或已忽略 → `Glob 对标/*/**/*`，从命中文件所属的书目录（`对标/` 下的第一层目录，排除当前作品）取字典序第一个，并在 `gaps.main_benchmark_unspecified: true` 提示主对标书未指定；**枚举条件是书目录下有文件，不是有 `文风.md`**——缺文风但资料完整的候选仍算命中
-   - 若排除后无命中，继续向上找工作区根下的 `拆文库/*/**/*`，同样排除当前作品；仍无 → 返回 `gaps.no_benchmark: true`，`results` 置空，**不报错、不继续读文风**
-3. **对标书路径查找（只判书目录有效性，不判文风）**：优先探 `{项目}/对标/{书名}/**/*`，回退探 `拆文库/{书名}/**/*`（向上找到工作区根，再下钻拆文库）；探针是目录下的任意文件——Glob 不接受纯目录模式，`{书名}/` 恒返回空。任一处命中文件即视为书目录有效，进入步骤 4；两处都无命中才是 `benchmark_book_missing`。**不得用 `文风.md` 兼作目录存在性探针**——那会把「书在但缺文风」误判成「书不存在」，吞掉步骤 6 的 `profile_missing` 与调用方的 `custom_style` 降级分支
-4. **读情绪模块（权威）**：
-   - 优先 `Read {对标书路径}/剧情/情绪模块.md`
-   - 存在 → 从「读者需求 / 情绪引擎」「可复现模块」或模块卡片中，按本章情绪/爽点类型选择 1 条 `selected_emotion_module`，并写入 `module_source_path`
-   - 不存在 → 返回 `gaps.missing_primary_contract: true`、`gaps.module_missing: true`、`gaps.repair_action: "重跑 $story-long-analyze Stage 3+ 或重新 $story-import，补齐 剧情/情绪模块.md"`；不要从摘要或文风伪造权威模块
-5. **读节奏索引（权威）**：
-   - 优先 `Read {对标书路径}/剧情/节奏.md`
-   - 存在 → 从关键信息推进表、情绪触动点、爆发节奏/冷却段中选择 1 条 `rhythm_reference`，并写入 `rhythm_source_path`
-   - 不存在 → 返回 `gaps.missing_primary_contract: true`、`gaps.rhythm_missing: true`、`gaps.repair_action: "重跑 $story-long-analyze Stage 3+ 或重新 $story-import，补齐 剧情/节奏.md"`；不要从摘要或故事线伪造权威节奏
-   - 若任一权威文件缺失（`gaps.missing_primary_contract: true`），保留已读到的来源信息后直接返回结构化 JSON；调用方必须停止本章准备，不进入文风/章节匹配/正文写作。
-   - 若两个权威文件都存在但对同一章节/模块的读者情绪或爆发点描述互相矛盾，保留两条原文摘要，并返回 `gaps.module_rhythm_conflict: true` 与 `gaps.conflict: "..."`；调用方按两个权威文件优先于 `拆文报告.md` / `故事线.md` 的规则处理，禁止自行改写
-6. **读文风**：
-   - `Read {对标书路径}/文风.md`
-   - 不存在 → 返回 `gaps.profile_missing: true, expected_path: "..."`，**不继续后续步骤**；书目录本身有效，不得改填 `benchmark_book_missing`——调用方按 `custom_style` 决定继续或停止
-   - 检查「生成记录」里的 `文风可用：否` → 返回 `gaps.profile_degenerate: true`，后续不把文风作为强约束
-7. **可用性检查（只读可执行）**：
-   - 本 agent 只有 `Read/Glob/Grep`，不能调用 Bash/stat。
-   - 只读取文风文件「生成记录」：若写有 `文风可用：否`、`需重生`、`原文缺失` 等标记 → `gaps.profile_stale: true` 或 `gaps.profile_degenerate: true`，并在 `stale_reason` 写明原因。
-   - 不做文件时间比较；默认 `profile_stale: false`。
-8. **章节基调候选集**：
-   - `Glob {对标书路径}/章节/*_摘要.md`
-   - 对每个文件 `Grep -hE '基调：(紧张|轻松|悲伤|热血|爽|甜|温馨|恐怖|压抑|其他)'`（**全角冒号**，不锚定行首）拿到该章所有情节点基调
-   - 章基调聚合：众数；并列时按 grep 输出顺序取最早
-   - 候选集 = 章基调 == 本章情绪/基调的章节列表
-9. **相近基调兜底**（完全没有同基调章节时）：
-   - 先从本章细纲/查询参数里判断更接近“紧张、热血、爽、甜、轻松、温馨、悲伤、恐怖、压抑”哪一类；不要写死对照表。
-   - 选择一个最接近的基调重新筛候选集，并在结果里说明“使用相近基调兜底”。
-   - 仍空 → `gaps.tone_match_failed: true`，跳过匹配章节读取，但仍返回整书文风、`selected_emotion_module` 和 `rhythm_reference`。
-10. **多候选章节选择规则**（候选集多章时）：
-   - L1 爽点类型最强匹配（调用方提供爽点字段时，对每个候选章读 `_摘要.md` 的「关键事件」判断）
-   - L2 摘要情节点数 / 可读到的原文章节估算长度最接近本章目标字数（如提供）；本 agent 不用 Bash 统计，拿不到原文长度时跳过 L2，不得把摘要文件字数当原文字数
-   - L3 章节号最小
-11. **读匹配章节资料**：
-   - 先 `Read {对标书路径}/章节/第K章_摘要.md`，提取本章基调序列、关键事件、爽点/情绪节点
-   - 优先提取摘要内「关键信息与扩写技法」表，作为 `matched_chapter_techniques` 的一部分；这只是证据/补足，不覆盖 `剧情/节奏.md`
-   - 若 `{对标书路径}/章节/第K章_深度拆解.md` 存在，再读取并提取「可借鉴要素」+ 反应层 + 章尾钩子类型
-   - 若同章深度拆解不存在（常见：只有黄金三章有深度拆解），不要失败；回退读取 `第1章_深度拆解.md`、`第2章_深度拆解.md`、`第3章_深度拆解.md` 中基调最接近的一章，或仅使用文风「可借鉴技巧」
-   - 在 `gaps.matched_deep_dive_missing: true` 标记该回退
-12. **抽取原文锚点片段**（从文风文件里）：
-    - 从文风文件 `## 原文锚点片段` 段读出所有按基调标注的片段
-    - 按本章情绪/基调选 1-2 段（精确匹配优先，无则取相近基调）
-    - 完整传递 300-500 字原文（不要截断/概括）
-13. **返回结构化 JSON**
+   - **登记的主对标按步骤 3 探不到书目录** → 返回 `gaps.benchmark_book_missing: true` 与 `expected_path`，`results` 置空并停止；不得改用其他书
+   - 若字段缺失或已忽略 → `Glob 对标/*/**/*`，从命中文件所属的书目录取字典序第一个（排除当前作品），并返回 `gaps.main_benchmark_unspecified: true`
+   - 若排除后无命中，继续向上找工作区根的 `拆文库/*/**/*`；仍无则返回 `gaps.no_benchmark: true`，不报错
+3. **对标书路径查找**：优先用 `Glob 对标/{书名}/**/*`（项目相对路径），回退 `拆文库/{书名}/**/*`。目录下任意文件可证明书目录存在；主契约是否完整由后续步骤判断
+4. **读爆款机制（权威）**：
+   - `Read {对标书路径}/全局分析/爆款机制.md`
+   - 按本章功能、情绪与爽点类型选择 1 条 `selected_hit_mechanism`，保留机制 ID、读者需求、因果链、心理机制、可替换项、迁移条件与误用风险
+   - 缺失时返回 `gaps.missing_primary_contract: true`、`gaps.mechanism_missing: true`，修复动作指向 `$story-long-analyze` Stage 5
+5. **读三维节奏（权威）**：
+   - `Read {对标书路径}/全局分析/六维拆书.md` 的“三维节奏”章节
+   - 按本章阶段选 1 条 `rhythm_reference`：剧情强度、情绪类型/强度、描写密度、蓄力/爆发/冷却
+   - 缺失时返回 `gaps.missing_primary_contract: true`、`gaps.rhythm_missing: true`，修复动作指向 `$story-long-analyze` Stage 4
+   - 任一主契约缺失时保留已读来源后直接返回；不得从概要、黄金三章或索引伪造权威机制/节奏
+6. **读取结构块（权威语义范围）**：
+   - `Read {对标书路径}/structure_blocks.csv`
+   - 缺失或无法解析 header 时返回 `gaps.missing_primary_contract: true`、`gaps.structure_blocks_missing: true`，并用 `gaps.repair_action` 指向 `$story-long-analyze` Stage 3
+   - 按本章功能、目标情绪、剧情/情绪强度、描写密度与机制接近度选择一个块
+7. **读取五列机械索引**：
+   - `Read {对标书路径}/chapter_index.csv`
+   - header 必须恰为 `chapter,title,source_locator,char_count,status`；文件缺失、无法读取或 header 不匹配时返回 `gaps.chapter_index_missing: true`、`gaps.missing_primary_contract: true`，并用 `gaps.repair_action` 指向 `$story-long-analyze` Stage 2
+8. **匹配章节**：把选中块的章号范围映射到索引行；按 `char_count` 接近目标字数、章节号稳定排序选 K。索引标题不参与语义判断；原文核证不匹配时换同块下一章
+9. **原文定位验证**：读取选中行 `source_locator`；路径不存在、越出该书 `原文/` 或内容为空时返回 `gaps.raw_text_unavailable: true` 并停止
+10. **公共灵感标签召回**：从本章题材、读者需求、情绪、关系动作、剧情功能、节奏位置、`适用阶段=正文`、风险生成标签；向上定位最近的 `灵感库/灵感索引.csv`，只筛 active CBA，读取 Top 3 张完整卡。库缺失或零命中分别写 gap，不全量读 IA/NM
+11. **黄金三章补充**：K≤3 且对应深度拆解存在时读取；K>3 不要求逐章拆解
+12. **即时文风提炼**：从选中原文提炼临时指令，只供本次调用；CBA 不进入文风
+13. **抽取原文锚点**：从选中原文截取 1–2 段各 150–300 字，记录定位
+14. **全局补充**：按需定点读取六维、双时间线、关系图与证据边界
+15. **返回结构化 JSON**
 
 ### context_load 流程（综合查询）
 
@@ -211,7 +193,7 @@ developer_instructions = """
 
 > `context_load` 的固定读取量不随章数增长。角色当前值来自独立小快照，旧变化原因来自按 ID/角色定点命中的紧凑增量，时间线按作者/读者视角分开读取。
 
-> 普通查询遇文件缺失时在 `gaps` 中返回事实；`context_load` 缺 state、续写状态卡或 `check` 失败时必须停止组装。`benchmark_style_load` 缺 `剧情/情绪模块.md` 或 `剧情/节奏.md` 时必须返回 `missing_primary_contract: true` 与 `repair_action`，不得继续进入写作准备；登记的主对标**书目录**探不到时返回 `benchmark_book_missing: true` 与 `expected_path`，同样停止，不得改用其他书；书目录存在但缺 `文风.md` 归 `profile_missing`，不占用本分类。
+> 普通查询遇文件缺失时在 `gaps` 中返回事实；`benchmark_style_load` 缺爆款机制、三维节奏、`structure_blocks.csv` 或五列 `chapter_index.csv` 时必须返回 `missing_primary_contract: true` 与 `repair_action`。灵感库缺失不属于主契约错误，只返回非阻塞 gap。
 
 ---
 
@@ -292,32 +274,43 @@ developer_instructions = """
 {
   "query_type": "benchmark_style_load",
   "results": {
-    "style_profile_path": "对标/{书名}/文风.md",
-    "style_profile_summary": "<≤200字 提取核心：标点习惯 + 对话技法 + 情绪交替模式>",
-    "selected_emotion_module": "<从 剧情/情绪模块.md 选出的读者需求/触发器/戏剧单元/可复现骨架；缺失时为 null>",
-    "rhythm_reference": "<从 剧情/节奏.md 选出的关键信息推进/情绪触动点/爆发节奏/冷却参考；缺失时为 null>",
-    "module_source_path": "对标/{书名}/剧情/情绪模块.md",
-    "rhythm_source_path": "对标/{书名}/剧情/节奏.md",
+    "global_analysis_paths": {
+      "hit_mechanisms": "对标/{书名}/全局分析/爆款机制.md",
+      "rhythm": "对标/{书名}/全局分析/六维拆书.md#三维节奏",
+      "six_dimensions": "对标/{书名}/全局分析/六维拆书.md",
+      "dual_timeline": "对标/{书名}/全局分析/六维拆书.md#双时间线与信息差",
+      "relationships": "对标/{书名}/全局分析/六维拆书.md#人物关系图谱",
+      "evidence_boundaries": "对标/{书名}/全局分析/证据与边界.md"
+    },
+    "chapter_index_path": "对标/{书名}/chapter_index.csv",
+    "structure_blocks_path": "对标/{书名}/structure_blocks.csv",
+    "selected_inspiration_aggregates": [
+      {"id": "CBA-001", "matched_tags": ["题材=都市脑洞"], "mechanism": "<机制链>", "conditions": "<条件>", "risk": "<风险>"}
+    ],
+    "selected_hit_mechanism": "<机制ID + 读者需求 + 因果链 + 心理机制 + 可替换项 + 迁移条件 + 误用风险>",
+    "rhythm_reference": "<RH-ID + 剧情强度 + 情绪类型/强度 + 描写密度 + 蓄力/爆发/冷却>",
     "matched_chapter_K": 14,
-    "matched_chapter_techniques": "<匹配章摘要 + 深度拆解/黄金三章回退中的可借鉴要素，≤300字>",
+    "source_locator": "原文/第014章_*.md",
+    "style_source": "matched_raw_chapter",
+    "transient_style_directives": "<≤250字：句长/标点/对话/潜台词/叙述距离/段落呼吸/禁止照搬>",
+    "matched_chapter_techniques": "<结构块字段 + 原文核证 + 可选黄金三章深度拆解，≤300字>",
     "anchor_excerpts": [
-      {"tone": "悲伤", "source": "第14章 第7段（行 823-901）", "demo_point": "对话潜台词手法", "text": "<300-500字原文>"},
-      {"tone": "热血", "source": "第8章 第3段（行 401-465）", "demo_point": "爽点铺放比", "text": "<300-500字原文>"}
+      {"tone": "悲伤", "source": "原文/第014章_*.md 第7段", "demo_point": "对话潜台词手法", "text": "<150-300字原文>"}
     ]
   },
-  "source_files": ["设定/题材定位.md", "对标/{书名}/剧情/情绪模块.md", "对标/{书名}/剧情/节奏.md", "对标/{书名}/文风.md", "对标/{书名}/拆文报告.md", "对标/{书名}/章节/第14章_深度拆解.md"],
+  "source_files": ["设定/题材定位.md", "灵感库/灵感索引.csv", "灵感库/跨书灵感聚合/CBA-001_*.md", "对标/{书名}/全局分析/爆款机制.md", "对标/{书名}/全局分析/六维拆书.md", "对标/{书名}/structure_blocks.csv", "对标/{书名}/chapter_index.csv", "对标/{书名}/原文/第014章_*.md"],
   "gaps": {
     "no_benchmark": false,
-    "module_missing": false,
+    "mechanism_missing": false,
     "rhythm_missing": false,
-    "module_rhythm_conflict": false,
+    "chapter_index_missing": false,
+    "structure_blocks_missing": false,
+    "inspiration_library_missing": false,
+    "inspiration_tag_no_match": false,
+    "mechanism_rhythm_conflict": false,
     "conflict": null,
     "missing_primary_contract": false,
     "repair_action": null,
-    "profile_missing": false,
-    "profile_stale": false,
-    "profile_degenerate": false,
-    "stale_reason": null,
     "main_benchmark_unspecified": false,
     "benchmark_book_missing": false,
     "self_benchmark_ignored": false,

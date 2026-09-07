@@ -103,7 +103,7 @@ def test_manifest_contract() -> None:
         )
 
         duplicate_artifacts = dict(raw)
-        duplicate_artifacts["primary_benchmark_artifacts"] = ["剧情/节奏.md", "剧情/节奏.md"]
+        duplicate_artifacts["primary_benchmark_artifacts"] = ["全局分析/六维拆书.md", "全局分析/六维拆书.md"]
         duplicate_path = tmpdir / "duplicate-artifacts.json"
         duplicate_path.write_text(json.dumps(duplicate_artifacts, ensure_ascii=False), encoding="utf-8")
         _, duplicate_findings = VALIDATOR.load_manifest(duplicate_path)
@@ -150,9 +150,9 @@ def semantic_findings(
 
 def test_bad_fallbacks_fail() -> None:
     bad_cases = {
-        "inline report fallback": "- 若 `剧情/情绪模块.md` 缺失，回退读取 `拆文报告.md`。",
+        "inline report fallback": "- 若 `全局分析/爆款机制.md` 缺失，回退读取 `拆文报告.md`。",
         "nested summary substitution": """
-1. 检查 `剧情/节奏.md`。
+1. 检查 `全局分析/六维拆书.md` 的“三维节奏”章节。
 2. 任一主产物缺失时：
    - 使用 `章节/*_摘要.md` 代替。
 """,
@@ -168,11 +168,11 @@ def test_bad_fallbacks_fail() -> None:
 
 def test_fail_fast_prose_passes() -> None:
     good_cases = {
-        "explicit不得": "- `剧情/情绪模块.md` 缺失时必须停止；不得以 `拆文报告.md`、章节摘要或故事线代替。",
+        "explicit不得": "- `全局分析/爆款机制.md` 缺失时必须停止；不得以 `拆文报告.md`、章节摘要或故事线代替。",
         "explicit禁止 fallback": "- `rhythm_missing: true` 时返回 `missing_primary_contract`，禁止 fallback 到 `故事线.md`。",
         "normal complete branch": "- 两个主产物都存在时读取 `拆文报告.md`，仅作人类可读概览。",
         "deep-dive fallback is not primary fallback": (
-            "- 先读 `剧情/情绪模块.md` 与 `剧情/节奏.md`；模块或节奏文件缺失时停止修复。"
+            "- 先读 `全局分析/爆款机制.md` 与 `全局分析/六维拆书.md`；机制或六维文件缺失时停止修复。"
             "匹配 `章节/*_摘要.md` 后，若同章深度拆解不存在，则回退黄金三章深度拆解。"
         ),
     }
@@ -183,7 +183,7 @@ def test_fail_fast_prose_passes() -> None:
 
 def test_sibling_bullets_do_not_lend_the_missing_condition() -> None:
     """相邻条目各自是独立契约：fail-fast 兄弟条目不得把「主产物缺失」借给正确的读取条目。"""
-    fail_fast = "- `剧情/节奏.md` → 缺失时停止导入，不得以 `拆文报告.md`、章节摘要或故事线代替"
+    fail_fast = "- `全局分析/六维拆书.md` → 缺失时停止导入，不得以 `拆文报告.md`、章节摘要或故事线代替"
     good_neighbours = {
         "benign read after a fail-fast sibling": "- 两个主产物都存在时读取 `拆文报告.md`，仅作人类可读概览。",
         "human-readable overview bullet": "- 故事线（人类可读概览）→ 从 `剧情/故事线.md` 读取；缺失时留空",
@@ -208,7 +208,7 @@ def test_sibling_bullets_do_not_lend_the_missing_condition() -> None:
         "silent-primary-artifact-fallback" in finding_codes(semantic_findings(deep)),
         "隔了一层的上级条件也要拦住降级子项",
     )
-    wrapped = "- 若 `剧情/节奏.md` 缺失，\n  则改读 `章节/*_摘要.md` 补足节奏。\n"
+    wrapped = "- 若 `全局分析/六维拆书.md` 缺失，\n  则改读 `章节/*_摘要.md` 补足节奏。\n"
     require(
         "silent-primary-artifact-fallback" in finding_codes(semantic_findings(wrapped)),
         "同一条目的续行仍与条件同属一件事",
@@ -216,7 +216,7 @@ def test_sibling_bullets_do_not_lend_the_missing_condition() -> None:
     table_rows = (
         "| 条件 | 行为 |\n"
         "|---|---|\n"
-        "| `剧情/节奏.md` 缺失 | 停止 Stage 6 并报 `missing_primary_contract` |\n"
+        "| `全局分析/六维拆书.md` 缺失 | 停止 Stage 6 并报 `missing_primary_contract` |\n"
         "| `章节/第1-3章_深度拆解.md` 缺失 | 对话潜台词段从拆文报告兜底 |\n"
     )
     require(
@@ -228,7 +228,7 @@ def test_sibling_bullets_do_not_lend_the_missing_condition() -> None:
     bad_row = (
         "| 条件 | 行为 |\n"
         "|---|---|\n"
-        "| `剧情/节奏.md` 缺失 | 回退读取 `拆文报告.md` 补足节奏 |\n"
+        "| `全局分析/六维拆书.md` 缺失 | 回退读取 `拆文报告.md` 补足节奏 |\n"
     )
     require(
         "silent-primary-artifact-fallback" in finding_codes(semantic_findings(bad_row)),
@@ -291,7 +291,8 @@ def test_progress_schema_pins_are_repo_wide() -> None:
         "skills/story-long-analyze/SKILL.md",
         "skills/story-import/SKILL.md",
         "skills/story-setup/UPGRADING.md",
-        "demo/拆文库/盘龙/_progress.md",
+        "demo/拆文库/盘龙/_progress.json",
+        "demo/拆文库/盘龙/_state_snapshot.json",
     ):
         require(
             relative in stale,

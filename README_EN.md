@@ -18,8 +18,12 @@ Professional authors follow a three-step method:
 
 Built around four pillars: reverse-engineering hits · plot modularization · layered state management · human-AI collaboration.
 
-> **Antigravity support preview:** `story-setup` can deploy all 13 Skills, 7 custom agents, an Always-On Rule, and workspace Hooks into the project's `.agents/` tree. The deployer does not modify `~/.gemini/`, depend on global directories, or require symlink discovery. In `.agents/hooks.json`, it replaces only the top-level `oh-story` group and preserves user groups. This contract keeps `agents_version: 29`; open a fresh Antigravity conversation after deployment and smoke-test the IDE and interactive `agy` separately.
+> **Antigravity support preview:** `story-setup` can deploy all 15 Skills, 7 custom agents, an Always-On Rule, and workspace Hooks into the project's `.agents/` tree. The deployer does not modify `~/.gemini/`, depend on global directories, or require symlink discovery. In `.agents/hooks.json`, it replaces only the top-level `oh-story` group and preserves user groups. This contract uses `agents_version: 31`; open a fresh Antigravity conversation after deployment and smoke-test the IDE and interactive `agy` separately.
 
+> **Candidate capability — three-layer inspiration library:** six-dimensional analysis saves five de-identified inspiration fields during the structure block's first semantic read. Post-processing renders the atomic layer mechanically, then aggregates single-novel and tagged cross-book layers without rereading the novel. Rerun `/story-setup` and start a new session; candidate `agents_version` is 31.
+>
+> **Candidate refactor — six-dimensional long-form analysis:** long-form analysis keeps the golden three chapters and reduces the full-text stage to a five-column mechanical index, 20-column structure blocks, and three self-contained global reports, with checkpoint protection. This branch includes that prerequisite refactor; the combined contract uses `agents_version: 31` as shown above.
+>
 > **v0.7.9 — 短篇按场景功能校准**: short-form drops per-section word floors, the 3-5 sub-event rule, dialogue ratios, and fixed hook intervals in favour of a single readable test — does this scene change risk, information, relationships, resources, a decision, an action, or the reader's understanding? The teaser is now the first scene of the prose, and chapter 1 continues from its consequences rather than replaying it. Adds a structural verifier for chapter outlines; the outline's target-emotion and protagonist-choice fields no longer accept placeholders. Rerun `/story-setup` and start a new session; `agents_version` is 29. [Full changes](CHANGELOG.md#079---2026-08-30)
 >
 > **v0.7.8 — 参考拆分与门禁**: long-form and short-form references are split per consumer and renamed; a blocking Reference Gate now runs before prose writing and short-story design, and Phase 2 plus final delivery each gain a deterministic verifier. Short-story length now follows the range the user gave. Rerun `/story-setup` and start a new session; `agents_version` is 28. [Full changes](CHANGELOG.md#078---2026-08-28)
@@ -108,23 +112,23 @@ On Windows you may occasionally see an `ENOENT ... mkdir` error while the run st
 <details>
 <summary>Antigravity / Codex / ZCode / OpenCode / OpenClaw / Reasonix / Web AI usage notes</summary>
 
-**Antigravity users:** Run `story-setup` from `/skills` or by natural language and select `target_cli=antigravity`. Inside the current writing project it updates only 13 known `.agents/skills/` directories, 7 known `.agents/agents/agent-name/agent.md` definitions (`agent-name` stands for the actual name), `.agents/rules/oh-story.md`, two `.agents/hooks/` runtime files, and the managed `oh-story` group in `.agents/hooks.json`. Other user Skills, Agents, Rules, Hooks, and hook groups are preserved; the deployer itself never writes `~/.gemini/`. Skills are real project-local directories. If `.agents/skills` is already a symlink, setup explains the git-diff impact and requires explicit migration approval; without approval it never writes through the link. Hooks require `node` on PATH. Open a fresh conversation after deployment, then smoke-test both the IDE and interactive `agy`. **`agy 1.1.22 -p` is currently outside the supported surface:** each headless process may scan the workspace before silent authentication finishes, then fail to reload custom agents and hooks. The result can be a skill fallback, `subagent not found`, or ordinary model output under `~/.gemini/antigravity-cli/scratch/`. For CLI writing, start interactive `agy` from the project and confirm `/skills`, `/agents`, and `/hooks` have discovered oh-story before sending the task; check the scratch directory for accidental story output after testing.
+**Antigravity users:** Run `story-setup` from `/skills` or by natural language and select `target_cli=antigravity`. Inside the current writing project it updates only 15 known `.agents/skills/` directories, 7 known `.agents/agents/agent-name/agent.md` definitions (`agent-name` stands for the actual name), `.agents/rules/oh-story.md`, two `.agents/hooks/` runtime files, and the managed `oh-story` group in `.agents/hooks.json`. Other user Skills, Agents, Rules, Hooks, and hook groups are preserved; the deployer itself never writes `~/.gemini/`. Skills are real project-local directories. If `.agents/skills` is already a symlink, setup explains the git-diff impact and requires explicit migration approval; without approval it never writes through the link. Hooks require `node` on PATH. Open a fresh conversation after deployment, then smoke-test both the IDE and interactive `agy`. **`agy 1.1.22 -p` is currently outside the supported surface:** each headless process may scan the workspace before silent authentication finishes, then fail to reload custom agents and hooks. The result can be a skill fallback, `subagent not found`, or ordinary model output under `~/.gemini/antigravity-cli/scratch/`. For CLI writing, start interactive `agy` from the project and confirm `/skills`, `/agents`, and `/hooks` have discovered oh-story before sending the task; check the scratch directory for accidental story output after testing.
 
-**Codex users:** Use it in-place: Codex scans `$REPO_ROOT/.agents/skills` (a symlink to `skills/`) and discovers all 13 skills; invoke via `$story`, `$story-setup`, or `/skills`. On Windows, enable git `core.symlinks=true` or the symlink breaks — then use the `$story-setup` deployment below.
+**Codex users:** Use it in-place: Codex scans `$REPO_ROOT/.agents/skills` (a symlink to `skills/`) and discovers all 15 skills; invoke via `$story`, `$story-setup`, or `/skills`. On Windows, enable git `core.symlinks=true` or the symlink breaks — then use the `$story-setup` deployment below.
 
 After `$story-setup` deploys into a writing project, it creates `.codex/agents/*.toml`, `.codex/hooks.json`, `.codex/hooks/{story_codex_hook.py,run-story-hook.sh,run-story-hook.cmd}`, and `.codex/skills/story-setup/references/agent-references/`. Trust the project `.codex/` layer, review/trust hooks in `/hooks`, and open a fresh Codex session so custom agents load.
 
-**ZCode users:** Add this repository as a marketplace in Plugin Management and install `oh-story`; then invoke the 13 Skills/Commands through `$story`, `$story-setup`, or the `/` panel. With `target_cli=zcode`, `$story-setup` deploys `.zcode/skills/`, `.zcode/commands/`, and `.zcode/hooks/story_zcode_hook.js`, then safely merges `.zcode/config.json` and the root `AGENTS.md`. Hooks require `node` on PATH. ZCode 3.3.4 does not execute project/plugin custom agents and has no `PreCompact` or `SessionEnd`; affected workflows report a solo/direct fallback, while `SessionStart` restores context after compaction.
+**ZCode users:** Add this repository as a marketplace in Plugin Management and install `oh-story`; then invoke the 15 Skills/Commands through `$story`, `$story-setup`, or the `/` panel. With `target_cli=zcode`, `$story-setup` deploys `.zcode/skills/`, `.zcode/commands/`, and `.zcode/hooks/story_zcode_hook.js`, then safely merges `.zcode/config.json` and the root `AGENTS.md`. Hooks require `node` on PATH. ZCode 3.3.4 does not execute project/plugin custom agents and has no `PreCompact` or `SessionEnd`; affected workflows report a solo/direct fallback, while `SessionStart` restores context after compaction.
 
 **OpenCode users:** After global install, opencode auto-discovers skills from `~/.claude/skills/`; trigger story-setup with natural language on first use (e.g., "use story-setup to deploy the web novel environment"), then **exit and re-enter with `opencode -c`** for slash commands to work. Some hook behaviors differ from Claude Code (session-start / session-end / compact, etc.) — see the OpenCode section in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-**OpenClaw users:** Current support is skills-only. OpenClaw can discover the 13 story skills from workspace `skills/`, `.agents/skills`, `~/.agents/skills`, `~/.openclaw/skills`, or configured extra skill roots. `SKILL.md` files use OpenClaw-compatible single-line `name` / `description` plus single-line JSON `metadata.openclaw`. When `story-setup` targets OpenClaw, it copies the skills into project `skills/` and writes an OpenClaw `AGENTS.md`; agents/hooks are intentionally deferred, so outline-before-prose guards are soft skill checks rather than runtime enforcement. If new skills do not appear immediately, open a fresh OpenClaw session or wait for the skills watcher to refresh.
+**OpenClaw users:** Current support is skills-only. OpenClaw can discover the 15 story skills from workspace `skills/`, `.agents/skills`, `~/.agents/skills`, `~/.openclaw/skills`, or configured extra skill roots. `SKILL.md` files use OpenClaw-compatible single-line `name` / `description` plus single-line JSON `metadata.openclaw`. When `story-setup` targets OpenClaw, it copies the skills into project `skills/` and writes an OpenClaw `AGENTS.md`; agents/hooks are intentionally deferred, so outline-before-prose guards are soft skill checks rather than runtime enforcement. If new skills do not appear immediately, open a fresh OpenClaw session or wait for the skills watcher to refresh.
 
-**Reasonix users:** Current support is Skills + a native plugin manifest. Reasonix natively scans project skill roots (`.agents/skills` etc., a symlink to `skills/`) and discovers all 13 skills — verify with `reasonix doctor capabilities`; you can also `reasonix plugin install` via the root `reasonix-plugin.json`. When `story-setup` targets `target_cli=reasonix`, it copies the skills into project `skills/` and writes a Reasonix `AGENTS.md`; hooks/custom agents are intentionally deferred, so skills needing specialist agents fall back to solo/direct. If Windows symlinks are disabled, use the native plugin instead.
+**Reasonix users:** Current support is Skills + a native plugin manifest. Reasonix natively scans project skill roots (`.agents/skills` etc., a symlink to `skills/`) and discovers all 15 skills — verify with `reasonix doctor capabilities`; you can also `reasonix plugin install` via the root `reasonix-plugin.json`. When `story-setup` targets `target_cli=reasonix`, it copies the skills into project `skills/` and writes a Reasonix `AGENTS.md`; hooks/custom agents are intentionally deferred, so skills needing specialist agents fall back to solo/direct. If Windows symlinks are disabled, use the native plugin instead.
 
 **Generic Web AI / agent users:** If your platform can read a GitHub repo or project files, have the agent read `skills/*/SKILL.md` plus the relevant `references/`. For local project copies, run `story-setup` with `target_cli=generic`; it only writes a generic `AGENTS.md` and `skills/`. Without this project's hooks/custom agents, checks run as skill-level soft constraints or solo/direct fallbacks.
 
-**OpenClaw / Reasonix / generic paths need manual cleanup of nested directories:** these three keep their skill copy inside the project's `skills/`, so re-running `/story-setup` executes that project-local copy and the automatic cleanup never reaches them. If the project contains `skills/story-setup/references/agent-references/agent-references/` (possibly nested several levels deep) or `skills/story-setup/skills/`, delete them by hand. To update the skill text itself, reinstall this project and overwrite the 13 skill directories under the project's `skills/` from the new package.
+**OpenClaw / Reasonix / generic paths need manual cleanup of nested directories:** these three keep their skill copy inside the project's `skills/`, so re-running `/story-setup` executes that project-local copy and the automatic cleanup never reaches them. If the project contains `skills/story-setup/references/agent-references/agent-references/` (possibly nested several levels deep) or `skills/story-setup/skills/`, delete them by hand. To update the skill text itself, reinstall this project and overwrite the 15 skill directories under the project's `skills/` from the new package.
 
 </details>
 
@@ -144,6 +148,8 @@ After updating, if a project has already run `/story-setup`, re-run `/story-setu
 | `story` | `/story` / `$story` / `/story dashboard` | Toolbox router, author-preference management, and local deconstruction/project dashboard |
 | `story-long-write` | `/story-long-write` | Long-form writing — outline building, character design, prose output |
 | `story-long-analyze` | `/story-long-analyze` | Long-form deconstruction — Golden First 3 Chapters, payoff design, pacing analysis |
+| `story-inspiration-distill` | `/story-inspiration-distill` | Inspiration abstraction — atoms, single-novel merge, tagged cross-book aggregation |
+| `story-runtime-guard` | `/story-runtime-guard` | Long-task guard — empty-history workers, checkpoints, no repeated reads |
 | `story-long-scan` | `/story-long-scan` | Long-form trend scan — Qidian/Fanqie/Jinjiang market trends |
 | `story-short-write` | `/story-short-write` | Short-form writing — emotion design, twist crafting, polish & delivery |
 | `story-short-analyze` | `/story-short-analyze` | Short-form deconstruction — story core, structure, emotional arc, reversal design, writing techniques, resonance analysis |
@@ -181,36 +187,21 @@ Full output from `/story-long-analyze` deep mode on the first 23 chapters of *Co
 
 ```
 demo/拆文库/盘龙/
-├── 概要.md              # Novel overview + chapter index
-├── 拆文报告.md           # 5-dimension scoring + pacing analysis + takeaways
-├── 文风.md              # Benchmark voice: sentence rhythm, punctuation, dialogue subtext, emotion pacing
-├── 章节/
-│   ├── 第1章_深度拆解.md … 第3章_深度拆解.md  # One deep analysis per Golden-3 chapter
-│   └── 第1章_摘要.md … 第23章_摘要.md          # One summary file per chapter
-├── 角色/
-│   ├── 林雷.md           # Protagonist full profile
-│   ├── 霍格.md           # Core supporting
-│   ├── 希尔曼.md         # Core supporting
-│   ├── 希里.md           # Functional character
-│   ├── 德林柯沃特.md      # Core supporting
-│   ├── 沃顿.md           # Functional character
-│   └── 角色关系.md        # Relationship network
-├── 剧情/
-│   ├── 故事线.md          # Framework + 4 plotlines + 2 storylines
-│   ├── 强者过境与魔法启蒙.md etc.  # Five scene-level plot units
-│   ├── 节奏.md            # Pacing + key-info progression + emotional trigger eruption rhythm
-│   └── 情绪模块.md        # Reader needs + emotional engine + reusable writing modules
-└── 设定/
-    ├── 世界观/
-    │   ├── 背景设定.md    # Core rules + special settings
-    │   ├── 力量体系.md    # Battle qi + magic + ranks
-    │   ├── 地理.md        # Andaluxia + Yulan Continent
-    │   └── 金手指.md      # Panlong Ring + Delin Cowort
-    └── 势力/
-        └── 巴鲁克家族.md  # Baluk family (dragon-blood lineage)
+├── 原文/原文.txt
+├── 概要.md
+├── 快速预览.md
+├── 章节/第1章_深度拆解.md … 第3章_深度拆解.md
+├── chapter_index.csv     # Five-column mechanical locator index
+├── structure_blocks.csv  # Variable-length dramatic structure blocks
+├── 全局分析/
+│   ├── 六维拆书.md       # Full relationship graph, dual timeline, and three-axis rhythm
+│   ├── 爆款机制.md
+│   └── 证据与边界.md
+├── _progress.json
+└── _state_snapshot.json
 ```
 
-Long-form deconstruction also produces `文风.md`, plus `剧情/节奏.md` (pacing, key-info progression, emotional trigger eruption rhythm) and `剧情/情绪模块.md` (reader needs, emotional engine, reusable writing modules); daily writing consumes these through `对标/{书名}/剧情/` to keep voice, pacing, and emotion modules close to the benchmark.
+Legacy per-chapter summaries, split global-analysis files, and old character/plot/setting reports remain in the demo as read-only compatibility artifacts; they are not part of analysis contract v5.0. Daily writing reads hit mechanisms, the three-axis rhythm section in `六维拆书.md`, and structure blocks, then uses the five-column index to reread source text. A custom project `设定/文风.md` always has priority.
 
 </details>
 
