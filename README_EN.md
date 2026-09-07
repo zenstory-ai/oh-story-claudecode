@@ -1,4 +1,4 @@
-<!-- Last synced with README.md: 2026-08-30 -->
+<!-- Last synced with README.md: 2026-09-05 -->
 
 **English** | [中文](README.md)
 
@@ -18,7 +18,14 @@ Professional authors follow a three-step method:
 
 Built around four pillars: reverse-engineering hits · plot modularization · layered state management · human-AI collaboration.
 
-> **Antigravity support preview:** `story-setup` can deploy all 13 Skills, 7 custom agents, an Always-On Rule, and workspace Hooks into the project's `.agents/` tree. The deployer does not modify `~/.gemini/`, depend on global directories, or require symlink discovery. In `.agents/hooks.json`, it replaces only the top-level `oh-story` group and preserves user groups. This contract keeps `agents_version: 29`; open a fresh Antigravity conversation after deployment and smoke-test the IDE and interactive `agy` separately.
+The current source tree uses deployment contract `agents_version: 30`. Rerun `/story-setup` after upgrading; multi-agent configuration takes effect in a new session. Contracts for published versions are listed in the release summaries below.
+
+<details>
+<summary>Antigravity support preview</summary>
+
+`story-setup` can deploy all 13 Skills, 7 custom agents, an Always-On Rule, and workspace Hooks into the project's `.agents/` tree. The deployer does not modify `~/.gemini/`, depend on global directories, or require symlink discovery. In `.agents/hooks.json`, it replaces only the top-level `oh-story` group and preserves user groups. Smoke-test the IDE and interactive `agy` separately.
+
+</details>
 
 > **v0.7.9 — 短篇按场景功能校准**: short-form drops per-section word floors, the 3-5 sub-event rule, dialogue ratios, and fixed hook intervals in favour of a single readable test — does this scene change risk, information, relationships, resources, a decision, an action, or the reader's understanding? The teaser is now the first scene of the prose, and chapter 1 continues from its consequences rather than replaying it. Adds a structural verifier for chapter outlines; the outline's target-emotion and protagonist-choice fields no longer accept placeholders. Rerun `/story-setup` and start a new session; `agents_version` is 29. [Full changes](CHANGELOG.md#079---2026-08-30)
 >

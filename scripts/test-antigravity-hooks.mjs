@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url"
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const source = path.join(repo, "skills/story-setup/references/antigravity/hooks")
-const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "oh-story-antigravity-hook-"))
+const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "oh story 中文 hook-"))
 const hookDir = path.join(fixture, ".agents/hooks")
 const artifact = path.join(fixture, ".antigravity-artifacts")
 const hook = path.join(hookDir, "story_antigravity_hook.js")
@@ -23,11 +23,31 @@ function write(relative, content) {
   return file
 }
 
-function invoke(event, input) {
-  // Antigravity executes project hooks with the directory containing
-  // .agents/hooks.json as cwd. Keep the deployed relative command shape here
-  // so a duplicated `.agents/.agents/` path cannot regress silently.
-  const result = spawnSync(process.execPath, ["hooks/story_antigravity_hook.js", event], {
+const events = {
+  "pre-tool-use": "PreToolUse",
+  "post-tool-use": "PostToolUse",
+  "pre-invocation": "PreInvocation",
+  stop: "Stop",
+}
+
+function invoke(event, input, shell = false) {
+  const registered = JSON.parse(fs.readFileSync(path.join(fixture, ".agents/hooks.json"), "utf8"))
+  const entries = registered["oh-story"][events[event]]
+  assert.equal(entries.length, 1, `${event}: expected one registered entry`)
+  const entry = entries[0]
+  if (entry.matcher && input.toolCall?.name) {
+    assert.ok(new RegExp(entry.matcher).test(input.toolCall.name), `${event}: tool is not routed`)
+  }
+  const handlers = entry.hooks || [entry]
+  assert.equal(handlers.length, 1, `${event}: expected one registered handler`)
+  const { command } = handlers[0]
+  // Exercise actual registration, not a reconstructed argv that hides quoting bugs.
+  // Shell execution follows the documented command contract. Literal whitespace
+  // tokenization additionally locks portability to hosts that forward quote chars;
+  // it is a compatibility probe, not an emulation of Antigravity's private parser.
+  const [program, ...args] = command.trim().split(/\s+/)
+  const result = spawnSync(shell ? command : program, shell ? [] : args, {
+    shell,
     cwd: path.join(fixture, ".agents"),
     input: JSON.stringify({
       conversationId: "fixture-conversation",
@@ -47,6 +67,19 @@ try {
   fs.mkdirSync(artifact, { recursive: true })
   fs.copyFileSync(path.join(source, "story_antigravity_hook.js"), hook)
   fs.copyFileSync(path.join(source, "story_hook_core.js"), path.join(hookDir, "story_hook_core.js"))
+  fs.copyFileSync(path.join(source, "hooks.json"), path.join(fixture, ".agents/hooks.json"))
+
+  // All four registered commands must launch in a project path containing spaces
+  // and Chinese characters, both through the OS shell and literal argv dispatch.
+  for (const shell of [false, true]) {
+    assert.deepEqual(invoke("pre-tool-use", {
+      toolCall: { name: "write_to_file", args: { TargetFile: "普通笔记.md" } },
+    }, shell).value, { decision: "allow" })
+    assert.equal(invoke("post-tool-use", {}, shell).raw, "{}")
+    assert.deepEqual(invoke("pre-invocation", { invocationNum: 1 }, shell).value, {})
+    assert.deepEqual(invoke("stop", { fullyIdle: true, terminationReason: "model_stop" }, shell).value,
+      { decision: "stop" })
+  }
 
   write("短篇/设定.md", "# 设定\n")
   const shortProse = path.join(fixture, "短篇/正文.md")
