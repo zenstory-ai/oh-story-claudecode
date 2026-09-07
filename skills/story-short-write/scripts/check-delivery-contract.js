@@ -92,7 +92,6 @@ function verify(projectDir, contract) {
     '只校正缺失、多余或误写的小节标记；不要为凑节数新开支线。'
   ))
 
-  const styles = new Set(markers.map((entry) => entry.marker.style))
   if (contract.minSectionChars != null) {
     for (const [index, entry] of markers.entries()) {
       const end = index + 1 < markers.length ? markers[index + 1].line - 1 : lines.length
@@ -110,6 +109,7 @@ function verify(projectDir, contract) {
       })
     }
   }
+  const styles = new Set(markers.map((entry) => entry.marker.style))
   checks.push(makeCheck(
     'delivery.section-style',
     markers.length > 0 && styles.size === 1,
