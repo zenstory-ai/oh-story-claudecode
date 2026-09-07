@@ -35,6 +35,7 @@ class ManifestError(ValueError):
 # 递归枚举 skills/*/scripts/ 时要跳过的非运行时目录：开发机上的构建缓存
 # （__pycache__、node_modules）不是需要登记的重复脚本。
 IGNORED_SCRIPT_DIRS = frozenset({".git", "__pycache__", "node_modules", ".venv"})
+MARKDOWN_SUFFIXES = frozenset({".md", ".mdx"})
 
 
 def parse_args() -> argparse.Namespace:
@@ -98,6 +99,12 @@ def load_groups(root: Path, manifest_path: Path) -> list[Group]:
             inside_root(root, raw_target, f"{name}.targets[{target_index}]")
             for target_index, raw_target in enumerate(raw_targets)
         )
+        for managed_path in (source, *targets):
+            if managed_path.suffix.lower() in MARKDOWN_SUFFIXES:
+                raise ManifestError(
+                    f"{name}: runtime manifest cannot manage Markdown path "
+                    f"{managed_path.relative_to(root)}"
+                )
         if len(set(targets)) != len(targets):
             duplicate = next(
                 target for target in targets if targets.count(target) > 1

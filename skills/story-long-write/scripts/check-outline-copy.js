@@ -31,8 +31,9 @@
  * 收尾复扫用 `正文/第XXX章_*.md` 这类通配传多章时，多出来的正文不能被当成细纲吞掉
  * ——那会让首个文件比错对象、其余文件根本不检，静默退 0 报「干净」。
  *
- * 退出码：0 = 干净或无法判定（缺细纲/非分章正文）；1 = 有重合待复核。
- * 无发现时完全静默，不污染上下文。
+ * 退出码：0 = 干净或未自动发现细纲而跳过；1 = 有重合待复核；
+ * 2 = 参数错误、输入不可读（含已发现的细纲）或非预期异常。
+ * 干净时静默；自动发现不到细纲时明确报告跳过，避免与「已检查且干净」混淆。
  */
 
 'use strict'
@@ -42,12 +43,26 @@ const path = require('path')
 const MIN_RUN = 16 // 判定阈值：连续重合 >15 字，即 >=16
 const REPORT_TOP = 8 // 最多列出的片段数
 
-function read(p) {
+function readTextFile(p) {
   try {
-    return fs.readFileSync(p, 'utf8').replace(/^﻿/, '')
-  } catch {
-    return null
+    const stat = fs.statSync(p)
+    if (!stat.isFile()) return { ok: false, reason: '不是普通文件' }
+    return { ok: true, text: fs.readFileSync(p, 'utf8').replace(/^﻿/, '') }
+  } catch (error) {
+    if (error && error.code === 'ENOENT') return { ok: false, reason: '不存在' }
+    if (error && error.code) return { ok: false, reason: `无法读取（${error.code}）` }
+    return { ok: false, reason: `无法读取：${error instanceof Error ? error.message : String(error)}` }
   }
+}
+
+function reportInputError(kind, file, reason) {
+  process.stderr.write(`错误: 无法读取${kind} "${file}"：${reason}。\n`)
+}
+
+function reportUsageError(message) {
+  process.stderr.write(`错误: ${message}。\n`)
+  process.stderr.write('用法: node check-outline-copy.js [--outline <细纲路径>] <正文路径...>\n')
+  return 2
 }
 
 /** 只留汉字——剥掉标点/加粗/【】后比对，防止细纲标注造成假阴性 */
@@ -129,7 +144,9 @@ function findOutline(proseFile) {
       const fm = file.match(/^细纲_第0*(\d+)章.*\.md$/)
       if (fm && fm[1] === chapter) return path.join(dir, file)
     }
-  } catch {}
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error
+  }
   return null
 }
 
@@ -137,30 +154,52 @@ function main() {
   const proseFiles = []
   let explicitOutline = null
   const argv = process.argv.slice(2)
+  let positionalOnly = false
   for (let k = 0; k < argv.length; k++) {
-    if (argv[k] === '--outline') explicitOutline = argv[++k] || null
-    else proseFiles.push(argv[k])
+    const arg = argv[k]
+    if (!positionalOnly && arg === '--') {
+      positionalOnly = true
+    } else if (!positionalOnly && arg === '--outline') {
+      if (explicitOutline !== null) return reportUsageError('--outline 不能重复指定')
+      const value = argv[k + 1]
+      if (!value || value.startsWith('--')) return reportUsageError('--outline 缺少路径')
+      explicitOutline = value
+      k++
+    } else if (!positionalOnly && arg.startsWith('--')) {
+      return reportUsageError(`未知选项: ${arg}`)
+    } else {
+      proseFiles.push(arg)
+    }
   }
-  if (!proseFiles.length) {
-    process.stderr.write('用法: node check-outline-copy.js [--outline <细纲路径>] <正文路径...>\n')
-    return 0
-  }
-  // 逐个文件独立判定；任一文件有重合即整体退 1
+  if (!proseFiles.length) return reportUsageError('缺少正文路径')
+
+  // 逐个文件独立判定；输入错误优先于重合发现
   let status = 0
   for (const proseFile of proseFiles) {
-    if (checkOne(proseFile, explicitOutline)) status = 1
+    status = Math.max(status, checkOne(proseFile, explicitOutline))
   }
   return status
 }
 
 function checkOne(proseFile, explicitOutline) {
-  const prose = read(proseFile)
-  if (prose === null) return 0
+  const proseResult = readTextFile(proseFile)
+  if (!proseResult.ok) {
+    reportInputError('正文', proseFile, proseResult.reason)
+    return 2
+  }
+  const prose = proseResult.text
 
   const outlineFile = explicitOutline || findOutline(proseFile)
-  if (!outlineFile) return 0
-  const outline = read(outlineFile)
-  if (outline === null) return 0
+  if (!outlineFile) {
+    process.stdout.write(`细纲照搬检测：跳过 "${proseFile}"（未自动发现细纲）。\n`)
+    return 0
+  }
+  const outlineResult = readTextFile(outlineFile)
+  if (!outlineResult.ok) {
+    reportInputError(explicitOutline ? '显式细纲' : '自动发现的细纲', outlineFile, outlineResult.reason)
+    return 2
+  }
+  const outline = outlineResult.text
 
   // 正文去掉标题行后比对
   const P = hanOnly(prose.replace(/^#.*$/gm, ''))
@@ -236,6 +275,8 @@ function checkOne(proseFile, explicitOutline) {
 
 try {
   process.exit(main())
-} catch {
-  process.exit(0)
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error)
+  process.stderr.write(`错误: 细纲照搬检测异常：${message}。\n`)
+  process.exit(2)
 }

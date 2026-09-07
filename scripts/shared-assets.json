@@ -52,14 +52,6 @@
       ]
     },
     {
-      "name": "story-tracking-transaction-reference",
-      "source": "skills/story-long-write/references/tracking-transaction.md",
-      "targets": [
-        "skills/story-import/references/tracking-transaction.md",
-        "skills/story-review/references/tracking-transaction.md"
-      ]
-    },
-    {
       "name": "story-author-memory-transaction",
       "source": "skills/story/scripts/author_memory_commit.py",
       "targets": [
@@ -67,16 +59,6 @@
         "skills/story-long-write/scripts/author_memory_commit.py",
         "skills/story-review/scripts/author_memory_commit.py",
         "skills/story-short-write/scripts/author_memory_commit.py"
-      ]
-    },
-    {
-      "name": "story-author-memory-reference",
-      "source": "skills/story/references/author-memory.md",
-      "targets": [
-        "skills/story-deslop/references/author-memory.md",
-        "skills/story-long-write/references/author-memory.md",
-        "skills/story-review/references/author-memory.md",
-        "skills/story-short-write/references/author-memory.md"
       ]
     },
     {
