@@ -108,7 +108,7 @@
     {
       "path": "skills/story-short-write/references/genre-writing-formulas.md",
       "budget": 7950,
-      "why": "短篇 Phase 2 冷门题材分支必读的结构公式。 对齐已发布 0.7.9（#384）的场景功能规则原文；仅校准新增预算登记，不改正文规则。"
+      "why": "短篇 Phase 2 冷门题材分支必读的结构公式。"
     },
     {
       "path": "skills/story-short-write/references/villain-and-reveal.md",
@@ -118,12 +118,12 @@
     {
       "path": "skills/story-short-write/references/genre-styles/世情打脸.md",
       "budget": 5700,
-      "why": "短篇 Phase 2 核心题材「世情打脸」分支必读。 对齐已发布 0.7.9（#384）的场景功能规则原文；仅校准新增预算登记，不改正文规则。"
+      "why": "短篇 Phase 2 核心题材「世情打脸」分支必读。"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/双男主.md",
       "budget": 4450,
-      "why": "短篇 Phase 2 核心题材「双男主」分支必读。 对齐已发布 0.7.9（#384）的场景功能规则原文；仅校准新增预算登记，不改正文规则。"
+      "why": "短篇 Phase 2 核心题材「双男主」分支必读。"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/复仇打脸.md",
@@ -133,12 +133,12 @@
     {
       "path": "skills/story-short-write/references/genre-styles/宅斗宫斗.md",
       "budget": 5500,
-      "why": "短篇 Phase 2 核心题材「宅斗宫斗」分支必读。 对齐已发布 0.7.9（#384）的场景功能规则原文；仅校准新增预算登记，不改正文规则。"
+      "why": "短篇 Phase 2 核心题材「宅斗宫斗」分支必读。"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/总裁豪门.md",
       "budget": 6000,
-      "why": "短篇 Phase 2 核心题材「总裁豪门」分支必读。 对齐已发布 0.7.9（#384）的场景功能规则原文；仅校准新增预算登记，不改正文规则。"
+      "why": "短篇 Phase 2 核心题材「总裁豪门」分支必读。"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/悬疑.md",
@@ -148,22 +148,22 @@
     {
       "path": "skills/story-short-write/references/genre-styles/民俗怪谈.md",
       "budget": 4550,
-      "why": "短篇 Phase 2 核心题材「民俗怪谈」分支必读。 对齐已发布 0.7.9（#384）的场景功能规则原文；仅校准新增预算登记，不改正文规则。"
+      "why": "短篇 Phase 2 核心题材「民俗怪谈」分支必读。"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/沙雕脑洞.md",
       "budget": 5100,
-      "why": "短篇 Phase 2 核心题材「沙雕脑洞」分支必读。 对齐已发布 0.7.9（#384）的场景功能规则原文；仅校准新增预算登记，不改正文规则。"
+      "why": "短篇 Phase 2 核心题材「沙雕脑洞」分支必读。"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/甜宠.md",
       "budget": 4100,
-      "why": "短篇 Phase 2 核心题材「甜宠」分支必读。 对齐已发布 0.7.9（#384）的场景功能规则原文；仅校准新增预算登记，不改正文规则。"
+      "why": "短篇 Phase 2 核心题材「甜宠」分支必读。"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/追妻火葬场.md",
       "budget": 5550,
-      "why": "短篇 Phase 2 核心题材「追妻火葬场」分支必读。 对齐已发布 0.7.9（#384）的场景功能规则原文；仅校准新增预算登记，不改正文规则。"
+      "why": "短篇 Phase 2 核心题材「追妻火葬场」分支必读。"
     },
     {
       "path": "skills/story-long-write/references/workflow-revision.md",
@@ -242,7 +242,7 @@
           ]
         }
       ],
-      "why": "补计 workflow-chapter 已有 direct/solo 必读（状态速记、契约校准、Phase 5 fallback）；未新增 prompt/读取，也不放松后续文本增长上限"
+      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。"
     },
     {
       "label": "长篇日更 direct/solo",
@@ -288,7 +288,7 @@
           ]
         }
       ],
-      "why": "补计 workflow-chapter 已有 direct/solo 必读（状态速记、契约校准、Phase 5 fallback）；未新增 prompt/读取，也不放松后续文本增长上限"
+      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。"
     },
     {
       "label": "短篇 Phase 2",
@@ -512,7 +512,7 @@
           "budget": 81580
         }
       ],
-      "why": "补计 workflow-chapter 已有 direct/solo 必读（状态速记、契约校准、Phase 5 fallback）；未新增 prompt/读取，也不放松后续文本增长上限"
+      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。"
     },
     {
       "label": "长篇开书并写首章主会话直接写正文",
@@ -558,7 +558,7 @@
           "budget": 91070
         }
       ],
-      "why": "补计 workflow-chapter 已有 direct/solo 必读（状态速记、契约校准、Phase 5 fallback）；未新增 prompt/读取，也不放松后续文本增长上限"
+      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。"
     }
   ]
 }
