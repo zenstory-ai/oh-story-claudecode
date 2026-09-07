@@ -35,7 +35,8 @@
 | 脚本 | 测什么 | 何时跑 |
 |---|---|---|
 | `test-ai-patterns.sh` | 确定性 AI 句式检测器 `check-ai-patterns.js` 回归 | CI |
-| `test-phase2-contract.js` | 短篇 Phase 2 首屏门禁、结构化产物验收、具名失败与定向 repair 回归 | Linux / Windows / macOS CI |
+| `test-phase2-contract.js` | 短篇 Phase 2 verifier 行为回归：设计字段、12 列大纲、字数区间、具名失败与 repair_scope | Linux / Windows / macOS CI |
+| `test-doc-budget.py` | 临时文档工程中的路径求和、超限和缺失文件失败 | CI |
 | `test-delivery-contract.js` | 短篇最终字数、节数、标记与空行交付契约回归 | Linux / Windows / macOS CI |
 | `check-reference-gates.js` | 长短篇 Reference Gate 的首屏位置、完整读取语义与关键路由静态守卫（gate 是提示词，无运行时入口可断言） | Linux / Windows / macOS CI |
 | `test-outline-contract.js` | 长篇细纲结构验收：字段、小节、五段式、四列情节点表与字数口径的正负例回归 | Linux / Windows / macOS CI |

@@ -31,6 +31,8 @@ jobs:
         run: python3 scripts/test-current-skill-contracts.py
       - name: Check hot-path doc budget
         run: bash scripts/check-doc-budget.sh
+      - name: Document budget behavior regression
+        run: python3 scripts/test-doc-budget.py
       - name: Check hook-regex sync
         run: bash scripts/check-hook-regex-sync.sh
       - name: Check shared-file consistency

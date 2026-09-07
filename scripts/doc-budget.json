@@ -22,8 +22,8 @@
     },
     {
       "path": "skills/story-long-write/references/workflow-chapter.md",
-      "budget": 12200,
-      "why": "单章正文与质量检查，日更/单章路径都加载。含 spawn prompt 的正文形状层约束——细纲边界只传「不许自造」半边时，子代理会一条情节点一段平推（#255 的复发路径），形状半边必须随 prompt 传达。+180：把筛选后的偏好传给初稿/去味 agent，并明确禁止为最大化命中牺牲连贯、节奏和字数。+170：把 stock-reaction-tic 接到逐处删除测试和可核验交付摘要，避免 advisory 被笼统略过"
+      "budget": 11850,
+      "why": "单章正文与质量检查，日更/单章路径都加载。含 spawn prompt 的正文形状层约束——细纲边界只传「不许自造」半边时，子代理会一条情节点一段平推（#255 的复发路径），形状半边必须随 prompt 传达。+180：把筛选后的偏好传给初稿/去味 agent，并明确禁止为最大化命中牺牲连贯、节奏和字数。+170：把 stock-reaction-tic 接到逐处删除测试和可核验交付摘要，避免 advisory 被笼统略过。本轮精简后将预算从 12200 收紧到 11850。"
     },
     {
       "path": "skills/story-long-write/references/workflow-setup.md",
@@ -32,8 +32,13 @@
     },
     {
       "path": "skills/story-short-write/SKILL.md",
-      "budget": 18400,
-      "why": "短篇任一场景都无条件加载。+100：移除把三维度和身体反应当逐段配额的旧指令，并明确功能性身体细节边界。+1500：6+6 首屏/尾部对照与缺引用 5+5 实验显示，Reference Gate 必须在首屏并 fail-closed；补 Phase 2 确定性 verifier、具名失败和最多两轮定向 repair，避免只读 SKILL.md 即写作。在原预算内替换冲突的手工字数说明：真实写作 A/B 暴露 6000-8000 用户范围与无条件 ≥8000 互相冲突；现明确用户范围优先，并加入最终 delivery verifier 与定向修复闭环"
+      "budget": 16500,
+      "why": "短篇任一场景都无条件加载。+100：移除把三维度和身体反应当逐段配额的旧指令，并明确功能性身体细节边界。+1500：6+6 首屏/尾部对照与缺引用 5+5 实验显示，Reference Gate 必须在首屏并 fail-closed；补 Phase 2 确定性 verifier、具名失败和最多两轮定向 repair，避免只读 SKILL.md 即写作。在原预算内替换冲突的手工字数说明：真实写作 A/B 暴露 6000-8000 用户范围与无条件 ≥8000 互相冲突；现明确用户范围优先，并加入最终 delivery verifier 与定向修复闭环。构思专属步骤迁入 workflow-design，保留共享对标加载与全部正文规则；收紧入口预算锁住无条件加载节省，Phase 2 合计仍计入迁出文件。"
+    },
+    {
+      "path": "skills/story-short-write/references/workflow-design.md",
+      "budget": 2350,
+      "why": "短篇 Phase 2 首屏门禁必读；原入口构思/设计/验收原文迁出，非新增技法，Phase 3/4 不预加载。"
     },
     {
       "path": "skills/story-setup/references/templates/agents/narrative-writer.md",
@@ -57,8 +62,8 @@
     },
     {
       "path": "skills/story-long-write/references/long-format.md",
-      "budget": 1100,
-      "why": "长篇 Reference Gate 把它列为主会话直接写正文前的无条件完整读取项，属热路径；预算按当前用量留余量"
+      "budget": 1000,
+      "why": "长篇正文直接写作的无条件必读项；本轮按实际用量将预算从 1100 收紧到 1000。"
     },
     {
       "path": "skills/story-long-write/references/long-chapter-quality.md",
@@ -77,8 +82,8 @@
     },
     {
       "path": "skills/story-short-write/references/submission-craft.md",
-      "budget": 1850,
-      "why": "同上，Phase 2 定平台基调必读"
+      "budget": 1760,
+      "why": "短篇 Phase 2 定平台基调的无条件必读项；本轮按实际用量将预算从 1850 收紧到 1760。"
     },
     {
       "path": "skills/story-short-write/references/short-craft.md",
@@ -89,6 +94,81 @@
       "path": "skills/story-short-write/references/short-reversal.md",
       "budget": 6250,
       "why": "同上，Phase 2 反转信息差验证必读"
+    },
+    {
+      "path": "skills/story-long-write/references/long-suspense.md",
+      "budget": 5650,
+      "why": "悬疑、惊悚或异常线索正文的条件必读项；文件级预算覆盖条件热路径。"
+    },
+    {
+      "path": "skills/story-long-write/references/long-reversal.md",
+      "budget": 5850,
+      "why": "身份、认知或立场反转正文的条件必读项；文件级预算覆盖条件热路径。"
+    },
+    {
+      "path": "skills/story-short-write/references/genre-writing-formulas.md",
+      "budget": 7950,
+      "why": "短篇 Phase 2 冷门题材分支必读的结构公式。 对齐已发布 0.7.9（#384）的场景功能规则原文；仅校准新增预算登记，不改正文规则。"
+    },
+    {
+      "path": "skills/story-short-write/references/villain-and-reveal.md",
+      "budget": 2375,
+      "why": "短篇 Phase 2 有反派或真相揭露时的条件必读项。"
+    },
+    {
+      "path": "skills/story-short-write/references/genre-styles/世情打脸.md",
+      "budget": 5700,
+      "why": "短篇 Phase 2 核心题材「世情打脸」分支必读。 对齐已发布 0.7.9（#384）的场景功能规则原文；仅校准新增预算登记，不改正文规则。"
+    },
+    {
+      "path": "skills/story-short-write/references/genre-styles/双男主.md",
+      "budget": 4450,
+      "why": "短篇 Phase 2 核心题材「双男主」分支必读。 对齐已发布 0.7.9（#384）的场景功能规则原文；仅校准新增预算登记，不改正文规则。"
+    },
+    {
+      "path": "skills/story-short-write/references/genre-styles/复仇打脸.md",
+      "budget": 5150,
+      "why": "短篇 Phase 2 核心题材「复仇打脸」分支必读。"
+    },
+    {
+      "path": "skills/story-short-write/references/genre-styles/宅斗宫斗.md",
+      "budget": 5500,
+      "why": "短篇 Phase 2 核心题材「宅斗宫斗」分支必读。 对齐已发布 0.7.9（#384）的场景功能规则原文；仅校准新增预算登记，不改正文规则。"
+    },
+    {
+      "path": "skills/story-short-write/references/genre-styles/总裁豪门.md",
+      "budget": 6000,
+      "why": "短篇 Phase 2 核心题材「总裁豪门」分支必读。 对齐已发布 0.7.9（#384）的场景功能规则原文；仅校准新增预算登记，不改正文规则。"
+    },
+    {
+      "path": "skills/story-short-write/references/genre-styles/悬疑.md",
+      "budget": 4750,
+      "why": "短篇 Phase 2 核心题材「悬疑」分支必读。"
+    },
+    {
+      "path": "skills/story-short-write/references/genre-styles/民俗怪谈.md",
+      "budget": 4550,
+      "why": "短篇 Phase 2 核心题材「民俗怪谈」分支必读。 对齐已发布 0.7.9（#384）的场景功能规则原文；仅校准新增预算登记，不改正文规则。"
+    },
+    {
+      "path": "skills/story-short-write/references/genre-styles/沙雕脑洞.md",
+      "budget": 5100,
+      "why": "短篇 Phase 2 核心题材「沙雕脑洞」分支必读。 对齐已发布 0.7.9（#384）的场景功能规则原文；仅校准新增预算登记，不改正文规则。"
+    },
+    {
+      "path": "skills/story-short-write/references/genre-styles/甜宠.md",
+      "budget": 4100,
+      "why": "短篇 Phase 2 核心题材「甜宠」分支必读。 对齐已发布 0.7.9（#384）的场景功能规则原文；仅校准新增预算登记，不改正文规则。"
+    },
+    {
+      "path": "skills/story-short-write/references/genre-styles/追妻火葬场.md",
+      "budget": 5550,
+      "why": "短篇 Phase 2 核心题材「追妻火葬场」分支必读。 对齐已发布 0.7.9（#384）的场景功能规则原文；仅校准新增预算登记，不改正文规则。"
+    },
+    {
+      "path": "skills/story-long-write/references/workflow-revision.md",
+      "budget": 2990,
+      "why": "大修 route Reference Gate 的强制完整读取项"
     }
   ],
   "paths": [
@@ -110,7 +190,7 @@
       ]
     },
     {
-      "label": "正文 agent 上下文",
+      "label": "正文 agent 基础规则（不含条件参考）",
       "budget": 40700,
       "files": [
         "skills/story-setup/references/templates/agents/narrative-writer.md",
@@ -118,6 +198,367 @@
         "skills/story-long-write/references/anti-ai-writing.md",
         "skills/story-long-write/references/banned-words.md"
       ]
+    },
+    {
+      "label": "长篇单章 direct/solo",
+      "files": [
+        "skills/story-long-write/SKILL.md",
+        "skills/story-long-write/references/workflow-chapter.md",
+        "skills/story-long-write/references/long-format.md",
+        "skills/story-long-write/references/writing-craft.md",
+        "skills/story-long-write/references/long-chapter-quality.md",
+        "skills/story-long-write/references/long-chapter-hooks.md",
+        "skills/story-long-write/references/anti-ai-writing.md",
+        "skills/story-long-write/references/banned-words.md",
+        "skills/story-long-write/references/reader-contract-and-progression.md",
+        "skills/story-long-write/references/state-tracking.md"
+      ],
+      "branches": [
+        {
+          "label": "基础",
+          "budget": 67080,
+          "files": []
+        },
+        {
+          "label": "悬疑",
+          "budget": 72750,
+          "files": [
+            "skills/story-long-write/references/long-suspense.md"
+          ]
+        },
+        {
+          "label": "反转",
+          "budget": 72920,
+          "files": [
+            "skills/story-long-write/references/long-reversal.md"
+          ]
+        },
+        {
+          "label": "悬疑+反转",
+          "budget": 78590,
+          "files": [
+            "skills/story-long-write/references/long-suspense.md",
+            "skills/story-long-write/references/long-reversal.md"
+          ]
+        }
+      ],
+      "why": "补计 workflow-chapter 已有 direct/solo 必读（状态速记、契约校准、Phase 5 fallback）；未新增 prompt/读取，也不放松后续文本增长上限"
+    },
+    {
+      "label": "长篇日更 direct/solo",
+      "files": [
+        "skills/story-long-write/SKILL.md",
+        "skills/story-long-write/references/workflow-daily.md",
+        "skills/story-long-write/references/workflow-chapter.md",
+        "skills/story-long-write/references/long-format.md",
+        "skills/story-long-write/references/writing-craft.md",
+        "skills/story-long-write/references/long-chapter-quality.md",
+        "skills/story-long-write/references/long-chapter-hooks.md",
+        "skills/story-long-write/references/anti-ai-writing.md",
+        "skills/story-long-write/references/banned-words.md",
+        "skills/story-long-write/references/reader-contract-and-progression.md",
+        "skills/story-long-write/references/state-tracking.md"
+      ],
+      "branches": [
+        {
+          "label": "基础",
+          "budget": 78550,
+          "files": []
+        },
+        {
+          "label": "悬疑",
+          "budget": 84220,
+          "files": [
+            "skills/story-long-write/references/long-suspense.md"
+          ]
+        },
+        {
+          "label": "反转",
+          "budget": 84390,
+          "files": [
+            "skills/story-long-write/references/long-reversal.md"
+          ]
+        },
+        {
+          "label": "悬疑+反转",
+          "budget": 90060,
+          "files": [
+            "skills/story-long-write/references/long-suspense.md",
+            "skills/story-long-write/references/long-reversal.md"
+          ]
+        }
+      ],
+      "why": "补计 workflow-chapter 已有 direct/solo 必读（状态速记、契约校准、Phase 5 fallback）；未新增 prompt/读取，也不放松后续文本增长上限"
+    },
+    {
+      "label": "短篇 Phase 2",
+      "files": [
+        "skills/story-short-write/SKILL.md",
+        "skills/story-short-write/references/workflow-design.md",
+        "skills/story-short-write/references/writing-workflow.md",
+        "skills/story-short-write/references/submission-craft.md",
+        "skills/story-short-write/references/short-craft.md",
+        "skills/story-short-write/references/short-reversal.md"
+      ],
+      "branches": [
+        {
+          "label": "世情打脸，无反派/揭露",
+          "budget": 41390,
+          "files": [
+            "skills/story-short-write/references/genre-styles/世情打脸.md"
+          ]
+        },
+        {
+          "label": "世情打脸，含反派/揭露",
+          "budget": 43750,
+          "files": [
+            "skills/story-short-write/references/genre-styles/世情打脸.md",
+            "skills/story-short-write/references/villain-and-reveal.md"
+          ]
+        },
+        {
+          "label": "双男主，无反派/揭露",
+          "budget": 40130,
+          "files": [
+            "skills/story-short-write/references/genre-styles/双男主.md"
+          ]
+        },
+        {
+          "label": "双男主，含反派/揭露",
+          "budget": 42500,
+          "files": [
+            "skills/story-short-write/references/genre-styles/双男主.md",
+            "skills/story-short-write/references/villain-and-reveal.md"
+          ]
+        },
+        {
+          "label": "复仇打脸，无反派/揭露",
+          "budget": 40850,
+          "files": [
+            "skills/story-short-write/references/genre-styles/复仇打脸.md"
+          ]
+        },
+        {
+          "label": "复仇打脸，含反派/揭露",
+          "budget": 43220,
+          "files": [
+            "skills/story-short-write/references/genre-styles/复仇打脸.md",
+            "skills/story-short-write/references/villain-and-reveal.md"
+          ]
+        },
+        {
+          "label": "宅斗宫斗，无反派/揭露",
+          "budget": 41120,
+          "files": [
+            "skills/story-short-write/references/genre-styles/宅斗宫斗.md"
+          ]
+        },
+        {
+          "label": "宅斗宫斗，含反派/揭露",
+          "budget": 43490,
+          "files": [
+            "skills/story-short-write/references/genre-styles/宅斗宫斗.md",
+            "skills/story-short-write/references/villain-and-reveal.md"
+          ]
+        },
+        {
+          "label": "总裁豪门，无反派/揭露",
+          "budget": 41690,
+          "files": [
+            "skills/story-short-write/references/genre-styles/总裁豪门.md"
+          ]
+        },
+        {
+          "label": "总裁豪门，含反派/揭露",
+          "budget": 44060,
+          "files": [
+            "skills/story-short-write/references/genre-styles/总裁豪门.md",
+            "skills/story-short-write/references/villain-and-reveal.md"
+          ]
+        },
+        {
+          "label": "悬疑，无反派/揭露",
+          "budget": 40450,
+          "files": [
+            "skills/story-short-write/references/genre-styles/悬疑.md"
+          ]
+        },
+        {
+          "label": "悬疑，含反派/揭露",
+          "budget": 42810,
+          "files": [
+            "skills/story-short-write/references/genre-styles/悬疑.md",
+            "skills/story-short-write/references/villain-and-reveal.md"
+          ]
+        },
+        {
+          "label": "民俗怪谈，无反派/揭露",
+          "budget": 40170,
+          "files": [
+            "skills/story-short-write/references/genre-styles/民俗怪谈.md"
+          ]
+        },
+        {
+          "label": "民俗怪谈，含反派/揭露",
+          "budget": 42540,
+          "files": [
+            "skills/story-short-write/references/genre-styles/民俗怪谈.md",
+            "skills/story-short-write/references/villain-and-reveal.md"
+          ]
+        },
+        {
+          "label": "沙雕脑洞，无反派/揭露",
+          "budget": 40730,
+          "files": [
+            "skills/story-short-write/references/genre-styles/沙雕脑洞.md"
+          ]
+        },
+        {
+          "label": "沙雕脑洞，含反派/揭露",
+          "budget": 43090,
+          "files": [
+            "skills/story-short-write/references/genre-styles/沙雕脑洞.md",
+            "skills/story-short-write/references/villain-and-reveal.md"
+          ]
+        },
+        {
+          "label": "甜宠，无反派/揭露",
+          "budget": 39770,
+          "files": [
+            "skills/story-short-write/references/genre-styles/甜宠.md"
+          ]
+        },
+        {
+          "label": "甜宠，含反派/揭露",
+          "budget": 42130,
+          "files": [
+            "skills/story-short-write/references/genre-styles/甜宠.md",
+            "skills/story-short-write/references/villain-and-reveal.md"
+          ]
+        },
+        {
+          "label": "追妻火葬场，无反派/揭露",
+          "budget": 41220,
+          "files": [
+            "skills/story-short-write/references/genre-styles/追妻火葬场.md"
+          ]
+        },
+        {
+          "label": "追妻火葬场，含反派/揭露",
+          "budget": 43590,
+          "files": [
+            "skills/story-short-write/references/genre-styles/追妻火葬场.md",
+            "skills/story-short-write/references/villain-and-reveal.md"
+          ]
+        },
+        {
+          "label": "冷门题材公式，无反派/揭露",
+          "budget": 43570,
+          "files": [
+            "skills/story-short-write/references/genre-writing-formulas.md"
+          ]
+        },
+        {
+          "label": "冷门题材公式，含反派/揭露",
+          "budget": 45930,
+          "files": [
+            "skills/story-short-write/references/genre-writing-formulas.md",
+            "skills/story-short-write/references/villain-and-reveal.md"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "长篇大修主会话直接写正文",
+      "files": [
+        "skills/story-long-write/SKILL.md",
+        "skills/story-long-write/references/workflow-chapter.md",
+        "skills/story-long-write/references/long-format.md",
+        "skills/story-long-write/references/writing-craft.md",
+        "skills/story-long-write/references/long-chapter-quality.md",
+        "skills/story-long-write/references/long-chapter-hooks.md",
+        "skills/story-long-write/references/workflow-revision.md",
+        "skills/story-long-write/references/anti-ai-writing.md",
+        "skills/story-long-write/references/banned-words.md",
+        "skills/story-long-write/references/reader-contract-and-progression.md",
+        "skills/story-long-write/references/state-tracking.md"
+      ],
+      "branches": [
+        {
+          "label": "基础",
+          "files": [],
+          "budget": 70070
+        },
+        {
+          "label": "悬疑",
+          "files": [
+            "skills/story-long-write/references/long-suspense.md"
+          ],
+          "budget": 75740
+        },
+        {
+          "label": "反转",
+          "files": [
+            "skills/story-long-write/references/long-reversal.md"
+          ],
+          "budget": 75910
+        },
+        {
+          "label": "悬疑+反转",
+          "files": [
+            "skills/story-long-write/references/long-suspense.md",
+            "skills/story-long-write/references/long-reversal.md"
+          ],
+          "budget": 81580
+        }
+      ],
+      "why": "补计 workflow-chapter 已有 direct/solo 必读（状态速记、契约校准、Phase 5 fallback）；未新增 prompt/读取，也不放松后续文本增长上限"
+    },
+    {
+      "label": "长篇开书并写首章主会话直接写正文",
+      "files": [
+        "skills/story-long-write/SKILL.md",
+        "skills/story-long-write/references/workflow-chapter.md",
+        "skills/story-long-write/references/long-format.md",
+        "skills/story-long-write/references/writing-craft.md",
+        "skills/story-long-write/references/long-chapter-quality.md",
+        "skills/story-long-write/references/long-chapter-hooks.md",
+        "skills/story-long-write/references/workflow-setup.md",
+        "skills/story-long-write/references/anti-ai-writing.md",
+        "skills/story-long-write/references/banned-words.md",
+        "skills/story-long-write/references/reader-contract-and-progression.md",
+        "skills/story-long-write/references/state-tracking.md"
+      ],
+      "branches": [
+        {
+          "label": "基础",
+          "files": [],
+          "budget": 79560
+        },
+        {
+          "label": "悬疑",
+          "files": [
+            "skills/story-long-write/references/long-suspense.md"
+          ],
+          "budget": 85230
+        },
+        {
+          "label": "反转",
+          "files": [
+            "skills/story-long-write/references/long-reversal.md"
+          ],
+          "budget": 85400
+        },
+        {
+          "label": "悬疑+反转",
+          "files": [
+            "skills/story-long-write/references/long-suspense.md",
+            "skills/story-long-write/references/long-reversal.md"
+          ],
+          "budget": 91070
+        }
+      ],
+      "why": "补计 workflow-chapter 已有 direct/solo 必读（状态速记、契约校准、Phase 5 fallback）；未新增 prompt/读取，也不放松后续文本增长上限"
     }
   ]
 }

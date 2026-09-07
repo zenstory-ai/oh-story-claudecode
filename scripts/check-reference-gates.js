@@ -46,4 +46,12 @@ assert.match(short, /只读本 SKILL\.md 不算完成门禁/)
 assert.match(short, /任一必需路径不存在、不可读/)
 assert.match(short, /分块直到 EOF；`rg` 检索或局部摘读不算读完/)
 
+// Phase 2 orchestration lives in its stage reference; these are source-policy
+// assertions, not evidence that a model loaded it or honored the repair loop.
+const shortGate = shortLines.slice(shortGateLine - 1, shortGateLine + 11).join('\n')
+assert(shortGate.includes('`references/workflow-design.md`'), 'Phase 2 gate must route workflow-design on the first screen')
+const shortDesign = fs.readFileSync(path.join(repoRoot, 'skills/story-short-write/references/workflow-design.md'), 'utf8')
+assert.match(shortDesign, /check-phase2-contract\.js --json/)
+assert.match(shortDesign, /最多做 2 轮定向 repair/)
+
 process.stdout.write('reference-gates: source policy holds\n')
