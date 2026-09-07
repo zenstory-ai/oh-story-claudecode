@@ -115,6 +115,18 @@ try {
   const markerBudget = run(writeCase('impossible-marker-budget', body(800, 1)), ['1', '801', '1'], 800)
   assert.strictEqual(markerBudget.status, 2)
 
+  // Marker characters consume the total budget even without an opt-in body floor.
+  for (const [sections, markerChars] of [[6, 12], [10, 21]]) {
+    const markersOnly = Array.from({ length: sections }, (_, index) => `${index + 1}.`).join('\n')
+    const dir = writeCase(`default-marker-budget-${sections}`, markersOnly)
+    for (const checkContract of [false, true]) {
+      for (const maxChars of [markerChars - 1, markerChars]) {
+        const result = run(dir, ['1', String(maxChars), String(sections)], undefined, checkContract)
+        assert.strictEqual(result.status, maxChars < markerChars ? 2 : 0, result.stdout + result.stderr)
+      }
+    }
+  }
+
   const invalid = spawnSync(process.execPath, [verifier, '--json', '--min-chars', '8000'], {
     cwd: repoRoot,
     encoding: 'utf8',

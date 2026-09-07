@@ -207,13 +207,11 @@ function parseArgs(argv) {
   if (positional.length > 1) return null
   if (!values['--min-chars'] || !values['--max-chars'] || !values['--sections']) return null
   if (values['--min-chars'] > values['--max-chars']) return null
-  if (values['--min-section-chars']) {
-    // The shortest allowed markers are 1., 2., ...; whitespace alone costs zero.
-    const sections = values['--sections']
-    let minimum = sections * (values['--min-section-chars'] + 1)
-    for (let start = 1; start <= sections; start *= 10) minimum += sections - start + 1
-    if (minimum > values['--max-chars']) return null
-  }
+  // The shortest allowed markers are 1., 2., ...; they count even without a body floor.
+  const sections = values['--sections']
+  let minimum = sections * ((values['--min-section-chars'] ?? 0) + 1)
+  for (let start = 1; start <= sections; start *= 10) minimum += sections - start + 1
+  if (minimum > values['--max-chars']) return null
   return {
     project: positional[0] || '.',
     contract: {
