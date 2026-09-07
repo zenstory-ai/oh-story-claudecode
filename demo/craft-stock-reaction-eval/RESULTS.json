@@ -1,0 +1,30 @@
+{
+  "experiment": {
+    "date": "2026-08-27",
+    "codex_cli": "0.148.0",
+    "model": "gpt-5.4",
+    "chapter": "让你管账号，你高燃混剪炸全网 / 第20章 老兵的礼物",
+    "replicates_per_arm": 3,
+    "blind_judges": 2
+  },
+  "arm_summary": {
+    "A": {"mean_chars": 2227.7, "strict_hits": 1, "body_parts": 27, "weak_markers": 17, "fixed_phrases": 5, "hook_runs": 2, "blind_stock_mean": 6.67, "overall_mean": 4.00, "delivery_summaries": 0},
+    "B": {"mean_chars": 2363.3, "strict_hits": 7, "body_parts": 28, "weak_markers": 17, "fixed_phrases": 5, "hook_runs": 2, "blind_stock_mean": 6.33, "overall_mean": 3.83, "delivery_summaries": 1},
+    "C": {"mean_chars": 2257.3, "strict_hits": 0, "body_parts": 9, "weak_markers": 14, "fixed_phrases": 2, "hook_runs": 1, "blind_stock_mean": 5.50, "overall_mean": 4.17, "delivery_summaries": 0},
+    "D": {"mean_chars": 2266.3, "strict_hits": 2, "body_parts": 10, "weak_markers": 12, "fixed_phrases": 4, "hook_runs": 1, "blind_stock_mean": 4.83, "overall_mean": 4.17, "delivery_summaries": 3}
+  },
+  "runs": [
+    {"run":"A1","chars":2219,"strict_hits":1,"body_parts":4,"weak_markers":8,"fixed_phrases":3,"hook":true,"blind_stock":6.5,"outline":8,"naturalness":3.5,"specificity":4.0,"overall":3.5,"sha256":"6a147428a7650359b2786576bf7123289d4822c9747afb65e5b89dbcf4b53747"},
+    {"run":"A2","chars":2282,"strict_hits":0,"body_parts":11,"weak_markers":6,"fixed_phrases":1,"hook":true,"blind_stock":6.5,"outline":8,"naturalness":4.5,"specificity":4.5,"overall":4.5,"sha256":"2a7c969d4f45136600cabd515c5d6245b7a7fde6722cde7f1a3ade4623de8d85"},
+    {"run":"A3","chars":2182,"strict_hits":0,"body_parts":12,"weak_markers":3,"fixed_phrases":1,"hook":false,"blind_stock":7.0,"outline":8,"naturalness":4.0,"specificity":4.0,"overall":4.0,"sha256":"1a750258cfb0a60f37d833f935232a1b9f214566105dd719058e43c47810fa95"},
+    {"run":"B1","chars":2347,"strict_hits":3,"body_parts":4,"weak_markers":5,"fixed_phrases":1,"hook":false,"blind_stock":5.5,"outline":8,"naturalness":4.0,"specificity":4.0,"overall":4.0,"sha256":"8bbe5ccf3b65ba0244d8d0da0913a1970c14ac1fe5e2038f2812a5530a1ccd2e"},
+    {"run":"B2","chars":2393,"strict_hits":2,"body_parts":16,"weak_markers":6,"fixed_phrases":3,"hook":true,"blind_stock":7.0,"outline":8,"naturalness":3.0,"specificity":4.0,"overall":3.0,"sha256":"bdc05ecf582ccce85264efe2de71ac2fdfe588207c8c5b6ba3586a9f49cbb186"},
+    {"run":"B3","chars":2350,"strict_hits":2,"body_parts":8,"weak_markers":6,"fixed_phrases":1,"hook":true,"blind_stock":6.5,"outline":8,"naturalness":4.5,"specificity":4.5,"overall":4.5,"sha256":"9893fdc3960e02ca212ecdd314eaeea9c02030e711e0c493af34ee57ffe7a359"},
+    {"run":"C1","chars":2222,"strict_hits":0,"body_parts":3,"weak_markers":4,"fixed_phrases":1,"hook":false,"blind_stock":5.5,"outline":8,"naturalness":4.5,"specificity":4.5,"overall":4.5,"sha256":"c6c8cfd5fc47830dda187dad2e5077a72cbbbd7a1c3796a453f7ba38051f9124"},
+    {"run":"C2","chars":2169,"strict_hits":0,"body_parts":3,"weak_markers":6,"fixed_phrases":1,"hook":true,"blind_stock":6.0,"outline":8,"naturalness":4.0,"specificity":4.0,"overall":4.0,"sha256":"b7d64dfb9e41be279b764e17c6200850062b9371cf1ee26a1a65b2354ee694f9"},
+    {"run":"C3","chars":2381,"strict_hits":0,"body_parts":3,"weak_markers":4,"fixed_phrases":0,"hook":false,"blind_stock":5.0,"outline":8,"naturalness":4.0,"specificity":4.5,"overall":4.0,"sha256":"b7f69e3bd4948501f0d3c3ed6820eb791a3cb6d293f7d2a04e3fd5d56f6a044c"},
+    {"run":"D1","chars":2202,"strict_hits":0,"body_parts":4,"weak_markers":3,"fixed_phrases":0,"hook":false,"blind_stock":4.5,"outline":8,"naturalness":4.5,"specificity":4.0,"overall":4.5,"sha256":"8106b45953d0162ae817f001f0e6383b76247609bbe972af62d37642495d25cb"},
+    {"run":"D2","chars":2316,"strict_hits":1,"body_parts":4,"weak_markers":4,"fixed_phrases":2,"hook":true,"blind_stock":5.0,"outline":8,"naturalness":4.0,"specificity":5.0,"overall":4.0,"sha256":"a9dc110105a6418009a1d5018d9240e68d74811af3d972425cc00b978f4297c6"},
+    {"run":"D3","chars":2281,"strict_hits":1,"body_parts":2,"weak_markers":5,"fixed_phrases":2,"hook":false,"blind_stock":5.0,"outline":8,"naturalness":4.0,"specificity":4.5,"overall":4.0,"sha256":"6811b80266435fd3df89fbe305e04fdf2e964bdb5c313f0728ae7da6eadb1dc2"}
+  ]
+}

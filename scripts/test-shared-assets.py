@@ -116,7 +116,7 @@ with tempfile.TemporaryDirectory(prefix="shared-assets-") as tmp:
         "escapes repository root",
     )
 
-    duplicate_target_groups = [
+    duplicate_target_groups: list[dict[str, object]] = [
         {"name": "one", "source": "src/tool.js", "targets": ["skills/one/scripts/tool.js"]},
         {"name": "two", "source": "src/other.js", "targets": ["skills/one/scripts/tool.js"]},
     ]
@@ -143,7 +143,7 @@ with tempfile.TemporaryDirectory(prefix="shared-assets-") as tmp:
         "duplicate managed target skills/one/scripts/tool.js repeated in repeated",
     )
 
-    copy_chain = [
+    copy_chain: list[dict[str, object]] = [
         {
             "name": "canonical",
             "source": "src/a/tool.js",
@@ -227,6 +227,55 @@ with tempfile.TemporaryDirectory(prefix="shared-assets-") as tmp:
     assert "MISSING SOURCE [tool] src/tool.js" in missing_source_sync.stdout
     assert "FAIL: synchronization incomplete" in missing_source_sync.stdout
     assert "OK:" not in missing_source_sync.stdout
+
+
+for markdown_suffix in (".md", ".MDX", ".mDx"):
+    with tempfile.TemporaryDirectory(prefix="shared-assets-domain-") as tmp:
+        root = Path(tmp)
+        manifest = root / "manifest.json"
+        source = root / "skills" / "one" / "references" / f"guide{markdown_suffix}"
+        target = root / "skills" / "one" / "references" / "runtime-shadow" / source.name
+        source.parent.mkdir(parents=True)
+        source.write_text("reference document\n", encoding="utf-8")
+        write_manifest(
+            manifest,
+            [
+                {
+                    "name": "reference-misregistered-as-runtime",
+                    "source": source.relative_to(root).as_posix(),
+                    "targets": [target.relative_to(root).as_posix()],
+                }
+            ],
+        )
+
+        rejected = run(root, manifest, "sync")
+        assert rejected.returncode == 2, rejected.stderr + rejected.stdout
+        assert "runtime manifest cannot manage Markdown" in rejected.stderr
+        assert not target.exists(), "invalid runtime manifests must fail before copying"
+
+
+with tempfile.TemporaryDirectory(prefix="shared-assets-reference-runtime-") as tmp:
+    root = Path(tmp)
+    manifest = root / "manifest.json"
+    runtime_groups: list[dict[str, object]] = []
+    for filename in ("story_hook_core.js", "reference_helper.PY"):
+        source = root / "skills" / "one" / "references" / filename
+        target = root / "skills" / "one" / "references" / "runtime-shadow" / filename
+        source.parent.mkdir(parents=True, exist_ok=True)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text(f"runtime {filename}\n", encoding="utf-8")
+        target.write_bytes(source.read_bytes())
+        runtime_groups.append(
+            {
+                "name": filename,
+                "source": source.relative_to(root).as_posix(),
+                "targets": [target.relative_to(root).as_posix()],
+            }
+        )
+    write_manifest(manifest, runtime_groups)
+
+    allowed = run(root, manifest, "check")
+    assert allowed.returncode == 0, allowed.stderr + allowed.stdout
 
 
 with tempfile.TemporaryDirectory(prefix="python-store-stub-") as tmp:

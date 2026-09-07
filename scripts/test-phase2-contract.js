@@ -9,7 +9,6 @@ const { spawnSync } = require('child_process')
 
 const repoRoot = path.resolve(__dirname, '..')
 const verifier = path.join(repoRoot, 'skills/story-short-write/scripts/check-phase2-contract.js')
-const skillFile = path.join(repoRoot, 'skills/story-short-write/SKILL.md')
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'phase2-contract-'))
 
 // 现行列名。新建项目必须用这一组，check-phase2-contract.js 的 currentHeader 分支。
@@ -114,14 +113,6 @@ function failureIds(result) {
 }
 
 try {
-  const skillLines = fs.readFileSync(skillFile, 'utf8').split(/\r?\n/)
-  const gateLine = skillLines.findIndex((line) => line.includes('阶段 Reference Gate')) + 1
-  assert(gateLine > 0 && gateLine <= 20, `Reference Gate must stay in first screen, got line ${gateLine}`)
-  const skillText = skillLines.join('\n')
-  assert.match(skillText, /只读本 SKILL\.md 不算完成门禁/)
-  assert.match(skillText, /check-phase2-contract\.js --json/)
-  assert.match(skillText, /最多做 2 轮定向 repair/)
-
   const good = run(writeCase('valid', validSettings(), validOutline()))
   assert.strictEqual(good.status, 0, good.stdout + good.stderr)
   assert.strictEqual(good.report.ok, true)

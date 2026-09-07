@@ -208,8 +208,8 @@ def _net_is_skippable(stripped: str) -> bool:
 # 占位后仍残留引号字符（跨行对话/未闭合）的行整行跳过。
 # js↔py 由 scripts/check-hook-regex-sync.sh（规范串逐字锁）与
 # scripts/test-prose-net-parity.sh（fixture 逐字 diff）锁 parity。
-# 单引号开符不得紧跟拉丁词字符，否则 don't ... John's / don‘t ... John’s 会被误配成台词跨度。
-_TOXIC_QUOTE_SPANS = [re.compile(r"「[^」]*」"), re.compile(r"『[^』]*』"), re.compile(r"【[^】]*】"), re.compile(r"“[^”]*”"), re.compile(r"(?<![A-Za-z0-9_])‘[^’]*’"), re.compile(r'"[^"]*"'), re.compile(r"(?<![A-Za-z0-9_])'[^']*'")]
+# 单引号须成对；词内撇号（don't、O’Connor）不作为开闭引号。
+_TOXIC_QUOTE_SPANS = [re.compile(r"「[^」]*」"), re.compile(r"『[^』]*』"), re.compile(r"【[^】]*】"), re.compile(r"“[^”]*”"), re.compile(r"(?<![A-Za-z0-9_])‘(?:[^’]|(?<=[A-Za-z0-9_])’(?=[A-Za-z0-9_]))*(?!(?<=[A-Za-z0-9_])’[A-Za-z0-9_])’"), re.compile(r'"[^"]*"'), re.compile(r"(?<![A-Za-z0-9_])'(?:[^']|(?<=[A-Za-z0-9_])'(?=[A-Za-z0-9_]))*(?!(?<=[A-Za-z0-9_])'[A-Za-z0-9_])'")]
 _TOXIC_QUOTE_CHARS = set("「」『』【】“”‘’\"'")
 # 分句起点边界（前一字符属于它才认「是A，不是B」的分句首「是」）；同时用作确认语的右边界。
 _TOXIC_CLAUSE_BOUNDARY = set("，,。.！!？?；;：:、…—~ \t　")
@@ -335,8 +335,7 @@ def prose_net_findings(text: str) -> list[str]:
             continue
         content.append((i, s))
         hit = False
-        # 只豁免成对引号内部的角色台词/系统播报；混合行的引号外叙述继续扫描。等长遮罩
-        # 保留位置，未闭合/跨行引号则保守地不豁免，避免坏引号吞掉真实退化信号。
+        # 只豁免成对引号内的内容，继续检查引号外叙述。
         outside_quotes = _toxic_mask_quoted(s)
         for rx, label in _NET_SOFT_PATTERNS:
             m = rx.search(outside_quotes)

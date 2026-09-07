@@ -15,6 +15,3 @@ skills-lock.json
 docs/plans/
 __pycache__/
 *.pyc
-
-# Local model experiments: keep outputs/reports off the remote.
-/demo/*-eval/

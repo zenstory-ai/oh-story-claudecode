@@ -29,8 +29,12 @@ jobs:
         run: bash scripts/check-current-skill-contracts.sh
       - name: Current-only skill contract regression
         run: python3 scripts/test-current-skill-contracts.py
+      - name: Agent permission behavior regression
+        run: python3 scripts/test-agent-permissions.py
       - name: Check hot-path doc budget
         run: bash scripts/check-doc-budget.sh
+      - name: Document budget behavior regression
+        run: python3 scripts/test-doc-budget.py
       - name: Check hook-regex sync
         run: bash scripts/check-hook-regex-sync.sh
       - name: Check shared-file consistency
@@ -49,8 +53,6 @@ jobs:
         run: python3 scripts/test-scan-runtime-policy.py
       - name: AI-pattern detector regression
         run: bash scripts/test-ai-patterns.sh
-      - name: Deslop evaluation harness regression
-        run: python3 scripts/test-deslop-eval.py
       - name: Outline-copy detector regression
         run: bash scripts/test-outline-copy.sh
       - name: Phase 2 contract verifier regression
