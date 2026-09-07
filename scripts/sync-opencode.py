@@ -24,6 +24,14 @@ BODY_COMMAND_RE = re.compile(r"(?:执行|运行|跑) `([^`]+)`")
 # 只在同一行出现委派主语时豁免，避免把「自己跑」写成委派句式蒙混过关。
 BODY_DELEGATION_RE = re.compile(r"(调用方|父流程|主会话|用户|由.{0,6}提示)")
 CAPABILITY_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
+TOOL_PERMISSIONS = {
+    "read": {"Read"},
+    "glob": {"Glob"},
+    "grep": {"Grep"},
+    "edit": {"Write", "Edit"},
+    "bash": {"Bash"},
+}
+SUPPORTED_TOOLS = set().union(*TOOL_PERMISSIONS.values())
 
 
 def body_bash_commands(body: str) -> list[str]:
@@ -116,49 +124,25 @@ def convert_claude_to_opencode(fm: dict, body: str) -> dict:
         else []
     )
     denied_tools = set(disallowed)
-    effective_tools = set(tools) - denied_tools
+    explicit_tools = "tools" in fm
+    effective_tools = (set(tools) if explicit_tools else SUPPORTED_TOOLS) - denied_tools
 
-    perm = {}
-    read_like = {"Read", "Glob", "Grep"}
-    if effective_tools & read_like:
-        perm["read"] = "allow"
-    elif denied_tools & read_like:
-        perm["read"] = "deny"
-    has_write = any(t in tools for t in ("Write", "Edit"))
-    has_edit_disallowed = any(t in disallowed for t in ("Write", "Edit"))
-    creation_only = (
-        "Write" in tools
-        and "Write" not in disallowed
-        and "Edit" in disallowed
-    )
-
-    # OpenCode's aggregate edit permission controls both file creation and edits.
-    # A canonical creation-only agent (effective Write + denied Edit) therefore
-    # needs edit: allow regardless of its name. All other explicit denials retain
-    # priority over allowed Write/Edit declarations.
-    if creation_only:
-        perm["edit"] = "allow"
-    elif has_edit_disallowed:
-        perm["edit"] = "deny"
-    elif has_write:
-        perm["edit"] = "allow"
-
-    # bash 同样走 "disallowedTools 优先"。OpenCode 未声明 bash 权限时默认为 ask；只读 agent
-    # 必须写成标量 deny，让上游 disabled() 直接摘掉 bash 工具。不要加“只读命令”白名单：
-    # shell.ts 只鉴权 command 的直接父节点，`( allowlisted-command ) > 正文.md` 会把外层重定向
-    # 藏在 subshell 外，字面量白名单也守不住文件系统边界。
+    # OpenCode defaults to allow. A declared list must also close unlisted tools,
+    # including task and MCP. Keep the wildcard first: later rules override it.
+    perm = {"*": "deny"} if explicit_tools else {}
+    # edit combines write/edit/apply_patch; either source tool grants mutation.
+    for permission, source_tools in TOOL_PERMISSIONS.items():
+        if explicit_tools:
+            perm[permission] = "allow" if effective_tools & source_tools else "deny"
+        elif source_tools <= denied_tools:
+            perm[permission] = "deny"
     mentioned_bash = body_bash_commands(body)
-    restricted_bash = "Bash" in disallowed
-    if restricted_bash:
-        if mentioned_bash:
-            raise ValueError(
-                f"{name or '<unnamed>'}: 只读 agent 禁止 Bash，但正文要求执行 "
-                + "、".join(f"`{command}`" for command in mentioned_bash)
-                + "；改写正文以使用宿主已提供的工作区和 Read/Glob/Grep，不得开放 shell 例外。"
-            )
-        perm["bash"] = "deny"
-    elif "Bash" in tools:
-        perm["bash"] = "allow"
+    if "Bash" not in effective_tools and mentioned_bash:
+        raise ValueError(
+            f"{name or '<unnamed>'}: agent 未获授权使用 Bash，但正文要求执行 "
+            + "、".join(f"`{command}`" for command in mentioned_bash)
+            + "；改写正文以使用宿主已提供的工作区和 Read/Glob/Grep，不得开放 shell 例外。"
+        )
     if perm:
         result["permission"] = perm
 
@@ -197,6 +181,8 @@ def _parse_list(val: str, field: str) -> list[str]:
             raise ValueError(f"{field}: malformed quoted capability {item!r}")
         if CAPABILITY_NAME_RE.fullmatch(item) is None:
             raise ValueError(f"{field}: invalid capability name {item!r}")
+        if item not in SUPPORTED_TOOLS:
+            raise ValueError(f"{field}: unsupported OpenCode capability {item!r}")
         parsed.append(item)
     return parsed
 
@@ -216,7 +202,8 @@ def format_frontmatter(fm: dict) -> str:
                     for glob, action in pv.items():
                         lines.append(f'    "{glob}": {action}')
                 else:
-                    lines.append(f"  {pk}: {pv}")
+                    permission_key = '"*"' if pk == "*" else pk
+                    lines.append(f"  {permission_key}: {pv}")
         elif key == "description" and "\n" in value:
             lines.append("description: |")
             for desc_line in value.split("\n"):

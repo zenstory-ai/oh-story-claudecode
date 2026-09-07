@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import argparse
+import json
+import os
 import shutil
 import subprocess
 import sys
@@ -86,7 +89,7 @@ def opencode_permissions(path: Path) -> dict[str, str]:
         if in_permissions and line.startswith("  "):
             key, separator, value = line.strip().partition(":")
             if separator and value.strip() in {"allow", "deny", "ask"}:
-                permissions[key] = value.strip()
+                permissions[key.strip('"')] = value.strip()
             continue
         if in_permissions:
             break
@@ -195,7 +198,7 @@ def assert_invalid_capabilities_fail_before_publish(capability_lines: str) -> No
         assert not (antigravity_dest / "invalid-capabilities").exists()
 
 
-def test_existing_agents_are_byte_identical() -> None:
+def test_generated_agents_are_in_sync() -> None:
     with tempfile.TemporaryDirectory(prefix="agent-permissions-baseline-") as tmp:
         root = Path(tmp)
         codex_dest = root / "codex"
@@ -228,153 +231,116 @@ def test_existing_agents_are_byte_identical() -> None:
             ).read_bytes(), filename
 
 def test_permissions_follow_capabilities_not_names() -> None:
+    cases = {
+        "renamed-reader": "tools: [Read, Glob, Grep]\ndisallowedTools: [Write, Edit, Bash]",
+        "implicit-reader": "tools: [Read]",
+        "renamed-writer": "tools: [Read, Write, Edit]",
+        "write-without-edit": "tools: [Read, Write]\ndisallowedTools: [Edit]",
+        "edit-without-write": "tools: [Read, Edit]\ndisallowedTools: [Write]",
+        "shell-reader": "tools: [Read, Bash]",
+        "denials-win": "tools: [Read, Write, Edit, Bash]\ndisallowedTools: [Write, Edit, Bash]",
+        "story-researcher": "tools: [Read]\ndisallowedTools: [Write, Edit, Bash]",
+        "mixed-read-like": "tools: [Read, Glob, Grep]\ndisallowedTools: [Read, Grep]",
+    }
     with tempfile.TemporaryDirectory(prefix="agent-permissions-fixture-") as tmp:
         root = Path(tmp)
         source = root / "sources"
-        write_agent(
-            source,
-            "renamed-reader",
-            ["Read", "Glob", "Grep"],
-            ["Write", "Edit", "Bash"],
-        )
-        write_agent(source, "renamed-writer", ["Read", "Write", "Edit"])
-        write_agent(source, "renamed-create-only", ["Read", "Write"], ["Edit"])
-        write_agent(source, "shell-reader", ["Read", "Bash"])
-        write_agent(
-            source,
-            "denials-win",
-            ["Read", "Write", "Edit", "Bash"],
-            ["Write", "Edit", "Bash"],
-        )
-        write_agent(
-            source,
-            "story-researcher",
-            ["Read"],
-            ["Write", "Edit", "Bash"],
-        )
-        write_agent(source, "read-denied", ["Read"], ["Read"])
-        write_agent(
-            source,
-            "all-read-like-denied",
-            ["Read", "Glob", "Grep"],
-            ["Read", "Glob", "Grep"],
-        )
-        write_agent(
-            source,
-            "mixed-read-like",
-            ["Read", "Glob", "Grep"],
-            ["Read", "Grep"],
-        )
-        write_raw_agent(
-            source,
-            "empty-tools-mutators-denied",
-            "tools: []\ndisallowedTools: [Write, Edit, Bash]",
-        )
-        write_raw_agent(
-            source,
-            "omitted-tools-mutators-denied",
-            "disallowedTools: [Write, Edit, Bash]",
-        )
-
-        codex_dest = root / "codex"
-        result = run(
-            str(CODEX_GENERATOR),
-            "--source",
-            str(source),
-            "--dest",
-            str(codex_dest),
-        )
+        for name, declaration in cases.items():
+            write_raw_agent(source, name, declaration)
+        result = run(str(CODEX_GENERATOR), "--source", str(source), "--dest", str(root / "codex"))
         assert result.returncode == 0, result.stdout + result.stderr
-        codex = codex_documents(codex_dest)
-        assert codex["renamed-reader"].get("sandbox_mode") == "read-only"
-        assert "sandbox_mode" not in codex["renamed-writer"]
-        assert "sandbox_mode" not in codex["renamed-create-only"]
-        assert "sandbox_mode" not in codex["shell-reader"]
-        assert codex["denials-win"].get("sandbox_mode") == "read-only"
-        assert codex["story-researcher"].get("sandbox_mode") == "read-only"
-        assert codex["empty-tools-mutators-denied"].get("sandbox_mode") == "read-only"
-        assert codex["omitted-tools-mutators-denied"].get("sandbox_mode") == "read-only"
+        codex = codex_documents(root / "codex")
+        for name in ("renamed-reader", "implicit-reader", "denials-win", "story-researcher", "mixed-read-like"):
+            assert codex[name].get("sandbox_mode") == "read-only", name
+        for name in ("renamed-writer", "write-without-edit", "edit-without-write", "shell-reader"):
+            assert "sandbox_mode" not in codex[name], name
 
-        generated = prepare_opencode_root(root / "opencode-fixture", source)
+        generated = prepare_opencode_root(root / "opencode", source)
         permissions = {
             path.stem: opencode_permissions(path)
             for path in (generated / "agents").glob("*.md")
         }
-        assert permissions["renamed-reader"] == {
-            "read": "allow",
-            "edit": "deny",
-            "bash": "deny",
-        }
-        assert permissions["renamed-writer"]["edit"] == "allow"
-        assert permissions["renamed-create-only"]["edit"] == "allow"
-        assert permissions["shell-reader"]["bash"] == "allow"
-        assert permissions["denials-win"] == {
-            "read": "allow",
-            "edit": "deny",
-            "bash": "deny",
-        }
-        assert permissions["story-researcher"] == {
-            "read": "allow",
-            "edit": "deny",
-            "bash": "deny",
-        }
-        assert permissions["read-denied"] == {"read": "deny"}
-        assert permissions["all-read-like-denied"] == {"read": "deny"}
-        assert permissions["mixed-read-like"] == {"read": "allow"}
-        assert permissions["empty-tools-mutators-denied"] == {
-            "edit": "deny",
-            "bash": "deny",
-        }
-        assert permissions["omitted-tools-mutators-denied"] == {
-            "edit": "deny",
-            "bash": "deny",
-        }
+        reader = {"*": "deny", "read": "allow", "glob": "allow", "grep": "allow", "edit": "deny", "bash": "deny"}
+        assert permissions["renamed-reader"] == reader
+        only_read = {**reader, "glob": "deny", "grep": "deny"}
+        for name in ("implicit-reader", "denials-win", "story-researcher"):
+            assert permissions[name] == only_read, name
+        assert permissions["mixed-read-like"] == {**reader, "read": "deny", "grep": "deny"}
+        for name in ("renamed-writer", "write-without-edit", "edit-without-write"):
+            assert permissions[name] == {**only_read, "edit": "allow"}, name
+        assert permissions["shell-reader"] == {**only_read, "bash": "allow"}
 
-        antigravity_source = root / "antigravity-sources"
-        write_agent(
-            antigravity_source,
-            "denied-write-edit-bash",
-            ["Read", "Write", "Edit", "Bash"],
-            ["Write", "Edit", "Bash"],
-        )
-        write_agent(
-            antigravity_source,
-            "denied-read",
-            ["Read", "Bash"],
-            ["Read"],
-        )
-        write_agent(
-            antigravity_source,
-            "denied-some-read-like",
-            ["Read", "Glob", "Grep"],
-            ["Read", "Grep"],
-        )
-        antigravity_dest = root / "antigravity"
         result = subprocess.run(
-            [
-                "node",
-                str(ANTIGRAVITY_GENERATOR),
-                "--source",
-                str(antigravity_source),
-                "--dest",
-                str(antigravity_dest),
-            ],
-            text=True,
-            capture_output=True,
-            check=False,
+            ["node", str(ANTIGRAVITY_GENERATOR), "--source", str(source), "--dest", str(root / "agy")],
+            text=True, capture_output=True,
         )
         assert result.returncode == 0, result.stdout + result.stderr
-        antigravity = {
-            path.parent.name: antigravity_tools(path)
-            for path in antigravity_dest.glob("*/agent.md")
-        }
-        assert antigravity["denied-write-edit-bash"] == ["view_file"]
-        assert antigravity["denied-read"] == ["run_command"]
-        assert antigravity["denied-some-read-like"] == ["find_by_name"]
+        assert antigravity_tools(root / "agy/denials-win/agent.md") == ["view_file"]
+        assert antigravity_tools(root / "agy/mixed-read-like/agent.md") == ["find_by_name"]
+        assert antigravity_tools(root / "agy/write-without-edit/agent.md") == ["view_file", "write_to_file"]
+        assert antigravity_tools(root / "agy/edit-without-write/agent.md") == ["view_file", "replace_file_content", "multi_replace_file_content"]
+
+
+def test_empty_and_inherited_tools_are_distinct() -> None:
+    cases = {
+        "empty": "tools: []",
+        "all-denied": "tools: [Read, Glob, Grep]\ndisallowedTools: [Read, Glob, Grep]",
+        "inherit": "",
+        "inherit-minus-glob": "disallowedTools: [Glob, Write, Edit, Bash]",
+    }
+    with tempfile.TemporaryDirectory(prefix="agent-permissions-inheritance-") as tmp:
+        root = Path(tmp)
+        for name, declaration in cases.items():
+            source = root / name / "sources"
+            write_raw_agent(source, name, declaration)
+            result = run(str(CODEX_GENERATOR), "--source", str(source), "--dest", str(root / name / "codex"))
+            if name in {"empty", "all-denied"}:
+                assert result.returncode != 0 and "zero effective tools" in result.stderr, result.stderr
+                assert not (root / name / "codex").exists()
+            else:
+                assert result.returncode == 0, result.stderr
+                assert "sandbox_mode" not in codex_documents(root / name / "codex")[name]
+            generated = prepare_opencode_root(root / name / "opencode", source)
+            permissions = opencode_permissions(generated / f"agents/{name}.md")
+            if name in {"empty", "all-denied"}:
+                assert permissions == {"*": "deny", "read": "deny", "glob": "deny", "grep": "deny", "edit": "deny", "bash": "deny"}
+            elif name == "inherit":
+                assert permissions == {}
+            else:
+                assert permissions == {"glob": "deny", "edit": "deny", "bash": "deny"}
+            result = subprocess.run(
+                ["node", str(ANTIGRAVITY_GENERATOR), "--source", str(source), "--dest", str(root / name / "agy")],
+                text=True, capture_output=True,
+            )
+            assert result.returncode != 0, name
+            assert not (root / name / "agy").exists()
+
+
+def test_codex_recognizes_other_mutating_tools() -> None:
+    with tempfile.TemporaryDirectory(prefix="codex-mutating-tools-") as tmp:
+        root = Path(tmp)
+        for tool in ("NotebookEdit", "PowerShell"):
+            write_agent(root / "sources", tool, ["Read", tool])
+            write_agent(root / "sources", f"denied-{tool}", ["Read", tool], [tool])
+        result = run(str(CODEX_GENERATOR), "--source", str(root / "sources"), "--dest", str(root / "codex"))
+        assert result.returncode == 0, result.stderr
+        docs = codex_documents(root / "codex")
+        for tool in ("NotebookEdit", "PowerShell"):
+            assert "sandbox_mode" not in docs[tool]
+            assert docs[f"denied-{tool}"]["sandbox_mode"] == "read-only"
+        result = run_opencode_fixture(root / "opencode", root / "sources")
+        assert result.returncode != 0 and "unsupported OpenCode capability" in result.stderr
+        result = subprocess.run(
+            ["node", str(ANTIGRAVITY_GENERATOR), "--source", str(root / "sources"), "--dest", str(root / "agy")],
+            text=True, capture_output=True,
+        )
+        assert result.returncode != 0 and "unsupported Antigravity capability" in result.stderr
 
 
 def test_invalid_capability_declarations_fail_closed() -> None:
     cases = [
+        "tools: [Read, NotARealTool]",
+        "tools: [Read]\ndisallowedTools: [NotARealTool]",
         "tools: Read, Write",
         "tools: [Read, Write]\ndisallowedTools: [Write",
         "tools: []\ndisallowedTools: Write, Edit",
@@ -385,39 +351,101 @@ def test_invalid_capability_declarations_fail_closed() -> None:
         assert_invalid_capabilities_fail_before_publish(capability_lines)
 
 
-def test_antigravity_rejects_agents_with_no_effective_tools() -> None:
-    with tempfile.TemporaryDirectory(prefix="antigravity-no-effective-tools-") as tmp:
-        root = Path(tmp)
+def test_opencode_runtime(cli: str) -> None:
+    """Exercise the V1 tool registry and allow/deny checks without model calls."""
+    with tempfile.TemporaryDirectory(prefix="opencode-agent-permissions-") as tmp:
+        root = Path(tmp).resolve()
         source = root / "sources"
-        write_raw_agent(
-            source,
-            "all-tools-denied",
-            "tools: [Read, Glob, Grep]\n"
-            "disallowedTools: [Read, Glob, Grep]",
-        )
-        destination = root / "antigravity"
-        result = subprocess.run(
-            [
-                "node",
-                str(ANTIGRAVITY_GENERATOR),
-                "--source",
-                str(source),
-                "--dest",
-                str(destination),
-            ],
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        assert result.returncode != 0, result.stdout + result.stderr
-        assert not destination.exists()
+        for name, declaration in {
+            "reader": "tools: [Read]",
+            "glob-only": "tools: [Read, Glob, Grep]\ndisallowedTools: [Read, Grep]",
+            "inherit-minus-glob": "disallowedTools: [Glob, Write, Edit, Bash]",
+            "writer": "tools: [Read, Write]\ndisallowedTools: [Edit, Bash]",
+            "shell": "tools: [Read, Bash]",
+            "empty": "tools: []",
+        }.items():
+            write_raw_agent(source, name, declaration)
+        generated = prepare_opencode_root(root / "generator", source)
+        project = root / "project"
+        shutil.copytree(generated / "agents", project / ".opencode/agents")
+        shutil.copytree(OPENCODE_BASELINE / "agents", project / ".opencode/agents", dirs_exist_ok=True)
+        (project / "opencode.json").write_text(json.dumps({
+            "model": "fixture/probe",
+            "provider": {"fixture": {
+                "npm": "@ai-sdk/openai-compatible",
+                "options": {"baseURL": "http://127.0.0.1:9/v1", "apiKey": "fixture"},
+                "models": {"probe": {"name": "probe", "limit": {"context": 10000, "output": 1000}}},
+            }},
+        }), encoding="utf-8")
+        (project / "canary.txt").write_text("PERMISSION_CANARY\n", encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if not k.startswith(("OPENCODE_", "ANTHROPIC_", "OPENAI_", "XDG_"))}
+        env["HOME"] = str(root / "home")
+        for kind in ("CONFIG", "DATA", "CACHE", "STATE"):
+            env[f"XDG_{kind}_HOME"] = str(root / "home" / kind.lower())
+
+        def invoke(name: str, *args: str) -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                [cli, "debug", "agent", name, "--pure", *args],
+                cwd=project, env=env, text=True, capture_output=True, timeout=90,
+            )
+
+        for name in ("reader", "empty", "chapter-extractor", "character-designer", "consistency-checker",
+                     "narrative-writer", "story-architect", "story-explorer", "story-researcher"):
+            result = invoke(name)
+            assert result.returncode == 0, result.stdout + result.stderr
+            tools = json.loads(result.stdout)["tools"]
+            for tool in ("task", "webfetch", "skill"):
+                assert tools[tool] is False, (name, tool, tools)
+            if name == "empty":
+                assert not any(tools.values()), tools
+            elif name != "reader":
+                assert all(tools[t] for t in ("read", "glob", "grep")), (name, tools)
+                assert tools["bash"] == (name in {"narrative-writer", "story-researcher"}), (name, tools)
+
+        checks = [
+            ("reader", "read", {"filePath": str(project / "canary.txt")}, True),
+            ("reader", "write", {"filePath": str(project / "reader-write.txt"), "content": "DENIED"}, False),
+            ("reader", "bash", {"command": "printf DENIED > shell-write.txt", "description": "Write fixture"}, False),
+            ("glob-only", "read", {"filePath": str(project / "canary.txt")}, False),
+            ("glob-only", "grep", {"pattern": "PERMISSION_CANARY", "path": "."}, False),
+            ("glob-only", "glob", {"pattern": "canary.txt"}, True),
+            ("inherit-minus-glob", "read", {"filePath": str(project / "canary.txt")}, True),
+            ("inherit-minus-glob", "glob", {"pattern": "canary.txt"}, False),
+            ("inherit-minus-glob", "grep", {"pattern": "PERMISSION_CANARY", "path": "."}, True),
+            ("writer", "write", {"filePath": str(project / "created.txt"), "content": "CREATED"}, True),
+            ("shell", "bash", {"command": "printf SHELL_OK", "description": "Fixture shell control"}, True),
+            ("empty", "read", {"filePath": str(project / "canary.txt")}, False),
+            ("empty", "write", {"filePath": str(project / "empty-write.txt"), "content": "DENIED"}, False),
+        ]
+        for name, tool, params, allowed in checks:
+            result = invoke(name, "--tool", tool, "--params", json.dumps(params))
+            output = result.stdout + result.stderr
+            if allowed:
+                assert result.returncode == 0, (name, tool, output)
+                if tool in {"read", "grep"}:
+                    assert "PERMISSION_CANARY" in output, output
+                elif tool == "glob":
+                    assert "canary.txt" in output, output
+            else:
+                assert result.returncode != 0 and "disabled" in output.lower(), (name, tool, output)
+            print(f"  OpenCode {name}/{tool}: {'allow' if allowed else 'deny'}")
+        assert (project / "created.txt").read_text(encoding="utf-8") == "CREATED"
+        for filename in ("reader-write.txt", "shell-write.txt", "empty-write.txt"):
+            assert not (project / filename).exists(), filename
+        assert (project / "canary.txt").read_text(encoding="utf-8") == "PERMISSION_CANARY\n"
 
 
 def main() -> int:
-    test_existing_agents_are_byte_identical()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--opencode", help="OpenCode V1 executable for real tool permission checks")
+    args = parser.parse_args()
+    test_generated_agents_are_in_sync()
     test_permissions_follow_capabilities_not_names()
+    test_empty_and_inherited_tools_are_distinct()
+    test_codex_recognizes_other_mutating_tools()
     test_invalid_capability_declarations_fail_closed()
-    test_antigravity_rejects_agents_with_no_effective_tools()
+    if args.opencode:
+        test_opencode_runtime(str(Path(args.opencode).resolve()))
     print("PASS: agent permissions derive from canonical capabilities")
     return 0
 

@@ -16,7 +16,8 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MUTATING_TOOLS = frozenset({"Write", "Edit", "Bash"})
+MUTATING_TOOLS = frozenset({"Write", "Edit", "Bash", "NotebookEdit", "PowerShell"})
+SUPPORTED_TOOLS = MUTATING_TOOLS | {"Read", "Glob", "Grep"}
 CAPABILITY_FIELDS = frozenset({"tools", "disallowedTools"})
 CAPABILITY_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
 NICKNAMES = {
@@ -108,6 +109,8 @@ def parse_tool_list(value: str, field: str) -> set[str]:
             raise ValueError(f"{field}: malformed quoted capability {item!r}")
         if CAPABILITY_NAME_RE.fullmatch(item) is None:
             raise ValueError(f"{field}: invalid capability name {item!r}")
+        if item not in SUPPORTED_TOOLS:
+            raise ValueError(f"{field}: unsupported Codex capability {item!r}")
         parsed.add(item)
     return parsed
 
@@ -122,9 +125,12 @@ def is_read_only(meta: dict[str, str]) -> bool:
         if "disallowedTools" in meta
         else set()
     )
-    if not declared:
-        return MUTATING_TOOLS.issubset(denied)
+    if "tools" not in meta:
+        # Inherited tools can include MCP and other capabilities not listed here.
+        return False
     effective = declared - denied
+    if not effective:
+        raise ValueError("tools: Codex sandbox_mode cannot represent zero effective tools")
     return effective.isdisjoint(MUTATING_TOOLS)
 
 

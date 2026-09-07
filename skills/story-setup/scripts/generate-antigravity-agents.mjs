@@ -95,6 +95,9 @@ function parseCapabilityList(value, field, source) {
     if (!CAPABILITY_NAME_RE.test(item)) {
       fail(`${source}: ${field}: invalid capability name ${JSON.stringify(item)}`)
     }
+    if (!TOOL_MAP.has(item)) {
+      fail(`${source}: ${field}: unsupported Antigravity capability ${JSON.stringify(item)}`)
+    }
     return item
   })
 }
@@ -160,10 +163,11 @@ function renderAgent(sourceFile) {
     fail(`${sourceFile}: unsafe or mismatched agent name ${JSON.stringify(name)}`)
   }
   if (!data.description) fail(`${sourceFile}: missing description`)
+  if (data.tools === undefined) fail(`${sourceFile}: tools: Antigravity requires an explicit tool list`)
   const sourceTools = parseCapabilityList(data.tools, "tools", sourceFile)
   const deniedTools = new Set(parseCapabilityList(data.disallowedTools, "disallowedTools", sourceFile))
   const effectiveSourceTools = sourceTools.filter((tool) => !deniedTools.has(tool))
-  const tools = [...new Set(effectiveSourceTools.flatMap((tool) => TOOL_MAP.get(tool) || []))]
+  const tools = [...new Set(effectiveSourceTools.flatMap((tool) => TOOL_MAP.get(tool)))]
   if (!tools.length) fail(`${sourceFile}: no supported Antigravity tools mapped`)
   const sourceModel = String(data.model || "").toLowerCase()
   const model = sourceModel === "haiku" ? "flash" : "pro"
