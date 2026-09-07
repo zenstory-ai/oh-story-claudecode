@@ -4,7 +4,8 @@
  *
  * Usage:
  *   node scripts/check-delivery-contract.js --json \
- *     --min-chars N --max-chars N --sections N [project-dir]
+ *     --min-chars N --max-chars N --sections N [--min-section-chars N] [--check-contract] [project-dir]
+ * --check-contract validates only parameters before writing; it is not delivery approval.
  * Exit: 0 = pass, 1 = blocking delivery failures, 2 = invalid invocation.
  *
  * The verifier only checks user-visible size and shape. It does not score prose,
@@ -92,6 +93,23 @@ function verify(projectDir, contract) {
   ))
 
   const styles = new Set(markers.map((entry) => entry.marker.style))
+  if (contract.minSectionChars != null) {
+    for (const [index, entry] of markers.entries()) {
+      const end = index + 1 < markers.length ? markers[index + 1].line - 1 : lines.length
+      const count = visibleChars(lines.slice(entry.line, end).join('\n'))
+      checks.push({
+        ...makeCheck(
+          'delivery.section-min-chars',
+          count >= contract.minSectionChars,
+          `${entry.text} 正文非空白 Unicode 字符：${count}`,
+          `每节正文至少 ${contract.minSectionChars} 个非空白字符（不含小节标记）`,
+          `只补足第 ${index + 1} 节既有情节点的行动、后果或对话，不新增支线。`
+        ),
+        section: index + 1,
+        actual_chars: count,
+      })
+    }
+  }
   checks.push(makeCheck(
     'delivery.section-style',
     markers.length > 0 && styles.size === 1,
@@ -141,12 +159,14 @@ function report(project, contract, checks) {
   return {
     schema_version: 1,
     verifier: 'story-short-write.delivery-contract',
+    scope: 'delivery',
     project,
     contract: {
       metric: 'non_whitespace_unicode_chars_v1',
       min_chars: contract.minChars,
       max_chars: contract.maxChars,
       sections: contract.sections,
+      min_section_chars: contract.minSectionChars ?? null,
     },
     ok: failures.length === 0,
     checks,
@@ -158,6 +178,7 @@ function report(project, contract, checks) {
       expected: failure.expected,
       references: failure.references,
       repair: failure.repair,
+      ...(failure.section === undefined ? {} : { section: failure.section, actual_chars: failure.actual_chars }),
     })),
   }
 }
@@ -173,8 +194,8 @@ function parseArgs(argv) {
   const positional = []
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index]
-    if (arg === '--json') continue
-    if (['--min-chars', '--max-chars', '--sections'].includes(arg)) {
+    if (arg === '--json' || arg === '--check-contract') continue
+    if (['--min-chars', '--max-chars', '--sections', '--min-section-chars'].includes(arg)) {
       if (index + 1 >= argv.length || argv[index + 1].startsWith('--')) return null
       values[arg] = parsePositiveInteger(argv[++index])
       if (values[arg] === null) return null
@@ -186,12 +207,20 @@ function parseArgs(argv) {
   if (positional.length > 1) return null
   if (!values['--min-chars'] || !values['--max-chars'] || !values['--sections']) return null
   if (values['--min-chars'] > values['--max-chars']) return null
+  if (values['--min-section-chars']) {
+    // The shortest allowed markers are 1., 2., ...; whitespace alone costs zero.
+    const sections = values['--sections']
+    let minimum = sections * (values['--min-section-chars'] + 1)
+    for (let start = 1; start <= sections; start *= 10) minimum += sections - start + 1
+    if (minimum > values['--max-chars']) return null
+  }
   return {
     project: positional[0] || '.',
     contract: {
       minChars: values['--min-chars'],
       maxChars: values['--max-chars'],
       sections: values['--sections'],
+      minSectionChars: values['--min-section-chars'] ?? null,
     },
   }
 }
@@ -199,10 +228,12 @@ function parseArgs(argv) {
 function main(argv) {
   const parsed = parseArgs(argv)
   if (!parsed) {
-    process.stderr.write('用法: node scripts/check-delivery-contract.js --json --min-chars N --max-chars N --sections N [project-dir]\n')
+    process.stderr.write('参数缺失或范围不可同时满足。用法: node scripts/check-delivery-contract.js --json --min-chars N --max-chars N --sections N [--min-section-chars N] [--check-contract] [project-dir]\n')
     return 2
   }
-  const result = verify(parsed.project, parsed.contract)
+  const result = argv.includes('--check-contract')
+    ? { ...report(path.resolve(parsed.project), parsed.contract, []), scope: 'parameters-only' }
+    : verify(parsed.project, parsed.contract)
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
   return result.ok ? 0 : 1
 }
