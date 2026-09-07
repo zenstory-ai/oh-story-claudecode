@@ -44,18 +44,9 @@ def write_agent(
     disallowed_line = (
         f"disallowedTools: [{', '.join(disallowed)}]\n" if disallowed else ""
     )
-    text = (
-        "---\n"
-        f"name: {name}\n"
-        f"description: {name} fixture\n"
-        f"tools: [{', '.join(tools)}]\n"
-        f"{disallowed_line}"
-        "maxTurns: 3\n"
-        "---\n"
-        f"# {name}\n\nCapability fixture.\n"
+    write_raw_agent(
+        directory, name, f"tools: [{', '.join(tools)}]\n{disallowed_line}"
     )
-    directory.mkdir(parents=True, exist_ok=True)
-    (directory / f"{name}.md").write_text(text, encoding="utf-8")
 
 
 def write_raw_agent(directory: Path, name: str, capability_lines: str) -> None:
@@ -112,15 +103,7 @@ def antigravity_tools(path: Path) -> list[str]:
 
 
 def prepare_opencode_root(root: Path, source_agents: Path) -> Path:
-    scripts = root / "scripts"
-    scripts.mkdir(parents=True)
-    shutil.copy2(OPENCODE_GENERATOR, scripts / OPENCODE_GENERATOR.name)
-    template_root = root / "skills/story-setup/references/templates"
-    shutil.copytree(source_agents, template_root / "agents")
-    (template_root / "CLAUDE.md.tmpl").write_text(
-        "# Fixture instructions\n", encoding="utf-8"
-    )
-    result = run(str(scripts / OPENCODE_GENERATOR.name), cwd=root)
+    result = run_opencode_fixture(root, source_agents)
     assert result.returncode == 0, result.stdout + result.stderr
     return root / "skills/story-setup/references/opencode"
 
@@ -229,6 +212,7 @@ def test_generated_agents_are_in_sync() -> None:
             assert (generated / "agents" / filename).read_bytes() == (
                 OPENCODE_BASELINE / "agents" / filename
             ).read_bytes(), filename
+
 
 def test_permissions_follow_capabilities_not_names() -> None:
     cases = {
