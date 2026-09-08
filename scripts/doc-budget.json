@@ -42,7 +42,7 @@
     },
     {
       "path": "skills/story-setup/references/templates/agents/narrative-writer.md",
-      "budget": 7000,
+      "budget": 7100,
       "why": "共享写手定义：长篇创作、短篇输出与按调用范围审查；压缩重复规则。"
     },
     {
@@ -191,7 +191,7 @@
     },
     {
       "label": "正文 agent 基础规则（不含条件参考）",
-      "budget": 36600,
+      "budget": 36700,
       "files": [
         "skills/story-setup/references/templates/agents/narrative-writer.md",
         "skills/story-long-write/references/writing-craft.md",
