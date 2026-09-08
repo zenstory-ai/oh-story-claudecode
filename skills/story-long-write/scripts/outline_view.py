@@ -107,6 +107,12 @@ def parse(text):
             found = re.search(r"剧情单元\s+([A-Za-z][\w-]*)", section.title) or UNIT_IN_TITLE.search(section.title)
             if found:
                 section.unit = found.group(1)
+        if section.unit is None and section.scope is None:
+            for line in section.lines[1:]:
+                field = re.match(r"^\s*[-*+]\s*单元ID\s*[：:]\s*([A-Za-z][\w-]*)\s*$", line.replace("**", ""))
+                if field:
+                    section.unit = field.group(1)
+                    break
     return lines, sections
 
 

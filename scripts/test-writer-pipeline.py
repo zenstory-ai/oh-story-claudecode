@@ -71,6 +71,12 @@ class PipelineTests(unittest.TestCase):
                 self.assertNotIn('不能串卡', result.stdout)
                 self.assertEqual(self.view('--check', '--strict').returncode, 0)
 
+    def test_legacy_unit_field(self):
+        self.volume.write_text('## 第一单元\n- **单元ID**：L1-01\n旧约束', encoding='utf-8')
+        result = self.view('--unit', 'L1-01')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('旧约束', result.stdout)
+
     def test_missing_unit_is_error(self):
         self.assertEqual(self.view('--unit', 'L1-02').returncode, 1)
 
