@@ -13,6 +13,29 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$SCRIPT_DIR/doc-budget.json"
 
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --root)
+      [ "$#" -ge 2 ] || { echo "FAIL: --root 缺少路径"; exit 2; }
+      REPO_ROOT="$2"
+      shift 2
+      ;;
+    --manifest)
+      [ "$#" -ge 2 ] || { echo "FAIL: --manifest 缺少路径"; exit 2; }
+      MANIFEST="$2"
+      shift 2
+      ;;
+    -h|--help)
+      echo "Usage: bash scripts/check-doc-budget.sh [--root DIR] [--manifest FILE]"
+      exit 0
+      ;;
+    *)
+      echo "FAIL: 未知参数：$1"
+      exit 2
+      ;;
+  esac
+done
+
 if [ ! -f "$MANIFEST" ]; then
   echo "FAIL: 预算清单缺失：$MANIFEST"
   exit 1
@@ -55,21 +78,33 @@ for (const entry of manifest.files) {
 }
 
 console.log("");
-console.log("路径合计（一次会话真正付的量）");
+console.log("已登记路径合计（不含项目资料与未登记条件项）");
 console.log("".padEnd(78, "-"));
-for (const group of manifest.paths || []) {
+const checkPath = (label, budget, files) => {
   let total = 0;
-  let missing = false;
-  for (const rel of group.files) {
+  const missing = [];
+  for (const rel of files) {
     const used = weigh(rel);
-    if (used === null) { missing = true; continue; }
+    if (used === null) { missing.push(rel); continue; }
     total += used;
   }
-  if (missing) continue;
-  const left = group.budget - total;
-  console.log(`  ${String(total).padStart(6)} / ${String(group.budget).padStart(6)} ${String(left).padStart(6)}  ${group.label}  [${left < 0 ? "OVER" : "ok"}]`);
+  if (missing.length) {
+    for (const rel of missing) fail.push(`路径「${label}」登记的文件不存在：${rel}`);
+    return;
+  }
+  const left = budget - total;
+  console.log(`  ${String(total).padStart(6)} / ${String(budget).padStart(6)} ${String(left).padStart(6)}  ${label}  [${left < 0 ? "OVER" : "ok"}]`);
   if (left < 0) {
-    fail.push(`路径「${group.label}」超预算 ${-left} 字（${total} > ${group.budget}）`);
+    fail.push(`路径「${label}」超预算 ${-left} 字（${total} > ${budget}）`);
+  }
+};
+for (const group of manifest.paths || []) {
+  if (group.branches) {
+    for (const branch of group.branches) {
+      checkPath(`${group.label}（${branch.label}）`, branch.budget, [...group.files, ...branch.files]);
+    }
+  } else {
+    checkPath(group.label, group.budget, group.files);
   }
 }
 

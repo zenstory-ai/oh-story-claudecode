@@ -365,7 +365,7 @@ echo "  OK agent templates"
 
 # frontmatter 解析必须锚定独占一行的 `---`（值里的三连字符不得截断 permission/steps），
 # 且 disallowedTools 里的 Bash 必须落成真正的标量 deny：OpenCode 未声明 bash 权限时
-# evaluate() 返回 ask（不是 deny），只有 edit: deny 的只读 agent 仍能借 shell 重定向写正文。
+# 默认允许 bash，只有 edit: deny 的只读 agent 仍能借 shell 重定向写正文。
 # 不给任何“只读命令”例外：上游 shell.ts 只把 command 的**直接父节点** redirected_statement
 # 纳入鉴权，`( allowlisted-command ) > 正文.md` 的 command 直接父节点是 subshell，能绕过字面量白名单。
 python3 - "scripts/sync-opencode.py" <<'PY'
@@ -646,9 +646,21 @@ for p in sorted(Path('skills/story-setup/references/opencode/commands').glob('*.
     fm = text.split('---', 2)[1]
     assert 'description:' in fm, f'{p}: missing description'
     assert f'请使用 {p.stem} skill' in text, f'{p}: command body must route to same skill'
+    # OpenCode 只在模板不含 $ARGUMENTS 且不含 $1..$N 时才把用户参数追加到末尾，
+    # 这个回退行为官方文档没有写（opencode.ai/docs/commands 只描述占位符），
+    # 实测 1.14.32 会追加成一行裸文本。显式写占位符才与 ZCode 一致，也不依赖未文档化行为。
+    assert '$ARGUMENTS' in text, f'{p}: command template must place $ARGUMENTS explicitly'
+
+# 两个有 command 面的适配层保持一致，任一侧漏写都拦下来
+zcode_dir = Path('skills/story-setup/references/zcode/commands')
+if zcode_dir.is_dir():
+    zcode_names = {p.stem for p in zcode_dir.glob('*.md')}
+    assert zcode_names == command_names, f'opencode/zcode command sets differ: only_zcode={zcode_names-command_names}, only_opencode={command_names-zcode_names}'
+    for p in sorted(zcode_dir.glob('*.md')):
+        assert '$ARGUMENTS' in p.read_text(), f'{p}: command template must place $ARGUMENTS explicitly'
 PY
 
-echo "  OK slash command templates"
+echo "  OK slash command templates (含 \$ARGUMENTS 占位符与 ZCode 对齐)"
 
 assert_grep 'experimental\.session\.compacting' "$ROOT/plugin.ts" "OpenCode plugin must inject pre-compact context"
 assert_grep 'tool\.execute\.before' "$ROOT/plugin.ts" "OpenCode plugin must guard tool writes"

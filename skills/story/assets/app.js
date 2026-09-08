@@ -5,6 +5,8 @@ const state = {
   originalContent: "",
   dirty: false,
   mode: "edit",
+  restored: false,
+  showLineNumbers: true,
   filter: "",
   loadingFile: false,
   saving: false,
@@ -37,6 +39,10 @@ const elements = {
   mobileBackButton: document.querySelector("#mobileBackButton"),
   editorEmpty: document.querySelector("#editorEmpty"),
   editorWorkspace: document.querySelector("#editorWorkspace"),
+  editorBody: document.querySelector("#editorBody"),
+  editorContainer: document.querySelector("#editorContainer"),
+  lineNumbersGutter: document.querySelector("#lineNumbersGutter"),
+  lineNumbersButton: document.querySelector("#lineNumbersButton"),
   editorTitle: document.querySelector("#editorTitle"),
   breadcrumbs: document.querySelector("#breadcrumbs"),
   dirtyStatus: document.querySelector("#dirtyStatus"),
@@ -477,6 +483,7 @@ async function loadWorkspace({ announce = false } = {}) {
     state.searchTruncation = null;
     state.searching = Boolean(state.filter.trim());
     renderWorkspace();
+    if (!state.restored) await restoreViewState();
     if (state.filter.trim()) scheduleSearch();
     if (announce) showToast("工作区目录已刷新");
   } catch (error) {
@@ -548,7 +555,170 @@ function updateCursorPosition() {
   const caret = elements.editorInput.selectionStart;
   const before = content.slice(0, caret);
   const lines = before.split("\n");
+  updateActiveGutterLine(lines.length);
   elements.cursorPosition.textContent = `第 ${lines.length} 行，第 ${[...lines.at(-1)].length + 1} 列`;
+}
+
+function updateActiveGutterLine(currentLine) {
+  const prevActive = elements.lineNumbersGutter.querySelector(".gutter-line.active");
+  if (prevActive && prevActive.dataset.line === String(currentLine)) return;
+  if (prevActive) prevActive.classList.remove("active");
+  const target = elements.lineNumbersGutter.querySelector(`.gutter-line[data-line='${currentLine}']`);
+  if (target) target.classList.add("active");
+}
+
+let lineMirror = null;
+function getLineMirror() {
+  if (!lineMirror) {
+    lineMirror = document.createElement("div");
+    lineMirror.className = "editor-line-mirror";
+    document.body.appendChild(lineMirror);
+  }
+  return lineMirror;
+}
+
+function updateLineNumbers() {
+  if (!state.showLineNumbers || elements.editorContainer.hidden) return;
+  const input = elements.editorInput;
+  const text = input.value;
+  const lines = text.split("\n");
+  const count = lines.length;
+
+  const style = window.getComputedStyle(input);
+  const mirror = getLineMirror();
+  mirror.style.fontFamily = style.fontFamily;
+  mirror.style.fontSize = style.fontSize;
+  mirror.style.fontWeight = style.fontWeight;
+  mirror.style.fontStyle = style.fontStyle;
+  // 与 textarea 一样使用无单位行高，避免像素小数取整在长文中累积偏移。
+  mirror.style.lineHeight = String(parseFloat(style.lineHeight) / parseFloat(style.fontSize));
+  mirror.style.letterSpacing = style.letterSpacing;
+  mirror.style.wordSpacing = style.wordSpacing;
+  mirror.style.textTransform = style.textTransform;
+  mirror.style.textIndent = style.textIndent;
+  mirror.style.whiteSpace = "pre-wrap";
+  mirror.style.wordBreak = style.wordBreak;
+  mirror.style.overflowWrap = "break-word";
+  mirror.style.tabSize = style.tabSize || "4";
+
+  const padLeft = parseFloat(style.paddingLeft) || 0;
+  const padRight = parseFloat(style.paddingRight) || 0;
+  const innerWidth = input.clientWidth - padLeft - padRight;
+  if (innerWidth <= 0) return;
+  mirror.style.width = `${innerWidth}px`;
+
+  mirror.innerHTML = lines.map((line) => `<div>${escapeHtml(line) || "&#8203;"}</div>`).join("");
+
+  const caret = input.selectionStart || 0;
+  const beforeCaret = text.slice(0, caret);
+  const activeLineIndex = beforeCaret.split("\n").length - 1;
+
+  elements.lineNumbersGutter.style.paddingTop = style.paddingTop;
+  elements.lineNumbersGutter.style.paddingBottom = style.paddingBottom;
+  elements.lineNumbersGutter.style.lineHeight = style.lineHeight;
+  const children = mirror.children;
+  const rows = document.createDocumentFragment();
+  for (let i = 0; i < count; i++) {
+    const isActive = i === activeLineIndex ? " active" : "";
+    const row = document.createElement("div");
+    row.className = `gutter-line${isActive}`;
+    row.dataset.line = String(i + 1);
+    row.textContent = String(i + 1);
+    row.style.height = `${children[i].getBoundingClientRect().height}px`;
+    rows.append(row);
+  }
+  elements.lineNumbersGutter.replaceChildren(rows);
+  elements.lineNumbersGutter.scrollTop = input.scrollTop;
+}
+
+let lineNumbersFrame = null;
+function scheduleLineNumbers() {
+  if (lineNumbersFrame !== null) return;
+  lineNumbersFrame = window.requestAnimationFrame(() => {
+    lineNumbersFrame = null;
+    updateLineNumbers();
+  });
+}
+
+function setLineNumbersVisible(visible) {
+  state.showLineNumbers = visible;
+  elements.editorBody.classList.toggle("show-line-numbers", visible);
+  elements.lineNumbersButton.setAttribute("aria-pressed", String(visible));
+  scheduleLineNumbers();
+  syncViewState();
+}
+
+function viewStateKey() {
+  return `story_dashboard_view:${state.workspace.workspace.path}`;
+}
+
+function syncViewState() {
+  if (!state.restored) return;
+  const saved = {
+    view: state.activeView,
+    file: state.activeFile?.path || null,
+    mode: state.mode,
+    showLineNumbers: state.showLineNumbers,
+  };
+  try {
+    localStorage.setItem(viewStateKey(), JSON.stringify(saved));
+  } catch {}
+  const url = new URL(window.location.href);
+  url.searchParams.set("view", saved.view);
+  if (saved.file) {
+    url.searchParams.set("file", saved.file);
+    url.searchParams.set("mode", saved.mode);
+  } else {
+    url.searchParams.delete("file");
+    url.searchParams.delete("mode");
+  }
+  window.history.replaceState(null, "", url);
+}
+
+async function restoreViewState() {
+  let saved = {};
+  try {
+    saved = JSON.parse(localStorage.getItem(viewStateKey())) || {};
+  } catch {}
+  const params = new URLSearchParams(window.location.search);
+  // 显式链接优先于这个工作区上次打开的文稿。
+  const linked = ["view", "file", "mode"].some((key) => params.has(key));
+  const file = linked ? params.get("file") : saved.file;
+  const mode = (linked ? params.get("mode") : saved.mode) === "preview" ? "preview" : "edit";
+  const requestedView = linked ? params.get("view") : saved.view;
+  const defaultView = state.workspace.libraries.length ? "libraries" : "projects";
+  const view = ["libraries", "projects"].includes(requestedView)
+    ? requestedView
+    : typeof file === "string" ? deduceViewForPath(file) : defaultView;
+  setLineNumbersVisible(saved.showLineNumbers !== false);
+  setMode(mode);
+  if (typeof file === "string" && file) await openFile(file, { force: true });
+  setActiveView(view);
+  state.restored = true;
+  syncViewState();
+}
+
+function expandParentDirs(filePath) {
+  if (!filePath) return;
+  const parts = filePath.split("/");
+  let current = "";
+  for (let i = 0; i < parts.length - 1; i++) {
+    current = current ? `${current}/${parts[i]}` : parts[i];
+    state.expandedDirs.add(current);
+    state.collapsedDirs.delete(current);
+  }
+}
+
+function deduceViewForPath(filePath) {
+  if (!state.workspace || !filePath) return state.activeView;
+  const containsFile = ({ path }) => path === "." || filePath.startsWith(`${path}/`);
+  if (state.workspace.libraries.some(containsFile)) {
+    return "libraries";
+  }
+  if (state.workspace.projects.some(containsFile)) {
+    return "projects";
+  }
+  return state.activeView;
 }
 
 async function openFile(path, { force = false } = {}) {
@@ -567,14 +737,18 @@ async function openFile(path, { force = false } = {}) {
     elements.editorTitle.textContent = file.name;
     renderBreadcrumbs(file.path);
     setDirty(false);
-    setMode("edit");
+    expandParentDirs(file.path);
+    setActiveView(deduceViewForPath(file.path));
+    setMode(state.mode);
     updateDocumentMeta();
     updateCursorPosition();
     elements.editorEmpty.hidden = true;
     elements.editorWorkspace.hidden = false;
     document.body.classList.add("document-open");
     syncActiveRow();
-    window.requestAnimationFrame(() => elements.editorInput.focus());
+    syncViewState();
+    scheduleLineNumbers();
+    if (state.mode === "edit") window.requestAnimationFrame(() => elements.editorInput.focus());
   } catch (error) {
     showToast(error.message, "error");
   } finally {
@@ -606,6 +780,7 @@ function markdownToSafeHtml(markdown) {
   const output = [];
   let inCode = false;
   let codeLines = [];
+  let codeStartLine = 1;
   let listType = null;
 
   const closeList = () => {
@@ -613,12 +788,16 @@ function markdownToSafeHtml(markdown) {
     listType = null;
   };
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineNum = i + 1;
     if (line.trim().startsWith("```")) {
       closeList();
       if (inCode) {
-        output.push(`<pre><code>${codeLines.join("\n")}</code></pre>`);
+        output.push(`<div class="preview-code-block" data-line="${codeStartLine}"><pre><code>${codeLines.join("\n")}</code></pre></div>`);
         codeLines = [];
+      } else {
+        codeStartLine = lineNum;
       }
       inCode = !inCode;
       continue;
@@ -634,7 +813,7 @@ function markdownToSafeHtml(markdown) {
     if (heading) {
       closeList();
       const level = heading[1].length;
-      output.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+      output.push(`<h${level} data-line="${lineNum}">${inlineMarkdown(heading[2])}</h${level}>`);
     } else if (unordered || ordered) {
       const nextType = unordered ? "ul" : "ol";
       if (listType !== nextType) {
@@ -642,21 +821,21 @@ function markdownToSafeHtml(markdown) {
         listType = nextType;
         output.push(`<${listType}>`);
       }
-      output.push(`<li>${inlineMarkdown((unordered || ordered)[1])}</li>`);
+      output.push(`<li data-line="${lineNum}">${inlineMarkdown((unordered || ordered)[1])}</li>`);
     } else if (/^\s*([-*_])(?:\s*\1){2,}\s*$/.test(line)) {
       closeList();
-      output.push("<hr>");
+      output.push(`<hr data-line="${lineNum}">`);
     } else if (line.startsWith("&gt; ")) {
       closeList();
-      output.push(`<blockquote>${inlineMarkdown(line.slice(5))}</blockquote>`);
+      output.push(`<blockquote data-line="${lineNum}">${inlineMarkdown(line.slice(5))}</blockquote>`);
     } else if (line.trim()) {
       closeList();
-      output.push(`<p>${inlineMarkdown(line)}</p>`);
+      output.push(`<p data-line="${lineNum}">${inlineMarkdown(line)}</p>`);
     } else {
       closeList();
     }
   }
-  if (inCode) output.push(`<pre><code>${codeLines.join("\n")}</code></pre>`);
+  if (inCode) output.push(`<div class="preview-code-block" data-line="${codeStartLine}"><pre><code>${codeLines.join("\n")}</code></pre></div>`);
   closeList();
   return output.join("");
 }
@@ -667,13 +846,15 @@ function setMode(mode) {
     button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
   });
   const previewing = mode === "preview";
-  elements.editorInput.hidden = previewing;
+  elements.editorContainer.hidden = previewing;
   elements.previewPane.hidden = !previewing;
   if (previewing) {
     elements.previewPane.innerHTML = markdownToSafeHtml(elements.editorInput.value);
   } else {
     window.requestAnimationFrame(() => elements.editorInput.focus());
   }
+  scheduleLineNumbers();
+  syncViewState();
 }
 
 async function saveFile() {
@@ -744,6 +925,7 @@ async function deleteFile() {
     elements.editorEmpty.hidden = false;
     document.body.classList.remove("document-open");
     setDirty(false);
+    syncViewState();
     await loadWorkspace();
     showToast(`已删除《${file.name}》`);
   } catch (error) {
@@ -821,6 +1003,7 @@ function setActiveView(view) {
   } else {
     renderTree();
   }
+  syncViewState();
 }
 
 elements.archiveTabs.forEach((tab) => {
@@ -863,7 +1046,19 @@ elements.editorInput.addEventListener("input", () => {
   setDirty(elements.editorInput.value !== state.originalContent);
   updateDocumentMeta();
   updateCursorPosition();
+  scheduleLineNumbers();
 });
+
+elements.editorInput.addEventListener("scroll", () => {
+  elements.lineNumbersGutter.scrollTop = elements.editorInput.scrollTop;
+}, { passive: true });
+
+elements.lineNumbersButton.addEventListener("click", () => {
+  setLineNumbersVisible(!state.showLineNumbers);
+});
+
+new ResizeObserver(scheduleLineNumbers).observe(elements.editorInput);
+document.fonts.ready.then(scheduleLineNumbers);
 
 ["click", "keyup", "select"].forEach((eventName) => {
   elements.editorInput.addEventListener(eventName, updateCursorPosition);

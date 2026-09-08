@@ -37,27 +37,21 @@ node --check "$HOOK_CORE"
 echo "  OK JSON/JavaScript syntax"
 
 python3 - <<'PY'
-import json, re
+import json
 from pathlib import Path
 
 plugin = json.loads(Path('.zcode-plugin/plugin.json').read_text())
-assert re.fullmatch(r'[a-z0-9][a-z0-9._-]{0,127}', plugin['name'])
-assert plugin['name'] == 'oh-story'
-assert plugin['skills'] == 'skills'
 assert plugin['commands'] == 'skills/story-setup/references/zcode/commands'
 assert plugin['hooks'] == 'skills/story-setup/references/zcode/hooks/hooks.json'
 for key in ('agents', 'channels', 'lspServers', 'outputStyles', 'settings'):
     assert key not in plugin, f'non-runnable ZCode component declared: {key}'
 
 market = json.loads(Path('marketplace.json').read_text())
-assert market['name'] == 'oh-story-zcode'
 assert market['version'] == 1
-assert len(market['plugins']) == 1
-entry = market['plugins'][0]
-assert entry['name'] == plugin['name'] and entry['source'] == './'
-assert entry['version'] == plugin['version']
-assert plugin['version'] == Path('skills/story/VERSION').read_text().strip()
 PY
+# ZCode's GitHub importer may discover the Claude catalog (#390); verify both
+# catalog paths against both native manifests, not just the root ZCode catalog.
+python3 "$SCRIPT_DIR/check-plugin-packaging.py" --root "$REPO_ROOT"
 echo "  OK native plugin/marketplace manifest"
 
 python3 - <<'PY'

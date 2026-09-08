@@ -8,7 +8,10 @@ description: |
   不做任何创作判断或修改。
 mode: subagent
 permission:
+  "*": deny
   read: allow
+  glob: allow
+  grep: allow
   edit: deny
   bash: deny
 steps: 15

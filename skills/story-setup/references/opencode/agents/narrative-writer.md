@@ -6,7 +6,10 @@ description: |
   也可执行完整去AI味流程和格式合规检查。
 mode: subagent
 permission:
+  "*": deny
   read: allow
+  glob: allow
+  grep: allow
   edit: allow
   bash: allow
 steps: 30

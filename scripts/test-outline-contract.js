@@ -251,6 +251,39 @@ try {
   assert.strictEqual(supplyMissing.status, 1)
   assert.match(JSON.parse(supplyMissing.stdout).evidence, /供给自查/)
 
+  for (const empty of ['无', '无。', '[待补充]', '；禁：不说破', '']) {
+    const body = outline().replace('允许老人当场说出这东西他留了几十年', empty)
+    const result = run(writeCase(`empty-release-${Buffer.from(empty).toString('hex')}`, body))
+    assert(failureIds(result).includes('outline.plotpoint-release'), result.stdout)
+  }
+  const skillRef = run(writeCase('skill-ref', outline() + '\n见 `writing-craft.md` 与 `references/anti-ai-writing.md`'))
+  assert.strictEqual(skillRef.status, 0, skillRef.stdout)
+  for (const ref of ['../设定/工钱.md', '设定\\工钱.md', './工钱.md']) {
+    const project = writeCase(`relative-${Buffer.from(ref).toString('hex')}`, outline() + `\n见 \`${ref}\``)
+    assert(failureIds(run(project)).includes('outline.setting-refs-exist'))
+    const target = path.resolve(project, '大纲', ref.replace(/\\/g, '/').startsWith('设定/') ? '../' + ref.replace(/\\/g, '/') : ref)
+    fs.mkdirSync(path.dirname(target), { recursive: true })
+    fs.mkdirSync(target)
+    assert(failureIds(run(project)).includes('outline.setting-refs-exist'))
+    fs.rmdirSync(target)
+    fs.writeFileSync(target, '# 工钱\n一日十文')
+    assert.strictEqual(run(project).status, 0)
+  }
+  const supplyCases = [
+    ['### 剧情单元 L1-010\n#### 供给自查', false],
+    ['### 剧情单元 L1-01\n尚未执行供给自查', false],
+    ['### 剧情单元 L1-01\n### 剧情单元 L1-02\n#### 供给自查', false],
+    ['### 剧情单元 L1-01\n```md\n#### 供给自查\n```', false],
+    ['### 剧情单元 L1-01\n#### 供给自查', true],
+    ['### 剧情单元 L1-01：码头\n#### 供给自查（本批）\n无缺口', true],
+    ['### 码头\n- **单元ID**：L1-01\n#### 信息\n##### 供给自查\n无', true],
+  ]
+  for (const [body, ok] of supplyCases) {
+    fs.writeFileSync(volumeFile, body)
+    const result = spawnSync(process.execPath, [verifier, '--supply', volumeFile, 'L1-01'], { encoding: 'utf8' })
+    assert.strictEqual(result.status, ok ? 0 : 1, result.stdout + body)
+  }
+
   const missingFile = run(writeCase('missing-file', null))
   assert.strictEqual(missingFile.status, 2)
   assert.match(missingFile.stderr, /没有第 21 章细纲/)

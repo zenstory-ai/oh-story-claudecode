@@ -78,7 +78,9 @@ PR 自动运行 `.github/workflows/cross-platform.yml`。static-check job 跑以
 - `scripts/check-scan-runtime-policy.sh` — scraper 本地日期依赖与 CDP 源码策略守卫
 - `python3 scripts/test-scan-runtime-policy.py` — 验证无关/死代码关键词不能骗过 scan/browser 策略守卫
 - `scripts/check-story-setup-deployment.sh` — story-setup 部署完整性
-- `scripts/check-claude-adapter.sh` — Claude marketplace 与 skill 映射检查
+- `python3 scripts/check-plugin-packaging.py` — Claude/ZCode catalog、原生 manifest、统一 bundle 身份、版本与 13 个根 Skills 检查
+- `python3 scripts/test-plugin-packaging.py` — 通过公开 CLI 对 catalog/manifest 做黑盒变异回归
+- `scripts/check-claude-adapter.sh` — Claude marketplace、根 plugin manifest 与 13 个 skill 自动发现检查；可选真实 CLI 生命周期
 - `scripts/check-opencode-adapter.sh` — OpenCode adapter 同步、commands/agents/config 结构与 plugin 真实行为检查
 - `scripts/check-openclaw-skills.sh` — OpenClaw 单行 frontmatter、`metadata.openclaw` 与可选真实 CLI 发现检查
 - `scripts/check-codex-adapter.sh` — Codex repo skills symlink、custom-agent TOML、hook 生成确定性与 launcher 契约
@@ -124,6 +126,8 @@ bash scripts/test-story-continuity.sh
 python3 scripts/test-storyctl.py
 python3 scripts/test-author-memory-commit.py
 bash scripts/check-story-setup-deployment.sh
+python3 scripts/check-plugin-packaging.py
+python3 scripts/test-plugin-packaging.py
 bash scripts/check-claude-adapter.sh
 bash scripts/check-codex-adapter.sh
 bash scripts/check-opencode-adapter.sh
@@ -166,6 +170,7 @@ python3 scripts/skill-numbering.py check
 - runtime 脚本的唯一源/目标定义在 `scripts/shared-assets.json`；先改 `source`，再运行 `python3 scripts/sync-shared-assets.py sync`。
 - 同名 runtime 脚本只能属于一个 canonical group，且每个 target 必须保留 source basename；禁止用改名 target 绕过单一 owner。
 - reference 文档的 canonical source、部署副本与目录镜像显式定义在 `scripts/shared-references.json`；先改 source，再运行 `python3 scripts/shared-references.py sync`。reference target 可用语义别名，但必须在 manifest 逐路径登记。
+- `check-shared-files.sh` 同时验证两个 manifest 的管理路径不重叠；reference 文档只登记在 `shared-references.json`。
 - `shared-references.py check` 还会按内容哈希扫描未登记的跨 Skill 精确副本；目录镜像的 `files` 必须完整覆盖 source tree，新增文件不能绕过 manifest。
 - `check-reference-similarity.py` 会扫描跨 Skill 近似副本；仍需独立演化的历史派生文件必须在 `derived_groups` 登记成员与分化理由。新增副本必须选择“登记同步”或“形成真正独立内容”，不能靠改名绕过 owner。
 - `story-short-analyze` 的 `analysis-short-*` 是源文观察标尺，不是写作 playbook；禁止重新引入长篇节点、卷级循环、推荐结构百分比或“每章必备”口令。由 `check-short-analysis-scope.py` 守卫。
@@ -197,6 +202,33 @@ fork → branch → commit → PR → review → merge
 - commit message 用中文，格式：`类型: 简短描述`
 - 类型：`feat`（新增）/ `fix`（修复）/ `docs`（文档）/ `refactor`（重构）
 
+## Plugin 打包与版本锚点
+
+Claude Code 与 ZCode 都发布单一 `oh-story` bundle，bundle 从仓库根暴露全部 13 个 Skills；不要恢复按 Skill 拆成 13 个 catalog 条目的旧结构。两个 marketplace 自身的名字按平台保持不同：Claude 为 `oh-story-skills`，ZCode 根 catalog 为 `oh-story-zcode`。两边 catalog 都只能有一个 `name: oh-story`、`source: ./` 的条目，其版本须与对应原生 manifest 一致。
+
+发版版本共有 6 个 JSON/VERSION 文件锚点，必须同步：
+
+1. `.claude-plugin/marketplace.json`（`metadata.version` 与唯一条目的 `version`）
+2. `.claude-plugin/plugin.json`
+3. `marketplace.json`（`plugins[0].version`；顶层 `version: 1` 是 schema 版本，不随发布改动）
+4. `.zcode-plugin/plugin.json`
+5. `reasonix-plugin.json`
+6. `skills/story/VERSION`
+
+Claude 根 manifest 依赖默认目录发现 `skills/`，不得在 catalog 条目或 `.claude-plugin/plugin.json` 写 `skills`、`agents`、`hooks`、`commands` 过滤器；ZCode 原生 manifest 保持 `skills: "skills"`，其 Commands/Hooks 另由既有 ZCode guard 校验。同版本打包修复的迁移步骤见[升级指南](skills/story-setup/UPGRADING.md#插件打包身份迁移v079-同版本修复)。
+
+检查步骤：
+
+```bash
+python3 scripts/check-plugin-packaging.py
+python3 scripts/test-plugin-packaging.py
+bash scripts/check-claude-adapter.sh
+CLAUDE_REAL_CHECK=1 bash scripts/check-claude-adapter.sh  # 可选：隔离 HOME 的真实 CLI 生命周期
+bash scripts/check-zcode-adapter.sh
+```
+
+格式与命令以 [Claude Code 插件参考](https://code.claude.com/docs/en/plugins-reference)和 [ZCode 插件文档](https://zcode.z.ai/en/docs/plugin)为准。生命周期脚本覆盖 Claude CLI；ZCode Desktop 的迁移需在对应桌面版本验证。
+
 ## OpenCode 模板同步
 
 本项目同时支持 Claude Code、Google Antigravity、OpenCode、Codex、ZCode、OpenClaw 和 Reasonix（Phase 1）。OpenCode 的 agent 模板和项目指令模板由 `scripts/sync-opencode.py` 从 Claude Code 模板自动生成。
@@ -216,6 +248,15 @@ python3 scripts/sync-opencode.py --check  # 可选：只校验，不改文件
 bash scripts/check-opencode-adapter.sh
 bash scripts/test-opencode-cli-e2e.sh  # 可选：需要本机已安装 opencode
 ```
+
+权限从 Claude 真源的 `tools` / `disallowedTools` 推导，禁止项先从声明工具中移除，不按 agent 名字特判。跨端映射有以下边界：
+
+- 三个生成器支持行内数组（如 `[Read, Glob, Grep]`，项可加成对引号）。Claude 官方也支持逗号字符串，但本项目生成器不支持该格式。未知或不支持的工具在发布生成文件前报错。
+- OpenCode V1 支持 Read、Glob、Grep、Write、Edit、Bash。显式 `tools` 先设置 `"*": deny`，再开放声明的能力，未声明的 shell、委派、MCP 等保持禁止；缺省 `tools` 才继承。Read/Glob/Grep 独立映射，空列表生成全禁用配置。Write 或 Edit 任一有效都会开放聚合 `edit` 权限（write/edit/apply_patch），无法保留这几个编辑工具之间的限制；Write 本身也可覆盖文件，并非“只能创建”。
+- Codex 支持上述六种工具，以及 NotebookEdit、PowerShell 的可写能力分类。它只推导文件系统 `sandbox_mode`，不能表达 Claude 的完整工具白名单。显式声明中只有 Read/Glob/Grep 有效时设置 read-only；存在可写能力时继承父会话沙箱。缺省 `tools` 也继承，不根据部分禁止项假定所有继承工具均只读。零有效工具无法由该字段表达，因此拒绝生成。
+- Antigravity 只支持上述六种工具的映射，要求显式非空有效工具列表；不能映射的项报错，不静默丢弃。
+
+回归命令：`python3 scripts/test-agent-permissions.py`；传入 `--opencode /path/to/opencode` 可用真实 OpenCode V1 CLI 验证工具允许/拒绝，无需模型请求。
 
 脚本会：
 1. 将 `templates/agents/` 下的 Claude Code agent 转换为 opencode 格式，写入 `opencode/agents/`
@@ -313,7 +354,7 @@ node scripts/test-antigravity-hooks.mjs
 
 ZCode 采用「原生 plugin + `story-setup` workspace 部署」双入口：
 
-- `.zcode-plugin/plugin.json` 与根 `marketplace.json` 暴露同一组 13 Skills、13 Commands 和 ZCode Hooks；版本必须与 `skills/story/VERSION` 同步。
+- `.zcode-plugin/plugin.json` 与根 `marketplace.json` 以同名同版本的单一 `oh-story` bundle 暴露 13 Skills、13 Commands 和 ZCode Hooks；catalog 自身名保持 `oh-story-zcode`，条目的插件版本必须与 `skills/story/VERSION` 同步。
 - `skills/story-setup/references/zcode/` 是 workspace 部署模板，包含 `AGENTS.md.tmpl`、Commands、`config.json.patch` 与无第三方依赖的 Node Hook runner。
 - ZCode 3.3.4 只支持 `SessionStart`、`UserPromptSubmit`、`PreToolUse`、`PermissionRequest`、`PostToolUse`、`PostToolUseFailure`、`Stop`。不要复制 Claude 的 `PreCompact`、`PostCompact`、`SessionEnd`、`SubagentStop` 或 `Notification`。
 - Hook stdout 为空表示放行；只要非空就必须满足严格 JSON schema。诊断只写 stderr，异常 fail-open；优先使用 `process` + `node`，不要引入 shell/Python launcher 的跨平台分支。

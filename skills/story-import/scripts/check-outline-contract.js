@@ -72,28 +72,7 @@ function resolveBookRoot(file, projectRoot) {
   return null
 }
 
-function collectBasenames(root) {
-  // 一次性遍历书目录收集全部文件名，供裸文件名引用（如 `经济与用度.md`）解析。
-  const names = new Set()
-  const stack = [root]
-  while (stack.length) {
-    const dir = stack.pop()
-    let entries
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true })
-    } catch { continue }
-    for (const entry of entries) {
-      if (entry.name.startsWith('.') || entry.name.startsWith('_旧追踪存档')) continue
-      if (entry.isDirectory()) stack.push(path.join(dir, entry.name))
-      else names.add(entry.name)
-    }
-  }
-  return names
-}
-
-// 细纲里凡用 `…` 引用项目内 .md 文件的，文件必须真实存在——
-// 「数字口径照 X.md」而 X 里查无此数是实测发生过的排纲事故（引用赌存在），
-// 文件级存在性是其中脚本可判定的部分；内容是否真有那组数仍归排纲时 grep 验证。
+// 项目引用须写目录路径；裸文件名可能指向 skill reference，不猜测其归属。
 const REF_DIR_PREFIX = /^(?:设定|大纲|追踪|正文|读者笔记|对标)\//
 
 function checkSettingRefs(text, name, file, projectRoot) {
@@ -105,32 +84,22 @@ function checkSettingRefs(text, name, file, projectRoot) {
   const pattern = /`([^`\n]+?\.md)[^`\n]*`/g
   let match
   while ((match = pattern.exec(text)) !== null) {
-    const token = match[1].trim()
+    const token = match[1].trim().replace(/\\/g, '/')
     if (token.includes('{') || token.includes('}')) continue
-    if (token.includes('/')) {
-      if (REF_DIR_PREFIX.test(token)) refs.add(token)
-    } else {
-      refs.add(token)
-    }
+    if (REF_DIR_PREFIX.test(token) || /^\.{1,2}\//.test(token)) refs.add(token)
   }
-  if (!refs.size) {
-    return makeCheck('outline.setting-refs-exist', true, name, '细纲未引用项目内文件', '细纲引用的项目内文件真实存在', '无需修复。')
-  }
-  let basenames = null
   const missing = []
   for (const token of refs) {
-    if (token.includes('/')) {
-      if (!fs.existsSync(path.join(bookRoot, token))) missing.push(token)
-    } else {
-      if (basenames === null) basenames = collectBasenames(bookRoot)
-      if (!basenames.has(token)) missing.push(token)
-    }
+    const base = /^\.{1,2}\//.test(token) ? path.dirname(path.resolve(file)) : bookRoot
+    try {
+      if (!fs.statSync(path.resolve(base, token)).isFile()) missing.push(token)
+    } catch { missing.push(token) }
   }
   return makeCheck(
     'outline.setting-refs-exist',
     missing.length === 0,
     name,
-    missing.length ? `引用的文件不存在：${missing.join('、')}` : `${refs.size} 处项目内引用全部存在`,
+    missing.length ? `引用的路径不是可用文件：${missing.join('、')}` : `${refs.size} 处项目内引用全部存在`,
     '细纲引用的每个项目内 .md 文件都真实存在——不许把槽位指向查无实据的权威文件',
     '修正引用路径；或按「创作自主权分级」先把缺的设定落档（B 级直接补、C 级进《供给单》提案），再在细纲引用。'
   )
@@ -233,7 +202,12 @@ function verify(file, projectRoot = null) {
       if (cells && cells.length === 5 && /^\d+$/.test(cells[0])) rows.push(cells)
     }
     if (rows.length) {
-      const released = rows.filter((cells) => /放\s*[：:]/.test(cells[4]))
+      const released = rows.filter((cells) => {
+        const match = cells[4].match(/(?:^|[。；;\s])放\s*[：:]([^]*?)(?=(?:禁|放)\s*[：:]|$)/)
+        if (!match) return false
+        const value = match[1].replace(/[\s。；;，,、\[\]【】]/g, '')
+        return value.length > 0 && !/^(?:无|暂无|待补充|待定|无缺口)$/.test(value)
+      })
       checks.push(makeCheck(
         'outline.plotpoint-release',
         released.length > 0,
@@ -335,23 +309,36 @@ function verifySupply(volumeFile, unitId) {
   if (!read.ok) {
     return { schema_version: 1, verifier: 'story-long-write.outline-supply', file: path.resolve(volumeFile), unit: unitId, ok: false, evidence: read.error || '卷纲文件为空' }
   }
-  const lines = read.text.split(/\r?\n/)
-  let start = -1
-  for (let index = 0; index < lines.length; index++) {
-    if (lines[index].includes(`剧情单元 ${unitId}`) || new RegExp(`单元ID\\s*[：:]\\s*\\*{0,2}${unitId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(lines[index])) {
-      start = index
-      break
+  // 只检查目标单元内的标题，不把正文提及或代码示例当成小节。
+  let fence = null
+  const lines = read.text.split(/\r?\n/).map((line) => {
+    const marker = line.match(/^\s{0,3}(`{3,}|~{3,})/)
+    if (marker) {
+      if (!fence) fence = marker[1]
+      else if (marker[1][0] === fence[0] && marker[1].length >= fence.length) fence = null
+      return ''
     }
+    return fence ? '' : line.replace(/\*\*/g, '')
+  })
+  const headings = []
+  for (let index = 0; index < lines.length; index++) {
+    const heading = lines[index].match(/^(#{1,6})\s+(.+)$/)
+    if (heading) headings.push({ index, level: heading[1].length, title: heading[2] })
   }
-  if (start === -1) {
+  const card = headings.find((heading) => {
+    const id = heading.title.match(/剧情单元\s+([A-Za-z][\w-]*)/)
+    if (id) return id[1] === unitId
+    const end = headings.find((next) => next.index > heading.index)?.index ?? lines.length
+    return lines.slice(heading.index + 1, end).some((line) => {
+      const field = line.match(/^\s*[-*+]\s*单元ID\s*[：:]\s*([A-Za-z][\w-]*)\s*$/)
+      return field?.[1] === unitId
+    })
+  })
+  const end = card ? (headings.find((next) => next.index > card.index && next.level <= card.level)?.index ?? lines.length) : 0
+  const ok = Boolean(card) && headings.some((heading) => heading.index > card.index && heading.index < end && /^供给自查(?:\s|[（(]|$)/.test(heading.title))
+  if (!card) {
     return { schema_version: 1, verifier: 'story-long-write.outline-supply', file: path.resolve(volumeFile), unit: unitId, ok: false, evidence: `卷纲中未找到剧情单元 ${unitId}` }
   }
-  let end = lines.length
-  for (let index = start + 1; index < lines.length; index++) {
-    if (/^#{2,3}\s/.test(lines[index]) && !/^####/.test(lines[index])) { end = index; break }
-  }
-  const block = lines.slice(start, end).join('\n')
-  const ok = block.includes('供给自查')
   return {
     schema_version: 1,
     verifier: 'story-long-write.outline-supply',

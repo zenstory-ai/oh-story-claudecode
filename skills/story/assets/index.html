@@ -139,6 +139,18 @@
                     <path d="M4.5 7h15M9 7V4.5h6V7M7 7l.8 13h8.4L17 7M10 10.5v6M14 10.5v6"></path>
                   </svg>
                 </button>
+                <button
+                  id="lineNumbersButton"
+                  class="icon-button line-numbers-button"
+                  type="button"
+                  title="切换行号显示"
+                  aria-label="切换行号显示"
+                  aria-pressed="true"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 6h2M4 12h2M4 18h2M9 6h11M9 12h11M9 18h11"></path>
+                  </svg>
+                </button>
                 <div class="mode-switch" role="group" aria-label="文稿模式">
                   <button type="button" data-mode="edit" aria-pressed="true">编辑</button>
                   <button type="button" data-mode="preview" aria-pressed="false">预览</button>
@@ -148,7 +160,10 @@
 
             <div id="editorBody" class="editor-body">
               <label class="sr-only" for="editorInput">文件内容</label>
-              <textarea id="editorInput" spellcheck="true"></textarea>
+              <div id="editorContainer" class="editor-container">
+                <div id="lineNumbersGutter" class="line-numbers-gutter" aria-hidden="true"></div>
+                <textarea id="editorInput" spellcheck="true"></textarea>
+              </div>
               <article id="previewPane" class="preview-pane" aria-label="Markdown 预览" hidden></article>
             </div>
 

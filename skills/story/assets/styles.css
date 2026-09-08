@@ -873,6 +873,129 @@ kbd {
   background: #dbeafe;
 }
 
+.line-numbers-button[aria-pressed="true"] {
+  color: var(--blue-600);
+  background: var(--blue-100);
+}
+
+.editor-container {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.line-numbers-gutter {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 100%;
+  margin: 0;
+  padding: 25px 0 80px;
+  overflow: hidden;
+  user-select: none;
+  background: var(--surface-subtle);
+  border-right: 1px solid var(--line);
+  box-sizing: border-box;
+}
+
+.gutter-line {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-400);
+  line-height: inherit;
+  box-sizing: border-box;
+  text-align: right;
+  padding-right: 10px;
+  padding-left: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.gutter-line.active {
+  color: var(--blue-600);
+  font-weight: 600;
+}
+
+.editor-body:not(.show-line-numbers) .line-numbers-gutter {
+  display: none;
+}
+
+.editor-container #editorInput {
+  flex: 1 1 0%;
+  width: 0;
+  min-width: 0;
+}
+
+.editor-line-mirror {
+  position: absolute;
+  top: 0;
+  left: -99999px;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  box-sizing: content-box;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  tab-size: 4;
+}
+
+.editor-line-mirror > div {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.show-line-numbers .preview-pane {
+  padding-left: clamp(52px, 5.5vw, 90px);
+}
+
+.show-line-numbers .preview-pane [data-line] {
+  position: relative;
+}
+
+.show-line-numbers .preview-pane [data-line]::before {
+  content: attr(data-line);
+  position: absolute;
+  left: -46px;
+  top: 0;
+  width: 36px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: inherit;
+  color: var(--ink-400);
+  user-select: none;
+  pointer-events: none;
+}
+
+.show-line-numbers .preview-pane ul,
+.show-line-numbers .preview-pane ol {
+  padding-left: 40px;
+}
+
+.show-line-numbers .preview-pane li[data-line]::before {
+  left: -86px;
+}
+
+.show-line-numbers .preview-pane blockquote[data-line]::before {
+  left: -49px;
+}
+
+.preview-pane .preview-code-block pre {
+  margin: 0;
+}
+
 .preview-pane {
   max-width: none;
 }
@@ -913,6 +1036,7 @@ kbd {
 .preview-pane ul,
 .preview-pane ol,
 .preview-pane blockquote,
+.preview-pane .preview-code-block,
 .preview-pane pre {
   max-width: 880px;
   margin: 0 0 1.1em;
