@@ -10,9 +10,9 @@
 职责边界:
 - 脚本做确定性部分：固定首行、定位、标题行字面量、细纲指针、文风三行与判读的通用参考、
   上一章结尾、降档判定与情绪/节奏槽、固定块指针。
-- 主会话填七槽：本章意图 / 参考技法 / 本节速记 / 涉及角色 / genre_prose_card /
+- 主会话填八槽：执行安排 / 本章意图 / 参考技法 / 本节速记 / 涉及角色 / genre_prose_card /
   必读设定 / author_preferences。降档不成立时情绪与节奏槽也归主会话。
-  这七项对应原流程步骤 3「写前准备」的四项输出（本节速记 / 情绪目标 / 涉及角色 /
+  材料槽对应原流程步骤 3「写前准备」的四项输出（本节速记 / 情绪目标 / 涉及角色 /
   参考技法）加上题材卡、设定补漏与作者偏好——都是判断，脚本做不了。
 - 续写状态卡校验后由主会话筛选，在「本节速记」槽内写入本章需要的状态。
 - 可选块缺失留标题并写明原因（「没有」与「漏了」在产物上必须长得不一样）。
@@ -206,7 +206,7 @@ def build(project: Path, chapter: int, report: list):
 
     # ---- 固定首行（指令，不是栏目；漏传即写手不读参考直接开写）----
     parts.append(
-        f"本次任务：写第 {chapter} 章，范围 全章。开始前先按「参考文件体系」逐行独立判定命中并读取，"
+        f"本次任务：写第 {chapter} 章，执行范围见「执行安排」。开始前先按「参考文件体系」逐行独立判定命中并读取，"
         "命中即必读，未命中不预加载；交付摘要里报出读了哪几个。")
 
     parts.append(f"项目目录：{project}")
@@ -217,7 +217,7 @@ def build(project: Path, chapter: int, report: list):
         return None, [f"细纲缺章名：{outline_file}，需要 ### 第 N 章：章名"]
     if any(char in title for char in '/\\'):
         return None, ["章名不能包含路径分隔符"]
-    parts.append(f"输出路径：{out_path}")
+    parts.append(f"最终输出路径：{out_path}")
     if title:
         heading_line, how = learn_heading_form(project, chapter, title)
         if heading_line:
@@ -338,7 +338,12 @@ def build(project: Path, chapter: int, report: list):
                        "），按 workflow-chapter 3(a)(b)(e)(f) 走全量召回后填此槽")
         report.append("召回降档：不成立（" + "、".join(why) + "）—— 全量召回归主会话")
 
-    # ---- 主会话五槽 ----
+    # ---- 需要主会话判断的槽位 ----
+    parts.append(
+        "——— 执行安排 ———\n"
+        f"{SLOT_MARK} 全章细纲用于整体编排。默认按自然转场或因果停顿分前后两组，"
+        "填写当前组的情节点/片段及临时输出路径；先只写前组，父流程测一次 checkpoint 后"
+        "再给后组和机器剩余区间。只有用户明确要求一次成文时才填「全章，直接写最终路径」。")
     parts.append(f"——— 本章意图（一句话）———\n{SLOT_MARK}")
     parts.append(slot_recall)
     # 伏笔与卷级禁忌走「主会话筛选后写进速记」这条原设计路线（步骤 3 状态筛选），
@@ -372,7 +377,7 @@ def build(project: Path, chapter: int, report: list):
         "本次照你的铁律 1-8 与被调用协议执行（细纲优先边界、正文形状、新增物三档、"
         "阅读体验字段、交付三附件均以你的定义为准，此处不重述）。")
     parts.append(
-        "字数目标按细纲执行，字数口径 visible_chars_v1；一次写完整章，"
+        "字数目标按细纲执行，字数口径 visible_chars_v1；按执行安排交付，"
         "目标按整章分量刻度使用，疏密自行分配，不拆逐点配额；不自测字数。")
 
     if errors:
