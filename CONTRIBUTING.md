@@ -111,6 +111,7 @@ bash scripts/check-shared-files.sh
 python3 scripts/test-shared-assets.py
 python3 scripts/test-shared-references.py
 node scripts/test-normalize-punctuation.js
+python3 scripts/test-style-precedence.py
 node scripts/test-scan-runtime.js
 bash scripts/check-scan-runtime-policy.sh
 python3 scripts/test-scan-runtime-policy.py

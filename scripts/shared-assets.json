@@ -83,6 +83,15 @@
       "targets": [
         "skills/story-import/scripts/check-outline-contract.js"
       ]
+    },
+    {
+      "name": "prose-style-whitelist",
+      "source": "skills/story-deslop/scripts/style-whitelist.js",
+      "targets": [
+        "skills/story-long-write/scripts/style-whitelist.js",
+        "skills/story-short-write/scripts/style-whitelist.js",
+        "skills/story-review/scripts/style-whitelist.js"
+      ]
     }
   ]
 }

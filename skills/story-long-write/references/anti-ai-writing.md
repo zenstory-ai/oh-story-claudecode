@@ -1,5 +1,7 @@
 # 去AI味完整指南
 
+> 本文件的句长、视角、标点、修辞与禁用词是默认写法，服从 [style-resolution.md](style-resolution.md) 的逐维裁决。所选 Gate 检查表达效果，不因作者有意选择某写法就机械删除；获准命中按书级 `.deslop-whitelist` 处理。
+
 <!-- 同名副本×5 字节同步，改动后跑 scripts/check-shared-files.sh -->
 
 > 识别AI写作指纹、系统性去AI三遍法、禁用词约束、改写范例库。用于正文写作后做去AI味自检和改写时查阅。

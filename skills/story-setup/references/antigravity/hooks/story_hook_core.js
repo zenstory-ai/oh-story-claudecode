@@ -696,7 +696,7 @@ function proseBlockReason(root, absolute) {
       let prevText = null
       try { prevText = fs.readFileSync(prevFile, "utf8") } catch {}
       if (prevText !== null && !/去味(：|:)跳过/.test(prevText.split(/\r?\n/).slice(0, 6).join("\n"))) {
-        const hits = toxicPhraseFindings(prevText).filter((line) => line.startsWith("第"))
+        const hits = toxicPhraseFindings(prevText, loadStyleWhitelist(prevFile)).filter((line) => line.startsWith("第"))
         if (hits.length) {
           const shown = hits.slice(0, 6)
           const more = hits.length - shown.length
@@ -823,13 +823,47 @@ function codePointSlice(value, start, end) {
   return Array.from(value).slice(start, end).join("")
 }
 
-function toxicPhraseFindings(text) {
+// Book-local only: never inherit an unrelated workspace or another book's choices.
+function loadStyleWhitelist(file) {
+  const parent = path.dirname(path.resolve(file));
+  const book = path.basename(parent) === '正文' ? path.dirname(parent) : parent;
+  try {
+    return fs.readFileSync(path.join(book, '.deslop-whitelist'), 'utf8')
+      .split(/\r?\n/).map(line => line.trim())
+      .filter(line => line && !line.startsWith('#'))
+      .sort((a, b) => b.length - a.length);
+  } catch (error) {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  }
+}
+
+function styleSpans(text, whitelist) {
+  const spans = [];
+  for (const literal of whitelist) {
+    for (let at = text.indexOf(literal); at !== -1; at = text.indexOf(literal, at + 1)) {
+      spans.push([at, at + literal.length]);
+    }
+  }
+  return spans;
+}
+
+function maskStyleText(text, whitelist) {
+  const chars = text.split('');
+  for (const [start, end] of styleSpans(text, whitelist)) {
+    chars.fill('？', start, end);
+  }
+  return chars.join('');
+}
+
+
+function toxicPhraseFindings(text, whitelist = []) {
   const findings = []
   const content = []
   text.split("\n").forEach((raw, index) => {
     const line = raw.trim()
     if (skippableLine(line)) return
-    const masked = maskQuotedSpans(line)
+    const masked = maskQuotedSpans(maskStyleText(line, whitelist))
     for (const ch of masked) {
       if (TOXIC_QUOTE_CHARS.has(ch)) return
     }
@@ -857,7 +891,7 @@ function toxicPhraseFindings(text) {
   return findings
 }
 
-function proseNetFindings(text) {
+function proseNetFindings(text, whitelist = []) {
   const findings = []
   const content = []
   text.split("\n").forEach((raw, index) => {
@@ -899,7 +933,7 @@ function proseNetFindings(text) {
   // 其余网（元信息/占位/复读/截断）照常——否则按拦截提示加标记的那次 Edit 会把
   // 已豁免的毒句式再次当硬信号推回。
   if (!/去味(：|:)跳过/.test(text.split(/\r?\n/).slice(0, 6).join("\n"))) {
-    findings.push(...toxicPhraseFindings(text))
+    findings.push(...toxicPhraseFindings(text, whitelist))
   }
   return findings
 }
@@ -941,7 +975,7 @@ function proseAfterWrite(root, absolute) {
     const bytes = fs.statSync(absolute).size
     if (bytes < 200) findings.push(`【落盘】正文仅 ${bytes} 字节，疑似未写完/落盘失败（quota/超时中断？），请核对并补写。`)
     const text = fs.readFileSync(absolute, "utf8")
-    findings.push(...proseNetFindings(text))
+    findings.push(...proseNetFindings(text, loadStyleWhitelist(absolute)))
   } catch {
     return ""
   }

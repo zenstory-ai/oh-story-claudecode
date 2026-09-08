@@ -49,16 +49,8 @@ def substantive(text):
 
 
 def has_custom_style(text):
-    if not substantive(text):
-        return False
-    if len(re.sub(r"\s", "", text)) >= 200:
-        return True
-    for section in re.split(r"(?=^#{1,6}\s)", text, flags=re.M):
-        heading, _, body = section.partition("\n")
-        if re.search(r"句长|标点|对话|锚点|笔调", heading) and substantive(body):
-            if re.search(r"\d|例如|例句|不用|禁止|避免|偏好|优先|保留|使用", body):
-                return True
-    return False
+    # A single substantive sentence can express the author's choice.
+    return substantive(re.sub(r"<!--[\s\S]*?-->", "", text or ""))
 
 
 def find_chapter_file(directory: Path, chapter: int, prefix: str):
@@ -247,19 +239,13 @@ def build(project: Path, chapter: int, report: list):
 
     # ---- 文风（本书自定义文风时由脚本全包）----
     style_file = project / "设定" / "文风.md"
-    style_digest = project / "设定" / "_文风摘要.md"
     style_text = read_text(style_file)
     custom_style = has_custom_style(style_text)
     if custom_style:
-        if read_text(style_digest):
-            parts.append(
-                f"文风路径：{style_digest}（书级文风摘要卡，写作按它执行；"
-                f"与细纲或脚本读数冲突时再查全文 {style_file}）")
-        else:
-            parts.append(f"文风路径：{style_file}（书级权威文风，写前必读）")
+        parts.append(f"文风路径：{style_file}（书级权威文风，写作与去味均读全文；摘要只作索引）")
         parts.append(
             "文风优先裁决：`设定/文风.md` 对句段／句法／对话落法／标点形态与删改取向的规定"
-            "优先于通用风格建议；不覆盖细纲事实、信息边界、调用方所选 Gate 范围及格式硬线。"
+            "按 style-resolution.md 裁决：当前请求 > 本书文风 > active 作者记忆 > 对标 > 通用参考；不覆盖细纲事实、信息边界、调用方所选 Gate 范围及文件结构。"
             "风格冲突按文风写，交付摘要列出「因文风优先而未执行的通用条款」。")
         skips, reads = parse_reference_ruling(style_text)
         if skips:
@@ -368,9 +354,9 @@ def build(project: Path, chapter: int, report: list):
     parts.append("——— 题材正文提示卡（genre_prose_card，只含本章相关条目）———\n"
                  f"{SLOT_MARK} 主题材抽 3-5 条、辅题材 1-2 条；只作内部校准，不进正文")
     parts.append(slot_setting)
-    parts.append("——— author_preferences（低优先级倾向，自然吸收，不逐条展示）———\n"
+    parts.append("——— style_resolution / author_preferences ———\n"
                  f"{SLOT_MARK} author_memory query 命中本章的 prose_style/story_design 项；"
-                 "无则写「无」；不逐条展示或最大化命中，不牺牲连贯、节奏和字数。")
+                 "query 显式传本书/题材/流程；偏好是低优先级倾向，无则写「无」。附 style_resolution：生效要求及来源、被覆盖的默认条款和事实边界；同一裁决传去味与审稿，不逐条追求命中。")
 
     # ---- 固定块：压成指针，不重述 agent 定义 ----
     parts.append(

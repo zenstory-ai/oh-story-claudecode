@@ -187,6 +187,16 @@
         "skills/story-import/references/tracking-transaction.md",
         "skills/story-review/references/tracking-transaction.md"
       ]
+    },
+    {
+      "name": "style-resolution",
+      "source": "skills/story-long-write/references/style-resolution.md",
+      "targets": [
+        "skills/story-short-write/references/style-resolution.md",
+        "skills/story-deslop/references/style-resolution.md",
+        "skills/story-review/references/style-resolution.md",
+        "skills/story-setup/references/agent-references/style-resolution.md"
+      ]
     }
   ],
   "derived_groups": [

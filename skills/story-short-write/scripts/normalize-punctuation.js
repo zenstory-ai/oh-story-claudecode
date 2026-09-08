@@ -2,6 +2,7 @@
 'use strict';
 
 const fs = require('fs');
+const { loadStyleWhitelist, styleSpans } = require('./style-whitelist.js');
 const path = require('path');
 
 const USAGE = `Usage: node normalize-punctuation.js [--check] [--quote-mode keep|ascii|yan] <file...>
@@ -9,6 +10,7 @@ const USAGE = `Usage: node normalize-punctuation.js [--check] [--quote-mode keep
 Normalize正文 punctuation deterministically:
   - replace ellipses, em dashes, and double hyphens with Chinese punctuation
   - remove markdown divider lines (---) from正文
+  - preserve pause punctuation covered by book-local .deslop-whitelist literals
   - keep quote style by default; convert quotes only when explicitly requested
 `;
 
@@ -61,7 +63,10 @@ for (const file of options.files) {
     continue;
   }
 
-  const result = normalizeDocument(input, options.quoteMode);
+  let whitelist;
+  try { whitelist = loadStyleWhitelist(fullPath); }
+  catch (error) { die(`${file}: unable to read .deslop-whitelist (${error.message})`); }
+  const result = normalizeDocument(input, options.quoteMode, whitelist);
   totalFindings += result.findings.length;
 
   if (options.check) {
@@ -94,7 +99,7 @@ function die(message) {
   process.exit(2);
 }
 
-function normalizeDocument(input, quoteMode) {
+function normalizeDocument(input, quoteMode, whitelist) {
   const { lines, endings } = splitLinesKeepingEndings(input);
 
   const findings = [];
@@ -159,7 +164,7 @@ function normalizeDocument(input, quoteMode) {
     }
 
     const commentOpenBefore = commentOpen;
-    const punctuationResult = normalizePausePunctuation(line, lineNo, commentOpen);
+    const punctuationResult = normalizePausePunctuation(line, lineNo, commentOpen, whitelist);
     findings.push(...punctuationResult.findings);
     line = punctuationResult.line;
     commentOpen = punctuationResult.commentOpen;
@@ -237,7 +242,7 @@ function isClosingFence(line, fence) {
 // 一遍归一化留不干净，再跑一遍还会改已定稿的正文；所以反复归一化到不动点。
 // 每遍至少把一个 `…/./—/-` 换成非停顿字符，字符数严格递减，必然收敛。
 // findings 只留第一遍：同一处不重复计数，column 也仍然是原行的偏移。
-function normalizePausePunctuation(line, lineNo, commentOpen) {
+function normalizePausePunctuation(line, lineNo, commentOpen, whitelist) {
   let current = line;
   let findings = null;
   let commentOpenAfter = commentOpen;
@@ -245,7 +250,7 @@ function normalizePausePunctuation(line, lineNo, commentOpen) {
   for (;;) {
     const comments = htmlCommentSpans(current, commentOpen);
     commentOpenAfter = comments.open;
-    const pass = normalizePausePunctuationPass(current, lineNo, comments.spans);
+    const pass = normalizePausePunctuationPass(current, lineNo, comments.spans.concat(styleSpans(current, whitelist)));
     if (findings === null) findings = pass.findings;
     if (pass.line === current) break;
     current = pass.line;

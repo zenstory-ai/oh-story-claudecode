@@ -62,7 +62,9 @@ jobs:
           node scripts/check-reference-gates.js
           node scripts/test-outline-contract.js
       - name: Writer pipeline CLI regression
-        run: python scripts/test-writer-pipeline.py
+        run: |
+          python scripts/test-writer-pipeline.py
+          python scripts/test-style-precedence.py
       - name: Degeneration detector regression
         run: bash scripts/test-degeneration.sh
       - name: Prose backstop hook regression
@@ -152,7 +154,9 @@ jobs:
           node scripts/check-reference-gates.js
           node scripts/test-outline-contract.js
       - name: Writer pipeline CLI regression
-        run: python scripts/test-writer-pipeline.py
+        run: |
+          python scripts/test-writer-pipeline.py
+          python scripts/test-style-precedence.py
       - name: Degeneration detector regression
         shell: bash
         run: bash scripts/test-degeneration.sh
@@ -241,7 +245,9 @@ jobs:
           node scripts/check-reference-gates.js
           node scripts/test-outline-contract.js
       - name: Writer pipeline CLI regression
-        run: python scripts/test-writer-pipeline.py
+        run: |
+          python scripts/test-writer-pipeline.py
+          python scripts/test-style-precedence.py
       - name: Degeneration detector regression
         run: bash scripts/test-degeneration.sh
       - name: Prose backstop hook regression

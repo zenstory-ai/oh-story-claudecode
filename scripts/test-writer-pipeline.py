@@ -180,6 +180,19 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('召回降档：成立', result.stdout)
         self.assertIn('第2章质疑', result.stdout)
 
+    def test_one_sentence_style_beats_stale_digest(self):
+        style = self.put('设定/文风.md', '采用有限全知，允许进入母女各自内心。')
+        digest = self.put('设定/_文风摘要.md', '旧规则：深度限知，不得进入他人内心。')
+        result = self.build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('custom_style=true', result.stdout)
+        self.assertIn(str(style), result.stdout)
+        self.assertNotIn(str(digest), result.stdout)
+        self.assertNotIn('旧规则', result.stdout)
+        for stub in ['', '# 文风', '# 文风\n[待补充]', '# 文风\n<!-- 作者稍后填写 -->']:
+            style.write_text(stub, encoding='utf-8')
+            self.assertIn('custom_style=false', self.build().stdout)
+
     def test_unreadable_utf8_is_reported(self):
         self.volume.write_bytes(b'\xff')
         self.assertEqual(self.view('--contract').returncode, 2)

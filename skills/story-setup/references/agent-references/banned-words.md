@@ -1,8 +1,10 @@
 # AI味禁用词与句式表
 
+> 表达默认值服从 [style-resolution.md](style-resolution.md)；文件结构与事实约束不豁免。
+
 <!-- 同名副本×6 字节同步，改动后跑 scripts/check-shared-files.sh -->
 
-## 最毒禁用句式（出现即修，最高优先级）
+## 默认优先检查的句式（先对照本书文风）
 
 写网文最毒的 AI 句式，作者一旦养成就会反复出现。Gate A 第一遍扫描必须命中：
 
