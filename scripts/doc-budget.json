@@ -533,21 +533,21 @@
         {
           "label": "基础",
           "files": [],
-          "budget": 79560
+          "budget": 80560
         },
         {
           "label": "悬疑",
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ],
-          "budget": 85230
+          "budget": 86230
         },
         {
           "label": "反转",
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ],
-          "budget": 85400
+          "budget": 86400
         },
         {
           "label": "悬疑+反转",
@@ -555,7 +555,7 @@
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
           ],
-          "budget": 91070
+          "budget": 92070
         }
       ],
       "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。"
