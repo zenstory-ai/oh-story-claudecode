@@ -174,7 +174,7 @@
   "paths": [
     {
       "label": "长篇日更主会话",
-      "budget": 41400,
+      "budget": 41500,
       "files": [
         "skills/story-long-write/SKILL.md",
         "skills/story-long-write/references/workflow-daily.md",
@@ -228,14 +228,14 @@
         },
         {
           "label": "反转",
-          "budget": 78500,
+          "budget": 78600,
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ]
         },
         {
           "label": "悬疑+反转",
-          "budget": 84100,
+          "budget": 84200,
           "files": [
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
@@ -262,12 +262,12 @@
       "branches": [
         {
           "label": "基础",
-          "budget": 84500,
+          "budget": 84600,
           "files": []
         },
         {
           "label": "悬疑",
-          "budget": 90100,
+          "budget": 90200,
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ]
@@ -487,14 +487,14 @@
         {
           "label": "基础",
           "files": [],
-          "budget": 75700
+          "budget": 75800
         },
         {
           "label": "悬疑",
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ],
-          "budget": 81300
+          "budget": 81400
         },
         {
           "label": "反转",
@@ -533,14 +533,14 @@
         {
           "label": "基础",
           "files": [],
-          "budget": 87400
+          "budget": 87500
         },
         {
           "label": "悬疑",
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ],
-          "budget": 93000
+          "budget": 93100
         },
         {
           "label": "反转",
