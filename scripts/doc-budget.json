@@ -12,8 +12,8 @@
   "files": [
     {
       "path": "skills/story-long-write/SKILL.md",
-      "budget": 15350,
-      "why": "长篇任一场景都无条件加载。+720：「卷纲不整读（取段器）」节与建纲当场缺口管道路由——卷纲随章数线性膨胀，整读是写作/排纲两条路径共同的最大单笔上下文开销；outline_view.py 按单元ID＋stage 给各自的最小切片，规则必须写在入口层否则任一 workflow 都可能绕回整读。+90：作者记忆若只在某条 workflow 按需出现，开书/日更/单章会有路径漏查；入口只保留按 kind 的 ≤2KB 查询、优先级、单事件回执和 reference 路由，完整协议仍是冷路径。+680：真实写作 A/B 发现单章路径会只读 workflow 后以 rg 摘取正文 references；首屏加入按路由、直接写作与题材条件分层的完整读取门禁，并明确局部检索不算读完。+300：第二轮 A/B 发现完整加载后会稀释当前细纲的时间与停笔约束；加入写前 Constraint Lock，把用户范围、必做/禁做、时间锚与章尾债重新置于最近上下文。"
+      "budget": 15100,
+      "why": "长篇入口与阶段路由；卷纲取段器是日更和补纲共同入口。"
     },
     {
       "path": "skills/story-long-write/references/workflow-daily.md",
@@ -22,13 +22,13 @@
     },
     {
       "path": "skills/story-long-write/references/workflow-chapter.md",
-      "budget": 15800,
-      "why": "单章正文与质量检查，日更/单章路径都加载。+460：细纲检查与上下文 (2a) 改取段器不整读（--stage write 与批次底稿隔离）；收编闸门改按「是否在卷纲占编号/占行」判定（F/L 编号、反转/打脸债行），三档待裁定项挂细纲「本章新增物处置」账并规定收编顺序（先卷纲分配编号再 tracking 登记）——顺序反了会出现 tracking 有、卷纲没有的伏笔或故事线。含 spawn prompt 的正文形状层约束——细纲边界只传「不许自造」半边时，子代理会一条情节点一段平推（#255 的复发路径），形状半边必须随 prompt 传达。+180：把筛选后的偏好传给初稿/去味 agent，并明确禁止为最大化命中牺牲连贯、节奏和字数。+170：把 stock-reaction-tic 接到逐处删除测试和可核验交付摘要，避免 advisory 被笼统略过。+460：形状层默认交错（同一时空相邻情节点默认互相打断，附可自跑判据）＋两段式切分点规则（尽量选在时空边界，不拆散同时空相邻点）＋交付随附时空表、步骤 8 先核时空表与组装接缝——实测某章 13 点 13/13 按细纲顺序平推、同场戏 5 点排队；两段式盲切实测产生拼接缝重复与跨段交错不可行，时空边界切分同时治两者，且切分点在表中留有审计痕迹 +800：正文新增物三档授权，与一致性审查阶段的三档处置（收编/修复/提请作者确认）。原「独立剧情 blocking」是无脚本检测的一刀切禁令，写手为规避它连一档现场材料（路人、器物、地名、一次性对话）都不敢写，正文只剩细纲骨架——这是情绪平、读起来像流水账的制度成因之一。三档把边界从「禁止」改成「按后续义务分级」，并把三个出口全部接到已有管道（Phase 3 建档 / foreshadow_changes / mode=revision 同章事务），不新增脚本、不新增 agent。 ＋1193：写手管线三改——①组装走 build_writer_prompt.py 脚本（固定首行/细纲/单元卡/状态速记/阅读体验字段由模板保证必在，手拼漏传是实测故障形态，原逐条手拼列表降为脚本不可用时的规格回退）；②召回降档（custom_style＋题材卡＋细纲目标情绪三条件满足时跳过逐章对标召回 (a)(b)(e)(f)，情绪/节奏取细纲与单元卡——成熟项目的最大写前材料开销）；③反套话验收与写法抽查改由质检 spawn 做删除测试直接改，写手不写验收短文；申报表附「想要没拿到」行接批末供给反馈。 ＋440（日更聚合线同步抬 410）：组装脚本改版——细纲全文、卷纲单元卡、续写状态卡都不再注入 prompt，改由主会话填七槽（本章意图／参考技法／本节速记／涉及角色／genre_prose_card／必读设定／author_preferences），每槽填法只写在槽内提示语里、本文件不复述；标题行改给字面量（层级与章号补零位数从既有章学）；agent 定义已有的五项在脚本路径与回落规格里都降为一行指针。"
+      "budget": 14600,
+      "why": "每章使用的组装、召回、写作与追踪交接；仅手动回落时加载 writer-prompt-fallback.md。"
     },
     {
       "path": "skills/story-long-write/references/workflow-setup.md",
-      "budget": 16550,
-      "why": "开书/补纲路径加载。+1400：①故事线层——卷纲加「本卷故事线」L 编号表与正面授权（授权写进卷契约，收编闸门以编号/行为判据）；②建纲当场缺口管道——排纲现场发现的设定缺口就地登记、批末统一回填，不再中断排纲去补设定；③具名地点底图按需落档——剧情消费空间属性（距离/方位/进出口/分区）时把用到的属性按 B 级落档，不消费不强制；无档硬写会导致连续章节地理互相矛盾；④卷纲读写全部接取段器。 ＋1345：细纲模板补阅读体验字段（本章标价 / 闭环状态 / 信息差触发点 / 镜头准入档），情节点表加「分辨率」列、执行边界改「禁 + 放」两半；「细纲后设定补全」加第四类刻度与名目，并给出缺刻度时的四步处理（先查→能推就补→推不出就问→先落设定再引用）。015 章实测：正文全章零价格锚、十一个情节点执行边界全是禁令、细纲登记了信息差却无触发点——三项都在细纲层缺表达位，写手无从补。 ＋881：排纲供给管道——批次流程加「供给自查」步骤（对手/角色/能力/刻度/场景五行，产《供给单》落卷纲单元卡，批末 --supply 脚本验收）；「缺刻度不许硬写」改写为创作自主权 A/B/C 分级（A 自由发明、B 发明＋落档、C 提案裁定），缺口从流程故障变成创作入口；细纲模板加「写手自由区」行、「禁止提前释放」限本章特有不复读卷级常任；对标剧情参照允许「自创」。第一卷排纲实测三类事故（细纲槽位指向查无实据的权威文件、连续七章无具名对手、单元形态连排同型）都缺一个批次级供给盘点位。"
+      "budget": 14700,
+      "why": "开书与补纲时使用：供给自查、A/B/C 创作授权、故事线及空间属性落档。"
     },
     {
       "path": "skills/story-short-write/SKILL.md",
@@ -42,13 +42,13 @@
     },
     {
       "path": "skills/story-setup/references/templates/agents/narrative-writer.md",
-      "budget": 6950,
-      "why": "正文 agent 的系统提示，每章每次 spawn 都付。−11250：≤150 行重写（实际 94 行）——保留铁律八条（细纲内容层演足/形状层交错判据/新增物三档与授权措辞/阅读体验字段消费/字数纪律/元信息隔离/格式硬线/不写追踪）、条件化参考文件表、写前静默预检、叙述姿态默认档与书级让位、7 Gate、时空表/对话九症状/文风漂移三项自检、文风优先级决议、申报表与「想要没拿到」行。删去与 writing-craft/anti-ai-writing 重复的工艺长文（写手按参考文件表条件读原件）、八问与反套话验收短文（义务转质检侧删除测试）、两段式 checkpoint 残文。书级自查等 agent 侧扩展段落不并入，其行为由组装脚本 prompt 注入与 workflow 层承担。+50：申报表末行改「本章没写成的」并列明被挡原因五类（随卷纲故事线层提交）——写成了的进申报表、这一行只收没写成的，两表口径分开才能接批末四路分流。+190：参考文件路径规则还原为三端同步器识别的标准段形。+470：引用一律带 canonical agent-references 前缀（运行时与同步器解析依赖）。+140：参考文件表补 format-and-structure 与 style-genre-modules 两行（部署引用消费链完整性检查要求所有 agent-references 有消费方）。+200：回填 v13 契约锚句（语气标点谱系/否定翻转复核链/under-over 口径/细纲边界）——部署检查按字面量断言这些条款在场。"
+      "budget": 7000,
+      "why": "共享写手定义：长篇创作、短篇输出与按调用范围审查；压缩重复规则。"
     },
     {
       "path": "skills/story-long-write/references/writing-craft.md",
-      "budget": 12200,
-      "why": "narrative-writer 每章写作时读。+700：重写情绪落地、场景三维度与动静节奏，删除『情绪词逐个替换成身体动作』的生成根因，并加入功能删除测试；固定章实验身体部位依赖下降 65.5%。+280：「从细纲到正文」把「情节点之间可以合并穿插重排」改成默认交错（限同一时空、串行需理由），并补判据与一个正例——这里是写手真正学怎么落地的地方，只在别处写规则会被当成放宽的许可而不是默认值 ＋2786：交付前八问定义（供质检侧引用的删除测试清单）、新增 §10 在场者的账（镜头准入 / 说话权分级 / 标价人 / 尺子先行）、§8 状态台阶与同类递减与密处禁概括与最重的一句最短、§4 二次锚定、§7 人物余韵例外。既有的疏密分配与反平推条目在完整流程实测全部落空，唯一配了自问句的三维遮盖法是唯一被执行的条目——没有自问句的条目会被读过去。"
+      "budget": 11800,
+      "why": "每章写作技法：场景交织、疏密、人物立场和收益刻度；质检用功能删除测试。"
     },
     {
       "path": "skills/story-long-write/references/anti-ai-writing.md",
@@ -174,7 +174,7 @@
   "paths": [
     {
       "label": "长篇日更主会话",
-      "budget": 43100,
+      "budget": 41400,
       "files": [
         "skills/story-long-write/SKILL.md",
         "skills/story-long-write/references/workflow-daily.md",
@@ -183,7 +183,7 @@
     },
     {
       "label": "长篇开书",
-      "budget": 31900,
+      "budget": 29800,
       "files": [
         "skills/story-long-write/SKILL.md",
         "skills/story-long-write/references/workflow-setup.md"
@@ -191,7 +191,7 @@
     },
     {
       "label": "正文 agent 基础规则（不含条件参考）",
-      "budget": 40700,
+      "budget": 36600,
       "files": [
         "skills/story-setup/references/templates/agents/narrative-writer.md",
         "skills/story-long-write/references/writing-craft.md",
@@ -216,26 +216,26 @@
       "branches": [
         {
           "label": "基础",
-          "budget": 67080,
+          "budget": 72800,
           "files": []
         },
         {
           "label": "悬疑",
-          "budget": 72750,
+          "budget": 78400,
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ]
         },
         {
           "label": "反转",
-          "budget": 72920,
+          "budget": 78500,
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ]
         },
         {
           "label": "悬疑+反转",
-          "budget": 78590,
+          "budget": 84100,
           "files": [
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
@@ -262,26 +262,26 @@
       "branches": [
         {
           "label": "基础",
-          "budget": 78550,
+          "budget": 84500,
           "files": []
         },
         {
           "label": "悬疑",
-          "budget": 84220,
+          "budget": 90100,
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ]
         },
         {
           "label": "反转",
-          "budget": 84390,
+          "budget": 90300,
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ]
         },
         {
           "label": "悬疑+反转",
-          "budget": 90060,
+          "budget": 95900,
           "files": [
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
@@ -487,21 +487,21 @@
         {
           "label": "基础",
           "files": [],
-          "budget": 70070
+          "budget": 75700
         },
         {
           "label": "悬疑",
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ],
-          "budget": 75740
+          "budget": 81300
         },
         {
           "label": "反转",
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ],
-          "budget": 75910
+          "budget": 81500
         },
         {
           "label": "悬疑+反转",
@@ -509,7 +509,7 @@
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
           ],
-          "budget": 81580
+          "budget": 87100
         }
       ],
       "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。"
@@ -533,21 +533,21 @@
         {
           "label": "基础",
           "files": [],
-          "budget": 80560
+          "budget": 87400
         },
         {
           "label": "悬疑",
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ],
-          "budget": 86230
+          "budget": 93000
         },
         {
           "label": "反转",
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ],
-          "budget": 86400
+          "budget": 93200
         },
         {
           "label": "悬疑+反转",
@@ -555,7 +555,7 @@
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
           ],
-          "budget": 92070
+          "budget": 98800
         }
       ],
       "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。"
