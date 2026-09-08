@@ -119,7 +119,7 @@ class PipelineTests(unittest.TestCase):
         result = self.call('build_writer_prompt.py', '--project', self.book, '--chapter', 1, '--out', out)
         self.assertEqual(result.returncode, 0, result.stderr)
         prompt = out.read_text(encoding='utf-8')
-        self.assertIn(str(self.book / '正文/第001章_一封信.md'), prompt)
+        self.assertIn(str((self.book / '正文/第001章_一封信.md').resolve()), prompt)
         self.assertIn('第1章接信', prompt)
         self.assertNotIn('不能串卡', prompt)
         self.assertIn('召回降档：成立', result.stdout)

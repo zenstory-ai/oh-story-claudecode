@@ -365,7 +365,7 @@ def build(project: Path, chapter: int, report: list):
     parts.append(slot_setting)
     parts.append("——— author_preferences（低优先级倾向，自然吸收，不逐条展示）———\n"
                  f"{SLOT_MARK} author_memory query 命中本章的 prose_style/story_design 项；"
-                 "无则写「无」")
+                 "无则写「无」；不逐条展示或最大化命中，不牺牲连贯、节奏和字数。")
 
     # ---- 固定块：压成指针，不重述 agent 定义 ----
     parts.append(
