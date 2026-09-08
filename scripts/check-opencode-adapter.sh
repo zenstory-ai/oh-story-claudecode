@@ -646,9 +646,21 @@ for p in sorted(Path('skills/story-setup/references/opencode/commands').glob('*.
     fm = text.split('---', 2)[1]
     assert 'description:' in fm, f'{p}: missing description'
     assert f'请使用 {p.stem} skill' in text, f'{p}: command body must route to same skill'
+    # OpenCode 只在模板不含 $ARGUMENTS 且不含 $1..$N 时才把用户参数追加到末尾，
+    # 这个回退行为官方文档没有写（opencode.ai/docs/commands 只描述占位符），
+    # 实测 1.14.32 会追加成一行裸文本。显式写占位符才与 ZCode 一致，也不依赖未文档化行为。
+    assert '$ARGUMENTS' in text, f'{p}: command template must place $ARGUMENTS explicitly'
+
+# 两个有 command 面的适配层保持一致，任一侧漏写都拦下来
+zcode_dir = Path('skills/story-setup/references/zcode/commands')
+if zcode_dir.is_dir():
+    zcode_names = {p.stem for p in zcode_dir.glob('*.md')}
+    assert zcode_names == command_names, f'opencode/zcode command sets differ: only_zcode={zcode_names-command_names}, only_opencode={command_names-zcode_names}'
+    for p in sorted(zcode_dir.glob('*.md')):
+        assert '$ARGUMENTS' in p.read_text(), f'{p}: command template must place $ARGUMENTS explicitly'
 PY
 
-echo "  OK slash command templates"
+echo "  OK slash command templates (含 \$ARGUMENTS 占位符与 ZCode 对齐)"
 
 assert_grep 'experimental\.session\.compacting' "$ROOT/plugin.ts" "OpenCode plugin must inject pre-compact context"
 assert_grep 'tool\.execute\.before' "$ROOT/plugin.ts" "OpenCode plugin must guard tool writes"
