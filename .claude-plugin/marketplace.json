@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "网络小说创作工具箱 — 扫榜、拆文、写作全流程 Claude Code skill，覆盖长篇与短篇网文",
-    "version": "0.7.9"
+    "version": "0.7.10"
   },
   "plugins": [
     {
       "name": "oh-story",
       "description": "网络小说创作工具箱：13 个 Skills，覆盖扫榜、拆文、写作、审查、去 AI 味和封面生成。",
       "source": "./",
-      "version": "0.7.9",
+      "version": "0.7.10",
       "category": "novel-writing"
     }
   ]

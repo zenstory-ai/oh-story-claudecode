@@ -12,6 +12,33 @@ compare 链接；小节名使用 Keep a Changelog 的六个英文类别（`Added
 
 ## [Unreleased]
 
+## [0.7.10] - 2026-09-09
+
+> 本版 `agents_version: 30`（v0.7.9 为 29），`setup_skill_version: 1.2.10`。更新技能包后，在写作项目根重新运行 `/story-setup`（Codex 用 `$story-setup`），再新开会话，加载新版写手、检查规则和参考文件。此前使用 main v30 的项目也需重新部署。
+
+### Added
+
+- 长篇新增排纲供给自查、A/B/C 创作授权与写手自由区（#394）：批次开始前盘点角色、能力和场景材料，细纲明确得失、叙事疏密与允许展开的空间。
+- 长篇新增写手 prompt 组装器与卷纲取段器（#395）：固定材料由脚本组装，主会话填写判断槽；按当前单元读取卷纲，同时保留全局约束与故事线。
+- 短篇新增写前交付参数预检（#402）：生成正文前核对总字数、节数与用户指定的逐节下限是否能同时满足。
+- `story-setup check` 新增只读环境检查，报告技能、agent、hook 和部署状态（#405、#408）。
+- Dashboard 记住浏览位置与展开状态，并显示文稿行号（#391）。
+
+### Changed
+
+- 长篇新增物按后续义务分档：现场材料直接写，可复用事实申报收编，影响主线和既有结果的变更交作者裁定；写手交付实际时空表，默认保留分组写作的一次字数 checkpoint（#395）。
+- 长短篇按需加载目录、初始化协议、对标召回与参考索引；去味规则集中维护，写手、语义审查者和最终扫描各有明确职责（#401、#415）。
+- Claude Code / ZCode 市场统一为一个 `oh-story` 插件，包含全部 13 个 Skills（#393）。旧拆分插件用户按 [升级指南](skills/story-setup/UPGRADING.md#插件打包身份迁移v079-同版本修复) 迁移。
+
+### Fixed
+
+- 统一当前请求、本书文风、作者记忆、对标与通用参考的逐维优先级，写作、去味和审稿使用同一文风裁决（#412）。
+- 修复文风覆盖导致整份 reference 停读的问题，保留技法和检查资料的任务读取条件（#415）。
+- 去味仅执行指定 Gate；保留有功能的情绪直写与身体细节，撤销短篇身体词次数上限，避免为词频改坏“手机”“抬手”等正常表达（#403、#406、#415）。
+- 细纲缺失或不可读时明确报告错误，排除细纲完成记录造成的照搬误报，并补充正文中的模型拒绝语与工程词检测（#398、#404）。
+- 修复跨 CLI agent 权限映射、OpenCode 命令参数传递、OpenCode/ZCode 的 setup 检查路由，以及 Antigravity Windows hook 路径引号（#399、#411、#408、#396）。
+- 分离运行脚本与共享参考的维护归属，保持部署副本一致。
+
 ## [0.7.9] - 2026-08-30
 
 > 本版改了 narrative-writer 模板与短篇 reference bundle，`agents_version` 升到 29。升级后必须在写作项目根重新运行 `/story-setup` 并新开会话，否则拿到的仍是旧 agent 与旧参考文件。
@@ -994,7 +1021,8 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 - 初始版本：长篇/短篇写作、拆文、扫榜、去 AI 味、浏览器操控
 - 用 52000+ 本真实数据增强知识库
 
-[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.7.9...HEAD
+[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.7.10...HEAD
+[0.7.10]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.7.9...v0.7.10
 [0.7.9]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.7.8...v0.7.9
 [0.7.8]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.7.7...v0.7.8
 [0.7.7]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.7.6...v0.7.7

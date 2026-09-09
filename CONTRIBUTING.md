@@ -207,6 +207,8 @@ fork → branch → commit → PR → review → merge
 
 Claude Code 与 ZCode 都发布单一 `oh-story` bundle，bundle 从仓库根暴露全部 13 个 Skills；不要恢复按 Skill 拆成 13 个 catalog 条目的旧结构。两个 marketplace 自身的名字按平台保持不同：Claude 为 `oh-story-skills`，ZCode 根 catalog 为 `oh-story-zcode`。两边 catalog 都只能有一个 `name: oh-story`、`source: ./` 的条目，其版本须与对应原生 manifest 一致。
 
+`agents_version` 在 release 时取上一个发布 tag 的值加 1；开发分支已提前使用该目标值时保持不变，不随 PR 合并次数累加。发布前核对 `scripts/current-contract.json`、部署提示与生成模板的一致性。
+
 发版版本共有 6 个 JSON/VERSION 文件锚点，必须同步：
 
 1. `.claude-plugin/marketplace.json`（`metadata.version` 与唯一条目的 `version`）
