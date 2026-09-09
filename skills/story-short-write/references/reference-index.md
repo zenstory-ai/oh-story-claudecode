@@ -12,6 +12,8 @@
 | [references/genre-styles/](genre-styles/) | **定方向后必读**：按题材加载对应风格包（追妻火葬场 / 世情打脸 / 复仇打脸 / 总裁豪门 / 宅斗宫斗 / 民俗怪谈 / 悬疑 / 甜宠 / 双男主 / 沙雕脑洞），正文风格随之切换 |
 | [references/short-deslop.md](short-deslop.md) | 去AI味时必读（短篇专属，只杀真·AI腔，不杀情绪烈度） |
 | [references/workflow-design.md](workflow-design.md) | Phase 2 构思、设计字段、Agent 调用与完成门禁；Phase 3/4 不预加载 |
+| [references/workflow-draft.md](workflow-draft.md) | Phase 3 写正文前必读：参数与逐场景写作；完成门槛见入口 |
+| [references/workflow-revision.md](workflow-revision.md) | Phase 4 精修/自检前必读：检查分工、去味调用、扫描与交付验收 |
 | [references/writing-workflow.md](writing-workflow.md) | Phase 2 设计任务 + Phase 4 精修 |
 | [references/genre-writing-formulas.md](genre-writing-formulas.md) | 冷门题材结构骨架补充（核心 10 题材直接用 genre-styles/） |
 | [references/genre-writing-techniques.md](genre-writing-techniques.md) | 跨题材通用技法（震惊场景/三翻四震/感情线四阶段/喜剧flag） |

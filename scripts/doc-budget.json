@@ -32,8 +32,8 @@
     },
     {
       "path": "skills/story-short-write/SKILL.md",
-      "budget": 11300,
-      "why": "短篇入口；对标召回和完整资料索引原文迁出，保留阶段门禁、原正文规则和 verifier。"
+      "budget": 5500,
+      "why": "短篇入口；Phase 3/4 执行细则原文迁出，按阶段完整读取。 根据同稿实验恢复入口的小节完整性与完成门槛，原规则未增写。"
     },
     {
       "path": "skills/story-short-write/references/workflow-design.md",
@@ -209,6 +209,16 @@
       "path": "skills/story-deslop/references/deslop-gates.md",
       "budget": 4700,
       "why": "语义去味按任务读取所选 Gate；独立去味详版与写手判据均为 main 原文，共享副本同步检查。"
+    },
+    {
+      "path": "skills/story-short-write/references/workflow-draft.md",
+      "budget": 4600,
+      "why": "Phase 3 写作细则由原 SKILL 原文迁入；根据同稿实验将小节完整性与完成门槛保留入口，原规则未增写。"
+    },
+    {
+      "path": "skills/story-short-write/references/workflow-revision.md",
+      "budget": 1700,
+      "why": "Phase 4 精修细则由原 SKILL 原文迁入；含最终扫描与交付验收。"
     }
   ],
   "paths": [
@@ -631,6 +641,16 @@
         }
       ],
       "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。"
+    },
+    {
+      "label": "短篇执行指令（入口+Phase 3/4，不含技法参考）",
+      "files": [
+        "skills/story-short-write/SKILL.md",
+        "skills/story-short-write/references/workflow-draft.md",
+        "skills/story-short-write/references/workflow-revision.md"
+      ],
+      "budget": 11500,
+      "why": "合计约束原入口拆分后的执行指令，避免迁出文件不计入预算；原短篇入口预算11300，新增200仅容纳阶段入口和相对路径说明。"
     }
   ]
 }
