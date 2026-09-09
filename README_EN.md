@@ -149,6 +149,8 @@ After updating, if a project has already run `/story-setup`, re-run `/story-setu
 
 **Author preferences persist across sessions:** tell `/story` to remember a writing habit; the write counts as successful only when it returns an `Author Memory Receipt`. Normal writing queries only relevant confirmed items with a hard 2 KB output cap, rather than injecting the full profile, candidates, and history into the prose prompt. This memory stays separate from per-book continuity tracking, and current instructions, book settings, and hard gates always take priority.
 
+**When the material to analyze or import isn't just web-page text:** for scouting you already pull web pages with WebFetch; [cue-omni-reader](https://github.com/sensedeal/cue-skills/tree/main/cue-omni-reader) fills the gap *beyond* web-page text — PDFs, interview recordings, in-page video/attachments, or several local files at once — collected into Markdown before analysis or `/story-import`. Install: `npx skills add sensedeal/cue-skills --skill cue-omni-reader` (MIT; may bill).
+
 ## Skills
 
 | Skill | Trigger | Description |

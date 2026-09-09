@@ -147,6 +147,8 @@ claude plugin install oh-story@oh-story-skills
 
 **作者习惯会跨会话延续：** 对 `/story` 说“记住我的写作习惯”，稳定偏好会进入工作区 `.story/作者记忆/`；看到 `Author Memory Receipt` 才算写入成功。普通写作只查询本次相关的已确认条目，输出硬上限 2KB，不把完整画像、候选和历史塞进正文 prompt。它与每本书的剧情追踪分开，当前要求、本书设定和硬性门禁始终优先。
 
+**要拆/要导的材料还不全是网页正文时：** 扫榜的网页正文你们已用 WebFetch 抓链接；[cue-omni-reader](https://github.com/sensedeal/cue-skills/tree/main/cue-omni-reader) 补的是网页正文之外的素材——PDF、访谈录音、页内视频/附件、一次多个本地文件——统一收成 Markdown 后，再进拆文或 `/story-import`。安装：`npx skills add sensedeal/cue-skills --skill cue-omni-reader`（MIT，可能计费）。
+
 ## Skills
 
 | Skill | 触发 | 说明 |
