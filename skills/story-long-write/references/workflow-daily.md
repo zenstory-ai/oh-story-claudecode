@@ -4,7 +4,7 @@
 
 > **日更准备步骤**：每章写作前 4 步——状态筛选 + 题材正文提示卡召回 + 文风召回 + 意图确认，嵌入 Step 2 逐章循环。
 >
-> 写前资料清单、对标书路径查找、题材正文提示卡、自定义文风模式、文风缺失 fail-fast、模块/节奏缺失停止、权威冲突规则、无对标项目处理，一律按 `SKILL.md` Phase 4 的「缺失文件处理」「对标分析权威优先级」和 workflow-chapter.md 写前准备 (a)-(g) 执行；本文件不另立一套。读者契约、主角代理权、期待债、终局储备参 `reader-contract-and-progression.md`。
+> 写前资料清单、对标书路径查找、题材正文提示卡、自定义文风模式、文风缺失 fail-fast、模块/节奏缺失停止、权威冲突规则、无对标项目处理，一律按 [project-files.md](project-files.md) 的「缺失文件处理」「对标分析权威优先级」和 [benchmark-recall.md](benchmark-recall.md) 的写前准备 (a)-(g) 执行；本文件不另立一套。读者契约、主角代理权、期待债、终局储备参 `reader-contract-and-progression.md`。
 >
 > **多本对标书**：从 `设定/题材定位.md` 读 `主对标书` 字段；字段指向当前作品时按缺失处理（老项目可能把本书自身登记成了主对标）。缺失时用 `对标/` 下字典序第一本并提示用户补字段——先按当前项目目录名、`.active-book` 和 `设定/题材定位.md` 中的本书信息识别当前作品，排除同名或来源指向当前正文的 `对标/{当前书}/`；排除后为空则按无对标处理。
 
@@ -47,7 +47,7 @@
 
 **首次初始化**：
 
-1. `_tracking-state.json` 不存在且项目尚无正文：构造 `last_chapter=0` 的初始化事务，执行 `tracking_commit.py init`。
+1. `_tracking-state.json` 不存在且项目尚无正文：先完整读取 [tracking-initialization.md](tracking-initialization.md)，构造 `last_chapter=0` 的初始化事务，执行 `tracking_commit.py init`。
 2. `_tracking-state.json` 不存在但项目已有正文：停止日更。该目录停在旧追踪结构上，走 `/story-import` 的「旧追踪项目迁移」重建 `追踪/`——**不用重跑全书拆解**，只按最后完整章号和现有追踪文件构造初始化事务。本 workflow 自己不解析旧追踪结构、不推测状态。`init` 会把旧结构按原样整体移入 `追踪/_旧追踪存档/` 再建当前协议——旧内容不删除也不参与解析。
 3. `tracking_commit.py check` 报告派生视图与 state 不一致：重新提交该章的 `mode=revision` 事务让工具整份重建（`expected_state_revision` 取 `追踪/_tracking-state.json` 的 `state_revision` 字段——`check` 失败时只往 stderr 打 ERROR，不输出 JSON）；不得手改 Markdown 或继续写下一章。手写出的逐章记录会让同章 append 永久报 `chapter delta N already exists with different content`，删掉那个手写文件后重跑原事务即可。
 

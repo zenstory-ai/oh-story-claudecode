@@ -293,7 +293,7 @@ story-architect 属于高层级结构设计 agent。轻量题材定位优先由�
 大纲完成后，创建以下 artifact（加载 [references/artifact-protocols.md](artifact-protocols.md) 中对应模板）：
 - **大纲/大纲.md**：全书卷级鸟瞰（卷名+字数+章数+核心事件+状态变化，一段式汇总）
 - **大纲/卷纲_第X卷.md**：每卷的故事线（L 编号）+剧情单元+情绪弧线（含章节定位）+人物弧线+伏笔+反转+对标结构坐标+**刻度台阶/打脸债/压力线轮转**三表（按需填写，不适用时省略或写「无」；参考 outline-methods.md「大纲三层结构法」 + outline-structure-theory.md「章节定位与张弛 / 对标节奏迁移」 + emotional-arc-design.md「六种弧线速查」 + long-reversal.md「反转类型」；三表模板见 artifact-protocols.md）
-- **追踪事务初始状态**：按 `references/tracking-transaction.md` 构造第 0 章初始化 JSON，执行 `scripts/tracking_commit.py init`，生成检查点、续写状态卡（固定 7 栏）、空的伏笔/时间线视图与目录；紧接着运行 `check`，通过后删除初始化事务 JSON；核心角色动态快照可在第一次正文事务中创建
+- **追踪事务初始状态**：先完整读取 [tracking-initialization.md](tracking-initialization.md)，按其构造第 0 章初始化 JSON，执行 `scripts/tracking_commit.py init`，生成检查点、续写状态卡（固定 7 栏）、空的伏笔/时间线视图与目录；紧接着运行 `check`，通过后删除初始化事务 JSON；核心角色动态快照可在第一次正文事务中创建
 
 前 3 章细纲额外加载 [references/opening-design.md](opening-design.md)（黄金三章法则+六大标准）。
 

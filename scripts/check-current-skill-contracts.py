@@ -1259,10 +1259,10 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
         )
 
     # 长篇的「对标发现」随 Phase 1-3 从 SKILL.md 搬进 workflow-setup.md（#269 减无条件加载），
-    # 断言跟着内容走；短篇的对标发现仍在自己的 SKILL.md 里。
+    # 断言跟着内容走；短篇对标发现位于独立的 benchmark-recall.md。
     for relative in (
         "skills/story-long-write/references/workflow-setup.md",
-        "skills/story-short-write/SKILL.md",
+        "skills/story-short-write/references/benchmark-recall.md",
         "skills/story-long-write/references/cross-book-recall.md",
         "skills/story-short-write/references/cross-book-recall.md",
     ):

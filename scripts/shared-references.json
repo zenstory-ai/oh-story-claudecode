@@ -197,6 +197,21 @@
         "skills/story-review/references/style-resolution.md",
         "skills/story-setup/references/agent-references/style-resolution.md"
       ]
+    },
+    {
+      "name": "deslop-gate-rules",
+      "source": "skills/story-deslop/references/deslop-gates.md",
+      "targets": [
+        "skills/story-setup/references/agent-references/deslop-gates.md"
+      ]
+    },
+    {
+      "name": "tracking-initialization",
+      "source": "skills/story-long-write/references/tracking-initialization.md",
+      "targets": [
+        "skills/story-import/references/tracking-initialization.md",
+        "skills/story-review/references/tracking-initialization.md"
+      ]
     }
   ],
   "derived_groups": [

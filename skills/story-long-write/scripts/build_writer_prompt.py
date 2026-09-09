@@ -8,7 +8,7 @@
 （主会话照抄，空槽以外一字不改），以下是核对报告（不进 prompt）。
 
 职责边界:
-- 脚本做确定性部分：固定首行、定位、标题行字面量、细纲指针、文风三行与判读的通用参考、
+- 脚本做确定性部分：固定首行、定位、标题行字面量、细纲指针、文风全文路径与裁决、
   上一章结尾、降档判定与情绪/节奏槽、固定块指针。
 - 主会话填八槽：执行安排 / 本章意图 / 参考技法 / 本节速记 / 涉及角色 / genre_prose_card /
   必读设定 / author_preferences。降档不成立时情绪与节奏槽也归主会话。
@@ -162,25 +162,6 @@ def learn_heading_form(project: Path, chapter: int, title: str):
             f"照既有章形态（{level} ＋ 章号{how}）")
 
 
-def parse_reference_ruling(style_text: str):
-    """扫 设定/文风.md「通用参考裁决」表，返回 (停读清单, 判读的行)。"""
-    skips, reads = [], []
-    for line in style_text.splitlines():
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cells) < 2:
-            continue
-        name = re.sub(r"[`*]", "", cells[0]).strip()
-        if not name.endswith(".md") and not name.endswith("/*"):
-            continue
-        if re.match(r"^停读(?:$|[（(\s])", cells[1]):
-            skips.append(name)
-        elif "读" in cells[1]:
-            caveat = re.sub(r"[`*]", "", cells[1]).strip()
-            caveat = re.sub(r"^读\s*[（(]?", "", caveat).rstrip("）)").strip()
-            reads.append(f"{name}（{caveat}）" if caveat else name)
-    return skips, reads
-
-
 def build(project: Path, chapter: int, report: list):
     errors = []
 
@@ -247,13 +228,7 @@ def build(project: Path, chapter: int, report: list):
             "文风优先裁决：`设定/文风.md` 对句段／句法／对话落法／标点形态与删改取向的规定"
             "按 style-resolution.md 裁决：当前请求 > 本书文风 > active 作者记忆 > 对标 > 通用参考；不覆盖细纲事实、信息边界、调用方所选 Gate 范围及文件结构。"
             "风格冲突按文风写，交付摘要列出「因文风优先而未执行的通用条款」。")
-        skips, reads = parse_reference_ruling(style_text)
-        if skips:
-            parts.append("本书停读清单（整行跳过、不判定不读取）：" + "、".join(skips))
-        if reads:
-            parts.append("本书判读的通用参考：" + "；".join(reads))
-        report.append(
-            f"文风：custom_style=true，停读 {len(skips)} 项、判读 {len(reads)} 项")
+        report.append("文风：custom_style=true，表达冲突按维度裁决；reference 读取仍按任务条件")
     else:
         parts.append(
             "——— 文风 ———\n"
@@ -338,8 +313,7 @@ def build(project: Path, chapter: int, report: list):
     parts.append(
         "——— 参考技法 ———\n"
         f"{SLOT_MARK} 步骤 3 三问的第 ②③ 问：借鉴哪个参考文件的哪个技法、用在哪些段落。"
-        "上面「判读的通用参考」是书级可读范围，不是本章取用；本书自定义文风优先，"
-        "通用参考只作技法示例、不给验收线。")
+        "按 reference 表的任务条件读取；本书文风只覆盖冲突表达条款，不停读整份文件。")
     parts.append(
         "——— 本节速记 ———\n"
         f"{SLOT_MARK} 按 workflow-chapter 步骤 3「状态筛选」产出（`追踪/上下文.md` 不注入"
@@ -357,6 +331,8 @@ def build(project: Path, chapter: int, report: list):
     parts.append("——— style_resolution / author_preferences ———\n"
                  f"{SLOT_MARK} author_memory query 命中本章的 prose_style/story_design 项；"
                  "query 显式传本书/题材/流程；偏好是低优先级倾向，无则写「无」。附 style_resolution：生效要求及来源、被覆盖的默认条款和事实边界；同一裁决传去味与审稿，不逐条追求命中。")
+
+    parts.append("检查分工：写手负责编排、内容覆盖和格式自检；父流程质量阶段负责语义去味及最终文件扫描。写手不提前重复整轮去味或相同检查链，保留时空表、新增申报与原定交付。")
 
     # ---- 固定块：压成指针，不重述 agent 定义 ----
     parts.append(

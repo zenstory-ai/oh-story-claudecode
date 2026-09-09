@@ -12,8 +12,8 @@
   "files": [
     {
       "path": "skills/story-long-write/SKILL.md",
-      "budget": 15100,
-      "why": "长篇入口与阶段路由；卷纲取段器是日更和补纲共同入口。"
+      "budget": 6900,
+      "why": "长篇入口与阶段路由；目录/产物与完整资料索引按原文迁出，锁住无条件加载节省。"
     },
     {
       "path": "skills/story-long-write/references/workflow-daily.md",
@@ -22,8 +22,8 @@
     },
     {
       "path": "skills/story-long-write/references/workflow-chapter.md",
-      "budget": 14600,
-      "why": "每章使用的组装、召回、写作与追踪交接；仅手动回落时加载 writer-prompt-fallback.md。"
+      "budget": 12300,
+      "why": "每章组装与质量流程；原 (a)-(g) 迁入 benchmark-recall，合计路径继续计入。"
     },
     {
       "path": "skills/story-long-write/references/workflow-setup.md",
@@ -32,8 +32,8 @@
     },
     {
       "path": "skills/story-short-write/SKILL.md",
-      "budget": 16500,
-      "why": "短篇任一场景都无条件加载。+100：移除把三维度和身体反应当逐段配额的旧指令，并明确功能性身体细节边界。+1500：6+6 首屏/尾部对照与缺引用 5+5 实验显示，Reference Gate 必须在首屏并 fail-closed；补 Phase 2 确定性 verifier、具名失败和最多两轮定向 repair，避免只读 SKILL.md 即写作。在原预算内替换冲突的手工字数说明：真实写作 A/B 暴露 6000-8000 用户范围与无条件 ≥8000 互相冲突；现明确用户范围优先，并加入最终 delivery verifier 与定向修复闭环。构思专属步骤迁入 workflow-design，保留共享对标加载与全部正文规则；收紧入口预算锁住无条件加载节省，Phase 2 合计仍计入迁出文件。"
+      "budget": 11300,
+      "why": "短篇入口；对标召回和完整资料索引原文迁出，保留阶段门禁、原正文规则和 verifier。"
     },
     {
       "path": "skills/story-short-write/references/workflow-design.md",
@@ -42,8 +42,8 @@
     },
     {
       "path": "skills/story-setup/references/templates/agents/narrative-writer.md",
-      "budget": 7350,
-      "why": "共享写手定义：长篇创作、短篇输出与按调用范围审查；压缩重复规则。 本次 +250：各执行模式共同加载文风裁决、区分 Gate 范围与表达默认值。"
+      "budget": 7000,
+      "why": "共享写手定义；A-G 原文迁入同源 Gate 细则，保留创作铁律并按调用方分配检查。"
     },
     {
       "path": "skills/story-long-write/references/writing-craft.md",
@@ -174,38 +174,82 @@
       "path": "skills/story-long-write/references/style-resolution.md",
       "budget": 1450,
       "why": "写作、去味、审稿共用的优先级与冲突裁决；替代分散的表达硬禁令，白名单只影响风格。"
+    },
+    {
+      "path": "skills/story-long-write/references/benchmark-recall.md",
+      "budget": 2900,
+      "why": "每章写前读取；原 workflow-chapter 的召回条件与 (a)-(g) 原文迁移。"
+    },
+    {
+      "path": "skills/story-long-write/references/project-files.md",
+      "budget": 4700,
+      "why": "首次定位/创建/缺失时加载；原目录与产物协议，续写不重复预加载。"
+    },
+    {
+      "path": "skills/story-long-write/references/reference-index.md",
+      "budget": 4100,
+      "why": "定位额外参考时读取；保留原文件表与主题权威索引。"
+    },
+    {
+      "path": "skills/story-short-write/references/benchmark-recall.md",
+      "budget": 1900,
+      "why": "有对标/拆文库/用户参考时读取；原对标发现与主副预算。"
+    },
+    {
+      "path": "skills/story-short-write/references/reference-index.md",
+      "budget": 4200,
+      "why": "定位额外资料时读取，首屏阶段 Gate 不变。"
+    },
+    {
+      "path": "skills/story-deslop/SKILL.md",
+      "budget": 10000,
+      "why": "独立去味入口，Claude narrative-writer 也预加载；详细 Gate 移至同源文件。"
+    },
+    {
+      "path": "skills/story-deslop/references/deslop-gates.md",
+      "budget": 4700,
+      "why": "语义去味按任务读取所选 Gate；独立去味详版与写手判据均为 main 原文，共享副本同步检查。"
     }
   ],
   "paths": [
     {
       "label": "长篇日更主会话",
-      "budget": 42950,
+      "budget": 43850,
       "files": [
         "skills/story-long-write/SKILL.md",
         "skills/story-long-write/references/workflow-daily.md",
         "skills/story-long-write/references/workflow-chapter.md",
-        "skills/story-long-write/references/style-resolution.md"
-      ]
+        "skills/story-long-write/references/style-resolution.md",
+        "skills/story-long-write/references/project-files.md",
+        "skills/story-long-write/references/reference-index.md",
+        "skills/story-long-write/references/benchmark-recall.md"
+      ],
+      "why": " 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。"
     },
     {
       "label": "长篇开书",
-      "budget": 31250,
+      "budget": 31450,
       "files": [
         "skills/story-long-write/SKILL.md",
         "skills/story-long-write/references/workflow-setup.md",
-        "skills/story-long-write/references/style-resolution.md"
-      ]
+        "skills/story-long-write/references/style-resolution.md",
+        "skills/story-long-write/references/project-files.md",
+        "skills/story-long-write/references/reference-index.md"
+      ],
+      "why": " 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +200：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。"
     },
     {
       "label": "正文 agent 基础规则（不含条件参考）",
-      "budget": 38400,
+      "budget": 42600,
       "files": [
         "skills/story-setup/references/templates/agents/narrative-writer.md",
         "skills/story-long-write/references/writing-craft.md",
         "skills/story-long-write/references/anti-ai-writing.md",
         "skills/story-long-write/references/banned-words.md",
-        "skills/story-long-write/references/style-resolution.md"
-      ]
+        "skills/story-long-write/references/style-resolution.md",
+        "skills/story-deslop/references/deslop-gates.md"
+      ],
+      "why": "保守计入完整 Gate 文件（原在预加载 story-deslop 与写手定义内）；不是新增技法。此路径不代表含预加载 skill 的完整上下文。"
     },
     {
       "label": "长篇单章 direct/solo",
@@ -220,38 +264,41 @@
         "skills/story-long-write/references/banned-words.md",
         "skills/story-long-write/references/reader-contract-and-progression.md",
         "skills/story-long-write/references/state-tracking.md",
-        "skills/story-long-write/references/style-resolution.md"
+        "skills/story-long-write/references/style-resolution.md",
+        "skills/story-long-write/references/project-files.md",
+        "skills/story-long-write/references/reference-index.md",
+        "skills/story-long-write/references/benchmark-recall.md"
       ],
       "branches": [
         {
           "label": "基础",
-          "budget": 74250,
+          "budget": 75150,
           "files": []
         },
         {
           "label": "悬疑",
-          "budget": 79850,
+          "budget": 80750,
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ]
         },
         {
           "label": "反转",
-          "budget": 80050,
+          "budget": 80950,
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ]
         },
         {
           "label": "悬疑+反转",
-          "budget": 85650,
+          "budget": 86550,
           "files": [
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
           ]
         }
       ],
-      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。"
+      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。"
     },
     {
       "label": "长篇日更 direct/solo",
@@ -267,38 +314,41 @@
         "skills/story-long-write/references/banned-words.md",
         "skills/story-long-write/references/reader-contract-and-progression.md",
         "skills/story-long-write/references/state-tracking.md",
-        "skills/story-long-write/references/style-resolution.md"
+        "skills/story-long-write/references/style-resolution.md",
+        "skills/story-long-write/references/project-files.md",
+        "skills/story-long-write/references/reference-index.md",
+        "skills/story-long-write/references/benchmark-recall.md"
       ],
       "branches": [
         {
           "label": "基础",
-          "budget": 86050,
+          "budget": 86950,
           "files": []
         },
         {
           "label": "悬疑",
-          "budget": 91650,
+          "budget": 92550,
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ]
         },
         {
           "label": "反转",
-          "budget": 91750,
+          "budget": 92650,
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ]
         },
         {
           "label": "悬疑+反转",
-          "budget": 97350,
+          "budget": 98250,
           "files": [
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
           ]
         }
       ],
-      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。"
+      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。"
     },
     {
       "label": "短篇 Phase 2",
@@ -309,19 +359,21 @@
         "skills/story-short-write/references/submission-craft.md",
         "skills/story-short-write/references/short-craft.md",
         "skills/story-short-write/references/short-reversal.md",
-        "skills/story-long-write/references/style-resolution.md"
+        "skills/story-long-write/references/style-resolution.md",
+        "skills/story-short-write/references/benchmark-recall.md",
+        "skills/story-short-write/references/reference-index.md"
       ],
       "branches": [
         {
           "label": "世情打脸，无反派/揭露",
-          "budget": 42840,
+          "budget": 43340,
           "files": [
             "skills/story-short-write/references/genre-styles/世情打脸.md"
           ]
         },
         {
           "label": "世情打脸，含反派/揭露",
-          "budget": 45200,
+          "budget": 45700,
           "files": [
             "skills/story-short-write/references/genre-styles/世情打脸.md",
             "skills/story-short-write/references/villain-and-reveal.md"
@@ -329,14 +381,14 @@
         },
         {
           "label": "双男主，无反派/揭露",
-          "budget": 41580,
+          "budget": 42080,
           "files": [
             "skills/story-short-write/references/genre-styles/双男主.md"
           ]
         },
         {
           "label": "双男主，含反派/揭露",
-          "budget": 43950,
+          "budget": 44450,
           "files": [
             "skills/story-short-write/references/genre-styles/双男主.md",
             "skills/story-short-write/references/villain-and-reveal.md"
@@ -344,14 +396,14 @@
         },
         {
           "label": "复仇打脸，无反派/揭露",
-          "budget": 42300,
+          "budget": 42800,
           "files": [
             "skills/story-short-write/references/genre-styles/复仇打脸.md"
           ]
         },
         {
           "label": "复仇打脸，含反派/揭露",
-          "budget": 44670,
+          "budget": 45170,
           "files": [
             "skills/story-short-write/references/genre-styles/复仇打脸.md",
             "skills/story-short-write/references/villain-and-reveal.md"
@@ -359,14 +411,14 @@
         },
         {
           "label": "宅斗宫斗，无反派/揭露",
-          "budget": 42570,
+          "budget": 43070,
           "files": [
             "skills/story-short-write/references/genre-styles/宅斗宫斗.md"
           ]
         },
         {
           "label": "宅斗宫斗，含反派/揭露",
-          "budget": 44940,
+          "budget": 45440,
           "files": [
             "skills/story-short-write/references/genre-styles/宅斗宫斗.md",
             "skills/story-short-write/references/villain-and-reveal.md"
@@ -374,14 +426,14 @@
         },
         {
           "label": "总裁豪门，无反派/揭露",
-          "budget": 43140,
+          "budget": 43640,
           "files": [
             "skills/story-short-write/references/genre-styles/总裁豪门.md"
           ]
         },
         {
           "label": "总裁豪门，含反派/揭露",
-          "budget": 45510,
+          "budget": 46010,
           "files": [
             "skills/story-short-write/references/genre-styles/总裁豪门.md",
             "skills/story-short-write/references/villain-and-reveal.md"
@@ -389,14 +441,14 @@
         },
         {
           "label": "悬疑，无反派/揭露",
-          "budget": 41900,
+          "budget": 42400,
           "files": [
             "skills/story-short-write/references/genre-styles/悬疑.md"
           ]
         },
         {
           "label": "悬疑，含反派/揭露",
-          "budget": 44260,
+          "budget": 44760,
           "files": [
             "skills/story-short-write/references/genre-styles/悬疑.md",
             "skills/story-short-write/references/villain-and-reveal.md"
@@ -404,14 +456,14 @@
         },
         {
           "label": "民俗怪谈，无反派/揭露",
-          "budget": 41620,
+          "budget": 42120,
           "files": [
             "skills/story-short-write/references/genre-styles/民俗怪谈.md"
           ]
         },
         {
           "label": "民俗怪谈，含反派/揭露",
-          "budget": 43990,
+          "budget": 44490,
           "files": [
             "skills/story-short-write/references/genre-styles/民俗怪谈.md",
             "skills/story-short-write/references/villain-and-reveal.md"
@@ -419,14 +471,14 @@
         },
         {
           "label": "沙雕脑洞，无反派/揭露",
-          "budget": 42180,
+          "budget": 42680,
           "files": [
             "skills/story-short-write/references/genre-styles/沙雕脑洞.md"
           ]
         },
         {
           "label": "沙雕脑洞，含反派/揭露",
-          "budget": 44540,
+          "budget": 45040,
           "files": [
             "skills/story-short-write/references/genre-styles/沙雕脑洞.md",
             "skills/story-short-write/references/villain-and-reveal.md"
@@ -434,14 +486,14 @@
         },
         {
           "label": "甜宠，无反派/揭露",
-          "budget": 41220,
+          "budget": 41720,
           "files": [
             "skills/story-short-write/references/genre-styles/甜宠.md"
           ]
         },
         {
           "label": "甜宠，含反派/揭露",
-          "budget": 43580,
+          "budget": 44080,
           "files": [
             "skills/story-short-write/references/genre-styles/甜宠.md",
             "skills/story-short-write/references/villain-and-reveal.md"
@@ -449,14 +501,14 @@
         },
         {
           "label": "追妻火葬场，无反派/揭露",
-          "budget": 42670,
+          "budget": 43170,
           "files": [
             "skills/story-short-write/references/genre-styles/追妻火葬场.md"
           ]
         },
         {
           "label": "追妻火葬场，含反派/揭露",
-          "budget": 45040,
+          "budget": 45540,
           "files": [
             "skills/story-short-write/references/genre-styles/追妻火葬场.md",
             "skills/story-short-write/references/villain-and-reveal.md"
@@ -464,20 +516,21 @@
         },
         {
           "label": "冷门题材公式，无反派/揭露",
-          "budget": 45020,
+          "budget": 45520,
           "files": [
             "skills/story-short-write/references/genre-writing-formulas.md"
           ]
         },
         {
           "label": "冷门题材公式，含反派/揭露",
-          "budget": 47380,
+          "budget": 47880,
           "files": [
             "skills/story-short-write/references/genre-writing-formulas.md",
             "skills/story-short-write/references/villain-and-reveal.md"
           ]
         }
-      ]
+      ],
+      "why": " 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +500：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。"
     },
     {
       "label": "长篇大修主会话直接写正文",
@@ -493,27 +546,30 @@
         "skills/story-long-write/references/banned-words.md",
         "skills/story-long-write/references/reader-contract-and-progression.md",
         "skills/story-long-write/references/state-tracking.md",
-        "skills/story-long-write/references/style-resolution.md"
+        "skills/story-long-write/references/style-resolution.md",
+        "skills/story-long-write/references/project-files.md",
+        "skills/story-long-write/references/reference-index.md",
+        "skills/story-long-write/references/benchmark-recall.md"
       ],
       "branches": [
         {
           "label": "基础",
           "files": [],
-          "budget": 77250
+          "budget": 78150
         },
         {
           "label": "悬疑",
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ],
-          "budget": 82850
+          "budget": 83750
         },
         {
           "label": "反转",
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ],
-          "budget": 82950
+          "budget": 83850
         },
         {
           "label": "悬疑+反转",
@@ -521,10 +577,10 @@
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
           ],
-          "budget": 88550
+          "budget": 89450
         }
       ],
-      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。"
+      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。"
     },
     {
       "label": "长篇开书并写首章主会话直接写正文",
@@ -540,27 +596,30 @@
         "skills/story-long-write/references/banned-words.md",
         "skills/story-long-write/references/reader-contract-and-progression.md",
         "skills/story-long-write/references/state-tracking.md",
-        "skills/story-long-write/references/style-resolution.md"
+        "skills/story-long-write/references/style-resolution.md",
+        "skills/story-long-write/references/project-files.md",
+        "skills/story-long-write/references/reference-index.md",
+        "skills/story-long-write/references/benchmark-recall.md"
       ],
       "branches": [
         {
           "label": "基础",
           "files": [],
-          "budget": 88950
+          "budget": 89850
         },
         {
           "label": "悬疑",
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ],
-          "budget": 94550
+          "budget": 95450
         },
         {
           "label": "反转",
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ],
-          "budget": 94650
+          "budget": 95550
         },
         {
           "label": "悬疑+反转",
@@ -568,10 +627,10 @@
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
           ],
-          "budget": 100250
+          "budget": 101150
         }
       ],
-      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。"
+      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。"
     }
   ]
 }
