@@ -254,5 +254,13 @@
     "Main-chain candidate is an intermediate snapshot, not the final source.",
     "Prose reachability alone is not a valid chapter lifecycle."
   ],
-  "delivery_status": "DRAFT: explicit prose transition failed lifecycle acceptance twice"
+  "delivery_status": "DRAFT: explicit prose transition failed lifecycle acceptance twice",
+  "post_retest_changes": [
+    {
+      "path": "skills/story-long-write/SKILL.md",
+      "sha256": "6e2bb65a9c6109af0f57d101cf3ac76e5eaef111746077d07d8b61f0733e7f12",
+      "change": "Restore planning-mode non-persistence wording; do not forbid the existing first-outline tracking initialization.",
+      "validation": "Static checks and review only; CLI not rerun. Transition failure remains unresolved."
+    }
+  ]
 }
