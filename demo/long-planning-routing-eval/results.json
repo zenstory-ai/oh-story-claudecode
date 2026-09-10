@@ -1,0 +1,258 @@
+{
+  "issue": 419,
+  "cli_version": "2.1.267",
+  "observed_model": "claude-sonnet-5",
+  "baseline_commit": "fde17546758c58ad4d3306ef93d0db8ad28f9f3c",
+  "rules": {
+    "candidate-main-chain": [
+      {
+        "sha256": "15a429153ea70100d660269dd6b4b657c20885657e970751edee6acde8d19803",
+        "path": "skills/story-long-write/SKILL.md"
+      },
+      {
+        "sha256": "f4d1cb2b9686b32ff96483c2915eab580919d15d0eeba308cf0eac6a3c9d6b74",
+        "path": "skills/story-long-write/references/project-files.md"
+      },
+      {
+        "sha256": "62bf9efc7a25d190c3eff537293fccec10db95ffefb5b910b27dd02a5c8f385a",
+        "path": "skills/story-long-write/references/workflow-chapter.md"
+      },
+      {
+        "sha256": "78e651fc5bf13cdc4bf54a03fca045606ebe1a1bf10ae984efbdf247b2229488",
+        "path": "skills/story-long-write/references/workflow-daily.md"
+      },
+      {
+        "sha256": "a0b6cff1d7b14c7f51c859e2d9885c2171c4ae6fb92d3b49a94a459c24795dfc",
+        "path": "skills/story-long-write/references/workflow-setup.md"
+      },
+      {
+        "sha256": "bb88f4cafea33168456c7c9c672534b1dc11d6ecc033a43a76f6b488939c0804",
+        "path": "skills/story/SKILL.md"
+      }
+    ],
+    "97f09ee": [
+      {
+        "sha256": "63b03345f027d4b20e225565ffff922ffab5be6f027d83d49c41ce362e0efc43",
+        "path": "skills/story-long-write/SKILL.md"
+      },
+      {
+        "sha256": "f4d1cb2b9686b32ff96483c2915eab580919d15d0eeba308cf0eac6a3c9d6b74",
+        "path": "skills/story-long-write/references/project-files.md"
+      },
+      {
+        "sha256": "62bf9efc7a25d190c3eff537293fccec10db95ffefb5b910b27dd02a5c8f385a",
+        "path": "skills/story-long-write/references/workflow-chapter.md"
+      },
+      {
+        "sha256": "78e651fc5bf13cdc4bf54a03fca045606ebe1a1bf10ae984efbdf247b2229488",
+        "path": "skills/story-long-write/references/workflow-daily.md"
+      },
+      {
+        "sha256": "f5981c75919ad92c56f2912dfc9f7399f19fb5dc187c66e36376c1f5a6f03cd2",
+        "path": "skills/story-long-write/references/workflow-setup.md"
+      },
+      {
+        "sha256": "bb88f4cafea33168456c7c9c672534b1dc11d6ecc033a43a76f6b488939c0804",
+        "path": "skills/story/SKILL.md"
+      }
+    ],
+    "transition-retest": {
+      "skills/story-long-write/SKILL.md": "2e666cc747f86f545251b021745a30f6f4ddcf1afe73a610e38bd58a83753dd7",
+      "skills/story-long-write/references/workflow-chapter.md": "589ee5c10ebd887ee40b9c360a324620300898aa120fd39aa06fcf644586d86f"
+    }
+  },
+  "runs": [
+    {
+      "case": "outline",
+      "arm": "baseline",
+      "turn": 1,
+      "exit_code": 1,
+      "result_subtype": "error_max_budget_usd",
+      "seconds": 185.169,
+      "cost_usd": 0.4677356,
+      "tool_count": 13,
+      "files": [
+        "雾港回声/大纲/卷纲_第1卷.md",
+        "雾港回声/大纲/卷纲_第2卷.md",
+        "雾港回声/大纲/卷纲_第3卷.md",
+        "雾港回声/大纲/大纲.md",
+        "雾港回声/核心设定表.md",
+        "雾港回声/设定/关系.md",
+        "雾港回声/设定/题材定位.md",
+        "雾港回声/设定/题材正文提示卡.md"
+      ]
+    },
+    {
+      "case": "outline",
+      "arm": "baseline",
+      "turn": 2,
+      "exit_code": 1,
+      "result_subtype": "error_max_budget_usd",
+      "seconds": 190.053,
+      "cost_usd": 0.38164719999999996,
+      "tool_count": 10,
+      "files": [
+        "雾港回声/大纲/卷纲_第1卷.md",
+        "雾港回声/大纲/卷纲_第2卷.md",
+        "雾港回声/大纲/卷纲_第3卷.md",
+        "雾港回声/大纲/大纲.md",
+        "雾港回声/大纲/细纲_第001章.md",
+        "雾港回声/大纲/细纲_第002章.md",
+        "雾港回声/大纲/细纲_第003章.md",
+        "雾港回声/大纲/细纲_第004章.md",
+        "雾港回声/大纲/细纲_第005章.md",
+        "雾港回声/大纲/细纲_第006章.md",
+        "雾港回声/大纲/细纲_第007章.md",
+        "雾港回声/大纲/细纲_第008章.md",
+        "雾港回声/大纲/细纲_第009章.md",
+        "雾港回声/大纲/细纲_第010章.md",
+        "雾港回声/核心设定表.md",
+        "雾港回声/设定/关系.md",
+        "雾港回声/设定/题材定位.md",
+        "雾港回声/设定/题材正文提示卡.md"
+      ]
+    },
+    {
+      "case": "outline",
+      "arm": "candidate-main-chain",
+      "turn": 1,
+      "exit_code": 1,
+      "result_subtype": "error_max_budget_usd",
+      "seconds": 269.491,
+      "cost_usd": 0.5575116,
+      "tool_count": 12,
+      "files": [
+        "雾港回声/大纲/卷纲_第一卷.md",
+        "雾港回声/大纲/卷纲_第二卷.md",
+        "雾港回声/大纲/大纲.md",
+        "雾港回声/设定/关系.md",
+        "雾港回声/设定/题材定位.md"
+      ]
+    },
+    {
+      "case": "outline",
+      "arm": "candidate-main-chain",
+      "turn": 2,
+      "exit_code": 0,
+      "result_subtype": "success",
+      "seconds": 75.874,
+      "cost_usd": 0.12968939999999998,
+      "tool_count": 1,
+      "files": [
+        "雾港回声/大纲/卷纲_第一卷.md",
+        "雾港回声/大纲/卷纲_第三卷.md",
+        "雾港回声/大纲/卷纲_第二卷.md",
+        "雾港回声/大纲/大纲.md",
+        "雾港回声/设定/关系.md",
+        "雾港回声/设定/题材定位.md"
+      ]
+    },
+    {
+      "case": "outline",
+      "arm": "candidate-main-chain",
+      "turn": 3,
+      "exit_code": 0,
+      "result_subtype": "success",
+      "seconds": 8.394,
+      "cost_usd": 0.0252478,
+      "tool_count": 0,
+      "files": [
+        "雾港回声/大纲/卷纲_第一卷.md",
+        "雾港回声/大纲/卷纲_第三卷.md",
+        "雾港回声/大纲/卷纲_第二卷.md",
+        "雾港回声/大纲/大纲.md",
+        "雾港回声/设定/关系.md",
+        "雾港回声/设定/题材定位.md"
+      ]
+    },
+    {
+      "case": "discussion",
+      "arm": "97f09ee",
+      "turn": 1,
+      "exit_code": 0,
+      "seconds": 42.9,
+      "subtype": "success",
+      "is_error": false,
+      "changed_files": [],
+      "write_calls": [],
+      "tool_names": [
+        "Read",
+        "Read"
+      ],
+      "cost_usd": 0.1002474
+    },
+    {
+      "case": "discussion",
+      "arm": "97f09ee",
+      "turn": 2,
+      "exit_code": 0,
+      "seconds": 32.3,
+      "subtype": "success",
+      "is_error": false,
+      "changed_files": [],
+      "write_calls": [],
+      "tool_names": [],
+      "cost_usd": 0.0275836
+    },
+    {
+      "case": "outline-edit",
+      "arm": "97f09ee",
+      "exit_code": 0,
+      "seconds": 26.0,
+      "subtype": "success",
+      "is_error": false,
+      "changed_files": [
+        "大纲/细纲_第012章.md"
+      ],
+      "protected_changed": [],
+      "cost_usd": 0.24538120000000002,
+      "write_count": 1
+    },
+    {
+      "case": "explicit-prose",
+      "arm": "97f09ee",
+      "exit_code": 0,
+      "result_subtype": "success",
+      "seconds": 119.017,
+      "cost_usd": 0.4412004,
+      "observed_prose_files": 1,
+      "observed_tracking_state": false,
+      "verdict": "FAIL: prose written before required references and tracking init/check; no chapter transaction",
+      "source_runtime_permission_denials": 1
+    },
+    {
+      "case": "explicit-prose",
+      "arm": "transition-retest",
+      "exit_code": 0,
+      "result_subtype": "success",
+      "seconds": 179.2,
+      "cost_usd": 0.5323296,
+      "prose_files": [
+        "正文/第001章_耳环里的那句话.md"
+      ],
+      "has_tracking_state": false,
+      "source_runtime_permission_denials": 0,
+      "latest_transition_was_injected": true,
+      "observed_reference_reads": [
+        "workflow-chapter.md"
+      ],
+      "tracking_calls": 0,
+      "verdict": "FAIL: prose created before mandatory references and tracking init/check; no chapter transaction",
+      "permission_denials": [],
+      "reads_before_first_prose_write": [
+        "skills/story-long-write/references/workflow-chapter.md",
+        "雾港回声/大纲/细纲_第001章.md",
+        "雾港回声/大纲/卷纲_第1卷.md",
+        "雾港回声/设定/题材正文提示卡.md"
+      ],
+      "tracking_calls_before_first_prose_write": 0
+    }
+  ],
+  "limits": [
+    "Budget-capped turns are incomplete, not PASS.",
+    "No token/performance comparison; arms had different caps.",
+    "Main-chain candidate is an intermediate snapshot, not the final source.",
+    "Prose reachability alone is not a valid chapter lifecycle."
+  ],
+  "delivery_status": "DRAFT: explicit prose transition failed lifecycle acceptance twice"
+}
