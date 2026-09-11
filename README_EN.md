@@ -4,6 +4,8 @@
 
 # oh-story-claudecode
 
+> Project page: <https://zenstory.ai/oh-story> · All ZenStory AI projects: <https://zenstory.ai/projects> · Glossary: <https://zenstory.ai/glossary>
+
 A web novel writing skill pack with built-in adapters for Claude Code, Google Antigravity, OpenCode, ZCode, OpenClaw, Codex CLI, and Reasonix. Web AI / agent environments that can read project files can use the generic skills path. Covers the full pipeline for long-form and short-form Chinese web novels: trend scanning, deconstruction, writing, AI tone removal, and cover generation.
 
 ## Core Approach
