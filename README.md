@@ -4,6 +4,10 @@
 
 网文写作 skill 包，覆盖长篇与短篇网络小说的扫榜、拆文、写作、去AI味、封面图全流程。内置适配 Claude Code、Google Antigravity、OpenCode、ZCode、OpenClaw、Codex CLI、Reasonix；能读取项目文件的 Web AI / Agent 环境也可按通用 skills 路径使用。
 
+**Oh Story** is an open-source skill pack that turns coding agents — Claude Code, Codex CLI, Google Antigravity, OpenCode, ZCode, OpenClaw and Reasonix — into a complete workflow for writing Chinese web fiction (网文), both long-form serials and short stories. It covers the professional author's method end to end: **扫榜** (scanning bestseller charts to choose genre, cast and angle), **拆文** (deconstructing top-ranked works into outline rhythm and reusable plot modules), commercial drafting with hooks and payoff pacing, **去AI味** (removing AI-flavored prose), and cover generation. It is not a prompt collection: the 13 skills ship with deterministic verifiers, blocking reference gates, layered context and state management, and per-harness deployers (`/story-setup`). Built for authors publishing on 起点, 番茄, 晋江, 七猫 and 知乎盐言. MIT licensed. Full English README: [README_EN.md](README_EN.md). Install: `npx skills add zenstory-ai/oh-story-claudecode -y -g`.
+
+由 [ZenStory AI](https://zenstory.ai) 维护，仓库地址 `github.com/zenstory-ai/oh-story-claudecode`（原 `worldwonderer/oh-story-claudecode`，旧链接自动跳转）。Maintained by ZenStory AI; previously hosted at `worldwonderer/oh-story-claudecode`, old links redirect.
+
 ## 核心思路
 
 > **套路 = 确定性的情绪满足**
@@ -16,17 +20,7 @@
 
 围绕四条线展开：爆款逆向 · 剧情模块化重组 · 上下文状态分层管理 · 人机协同。
 
-> **Antigravity 支持预览**：`story-setup` 可把 13 个 Skills、7 个 custom agents、Always-On Rule 和 workspace Hooks 完整部署到项目 `.agents/`。部署器不修改 `~/.gemini/`，不依赖全局目录或 symlink；`.agents/hooks.json` 只替换顶层 `oh-story` 管理组并保留用户组。当前 `agents_version: 30`，部署后需新开 Antigravity conversation；IDE 与交互式 `agy` 建议分别试用。
-
-> **v0.7.10 — 写作流程与文风修复**：长篇新增供给自查、写手组装器和卷纲取段器；统一文风优先级，修复 reference 停读，整理去味检查分工；短篇增加交付参数预检，移除身体词次数上限。升级后重跑 `/story-setup` 并新开会话；本版 `agents_version` 为 30。[完整变更](CHANGELOG.md#0710---2026-09-09)
->
-> **v0.7.9 — 短篇按场景功能校准**：短篇移除逐节最低字数、每节 3-5 个子事件、对白占比和固定钩子节距等机械配额，改按「本场是否改变风险、信息、关系、资源、决定、行动或读者理解」判断；导语作为正文第一场，第 1 章从其后果或新行动继续。新增细纲结构验收，细纲的目标情绪与主角关键选择不再接受占位符。升级后需重跑 `/story-setup`、新开会话；本版 `agents_version` 为 29。[完整变更](CHANGELOG.md#079---2026-08-30)
->
-> **v0.7.8 — 参考拆分与门禁**：长短篇参考资料按消费者拆开改名，写正文与短篇构思前新增会阻断的 Reference Gate，短篇 Phase 2 与交付各加一个确定性 verifier；短篇总字数以用户给的范围为准。升级后需重跑 `/story-setup`、新开会话；本版 `agents_version` 为 28。[完整变更](CHANGELOG.md#078---2026-08-28)
->
-> **v0.7.7 — 记忆与收口**：长篇正文改用唯一机器字数口径，欠字不自动加戏，超字最多压缩一次；新增跨会话作者记忆、Codex 内置 ImageGen，并修复 story-setup 递归复制。缺少合法「字数目标」现在会停止，不再回退到 3000。升级后需重跑 `/story-setup`、新开会话；本版 `agents_version` 为 26。[完整变更](CHANGELOG.md#077---2026-08-26)
->
-> 更早版本变更见 [CHANGELOG.md](CHANGELOG.md)。
+> 最新版本 **v0.7.10**（2026-09-09）。完整变更见 [CHANGELOG.md](CHANGELOG.md) 与 [Releases](https://github.com/zenstory-ai/oh-story-claudecode/releases)；升级后请重跑 `/story-setup` 并新开会话。Antigravity 部署方式见下文「使用说明」。
 
 ## 流程总览
 
@@ -428,3 +422,16 @@ Agent 按需加载 `references/` 中的写作理论（角色设计、对话技�
 - [LINUX DO - The New Ideal Community](https://linux.do) — 社区支持
 - [FanqieRankTracker](https://github.com/wen1701/FanqieRankTracker) — 番茄小说字体反爬解码方案参考
 - [Zhuque AIGC Detector CLI](https://github.com/Sophomoresty/zhuque) — 去 AI 味实验中的外部复测工具参考
+
+## ZenStory AI 项目
+
+Oh Story 是 [ZenStory AI](https://zenstory.ai) 的一部分——一组开源、面向 agent 的故事创作、改编与生产工具（GitHub 组织：[zenstory-ai](https://github.com/zenstory-ai)）。同组织项目：
+
+| 项目 | 用途 |
+| --- | --- |
+| [oh-story-claudecode](https://github.com/zenstory-ai/oh-story-claudecode) | 网文写作 skill 包（本仓库） |
+| [drama-skills](https://github.com/zenstory-ai/drama-skills) | AI 短剧 / 漫剧创作 skill 合集：剧本、资产、分镜、图片/视频提示词、独立审查 |
+| [novel-to-game](https://github.com/zenstory-ai/novel-to-game) | 把小说改编成可玩游戏的 agent skills |
+| [video-recap-skills](https://github.com/zenstory-ai/video-recap-skills) | 把任意视频剪成中文解说视频，支持剪映草稿导出 |
+| [oh-story-dsh](https://github.com/zenstory-ai/oh-story-dsh) | DeepSeek Harness 插件，封装 Oh Story 与 Drama Skills 工作流 |
+| [zenstory](https://github.com/zenstory-ai/zenstory) | 对话即创作的 AI 小说写作工作台（[zenstory.ai](https://zenstory.ai)） |

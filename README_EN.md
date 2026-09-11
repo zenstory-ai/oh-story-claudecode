@@ -1,4 +1,4 @@
-<!-- Last synced with README.md: 2026-09-07 -->
+<!-- Last synced with README.md: 2026-09-11 -->
 
 **English** | [中文](README.md)
 
@@ -18,17 +18,7 @@ Professional authors follow a three-step method:
 
 Built around four pillars: reverse-engineering hits · plot modularization · layered state management · human-AI collaboration.
 
-> **Antigravity support preview:** `story-setup` can deploy all 13 Skills, 7 custom agents, an Always-On Rule, and workspace Hooks into the project's `.agents/` tree. The deployer does not modify `~/.gemini/`, depend on global directories, or require symlink discovery. In `.agents/hooks.json`, it replaces only the top-level `oh-story` group and preserves user groups. The current contract uses `agents_version: 30`; open a fresh Antigravity conversation after deployment and smoke-test the IDE and interactive `agy` separately.
-
-> **v0.7.10 — Writing workflow and style fixes**: adds long-form planning checks, scripted writer prompts, and scoped outline reads. Unifies style precedence, fixes skipped references, and assigns prose review and final scans to their owners. Short stories gain delivery-parameter checks and drop body-word frequency limits. Rerun `/story-setup` and open a new session; `agents_version` is 30. [Full changes](CHANGELOG.md#0710---2026-09-09)
->
-> **v0.7.9 — 短篇按场景功能校准**: short-form drops per-section word floors, the 3-5 sub-event rule, dialogue ratios, and fixed hook intervals in favour of a single readable test — does this scene change risk, information, relationships, resources, a decision, an action, or the reader's understanding? The teaser is now the first scene of the prose, and chapter 1 continues from its consequences rather than replaying it. Adds a structural verifier for chapter outlines; the outline's target-emotion and protagonist-choice fields no longer accept placeholders. Rerun `/story-setup` and start a new session; `agents_version` is 29. [Full changes](CHANGELOG.md#079---2026-08-30)
->
-> **v0.7.8 — 参考拆分与门禁**: long-form and short-form references are split per consumer and renamed; a blocking Reference Gate now runs before prose writing and short-story design, and Phase 2 plus final delivery each gain a deterministic verifier. Short-story length now follows the range the user gave. Rerun `/story-setup` and start a new session; `agents_version` is 28. [Full changes](CHANGELOG.md#078---2026-08-28)
->
-> **v0.7.7 — 记忆与收口**: long-form prose now uses one machine-enforced length metric; under-length chapters are not padded with new plot, and over-length chapters get at most one compression pass. This release also adds cross-session author memory and Codex built-in ImageGen, and fixes recursive story-setup copies. **The patch number does not convey this tightening**: a missing or invalid word target now stops instead of falling back to 3,000. Update the pack, rerun `/story-setup`, and start a new session; `agents_version` is 26. [Full changes](CHANGELOG.md#077---2026-08-26)
->
-> For earlier versions, see [CHANGELOG.md](CHANGELOG.md).
+> Latest release: **v0.7.10** (2026-09-09). See [CHANGELOG.md](CHANGELOG.md) and [Releases](https://github.com/zenstory-ai/oh-story-claudecode/releases); rerun `/story-setup` and start a new session after upgrading. Antigravity deployment is covered in the usage notes below.
 
 ## Pipeline Overview
 
@@ -425,3 +415,16 @@ Contributions are welcome — new skills, knowledge base additions, market data 
 - [LINUX DO - The New Ideal Community](https://linux.do) — Community support
 - [FanqieRankTracker](https://github.com/wen1701/FanqieRankTracker) — Fanqie Novels font obfuscation decoding reference
 - [Zhuque AIGC Detector CLI](https://github.com/Sophomoresty/zhuque) — External retest reference used during anti-AI-writing experiments
+
+## Part of ZenStory AI
+
+Oh Story is part of [ZenStory AI](https://zenstory.ai) — open-source, agent-native tools for creating, adapting and producing stories (GitHub org: [zenstory-ai](https://github.com/zenstory-ai)). Sibling projects:
+
+| Project | What it does |
+| --- | --- |
+| [oh-story-claudecode](https://github.com/zenstory-ai/oh-story-claudecode) | Web-fiction writing skill pack (this repo) |
+| [drama-skills](https://github.com/zenstory-ai/drama-skills) | AI short-drama / motion-comic suite: scripts, assets, storyboards, image & video prompts, independent review |
+| [novel-to-game](https://github.com/zenstory-ai/novel-to-game) | Agent skills that turn novels into playable games |
+| [video-recap-skills](https://github.com/zenstory-ai/video-recap-skills) | Clip any video into a narrated Chinese recap, with CapCut draft export |
+| [oh-story-dsh](https://github.com/zenstory-ai/oh-story-dsh) | DeepSeek Harness plugin wrapping the Oh Story and Drama Skills workflows |
+| [zenstory](https://github.com/zenstory-ai/zenstory) | Chat-to-create AI novel-writing workbench ([zenstory.ai](https://zenstory.ai)) |
