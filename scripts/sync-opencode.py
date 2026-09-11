@@ -5,6 +5,8 @@ Scans templates/agents/*.md, converts frontmatter to opencode format,
 and writes to opencode/agents/. Also syncs CLAUDE.md.tmpl -> AGENTS.md.tmpl.
 """
 
+from __future__ import annotations
+
 import argparse
 import os
 import re
