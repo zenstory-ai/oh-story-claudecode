@@ -400,6 +400,41 @@ Real output samples are in [demo/](demo/): short-form deconstruction 《曾将�
 
 I built this skill pack to help me through a job-hunting transition :joy:, and I hope it can help others too.
 
+## FAQ
+
+### Does it work in Codex, Google Antigravity or OpenCode, or only in Claude Code?
+
+oh-story-claudecode ships adapters for Claude Code, Google Antigravity, OpenCode, ZCode, OpenClaw, Codex CLI and Reasonix. Codex discovers the 13 skills by scanning `.agents/skills` in the repo and invokes them with `$story-setup`; in Antigravity run `story-setup` via `/skills` or natural language and choose `target_cli=antigravity`. Any Web AI or agent environment that can read project files can use the generic skills path.
+
+### Do I need a GPU or to host a model?
+
+No. oh-story-claudecode is a set of skills that runs inside the coding agent you already use, so the writing model is that agent's model; only deterministic check scripts (Node / Python) run locally. The one exception is `story-cover`, which calls GPT-Image-2 (Codex built-in quota or an API fallback).
+
+### Chapter lengths are inconsistent or the word count is off. What do I do?
+
+Since v0.7.7 long-form prose uses a single machine-counted length metric: every chapter blueprint must state a valid word target, and a missing target stops the run instead of falling back to 3,000; under-length chapters are not padded with new plot, and over-length chapters get at most one compression pass. `check-prose-after-write.sh` flags length debt after each write. Rerun `/story-setup` and start a new session after upgrading an older project.
+
+### After de-AI editing, detectors such as Zhuque still flag the text as AI. Why?
+
+`story-deslop` (`/去AI味`) is a writing lint: it deterministically detects and removes known AI sentence patterns, punctuation habits and degeneration artifacts. Its target is how the prose reads, not evading detectors. External detectors are a self-check reference only, and oh-story-claudecode makes no promise of passing any AI detector.
+
+### I already have part of a novel written. Can I import it and continue?
+
+Yes. Run `/story-setup` in the project root, start or refresh a session, run `/story-import` to reverse-parse the existing novel into the standard project layout, then continue with `/story-long-write 日更` or `/story-long-write 写第N章`.
+
+### On Windows the install prints `ENOENT ... mkdir` but ends with Done. Is that normal?
+
+It means some skills were not fully installed. Rerun the same install command, with or without the error, and it repairs itself; if a reference-material directory is missing, `/story-setup` reports the reference pack as incomplete. Codex users on Windows also need `core.symlinks` enabled in git.
+
+### What do I do after upgrading?
+
+Rerun `/story-setup` and start a new session. The seven agents (story-architect, narrative-writer, consistency-checker and others) are written into the project by `/story-setup`; multi-agent collaboration only takes effect after deploying and opening a fresh session.
+
+### What is the difference between the short-form and long-form entry points?
+
+Long-form: `/story-long-scan` (chart scanning) → `/story-long-analyze` (deconstruction) → `/story-long-write` (outline, volume outline, chapter blueprints, prose). Short-form: `/story-short-scan` → `/story-short-analyze` → `/story-short-write`. Both share `/story-setup`, `/story-deslop`, `/story-review` and `/story-cover`.
+
+
 ## Contributing
 
 Contributions are welcome — new skills, knowledge base additions, market data updates. See [CONTRIBUTING.md](CONTRIBUTING.md) (Chinese only).

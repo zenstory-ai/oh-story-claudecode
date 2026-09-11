@@ -407,6 +407,41 @@ Agent 按需加载 `references/` 中的写作理论（角色设计、对话技�
 
 这套 skill 现在能让我度过找工作的过渡期 :joy:，希望也能帮到有需要的朋友。
 
+## 常见问题
+
+### 能在 Codex、Google Antigravity、OpenCode 里用吗，还是只支持 Claude Code？
+
+oh-story-claudecode 内置适配 Claude Code、Google Antigravity、OpenCode、ZCode、OpenClaw、Codex CLI 和 Reasonix。Codex 会直接扫描仓库内 `.agents/skills` 发现 13 个 skill，用 `$story-setup` 调用；Antigravity 用 `/skills` 或自然语言运行 `story-setup` 并选择 `target_cli=antigravity`；能读取项目文件的 Web AI / Agent 环境也可以按通用 skills 路径使用。
+
+### 需要 GPU 或自己部署模型吗？
+
+不需要。oh-story-claudecode 是一组 skill，运行在你已经在用的编程 Agent 里，写作用的模型就是该 Agent 的模型；本地只跑确定性的检查脚本（Node / Python）。唯一的例外是 `story-cover` 封面生成，它调用 GPT-Image-2（Codex 内置用量或 API 回退）。
+
+### 每章字数不统一、字数对不上怎么办？
+
+从 v0.7.7 起，长篇正文只用一个机器统计的字数口径：每份细纲必须写明合法的「字数目标」，缺少时会停止而不是回退到 3000；欠字不会自动加戏，超字最多压缩一次。写入后 `check-prose-after-write.sh` 会提醒字数欠账。升级旧项目后重跑 `/story-setup` 并新开会话即可生效。
+
+### 去AI味之后，朱雀等 AI 检测还是判定为 AI 怎么办？
+
+`story-deslop`（`/去AI味`）是写作 lint：它确定性地检测并清除已知的 AI 句式、标点和退化痕迹，目标是读感，不是绕过检测器。朱雀等外部检测只作自测参考，不替代人工读感；oh-story-claudecode 不承诺通过任何 AI 检测。
+
+### 已经写了一部分的小说，能导入后继续写吗？
+
+可以。先在写作项目根运行 `/story-setup`，新开或刷新会话后运行 `/story-import`（`/导入小说`）把已有小说反向解析成标准项目结构，再用 `/story-long-write 日更` 或 `/story-long-write 写第N章` 续写。
+
+### Windows 上安装报 `ENOENT ... mkdir`，但末尾显示 Done，正常吗？
+
+这是有技能没装全。无论有没有报错，重跑同一条安装命令即可修复；如果参考资料目录缺了一块，`/story-setup` 会提示参考资料包不完整。Codex 用户在 Windows 上还需要为 git 打开 `core.symlinks`。
+
+### 升级到新版本后要做什么？
+
+重跑 `/story-setup` 并新开会话。7 个专业 agent（story-architect、narrative-writer、consistency-checker 等）由 `/story-setup` 写入项目目录，必须先部署再新开会话，多 agent 协作才会生效。
+
+### 短篇和长篇的入口有什么区别？
+
+长篇：`/story-long-scan`（扫榜）→ `/story-long-analyze`（拆文）→ `/story-long-write`（写作，含大纲、卷纲、细纲、正文）。短篇：`/story-short-scan` → `/story-short-analyze` → `/story-short-write`。两条线共用 `/story-setup`、`/story-deslop`、`/story-review` 和 `/story-cover`。
+
+
 ## 贡献
 
 欢迎贡献新 skill、补充知识库、更新市场数据。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
