@@ -464,4 +464,4 @@ Oh Story is part of [ZenStory AI](https://zenstory.ai) — open-source, agent-na
 | [novel-to-game](https://github.com/zenstory-ai/novel-to-game) | Agent skills that turn novels into playable games |
 | [video-recap-skills](https://github.com/zenstory-ai/video-recap-skills) | Clip any video into a narrated Chinese recap, with CapCut draft export |
 | [oh-story-dsh](https://github.com/zenstory-ai/oh-story-dsh) | DeepSeek Harness plugin wrapping the Oh Story and Drama Skills workflows |
-| [zenstory](https://github.com/zenstory-ai/zenstory) | Chat-to-create AI novel-writing workbench ([zenstory.ai](https://zenstory.ai)) |
+| [zenstory](https://github.com/zenstory-ai/zenstory) | Chat-to-create AI novel-writing workbench ([app.zenstory.ai](https://app.zenstory.ai)) |
