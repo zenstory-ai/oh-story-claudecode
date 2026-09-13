@@ -10,6 +10,30 @@
 
 由 [ZenStory AI](https://zenstory.ai) 维护，仓库地址 `github.com/zenstory-ai/oh-story-claudecode`（原 `worldwonderer/oh-story-claudecode`，旧链接自动跳转）。Maintained by ZenStory AI; previously hosted at `worldwonderer/oh-story-claudecode`, old links redirect.
 
+## 按写作任务开始
+
+本仓库是安装到兼容 Agent 宿主中的 skill 包；它与 ZenStory 托管写作工作台是两个独立产品，项目文件、设定和进度不会自动同步。下列指南帮你先理清任务，再在已安装的宿主里执行：
+
+| 你要做什么 | 实用指南 | 重点 |
+|---|---|---|
+| 先看懂写作 Skill | [提示词、技能包、插件与 MCP 怎么分](https://zenstory.ai/oh-story/agent-skills-for-writers) | 先选写作任务，再选宿主与流程 |
+| 导入已写小说 | [导入 10–20 章后接着写](https://zenstory.ai/oh-story/import-and-continue) | 审阅反推结果，以书稿证据为准 |
+| 维持长篇连续性 | [分开角色已知、承诺与线索](https://zenstory.ai/oh-story/long-novel-continuity) | 别把未来计划当成已发生事实 |
+| 把章纲写成章节 | [把剧情规格写成可见变化](https://zenstory.ai/oh-story/outline-to-chapter) | 用行动、选择、代价和结果推进 |
+| 修改套路化表达 | [用具体改稿减少“AI 味”](https://zenstory.ai/oh-story/revise-ai-prose) | 改读感，不追求鉴定分数 |
+| 续写时保持自己的文风 | [分开文风选择与本书事实](https://zenstory.ai/oh-story/preserve-author-voice) | 用自有或获准样本，不复制原句 |
+
+## 安装后的第一条请求
+
+先按下文说明在选定宿主中完成安装与 setup，再按当前任务选一条，把〈占位内容〉换成自己的信息。这些是任务简报，不是安装命令，也不要求把所有阶段跑完；输出仍需审阅，不会与 ZenStory 托管工作台自动同步。
+
+1. **开一本新书**
+   > 我想开一部〈类型/题材〉新书。先从我提供的材料中分开已确定事实与待决问题；只规划一个有边界的开篇，交付核心冲突、视角/信息释放限制、前三章变化和待决项。不要自动写正文；题材取舍、角色动机和长期方向留给我确认。
+2. **导入已有书稿**
+   > 请把这份书稿整理成可续写项目。第 1–〈N〉章完整，〈文件名〉是第〈N+1〉章残稿；保留原文，不覆盖完整章节，不把残稿算作完整章，推断出的设定单列待确认。先交付识别范围、重建事实、冲突/歧义和待我确认的决定，供我审阅；暂不续写。
+3. **修一段不满意的正文**
+   > 这段读起来〈空泛/重复/过度解释〉。先指出具体读感问题，保留故事事实、角色已知和未揭示边界；只交付这一段的修订建议、前后对照与理由，不全书改写。哪些建议采用由我决定。
+
 ## 核心思路
 
 > **套路 = 确定性的情绪满足**
@@ -426,10 +450,23 @@ oh-story-claudecode 内置适配 Claude Code、Google Antigravity、OpenCode、Z
 ### 去AI味之后，朱雀等 AI 检测还是判定为 AI 怎么办？
 
 `story-deslop`（`/去AI味`）是写作 lint：它确定性地检测并清除已知的 AI 句式、标点和退化痕迹，目标是读感，不是绕过检测器。朱雀等外部检测只作自测参考，不替代人工读感；oh-story-claudecode 不承诺通过任何 AI 检测。
+可按[这份具体改稿指南](https://zenstory.ai/oh-story/revise-ai-prose)把空泛情绪、重复句式、拔高议论和过度解释分别处理，同时保留场景任务与作者设定。
 
 ### 已经写了一部分的小说，能导入后继续写吗？
 
-可以。先在写作项目根运行 `/story-setup`，新开或刷新会话后运行 `/story-import`（`/导入小说`）把已有小说反向解析成标准项目结构，再用 `/story-long-write 日更` 或 `/story-long-write 写第N章` 续写。
+可以。先在写作项目根运行 `/story-setup`，新开或刷新会话后运行 `/story-import`（`/导入小说`）把已有小说反向解析成标准项目结构，审阅反推结果，再用 `/story-long-write 日更` 或 `/story-long-write 写第N章` 续写。[导入与续写指南](https://zenstory.ai/oh-story/import-and-continue)说明了为什么书稿证据应优先于模型猜测。
+
+### 长篇续写怎样减少忘伏笔或角色提前知道答案？
+
+续写前分开故事客观事实、角色已知和读者已见，只带上本章相关的当前状态与未完承诺。[长篇连续性指南](https://zenstory.ai/oh-story/long-novel-continuity)给出三章示例；结构化记录能帮助交接，但不代表几百章都不会出错。
+
+### 章纲齐全，为什么写出来还是在复述设定？
+
+把章纲当作“本章必须发生什么变化”的规格，再把目标、阻碍、证据、选择和代价转成视角人物可感知的行动与结果。[章纲到章节指南](https://zenstory.ai/oh-story/outline-to-chapter)是编辑示例，不是工具实测或模型质量承诺。
+
+### 怎样保留我的文风，又不把另一本书的情节带进来？
+
+把你自己写的或获准使用的短样本拆成表达维度，与当前书的事实分开讨论；样本推断不自动成为长期偏好。[作者文风指南](https://zenstory.ai/oh-story/preserve-author-voice)说明如何裁决当前要求、本书文风与作者偏好；它不承诺自动匹配文风，也不鼓励复制原句。
 
 ### Windows 上安装报 `ENOENT ... mkdir`，但末尾显示 Done，正常吗？
 

@@ -1,4 +1,4 @@
-<!-- Last synced with README.md: 2026-09-11 -->
+<!-- Last synced with README.md: 2026-09-12 -->
 
 **English** | [中文](README.md)
 
@@ -7,6 +7,30 @@
 > Project page: <https://zenstory.ai/oh-story> · All ZenStory AI projects: <https://zenstory.ai/projects> · Glossary: <https://zenstory.ai/glossary>
 
 A web novel writing skill pack with built-in adapters for Claude Code, Google Antigravity, OpenCode, ZCode, OpenClaw, Codex CLI, and Reasonix. Web AI / agent environments that can read project files can use the generic skills path. Covers the full pipeline for long-form and short-form Chinese web novels: trend scanning, deconstruction, writing, AI tone removal, and cover generation.
+
+## Start with Your Writing Task
+
+This repository is a skill pack installed in a compatible agent host. It is separate from the hosted ZenStory writing workbench: project files, settings and progress do not sync automatically between the two products. Use these guides to define the task before running it in your installed host:
+
+| What you want to do | Practical guide | Focus |
+|---|---|---|
+| Understand writing skills first | [Prompts, skill packs, plugins and MCP](https://zenstory.ai/oh-story/agent-skills-for-writers) | Choose the writing job before the host and workflow |
+| Import an existing novel | [Import 10–20 chapters and continue](https://zenstory.ai/oh-story/import-and-continue) | Review inferred structure; treat the manuscript as evidence |
+| Keep a long novel consistent | [Separate character knowledge, promises and clues](https://zenstory.ai/oh-story/long-novel-continuity) | Do not turn future plans into past events |
+| Turn an outline into a chapter | [Write plot specifications as visible change](https://zenstory.ai/oh-story/outline-to-chapter) | Advance through action, choice, cost and result |
+| Revise formulaic prose | [Reduce "AI-sounding" prose with concrete edits](https://zenstory.ai/oh-story/revise-ai-prose) | Improve the reading experience, not a detector score |
+| Preserve author voice in continuation | [Separate voice choices from book facts](https://zenstory.ai/oh-story/preserve-author-voice) | Use authorized samples without copying phrases |
+
+## Your First Request after Setup
+
+First follow the instructions below to install and run setup in your chosen host. Choose the brief that fits your current task and replace the 〈placeholders〉. These are not installation commands or a required sequence; review the output, and do not expect automatic synchronization with the hosted ZenStory workbench.
+
+1. **Start a new book**
+   > I want to start a new 〈genre/premise〉 book. First separate fixed facts in my material from decisions that remain open. Plan only a bounded opening and deliver the central conflict, viewpoint/information-release limits, changes across the first three chapters and open decisions. Do not draft prose automatically; leave genre tradeoffs, character motives and the long-term direction for me to confirm.
+2. **Import an existing manuscript**
+   > Organize this manuscript as a continuable project. Chapters 1–〈N〉 are complete; 〈filename〉 is a partial chapter 〈N+1〉. Preserve the source prose, do not overwrite complete chapters, and do not count the fragment as a complete chapter, and separate inferred settings for confirmation. First deliver the detected range, reconstructed facts, conflicts/ambiguities and decisions requiring my confirmation for review; do not continue the story yet.
+3. **Fix an unsatisfactory passage**
+   > This passage reads as 〈vague/repetitive/over-explained〉. First name the specific reading problem while preserving story facts, character knowledge and unrevealed information. Deliver only a proposed revision of this passage, a before/after comparison and reasons—not a book-wide rewrite. I will decide which suggestions to accept.
 
 ## Core Approach
 
@@ -419,10 +443,23 @@ Since v0.7.7 long-form prose uses a single machine-counted length metric: every 
 ### After de-AI editing, detectors such as Zhuque still flag the text as AI. Why?
 
 `story-deslop` (`/去AI味`) is a writing lint: it deterministically detects and removes known AI sentence patterns, punctuation habits and degeneration artifacts. Its target is how the prose reads, not evading detectors. External detectors are a self-check reference only, and oh-story-claudecode makes no promise of passing any AI detector.
+[This concrete revision guide](https://zenstory.ai/oh-story/revise-ai-prose) separates vague emotion, repeated syntax, unearned commentary and over-explaining while preserving the scene's job and the author's facts.
 
 ### I already have part of a novel written. Can I import it and continue?
 
-Yes. Run `/story-setup` in the project root, start or refresh a session, run `/story-import` to reverse-parse the existing novel into the standard project layout, then continue with `/story-long-write 日更` or `/story-long-write 写第N章`.
+Yes. Run `/story-setup` in the project root, start or refresh a session, run `/story-import` to reverse-parse the existing novel into the standard project layout, review its inferences, then continue with `/story-long-write 日更` or `/story-long-write 写第N章`. The [import-and-continue guide](https://zenstory.ai/oh-story/import-and-continue) explains why manuscript evidence should take priority over model guesses.
+
+### How do I reduce forgotten clues or characters knowing answers too early in a long continuation?
+
+Before continuing, separate objective story facts, character knowledge and what readers have seen; carry only the relevant current state and unfinished commitments into the chapter. The [long-novel continuity guide](https://zenstory.ai/oh-story/long-novel-continuity) gives a three-chapter example. Structured records can help organize the handoff, but do not promise error-free writing over hundreds of chapters.
+
+### My chapter outline is complete. Why does the prose still summarize the setup?
+
+Treat the outline as a specification for what must change, then turn its goal, obstacle, evidence, choice and cost into actions and results the viewpoint character can perceive. The [outline-to-chapter guide](https://zenstory.ai/oh-story/outline-to-chapter) is an editorial example, not a recorded tool run or model-quality claim.
+
+### How do I keep my voice without carrying plot facts over from another book?
+
+Describe the dimensions of a short sample you wrote or may use, separately from the current book's facts; sample inference does not automatically establish an enduring preference. The [author-voice guide](https://zenstory.ai/oh-story/preserve-author-voice) explains how to resolve the current request, book style and author preferences; it does not promise automatic style matching or encourage copied phrases.
 
 ### On Windows the install prints `ENOENT ... mkdir` but ends with Done. Is that normal?
 
