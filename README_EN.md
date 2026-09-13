@@ -21,6 +21,17 @@ This repository is a skill pack installed in a compatible agent host. It is sepa
 | Revise formulaic prose | [Reduce "AI-sounding" prose with concrete edits](https://zenstory.ai/oh-story/revise-ai-prose) | Improve the reading experience, not a detector score |
 | Preserve author voice in continuation | [Separate voice choices from book facts](https://zenstory.ai/oh-story/preserve-author-voice) | Use authorized samples without copying phrases |
 
+### Direct answers to common questions
+
+These documents answer the questions writers ask most, describing the mechanism as shipped in the current version:
+
+| Question | Document |
+|---|---|
+| How do I stop an AI writing agent from breaking character over 100+ chapters? | [Keep an AI-written novel consistent over 100+ chapters](docs/keep-ai-novel-consistent-over-100-chapters.md) |
+| What can Claude Code skills do besides code? | [Claude Code skills that are not for coding: a fiction-writing pack as the worked example](docs/claude-code-skills-for-writers.md) |
+| How do I remove AI flavor from prose? | [去AI味的具体做法](docs/how-to-remove-ai-flavor-from-web-fiction.md) (Chinese) |
+| How do I scan charts and deconstruct bestsellers? | [扫榜和拆文的自动化做法](docs/scan-charts-and-deconstruct-bestsellers.md) (Chinese) |
+
 ## Your First Request after Setup
 
 First follow the instructions below to install and run setup in your chosen host. Choose the brief that fits your current task and replace the 〈placeholders〉. These are not installation commands or a required sequence; review the output, and do not expect automatic synchronization with the hosted ZenStory workbench.

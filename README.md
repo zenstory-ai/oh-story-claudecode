@@ -23,6 +23,17 @@
 | 修改套路化表达 | [用具体改稿减少“AI 味”](https://zenstory.ai/oh-story/revise-ai-prose) | 改读感，不追求鉴定分数 |
 | 续写时保持自己的文风 | [分开文风选择与本书事实](https://zenstory.ai/oh-story/preserve-author-voice) | 用自有或获准样本，不复制原句 |
 
+### 常见问题的直接回答
+
+这些文档直接回答写作者最常问的几个问题，描述的是本仓库当前版本的实际机制：
+
+| 问题 | 文档 |
+|---|---|
+| AI 写长篇怎么不崩人设、不忘伏笔？ | [AI 写长篇小说怎么不崩人设：Oh Story 的做法](docs/ai-long-novel-character-consistency.md) |
+| AI 写的小说 AI 味太重怎么办？ | [去AI味的具体做法](docs/how-to-remove-ai-flavor-from-web-fiction.md) |
+| 怎么拆解榜单爆款、学它的结构？ | [扫榜和拆文的自动化做法](docs/scan-charts-and-deconstruct-bestsellers.md) |
+| Claude Code skills 不写代码能干什么？ | [Claude Code skills for writers](docs/claude-code-skills-for-writers.md)（英文） |
+
 ## 安装后的第一条请求
 
 先按下文说明在选定宿主中完成安装与 setup，再按当前任务选一条，把〈占位内容〉换成自己的信息。这些是任务简报，不是安装命令，也不要求把所有阶段跑完；输出仍需审阅，不会与 ZenStory 托管工作台自动同步。
