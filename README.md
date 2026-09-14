@@ -2,13 +2,13 @@
 
 # oh-story-claudecode
 
-> 项目页：<https://zenstory.ai/oh-story> · ZenStory AI 全部项目：<https://zenstory.ai/projects> · 术语表：<https://zenstory.ai/glossary>
+> 项目页：<https://zenstory.ai/zh/oh-story> · ZenStory AI 全部项目：<https://zenstory.ai/zh/projects> · 术语表：<https://zenstory.ai/zh/glossary>
 
 网文写作 skill 包，覆盖长篇与短篇网络小说的扫榜、拆文、写作、去AI味、封面图全流程。内置适配 Claude Code、Google Antigravity、OpenCode、ZCode、OpenClaw、Codex CLI、Reasonix；能读取项目文件的 Web AI / Agent 环境也可按通用 skills 路径使用。
 
 **Oh Story** is an open-source skill pack that turns coding agents — Claude Code, Codex CLI, Google Antigravity, OpenCode, ZCode, OpenClaw and Reasonix — into a complete workflow for writing Chinese web fiction (网文), both long-form serials and short stories. It covers the professional author's method end to end: **扫榜** (scanning bestseller charts to choose genre, cast and angle), **拆文** (deconstructing top-ranked works into outline rhythm and reusable plot modules), commercial drafting with hooks and payoff pacing, **去AI味** (removing AI-flavored prose), and cover generation. It is not a prompt collection: the 13 skills ship with deterministic verifiers, blocking reference gates, layered context and state management, and per-harness deployers (`/story-setup`). Built for authors publishing on 起点, 番茄, 晋江, 七猫 and 知乎盐言. MIT licensed. Full English README: [README_EN.md](README_EN.md). Install: `npx skills add zenstory-ai/oh-story-claudecode -y -g`.
 
-由 [ZenStory AI](https://zenstory.ai) 维护，仓库地址 `github.com/zenstory-ai/oh-story-claudecode`（原 `worldwonderer/oh-story-claudecode`，旧链接自动跳转）。Maintained by ZenStory AI; previously hosted at `worldwonderer/oh-story-claudecode`, old links redirect.
+由 [ZenStory AI](https://zenstory.ai/zh) 维护，仓库地址 `github.com/zenstory-ai/oh-story-claudecode`（原 `worldwonderer/oh-story-claudecode`，旧链接自动跳转）。Maintained by ZenStory AI; previously hosted at `worldwonderer/oh-story-claudecode`, old links redirect.
 
 ## 按写作任务开始
 
@@ -16,12 +16,12 @@
 
 | 你要做什么 | 实用指南 | 重点 |
 |---|---|---|
-| 先看懂写作 Skill | [提示词、技能包、插件与 MCP 怎么分](https://zenstory.ai/oh-story/agent-skills-for-writers) | 先选写作任务，再选宿主与流程 |
-| 导入已写小说 | [导入 10–20 章后接着写](https://zenstory.ai/oh-story/import-and-continue) | 审阅反推结果，以书稿证据为准 |
-| 维持长篇连续性 | [分开角色已知、承诺与线索](https://zenstory.ai/oh-story/long-novel-continuity) | 别把未来计划当成已发生事实 |
-| 把章纲写成章节 | [把剧情规格写成可见变化](https://zenstory.ai/oh-story/outline-to-chapter) | 用行动、选择、代价和结果推进 |
-| 修改套路化表达 | [用具体改稿减少“AI 味”](https://zenstory.ai/oh-story/revise-ai-prose) | 改读感，不追求鉴定分数 |
-| 续写时保持自己的文风 | [分开文风选择与本书事实](https://zenstory.ai/oh-story/preserve-author-voice) | 用自有或获准样本，不复制原句 |
+| 先看懂写作 Skill | [提示词、技能包、插件与 MCP 怎么分](https://zenstory.ai/zh/oh-story/agent-skills-for-writers) | 先选写作任务，再选宿主与流程 |
+| 导入已写小说 | [导入 10–20 章后接着写](https://zenstory.ai/zh/oh-story/import-and-continue) | 审阅反推结果，以书稿证据为准 |
+| 维持长篇连续性 | [分开角色已知、承诺与线索](https://zenstory.ai/zh/oh-story/long-novel-continuity) | 别把未来计划当成已发生事实 |
+| 把章纲写成章节 | [把剧情规格写成可见变化](https://zenstory.ai/zh/oh-story/outline-to-chapter) | 用行动、选择、代价和结果推进 |
+| 修改套路化表达 | [用具体改稿减少“AI 味”](https://zenstory.ai/zh/oh-story/revise-ai-prose) | 改读感，不追求鉴定分数 |
+| 续写时保持自己的文风 | [分开文风选择与本书事实](https://zenstory.ai/zh/oh-story/preserve-author-voice) | 用自有或获准样本，不复制原句 |
 
 ### 常见问题的直接回答
 
@@ -461,23 +461,23 @@ oh-story-claudecode 内置适配 Claude Code、Google Antigravity、OpenCode、Z
 ### 去AI味之后，朱雀等 AI 检测还是判定为 AI 怎么办？
 
 `story-deslop`（`/去AI味`）是写作 lint：它确定性地检测并清除已知的 AI 句式、标点和退化痕迹，目标是读感，不是绕过检测器。朱雀等外部检测只作自测参考，不替代人工读感；oh-story-claudecode 不承诺通过任何 AI 检测。
-可按[这份具体改稿指南](https://zenstory.ai/oh-story/revise-ai-prose)把空泛情绪、重复句式、拔高议论和过度解释分别处理，同时保留场景任务与作者设定。
+可按[这份具体改稿指南](https://zenstory.ai/zh/oh-story/revise-ai-prose)把空泛情绪、重复句式、拔高议论和过度解释分别处理，同时保留场景任务与作者设定。
 
 ### 已经写了一部分的小说，能导入后继续写吗？
 
-可以。先在写作项目根运行 `/story-setup`，新开或刷新会话后运行 `/story-import`（`/导入小说`）把已有小说反向解析成标准项目结构，审阅反推结果，再用 `/story-long-write 日更` 或 `/story-long-write 写第N章` 续写。[导入与续写指南](https://zenstory.ai/oh-story/import-and-continue)说明了为什么书稿证据应优先于模型猜测。
+可以。先在写作项目根运行 `/story-setup`，新开或刷新会话后运行 `/story-import`（`/导入小说`）把已有小说反向解析成标准项目结构，审阅反推结果，再用 `/story-long-write 日更` 或 `/story-long-write 写第N章` 续写。[导入与续写指南](https://zenstory.ai/zh/oh-story/import-and-continue)说明了为什么书稿证据应优先于模型猜测。
 
 ### 长篇续写怎样减少忘伏笔或角色提前知道答案？
 
-续写前分开故事客观事实、角色已知和读者已见，只带上本章相关的当前状态与未完承诺。[长篇连续性指南](https://zenstory.ai/oh-story/long-novel-continuity)给出三章示例；结构化记录能帮助交接，但不代表几百章都不会出错。
+续写前分开故事客观事实、角色已知和读者已见，只带上本章相关的当前状态与未完承诺。[长篇连续性指南](https://zenstory.ai/zh/oh-story/long-novel-continuity)给出三章示例；结构化记录能帮助交接，但不代表几百章都不会出错。
 
 ### 章纲齐全，为什么写出来还是在复述设定？
 
-把章纲当作“本章必须发生什么变化”的规格，再把目标、阻碍、证据、选择和代价转成视角人物可感知的行动与结果。[章纲到章节指南](https://zenstory.ai/oh-story/outline-to-chapter)是编辑示例，不是工具实测或模型质量承诺。
+把章纲当作“本章必须发生什么变化”的规格，再把目标、阻碍、证据、选择和代价转成视角人物可感知的行动与结果。[章纲到章节指南](https://zenstory.ai/zh/oh-story/outline-to-chapter)是编辑示例，不是工具实测或模型质量承诺。
 
 ### 怎样保留我的文风，又不把另一本书的情节带进来？
 
-把你自己写的或获准使用的短样本拆成表达维度，与当前书的事实分开讨论；样本推断不自动成为长期偏好。[作者文风指南](https://zenstory.ai/oh-story/preserve-author-voice)说明如何裁决当前要求、本书文风与作者偏好；它不承诺自动匹配文风，也不鼓励复制原句。
+把你自己写的或获准使用的短样本拆成表达维度，与当前书的事实分开讨论；样本推断不自动成为长期偏好。[作者文风指南](https://zenstory.ai/zh/oh-story/preserve-author-voice)说明如何裁决当前要求、本书文风与作者偏好；它不承诺自动匹配文风，也不鼓励复制原句。
 
 ### Windows 上安装报 `ENOENT ... mkdir`，但末尾显示 Done，正常吗？
 
@@ -510,7 +510,7 @@ oh-story-claudecode 内置适配 Claude Code、Google Antigravity、OpenCode、Z
 
 ## ZenStory AI 项目
 
-Oh Story 是 [ZenStory AI](https://zenstory.ai) 的一部分——一组开源、面向 agent 的故事创作、改编与生产工具（GitHub 组织：[zenstory-ai](https://github.com/zenstory-ai)）。同组织项目：
+Oh Story 是 [ZenStory AI](https://zenstory.ai/zh) 的一部分——一组开源、面向 agent 的故事创作、改编与生产工具（GitHub 组织：[zenstory-ai](https://github.com/zenstory-ai)）。同组织项目：
 
 | 项目 | 用途 |
 | --- | --- |
