@@ -156,15 +156,16 @@ developer_instructions = """
    - 若字段缺失或已忽略 → `Glob 对标/*/**/*`，从命中文件所属的书目录（`对标/` 下的第一层目录，排除当前作品）取字典序第一个，并在 `gaps.main_benchmark_unspecified: true` 提示主对标书未指定；**枚举条件是书目录下有文件，不是有 `文风.md`**——缺文风但资料完整的候选仍算命中
    - 若排除后无命中，继续向上找工作区根下的 `拆文库/*/**/*`，同样排除当前作品；仍无 → 返回 `gaps.no_benchmark: true`，`results` 置空，**不报错、不继续读文风**
 3. **对标书路径查找（只判书目录有效性，不判文风）**：优先探 `{项目}/对标/{书名}/**/*`，回退探 `拆文库/{书名}/**/*`（向上找到工作区根，再下钻拆文库）；探针是目录下的任意文件——Glob 不接受纯目录模式，`{书名}/` 恒返回空。任一处命中文件即视为书目录有效，进入步骤 4；两处都无命中才是 `benchmark_book_missing`。**不得用 `文风.md` 兼作目录存在性探针**——那会把「书在但缺文风」误判成「书不存在」，吞掉步骤 6 的 `profile_missing` 与调用方的 `custom_style` 降级分支
-4. **读情绪模块（权威）**：
-   - 优先 `Read {对标书路径}/剧情/情绪模块.md`
-   - 存在 → 从「读者需求 / 情绪引擎」「可复现模块」或模块卡片中，按本章情绪/爽点类型选择 1 条 `selected_emotion_module`，并写入 `module_source_path`
-   - 不存在 → 返回 `gaps.missing_primary_contract: true`、`gaps.module_missing: true`、`gaps.repair_action: "重跑 $story-long-analyze Stage 3+ 或重新 $story-import，补齐 剧情/情绪模块.md"`；不要从摘要或文风伪造权威模块
-5. **读节奏索引（权威）**：
-   - 优先 `Read {对标书路径}/剧情/节奏.md`
-   - 存在 → 从关键信息推进表、情绪触动点、爆发节奏/冷却段中选择 1 条 `rhythm_reference`，并写入 `rhythm_source_path`
-   - 不存在 → 返回 `gaps.missing_primary_contract: true`、`gaps.rhythm_missing: true`、`gaps.repair_action: "重跑 $story-long-analyze Stage 3+ 或重新 $story-import，补齐 剧情/节奏.md"`；不要从摘要或故事线伪造权威节奏
-   - 若任一权威文件缺失（`gaps.missing_primary_contract: true`），保留已读到的来源信息后直接返回结构化 JSON；调用方必须停止本章准备，不进入文风/章节匹配/正文写作。
+4. **主产物探针与资料代际**：
+   - 先探 `{对标书路径}/剧情/情绪模块.md` 和 `{对标书路径}/剧情/节奏.md`，两者都存在才进入当前权威召回。
+   - 任一未命中时，核对 `_progress.md`、`拆文报告.md`、`章节/*_摘要.md`、`剧情/*.md` 和 `文风.md` 的存在、非空与覆盖范围。进度为 `schema_version: 2`，或旧核心资料不完整时按下面两项返回并停止准备。
+   - 缺 `剧情/情绪模块.md` → `gaps.missing_primary_contract: true`、`gaps.module_missing: true`，`repair_action` 写“重跑 $story-long-analyze Stage 3，补齐情绪模块”。
+   - 缺 `剧情/节奏.md` → `gaps.missing_primary_contract: true`、`gaps.rhythm_missing: true`，`repair_action` 写“重跑 $story-long-analyze Stage 3，补齐节奏索引”。
+   - 没有 current schema 且旧报告、逐章事实、剧情资料覆盖完整 → 返回 `gaps.legacy_benchmark_limited: true`；已存在的当前主产物仍进入步骤 5，缺失项的召回值与来源路径为 `null`，再从步骤 6 继续旧文风/章节参考。不得把旧文件改名或概括成权威主产物。
+5. **当前权威召回**：
+   - 对存在的 `{对标书路径}/剧情/情绪模块.md`，从读者需求、情绪引擎或可复现模块中选择 1 条 `selected_emotion_module`，写入 `module_source_path`。
+   - 对存在的 `{对标书路径}/剧情/节奏.md`，从关键信息推进、情绪触动点、爆发/冷却中选择 1 条 `rhythm_reference`，写入 `rhythm_source_path`。
+   - 两份文件冲突时保留两条来源摘要，返回 `gaps.module_rhythm_conflict: true`；二者优先于报告和故事线，禁止自行改写。
    - 若两个权威文件都存在但对同一章节/模块的读者情绪或爆发点描述互相矛盾，保留两条原文摘要，并返回 `gaps.module_rhythm_conflict: true` 与 `gaps.conflict: "..."`；调用方按两个权威文件优先于 `拆文报告.md` / `故事线.md` 的规则处理，禁止自行改写
 6. **读文风**：
    - `Read {对标书路径}/文风.md`
@@ -189,7 +190,7 @@ developer_instructions = """
    - L3 章节号最小
 11. **读匹配章节资料**：
    - 先 `Read {对标书路径}/章节/第K章_摘要.md`，提取本章基调序列、关键事件、爽点/情绪节点
-   - 优先提取摘要内「关键信息与扩写技法」表，作为 `matched_chapter_techniques` 的一部分；这只是证据/补足，不覆盖 `剧情/节奏.md`
+   - 新版轻量摘要优先读取「章节卡」的信息变化、章尾钩子和三维节奏；旧摘要没有章节卡时再读取「关键信息与扩写技法」表，作为 `matched_chapter_techniques` 的证据/补足；两者都不覆盖 `剧情/节奏.md`
    - 若 `{对标书路径}/章节/第K章_深度拆解.md` 存在，再读取并提取「可借鉴要素」+ 反应层 + 章尾钩子类型
    - 若同章深度拆解不存在（常见：只有黄金三章有深度拆解），不要失败；回退读取 `第1章_深度拆解.md`、`第2章_深度拆解.md`、`第3章_深度拆解.md` 中基调最接近的一章，或仅使用文风「可借鉴技巧」
    - 在 `gaps.matched_deep_dive_missing: true` 标记该回退
@@ -211,7 +212,7 @@ developer_instructions = """
 
 > `context_load` 的固定读取量不随章数增长。角色当前值来自独立小快照，旧变化原因来自按 ID/角色定点命中的紧凑增量，时间线按作者/读者视角分开读取。
 
-> 普通查询遇文件缺失时在 `gaps` 中返回事实；`context_load` 缺 state、续写状态卡或 `check` 失败时必须停止组装。`benchmark_style_load` 缺 `剧情/情绪模块.md` 或 `剧情/节奏.md` 时必须返回 `missing_primary_contract: true` 与 `repair_action`，不得继续进入写作准备；登记的主对标**书目录**探不到时返回 `benchmark_book_missing: true` 与 `expected_path`，同样停止，不得改用其他书；书目录存在但缺 `文风.md` 归 `profile_missing`，不占用本分类。
+> 普通查询遇文件缺失时在 `gaps` 中返回事实；`context_load` 缺 state、续写状态卡或 `check` 失败时停止。`benchmark_style_load` 的当前资料缺两个主产物时返回 `missing_primary_contract` 与 `repair_action`；只有步骤 4 验证为完整旧拆文才返回 `legacy_benchmark_limited` 并继续旧能力。登记的主对标书目录探不到时返回 `benchmark_book_missing` 与 `expected_path`；缺 `文风.md` 归 `profile_missing`。
 
 ---
 
@@ -313,6 +314,7 @@ developer_instructions = """
     "module_rhythm_conflict": false,
     "conflict": null,
     "missing_primary_contract": false,
+    "legacy_benchmark_limited": false,
     "repair_action": null,
     "profile_missing": false,
     "profile_stale": false,

@@ -29,6 +29,8 @@ jobs:
         run: bash scripts/check-current-skill-contracts.sh
       - name: Current-only skill contract regression
         run: python3 scripts/test-current-skill-contracts.py
+      - name: Long-analysis runtime and compatibility regression
+        run: python3 scripts/test-long-analyze-runtime.py
       - name: Agent permission behavior regression
         run: python3 scripts/test-agent-permissions.py
       - name: Check hot-path doc budget
@@ -180,6 +182,8 @@ jobs:
       - name: Workflow numbering regression
         shell: bash
         run: bash scripts/test-skill-numbering.sh
+      - name: Long-analysis runtime and compatibility regression
+        run: python scripts/test-long-analyze-runtime.py
       - name: Check shared-file consistency (Windows Git Bash)
         shell: bash
         run: bash scripts/check-shared-files.sh
@@ -266,6 +270,8 @@ jobs:
         run: python3 scripts/test-author-memory-commit.py
       - name: Workflow numbering regression
         run: bash scripts/test-skill-numbering.sh
+      - name: Long-analysis runtime and compatibility regression
+        run: python3 scripts/test-long-analyze-runtime.py
       - name: Punctuation normalizer regression
         run: node scripts/test-normalize-punctuation.js
       - name: Scan runtime regression
