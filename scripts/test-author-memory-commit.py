@@ -369,18 +369,19 @@ def main() -> None:
         auto_result = json.loads(record(auto_workspace, input_path, auto_event).stdout)
         assert auto_result["receipt"] == "Author Memory Receipt: r1 · AP001"
         assert state(auto_workspace)["state_revision"] == 1
-        many_preferences = transaction(
-            "tx-query-budget",
+        # 写入即限载：装得下的一组照常入库
+        fitting = transaction(
+            "tx-query-budget-fit",
             1,
             [
                 {
                     "action": "remember",
                     "preference": preference(
-                        f"长偏好 {index}：" + "用具体动作和物件承载信息" * 18,
-                        f"第 {index} 条用于验证查询预算的明确偏好。",
+                        f"短偏好 {index}：动词承重，不用被动式。",
+                        f"第 {index} 条短偏好。",
                     ),
                 }
-                for index in range(8)
+                for index in range(2)
             ] + [{
                 "action": "remember",
                 "preference": preference(
@@ -392,21 +393,53 @@ def main() -> None:
                 ),
             }],
         )
-        commit(auto_workspace, input_path, many_preferences)
-        bounded_query = run("query", "--workspace", str(auto_workspace), "--kind", "prose_style")
-        bounded_document = json.loads(bounded_query.stdout)
-        assert len(bounded_query.stdout.encode("utf-8")) <= 2048
-        assert bounded_document["omitted"] > 0
+        commit(auto_workspace, input_path, fitting)
+        fit_query = json.loads(run("query", "--workspace", str(auto_workspace), "--kind", "prose_style").stdout)
+        assert fit_query["omitted_ids"] == []
         matching_design = json.loads(run(
             "query", "--workspace", str(auto_workspace),
             "--kind", "story_design", "--genre", "悬疑",
         ).stdout)
-        assert [item["id"] for item in matching_design["items"]] == ["AP010"]
+        assert [item["id"] for item in matching_design["items"]] == ["AP004"]
         assert json.loads(run(
             "query", "--workspace", str(auto_workspace),
             "--kind", "story_design", "--genre", "甜宠",
         ).stdout)["items"] == []
         run("check", "--workspace", str(auto_workspace))
+
+        # 会把「正文初稿/续写」组合撑破 2048 的事务必须被拒绝，state 不动
+        before_revision = state(auto_workspace)["state_revision"]
+        overflowing = transaction(
+            "tx-query-budget-overflow",
+            before_revision,
+            [
+                {
+                    "action": "remember",
+                    "preference": preference(
+                        f"长偏好 {index}：" + "用具体动作和物件承载信息" * 18,
+                        f"第 {index} 条用于验证写入即限载。",
+                    ),
+                }
+                for index in range(4)
+            ],
+        )
+        rejected = commit(auto_workspace, input_path, overflowing, expect=2)
+        assert "注入预算" in rejected.stderr, rejected.stderr
+        assert state(auto_workspace)["state_revision"] == before_revision
+
+        # 老库过渡态（绕过工具直接充胀 state）：查询保险丝要响亮不静默——
+        # 预算内能装几条装几条，漏下的 ID 全部报进 omitted_ids
+        legacy_state = state(auto_workspace)
+        for item_id in ("AP001", "AP002", "AP003"):
+            legacy_state["items"][item_id]["assertion"] = "长" * 250
+        state_file = auto_workspace / ".story" / "作者记忆" / "_author-memory-state.json"
+        state_file.write_text(json.dumps(legacy_state, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        fused = run("query", "--workspace", str(auto_workspace), "--kind", "prose_style")
+        assert len(fused.stdout.encode("utf-8")) <= 2048
+        fused_document = json.loads(fused.stdout)
+        assert fused_document["omitted_ids"], "老库超编必须报 omitted_ids"
+        assert fused_document["omitted"] == len(fused_document["omitted_ids"])
+        assert fused_document["items"], "跳过不中断——装得下的条目仍应返回"
 
     injection_contracts = {
         REPO / "skills/story-long-write/references/workflow-chapter.md": (

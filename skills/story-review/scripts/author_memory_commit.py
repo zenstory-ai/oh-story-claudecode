@@ -30,6 +30,20 @@ PENDING_MAX_BYTES = 12288
 JOURNAL_MAX_BYTES = 24576
 QUERY_MAX_BYTES = 2048
 
+# 写入即限载：query 的输出是要原样贴进执行 agent prompt 的注入载荷，
+# QUERY_MAX_BYTES 是低优先级偏好在 prompt 里的注意力预算，不该放大。
+# 防「作者以为载入了、实际被静默截断挤掉」的唯一可靠位置在写入端——
+# 下列任务组合（与 references/author-memory.md 的映射表同包跟版）在
+# 最坏查询情形下都必须装进 QUERY_MAX_BYTES，超限拒绝写入，先精简/
+# 合并/退役旧条目。最坏情形＝全局条目＋各 scope 维度上最重的单一切片
+# （一次查询只带一个 book/genre/workflow，不同书的条目不会同现）。
+QUERY_COMBOS: dict[str, tuple[str, ...]] = {
+    "正文初稿/续写": ("prose_style", "story_design"),
+    "去AI味/改写": ("prose_style",),
+    "设定/大纲": ("story_design", "workflow", "interaction"),
+    "审稿": ("delivery", "interaction", "prose_style"),
+}
+
 KINDS = ("prose_style", "story_design", "workflow", "delivery", "interaction")
 KIND_TITLES = {
     "prose_style": "文风与表达",
@@ -690,6 +704,56 @@ def command_init(workspace: Path) -> dict[str, Any]:
     return {"ok": True, "command": "init", "revision": state["state_revision"], "root": str(memory_root(workspace))}
 
 
+def query_envelope_bytes(items: list[dict[str, Any]], revision: int) -> int:
+    """按 command_query 同款 JSON 信封计算字节——校验与真实输出必须同一把尺。"""
+    result = {
+        "ok": True,
+        "command": "query",
+        "initialized": True,
+        "revision": revision,
+        "items": [
+            {"id": i["id"], "kind": i["kind"], "scope": i["scope"], "assertion": i["assertion"]}
+            for i in items
+        ],
+        "omitted": 0,
+        "omitted_ids": [],
+    }
+    return len((json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8"))
+
+
+def enforce_query_budgets(state: dict[str, Any]) -> None:
+    """每个任务组合在最坏查询情形下必须装进 QUERY_MAX_BYTES，否则拒绝写入。
+
+    query 侧的截断只是最后的保险丝；真到那一步，作者以为载入的记忆已经静默
+    失效。所以闸门设在这里：写不进去就先盘点——精简判据句、合并同义条、退役
+    过时条。init/幂等重放不查（老库越限时仍可修复视图、可做减量盘点）。
+    """
+    for task, kinds in QUERY_COMBOS.items():
+        pool = [i for i in state["items"].values() if i["status"] == "active" and i["kind"] in kinds]
+        worst = [i for i in pool if i["scope"]["level"] == "global"]
+        for level in ("book", "genre", "workflow"):
+            slices: dict[str, list[dict[str, Any]]] = {}
+            for i in pool:
+                if i["scope"]["level"] == level:
+                    slices.setdefault(i["scope"]["value"] or "", []).append(i)
+            if slices:
+                worst.extend(max(
+                    slices.values(),
+                    key=lambda items: sum(len(json.dumps(i, ensure_ascii=False).encode("utf-8")) for i in items),
+                ))
+        size = query_envelope_bytes(worst, state["state_revision"])
+        if size <= QUERY_MAX_BYTES:
+            continue
+        heaviest = sorted(worst, key=lambda i: -len(i["assertion"].encode("utf-8")))[:6]
+        detail = "；".join(f"{i['id']}({len(i['assertion'].encode('utf-8'))}B)" for i in heaviest)
+        require(
+            False,
+            f"「{task}」组合最坏查询 {size} 字节，超出注入预算 {QUERY_MAX_BYTES}——"
+            f"query 将静默截断，记忆看似载入实则失效。先精简/合并/退役旧条目再写入。"
+            f"该组合最重条目：{detail}",
+        )
+
+
 def command_commit(workspace: Path, input_path: Path) -> dict[str, Any]:
     require(state_path(workspace).exists(), "author memory is not initialized; run init first")
     state = validate_state(read_json(state_path(workspace)))
@@ -698,6 +762,7 @@ def command_commit(workspace: Path, input_path: Path) -> dict[str, Any]:
     updated, summaries = apply_transaction(state, transaction, digest)
     replayed = updated is state
     if not replayed:
+        enforce_query_budgets(updated)
         write_snapshot(workspace, updated)
     else:
         # Repair missing or stale views during an idempotent retry.
@@ -730,6 +795,8 @@ def command_record(workspace: Path, input_path: Path) -> dict[str, Any]:
     digest = transaction_digest(transaction)
     updated, summaries = apply_transaction(state, transaction, digest)
     replayed = updated is state
+    if not replayed:
+        enforce_query_budgets(updated)
     write_snapshot(workspace, updated)
     record = updated["applied_transactions"][transaction_id]
     item_ids = record["item_ids"]
@@ -761,7 +828,7 @@ def command_query(
     require(workspace.exists() and workspace.is_dir(), f"workspace does not exist: {workspace}")
     path = state_path(workspace)
     if not path.exists():
-        return {"ok": True, "command": "query", "initialized": False, "revision": 0, "items": [], "omitted": 0}
+        return {"ok": True, "command": "query", "initialized": False, "revision": 0, "items": [], "omitted": 0, "omitted_ids": []}
     state = validate_state(read_json(path))
     requested_kinds = set(kinds or KINDS)
     requested_scopes = {
@@ -792,8 +859,13 @@ def command_query(
         "initialized": True,
         "revision": state["state_revision"],
         "items": [],
-        "omitted": len(candidates),
+        "omitted": 0,
+        "omitted_ids": [],
     }
+    # 写入即限载（enforce_query_budgets）保证这里恒装得下；截断分支只是老库
+    # 未盘点时的过渡保险丝——装不下的**跳过而不中断**（一条长的不挡后面的短
+    # 条），漏下的 ID 逐个报进 omitted_ids：非空＝记忆超编该盘点了，不是
+    # 「没有更多了」。
     for item in candidates:
         compact = {
             "id": item["id"],
@@ -802,12 +874,15 @@ def command_query(
             "assertion": item["assertion"],
         }
         result["items"].append(compact)
-        result["omitted"] = len(candidates) - len(result["items"])
         payload = json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n"
         if len(payload.encode("utf-8")) > QUERY_MAX_BYTES:
             result["items"].pop()
-            result["omitted"] += 1
-            break
+            result["omitted_ids"].append(item["id"])
+    # omitted 计数落定后包可能恰好贴边超出一两个字节，回吐条目直到装下。
+    result["omitted"] = len(result["omitted_ids"])
+    while result["items"] and len((json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8")) > QUERY_MAX_BYTES:
+        result["omitted_ids"].append(result["items"].pop()["id"])
+        result["omitted"] = len(result["omitted_ids"])
     require(len((json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8")) <= QUERY_MAX_BYTES, "query result exceeds its fixed byte budget")
     return result
 
