@@ -1,10 +1,47 @@
-<!-- Last synced with README.md: 2026-09-07 -->
+<!-- Last synced with README.md: 2026-09-12 -->
 
 **English** | [中文](README.md)
 
 # oh-story-claudecode
 
+> Project page: <https://zenstory.ai/oh-story> · All ZenStory AI projects: <https://zenstory.ai/projects> · Glossary: <https://zenstory.ai/glossary>
+
 A web novel writing skill pack with built-in adapters for Claude Code, Google Antigravity, OpenCode, ZCode, OpenClaw, Codex CLI, and Reasonix. Web AI / agent environments that can read project files can use the generic skills path. Covers the full pipeline for long-form and short-form Chinese web novels: trend scanning, deconstruction, writing, AI tone removal, and cover generation.
+
+## Start with Your Writing Task
+
+This repository is a skill pack installed in a compatible agent host. It is separate from the hosted ZenStory writing workbench: project files, settings and progress do not sync automatically between the two products. Use these guides to define the task before running it in your installed host:
+
+| What you want to do | Practical guide | Focus |
+|---|---|---|
+| Understand writing skills first | [Prompts, skill packs, plugins and MCP](https://zenstory.ai/oh-story/agent-skills-for-writers) | Choose the writing job before the host and workflow |
+| Import an existing novel | [Import 10–20 chapters and continue](https://zenstory.ai/oh-story/import-and-continue) | Review inferred structure; treat the manuscript as evidence |
+| Keep a long novel consistent | [Separate character knowledge, promises and clues](https://zenstory.ai/oh-story/long-novel-continuity) | Do not turn future plans into past events |
+| Turn an outline into a chapter | [Write plot specifications as visible change](https://zenstory.ai/oh-story/outline-to-chapter) | Advance through action, choice, cost and result |
+| Revise formulaic prose | [Reduce "AI-sounding" prose with concrete edits](https://zenstory.ai/oh-story/revise-ai-prose) | Improve the reading experience, not a detector score |
+| Preserve author voice in continuation | [Separate voice choices from book facts](https://zenstory.ai/oh-story/preserve-author-voice) | Use authorized samples without copying phrases |
+
+### Direct answers to common questions
+
+These documents answer the questions writers ask most, describing the mechanism as shipped in the current version:
+
+| Question | Document |
+|---|---|
+| How do I stop an AI writing agent from breaking character over 100+ chapters? | [Keep an AI-written novel consistent over 100+ chapters](docs/keep-ai-novel-consistent-over-100-chapters.md) |
+| What can Claude Code skills do besides code? | [Claude Code skills that are not for coding: a fiction-writing pack as the worked example](docs/claude-code-skills-for-writers.md) |
+| How do I remove AI flavor from prose? | [去AI味的具体做法](docs/how-to-remove-ai-flavor-from-web-fiction.md) (Chinese) |
+| How do I scan charts and deconstruct bestsellers? | [扫榜和拆文的自动化做法](docs/scan-charts-and-deconstruct-bestsellers.md) (Chinese) |
+
+## Your First Request after Setup
+
+First follow the instructions below to install and run setup in your chosen host. Choose the brief that fits your current task and replace the 〈placeholders〉. These are not installation commands or a required sequence; review the output, and do not expect automatic synchronization with the hosted ZenStory workbench.
+
+1. **Start a new book**
+   > I want to start a new 〈genre/premise〉 book. First separate fixed facts in my material from decisions that remain open. Plan only a bounded opening and deliver the central conflict, viewpoint/information-release limits, changes across the first three chapters and open decisions. Do not draft prose automatically; leave genre tradeoffs, character motives and the long-term direction for me to confirm.
+2. **Import an existing manuscript**
+   > Organize this manuscript as a continuable project. Chapters 1–〈N〉 are complete; 〈filename〉 is a partial chapter 〈N+1〉. Preserve the source prose, do not overwrite complete chapters, and do not count the fragment as a complete chapter, and separate inferred settings for confirmation. First deliver the detected range, reconstructed facts, conflicts/ambiguities and decisions requiring my confirmation for review; do not continue the story yet.
+3. **Fix an unsatisfactory passage**
+   > This passage reads as 〈vague/repetitive/over-explained〉. First name the specific reading problem while preserving story facts, character knowledge and unrevealed information. Deliver only a proposed revision of this passage, a before/after comparison and reasons—not a book-wide rewrite. I will decide which suggestions to accept.
 
 ## Core Approach
 
@@ -18,17 +55,7 @@ Professional authors follow a three-step method:
 
 Built around four pillars: reverse-engineering hits · plot modularization · layered state management · human-AI collaboration.
 
-> **Antigravity support preview:** `story-setup` can deploy all 13 Skills, 7 custom agents, an Always-On Rule, and workspace Hooks into the project's `.agents/` tree. The deployer does not modify `~/.gemini/`, depend on global directories, or require symlink discovery. In `.agents/hooks.json`, it replaces only the top-level `oh-story` group and preserves user groups. The current contract uses `agents_version: 30`; open a fresh Antigravity conversation after deployment and smoke-test the IDE and interactive `agy` separately.
-
-> **v0.7.10 — Writing workflow and style fixes**: adds long-form planning checks, scripted writer prompts, and scoped outline reads. Unifies style precedence, fixes skipped references, and assigns prose review and final scans to their owners. Short stories gain delivery-parameter checks and drop body-word frequency limits. Rerun `/story-setup` and open a new session; `agents_version` is 30. [Full changes](CHANGELOG.md#0710---2026-09-09)
->
-> **v0.7.9 — 短篇按场景功能校准**: short-form drops per-section word floors, the 3-5 sub-event rule, dialogue ratios, and fixed hook intervals in favour of a single readable test — does this scene change risk, information, relationships, resources, a decision, an action, or the reader's understanding? The teaser is now the first scene of the prose, and chapter 1 continues from its consequences rather than replaying it. Adds a structural verifier for chapter outlines; the outline's target-emotion and protagonist-choice fields no longer accept placeholders. Rerun `/story-setup` and start a new session; `agents_version` is 29. [Full changes](CHANGELOG.md#079---2026-08-30)
->
-> **v0.7.8 — 参考拆分与门禁**: long-form and short-form references are split per consumer and renamed; a blocking Reference Gate now runs before prose writing and short-story design, and Phase 2 plus final delivery each gain a deterministic verifier. Short-story length now follows the range the user gave. Rerun `/story-setup` and start a new session; `agents_version` is 28. [Full changes](CHANGELOG.md#078---2026-08-28)
->
-> **v0.7.7 — 记忆与收口**: long-form prose now uses one machine-enforced length metric; under-length chapters are not padded with new plot, and over-length chapters get at most one compression pass. This release also adds cross-session author memory and Codex built-in ImageGen, and fixes recursive story-setup copies. **The patch number does not convey this tightening**: a missing or invalid word target now stops instead of falling back to 3,000. Update the pack, rerun `/story-setup`, and start a new session; `agents_version` is 26. [Full changes](CHANGELOG.md#077---2026-08-26)
->
-> For earlier versions, see [CHANGELOG.md](CHANGELOG.md).
+> Latest release: **v0.7.10** (2026-09-09). See [CHANGELOG.md](CHANGELOG.md) and [Releases](https://github.com/zenstory-ai/oh-story-claudecode/releases); rerun `/story-setup` and start a new session after upgrading. Antigravity deployment is covered in the usage notes below.
 
 ## Pipeline Overview
 
@@ -410,6 +437,54 @@ Real output samples are in [demo/](demo/): short-form deconstruction 《曾将�
 
 I built this skill pack to help me through a job-hunting transition :joy:, and I hope it can help others too.
 
+## FAQ
+
+### Does it work in Codex, Google Antigravity or OpenCode, or only in Claude Code?
+
+oh-story-claudecode ships adapters for Claude Code, Google Antigravity, OpenCode, ZCode, OpenClaw, Codex CLI and Reasonix. Codex discovers the 13 skills by scanning `.agents/skills` in the repo and invokes them with `$story-setup`; in Antigravity run `story-setup` via `/skills` or natural language and choose `target_cli=antigravity`. Any Web AI or agent environment that can read project files can use the generic skills path.
+
+### Do I need a GPU or to host a model?
+
+No. oh-story-claudecode is a set of skills that runs inside the coding agent you already use, so the writing model is that agent's model; only deterministic check scripts (Node / Python) run locally. The one exception is `story-cover`, which calls GPT-Image-2 (Codex built-in quota or an API fallback).
+
+### Chapter lengths are inconsistent or the word count is off. What do I do?
+
+Since v0.7.7 long-form prose uses a single machine-counted length metric: every chapter blueprint must state a valid word target, and a missing target stops the run instead of falling back to 3,000; under-length chapters are not padded with new plot, and over-length chapters get at most one compression pass. `check-prose-after-write.sh` flags length debt after each write. Rerun `/story-setup` and start a new session after upgrading an older project.
+
+### After de-AI editing, detectors such as Zhuque still flag the text as AI. Why?
+
+`story-deslop` (`/去AI味`) is a writing lint: it deterministically detects and removes known AI sentence patterns, punctuation habits and degeneration artifacts. Its target is how the prose reads, not evading detectors. External detectors are a self-check reference only, and oh-story-claudecode makes no promise of passing any AI detector.
+[This concrete revision guide](https://zenstory.ai/oh-story/revise-ai-prose) separates vague emotion, repeated syntax, unearned commentary and over-explaining while preserving the scene's job and the author's facts.
+
+### I already have part of a novel written. Can I import it and continue?
+
+Yes. Run `/story-setup` in the project root, start or refresh a session, run `/story-import` to reverse-parse the existing novel into the standard project layout, review its inferences, then continue with `/story-long-write 日更` or `/story-long-write 写第N章`. The [import-and-continue guide](https://zenstory.ai/oh-story/import-and-continue) explains why manuscript evidence should take priority over model guesses.
+
+### How do I reduce forgotten clues or characters knowing answers too early in a long continuation?
+
+Before continuing, separate objective story facts, character knowledge and what readers have seen; carry only the relevant current state and unfinished commitments into the chapter. The [long-novel continuity guide](https://zenstory.ai/oh-story/long-novel-continuity) gives a three-chapter example. Structured records can help organize the handoff, but do not promise error-free writing over hundreds of chapters.
+
+### My chapter outline is complete. Why does the prose still summarize the setup?
+
+Treat the outline as a specification for what must change, then turn its goal, obstacle, evidence, choice and cost into actions and results the viewpoint character can perceive. The [outline-to-chapter guide](https://zenstory.ai/oh-story/outline-to-chapter) is an editorial example, not a recorded tool run or model-quality claim.
+
+### How do I keep my voice without carrying plot facts over from another book?
+
+Describe the dimensions of a short sample you wrote or may use, separately from the current book's facts; sample inference does not automatically establish an enduring preference. The [author-voice guide](https://zenstory.ai/oh-story/preserve-author-voice) explains how to resolve the current request, book style and author preferences; it does not promise automatic style matching or encourage copied phrases.
+
+### On Windows the install prints `ENOENT ... mkdir` but ends with Done. Is that normal?
+
+It means some skills were not fully installed. Rerun the same install command, with or without the error, and it repairs itself; if a reference-material directory is missing, `/story-setup` reports the reference pack as incomplete. Codex users on Windows also need `core.symlinks` enabled in git.
+
+### What do I do after upgrading?
+
+Rerun `/story-setup` and start a new session. The seven agents (story-architect, narrative-writer, consistency-checker and others) are written into the project by `/story-setup`; multi-agent collaboration only takes effect after deploying and opening a fresh session.
+
+### What is the difference between the short-form and long-form entry points?
+
+Long-form: `/story-long-scan` (chart scanning) → `/story-long-analyze` (deconstruction) → `/story-long-write` (outline, volume outline, chapter blueprints, prose). Short-form: `/story-short-scan` → `/story-short-analyze` → `/story-short-write`. Both share `/story-setup`, `/story-deslop`, `/story-review` and `/story-cover`.
+
+
 ## Contributing
 
 Contributions are welcome — new skills, knowledge base additions, market data updates. See [CONTRIBUTING.md](CONTRIBUTING.md) (Chinese only).
@@ -425,3 +500,16 @@ Contributions are welcome — new skills, knowledge base additions, market data 
 - [LINUX DO - The New Ideal Community](https://linux.do) — Community support
 - [FanqieRankTracker](https://github.com/wen1701/FanqieRankTracker) — Fanqie Novels font obfuscation decoding reference
 - [Zhuque AIGC Detector CLI](https://github.com/Sophomoresty/zhuque) — External retest reference used during anti-AI-writing experiments
+
+## Part of ZenStory AI
+
+Oh Story is part of [ZenStory AI](https://zenstory.ai) — open-source, agent-native tools for creating, adapting and producing stories (GitHub org: [zenstory-ai](https://github.com/zenstory-ai)). Sibling projects:
+
+| Project | What it does |
+| --- | --- |
+| [oh-story-claudecode](https://github.com/zenstory-ai/oh-story-claudecode) | Web-fiction writing skill pack (this repo) |
+| [drama-skills](https://github.com/zenstory-ai/drama-skills) | AI short-drama / motion-comic suite: scripts, assets, storyboards, image & video prompts, independent review |
+| [novel-to-game](https://github.com/zenstory-ai/novel-to-game) | Agent skills for source-grounded novel adaptation, target-runtime builds, and evidence-based QA |
+| [video-recap-skills](https://github.com/zenstory-ai/video-recap-skills) | Create Chinese-narration recaps from supported video files, with optional editable JianYing/CapCut draft export |
+| [oh-story-dsh](https://github.com/zenstory-ai/oh-story-dsh) | Community DeepSeek Harness plugin with novel, short-drama, game and video-recap workbenches |
+| [zenstory](https://github.com/zenstory-ai/zenstory) | Chat-to-create AI novel-writing workbench ([app.zenstory.ai](https://app.zenstory.ai)) |

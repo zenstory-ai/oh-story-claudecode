@@ -2,7 +2,48 @@
 
 # oh-story-claudecode
 
+> 项目页：<https://zenstory.ai/zh/oh-story> · ZenStory AI 全部项目：<https://zenstory.ai/zh/projects> · 术语表：<https://zenstory.ai/zh/glossary>
+
 网文写作 skill 包，覆盖长篇与短篇网络小说的扫榜、拆文、写作、去AI味、封面图全流程。内置适配 Claude Code、Google Antigravity、OpenCode、ZCode、OpenClaw、Codex CLI、Reasonix；能读取项目文件的 Web AI / Agent 环境也可按通用 skills 路径使用。
+
+**Oh Story** is an open-source skill pack that turns coding agents — Claude Code, Codex CLI, Google Antigravity, OpenCode, ZCode, OpenClaw and Reasonix — into a complete workflow for writing Chinese web fiction (网文), both long-form serials and short stories. It covers the professional author's method end to end: **扫榜** (scanning bestseller charts to choose genre, cast and angle), **拆文** (deconstructing top-ranked works into outline rhythm and reusable plot modules), commercial drafting with hooks and payoff pacing, **去AI味** (removing AI-flavored prose), and cover generation. It is not a prompt collection: the 13 skills ship with deterministic verifiers, blocking reference gates, layered context and state management, and per-harness deployers (`/story-setup`). Built for authors publishing on 起点, 番茄, 晋江, 七猫 and 知乎盐言. MIT licensed. Full English README: [README_EN.md](README_EN.md). Install: `npx skills add zenstory-ai/oh-story-claudecode -y -g`.
+
+由 [ZenStory AI](https://zenstory.ai/zh) 维护，仓库地址 `github.com/zenstory-ai/oh-story-claudecode`（原 `worldwonderer/oh-story-claudecode`，旧链接自动跳转）。Maintained by ZenStory AI; previously hosted at `worldwonderer/oh-story-claudecode`, old links redirect.
+
+## 按写作任务开始
+
+本仓库是安装到兼容 Agent 宿主中的 skill 包；它与 ZenStory 托管写作工作台是两个独立产品，项目文件、设定和进度不会自动同步。下列指南帮你先理清任务，再在已安装的宿主里执行：
+
+| 你要做什么 | 实用指南 | 重点 |
+|---|---|---|
+| 先看懂写作 Skill | [提示词、技能包、插件与 MCP 怎么分](https://zenstory.ai/zh/oh-story/agent-skills-for-writers) | 先选写作任务，再选宿主与流程 |
+| 导入已写小说 | [导入 10–20 章后接着写](https://zenstory.ai/zh/oh-story/import-and-continue) | 审阅反推结果，以书稿证据为准 |
+| 维持长篇连续性 | [分开角色已知、承诺与线索](https://zenstory.ai/zh/oh-story/long-novel-continuity) | 别把未来计划当成已发生事实 |
+| 把章纲写成章节 | [把剧情规格写成可见变化](https://zenstory.ai/zh/oh-story/outline-to-chapter) | 用行动、选择、代价和结果推进 |
+| 修改套路化表达 | [用具体改稿减少“AI 味”](https://zenstory.ai/zh/oh-story/revise-ai-prose) | 改读感，不追求鉴定分数 |
+| 续写时保持自己的文风 | [分开文风选择与本书事实](https://zenstory.ai/zh/oh-story/preserve-author-voice) | 用自有或获准样本，不复制原句 |
+
+### 常见问题的直接回答
+
+这些文档直接回答写作者最常问的几个问题，描述的是本仓库当前版本的实际机制：
+
+| 问题 | 文档 |
+|---|---|
+| AI 写长篇怎么不崩人设、不忘伏笔？ | [AI 写长篇小说怎么不崩人设：Oh Story 的做法](docs/ai-long-novel-character-consistency.md) |
+| AI 写的小说 AI 味太重怎么办？ | [去AI味的具体做法](docs/how-to-remove-ai-flavor-from-web-fiction.md) |
+| 怎么拆解榜单爆款、学它的结构？ | [扫榜和拆文的自动化做法](docs/scan-charts-and-deconstruct-bestsellers.md) |
+| Claude Code skills 不写代码能干什么？ | [Claude Code skills for writers](docs/claude-code-skills-for-writers.md)（英文） |
+
+## 安装后的第一条请求
+
+先按下文说明在选定宿主中完成安装与 setup，再按当前任务选一条，把〈占位内容〉换成自己的信息。这些是任务简报，不是安装命令，也不要求把所有阶段跑完；输出仍需审阅，不会与 ZenStory 托管工作台自动同步。
+
+1. **开一本新书**
+   > 我想开一部〈类型/题材〉新书。先从我提供的材料中分开已确定事实与待决问题；只规划一个有边界的开篇，交付核心冲突、视角/信息释放限制、前三章变化和待决项。不要自动写正文；题材取舍、角色动机和长期方向留给我确认。
+2. **导入已有书稿**
+   > 请把这份书稿整理成可续写项目。第 1–〈N〉章完整，〈文件名〉是第〈N+1〉章残稿；保留原文，不覆盖完整章节，不把残稿算作完整章，推断出的设定单列待确认。先交付识别范围、重建事实、冲突/歧义和待我确认的决定，供我审阅；暂不续写。
+3. **修一段不满意的正文**
+   > 这段读起来〈空泛/重复/过度解释〉。先指出具体读感问题，保留故事事实、角色已知和未揭示边界；只交付这一段的修订建议、前后对照与理由，不全书改写。哪些建议采用由我决定。
 
 ## 核心思路
 
@@ -16,17 +57,7 @@
 
 围绕四条线展开：爆款逆向 · 剧情模块化重组 · 上下文状态分层管理 · 人机协同。
 
-> **Antigravity 支持预览**：`story-setup` 可把 13 个 Skills、7 个 custom agents、Always-On Rule 和 workspace Hooks 完整部署到项目 `.agents/`。部署器不修改 `~/.gemini/`，不依赖全局目录或 symlink；`.agents/hooks.json` 只替换顶层 `oh-story` 管理组并保留用户组。当前 `agents_version: 30`，部署后需新开 Antigravity conversation；IDE 与交互式 `agy` 建议分别试用。
-
-> **v0.7.10 — 写作流程与文风修复**：长篇新增供给自查、写手组装器和卷纲取段器；统一文风优先级，修复 reference 停读，整理去味检查分工；短篇增加交付参数预检，移除身体词次数上限。升级后重跑 `/story-setup` 并新开会话；本版 `agents_version` 为 30。[完整变更](CHANGELOG.md#0710---2026-09-09)
->
-> **v0.7.9 — 短篇按场景功能校准**：短篇移除逐节最低字数、每节 3-5 个子事件、对白占比和固定钩子节距等机械配额，改按「本场是否改变风险、信息、关系、资源、决定、行动或读者理解」判断；导语作为正文第一场，第 1 章从其后果或新行动继续。新增细纲结构验收，细纲的目标情绪与主角关键选择不再接受占位符。升级后需重跑 `/story-setup`、新开会话；本版 `agents_version` 为 29。[完整变更](CHANGELOG.md#079---2026-08-30)
->
-> **v0.7.8 — 参考拆分与门禁**：长短篇参考资料按消费者拆开改名，写正文与短篇构思前新增会阻断的 Reference Gate，短篇 Phase 2 与交付各加一个确定性 verifier；短篇总字数以用户给的范围为准。升级后需重跑 `/story-setup`、新开会话；本版 `agents_version` 为 28。[完整变更](CHANGELOG.md#078---2026-08-28)
->
-> **v0.7.7 — 记忆与收口**：长篇正文改用唯一机器字数口径，欠字不自动加戏，超字最多压缩一次；新增跨会话作者记忆、Codex 内置 ImageGen，并修复 story-setup 递归复制。缺少合法「字数目标」现在会停止，不再回退到 3000。升级后需重跑 `/story-setup`、新开会话；本版 `agents_version` 为 26。[完整变更](CHANGELOG.md#077---2026-08-26)
->
-> 更早版本变更见 [CHANGELOG.md](CHANGELOG.md)。
+> 最新版本 **v0.7.10**（2026-09-09）。完整变更见 [CHANGELOG.md](CHANGELOG.md) 与 [Releases](https://github.com/zenstory-ai/oh-story-claudecode/releases)；升级后请重跑 `/story-setup` 并新开会话。Antigravity 部署方式见下文「使用说明」。
 
 ## 流程总览
 
@@ -413,6 +444,54 @@ Agent 按需加载 `references/` 中的写作理论（角色设计、对话技�
 
 这套 skill 现在能让我度过找工作的过渡期 :joy:，希望也能帮到有需要的朋友。
 
+## 常见问题
+
+### 能在 Codex、Google Antigravity、OpenCode 里用吗，还是只支持 Claude Code？
+
+oh-story-claudecode 内置适配 Claude Code、Google Antigravity、OpenCode、ZCode、OpenClaw、Codex CLI 和 Reasonix。Codex 会直接扫描仓库内 `.agents/skills` 发现 13 个 skill，用 `$story-setup` 调用；Antigravity 用 `/skills` 或自然语言运行 `story-setup` 并选择 `target_cli=antigravity`；能读取项目文件的 Web AI / Agent 环境也可以按通用 skills 路径使用。
+
+### 需要 GPU 或自己部署模型吗？
+
+不需要。oh-story-claudecode 是一组 skill，运行在你已经在用的编程 Agent 里，写作用的模型就是该 Agent 的模型；本地只跑确定性的检查脚本（Node / Python）。唯一的例外是 `story-cover` 封面生成，它调用 GPT-Image-2（Codex 内置用量或 API 回退）。
+
+### 每章字数不统一、字数对不上怎么办？
+
+从 v0.7.7 起，长篇正文只用一个机器统计的字数口径：每份细纲必须写明合法的「字数目标」，缺少时会停止而不是回退到 3000；欠字不会自动加戏，超字最多压缩一次。写入后 `check-prose-after-write.sh` 会提醒字数欠账。升级旧项目后重跑 `/story-setup` 并新开会话即可生效。
+
+### 去AI味之后，朱雀等 AI 检测还是判定为 AI 怎么办？
+
+`story-deslop`（`/去AI味`）是写作 lint：它确定性地检测并清除已知的 AI 句式、标点和退化痕迹，目标是读感，不是绕过检测器。朱雀等外部检测只作自测参考，不替代人工读感；oh-story-claudecode 不承诺通过任何 AI 检测。
+可按[这份具体改稿指南](https://zenstory.ai/zh/oh-story/revise-ai-prose)把空泛情绪、重复句式、拔高议论和过度解释分别处理，同时保留场景任务与作者设定。
+
+### 已经写了一部分的小说，能导入后继续写吗？
+
+可以。先在写作项目根运行 `/story-setup`，新开或刷新会话后运行 `/story-import`（`/导入小说`）把已有小说反向解析成标准项目结构，审阅反推结果，再用 `/story-long-write 日更` 或 `/story-long-write 写第N章` 续写。[导入与续写指南](https://zenstory.ai/zh/oh-story/import-and-continue)说明了为什么书稿证据应优先于模型猜测。
+
+### 长篇续写怎样减少忘伏笔或角色提前知道答案？
+
+续写前分开故事客观事实、角色已知和读者已见，只带上本章相关的当前状态与未完承诺。[长篇连续性指南](https://zenstory.ai/zh/oh-story/long-novel-continuity)给出三章示例；结构化记录能帮助交接，但不代表几百章都不会出错。
+
+### 章纲齐全，为什么写出来还是在复述设定？
+
+把章纲当作“本章必须发生什么变化”的规格，再把目标、阻碍、证据、选择和代价转成视角人物可感知的行动与结果。[章纲到章节指南](https://zenstory.ai/zh/oh-story/outline-to-chapter)是编辑示例，不是工具实测或模型质量承诺。
+
+### 怎样保留我的文风，又不把另一本书的情节带进来？
+
+把你自己写的或获准使用的短样本拆成表达维度，与当前书的事实分开讨论；样本推断不自动成为长期偏好。[作者文风指南](https://zenstory.ai/zh/oh-story/preserve-author-voice)说明如何裁决当前要求、本书文风与作者偏好；它不承诺自动匹配文风，也不鼓励复制原句。
+
+### Windows 上安装报 `ENOENT ... mkdir`，但末尾显示 Done，正常吗？
+
+这是有技能没装全。无论有没有报错，重跑同一条安装命令即可修复；如果参考资料目录缺了一块，`/story-setup` 会提示参考资料包不完整。Codex 用户在 Windows 上还需要为 git 打开 `core.symlinks`。
+
+### 升级到新版本后要做什么？
+
+重跑 `/story-setup` 并新开会话。7 个专业 agent（story-architect、narrative-writer、consistency-checker 等）由 `/story-setup` 写入项目目录，必须先部署再新开会话，多 agent 协作才会生效。
+
+### 短篇和长篇的入口有什么区别？
+
+长篇：`/story-long-scan`（扫榜）→ `/story-long-analyze`（拆文）→ `/story-long-write`（写作，含大纲、卷纲、细纲、正文）。短篇：`/story-short-scan` → `/story-short-analyze` → `/story-short-write`。两条线共用 `/story-setup`、`/story-deslop`、`/story-review` 和 `/story-cover`。
+
+
 ## 贡献
 
 欢迎贡献新 skill、补充知识库、更新市场数据。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
@@ -428,3 +507,16 @@ Agent 按需加载 `references/` 中的写作理论（角色设计、对话技�
 - [LINUX DO - The New Ideal Community](https://linux.do) — 社区支持
 - [FanqieRankTracker](https://github.com/wen1701/FanqieRankTracker) — 番茄小说字体反爬解码方案参考
 - [Zhuque AIGC Detector CLI](https://github.com/Sophomoresty/zhuque) — 去 AI 味实验中的外部复测工具参考
+
+## ZenStory AI 项目
+
+Oh Story 是 [ZenStory AI](https://zenstory.ai/zh) 的一部分——一组开源、面向 agent 的故事创作、改编与生产工具（GitHub 组织：[zenstory-ai](https://github.com/zenstory-ai)）。同组织项目：
+
+| 项目 | 用途 |
+| --- | --- |
+| [oh-story-claudecode](https://github.com/zenstory-ai/oh-story-claudecode) | 网文写作 skill 包（本仓库） |
+| [drama-skills](https://github.com/zenstory-ai/drama-skills) | AI 短剧 / 漫剧创作 skill 合集：剧本、资产、分镜、图片/视频提示词、独立审查 |
+| [novel-to-game](https://github.com/zenstory-ai/novel-to-game) | 面向原著改编、指定运行环境构建与运行证据 QA 的 agent skills |
+| [video-recap-skills](https://github.com/zenstory-ai/video-recap-skills) | 将支持的视频文件制作成中文解说，可选导出可编辑的剪映/CapCut 草稿 |
+| [oh-story-dsh](https://github.com/zenstory-ai/oh-story-dsh) | DeepSeek Harness 社区插件，提供小说、短剧、游戏和视频解说工作台 |
+| [zenstory](https://github.com/zenstory-ai/zenstory) | 对话即创作的 AI 小说写作工作台（[app.zenstory.ai](https://app.zenstory.ai)） |
