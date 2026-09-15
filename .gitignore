@@ -3,13 +3,12 @@
 .claude/
 .agents/*
 !.agents/skills
+!.agents/notes
 .codebuddy/
 .codewhale/
 node_modules/
 playwright-report/
 test-results/
-AGENTS.md
-CLAUDE.md
 _archive/
 skills-lock.json
 docs/plans/
