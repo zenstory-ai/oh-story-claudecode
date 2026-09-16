@@ -1,10 +1,34 @@
-[English](README_EN.md) | **中文**
+<p align="center">
+  <img src="https://zenstory.ai/brand/zenstory-ai-mark.svg" alt="" width="76" height="76">
+</p>
 
-# oh-story-claudecode
+<h1 align="center">Oh Story</h1>
 
-**网文写作 skill 包：扫榜、拆文、写作、去AI味、封面图一套流程，装进你正在用的编程 Agent。**
+<p align="center">
+  <b>网文写作 skill 包：扫榜、拆文、写作、去AI味、封面图一套流程，装进你正在用的编程 Agent。</b>
+</p>
 
-项目主页：https://zenstory.ai/zh/oh-story
+<p align="center">
+  <a href="https://zenstory.ai/zh/oh-story"><b>项目主页</b></a>
+  &nbsp;·&nbsp;
+  <a href="#安装"><b>安装</b></a>
+  &nbsp;·&nbsp;
+  <a href="#常见问题"><b>常见问题</b></a>
+  &nbsp;·&nbsp;
+  <a href="README_EN.md"><b>English</b></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/zenstory-ai/oh-story-claudecode/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/zenstory-ai/oh-story-claudecode?style=flat-square&color=22D3EE&logo=github&logoColor=white&label=Stars"></a>
+  <a href="https://github.com/zenstory-ai/oh-story-claudecode/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/zenstory-ai/oh-story-claudecode?style=flat-square&color=081431&label=Release"></a>
+  <img alt="Skills 13" src="https://img.shields.io/badge/Skills-13-081431?style=flat-square">
+  <a href="./LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/License-MIT-1F6FEB?style=flat-square"></a>
+</p>
+
+<p align="center">
+  <a href="https://t.me/ohstoryclaudecode"><img alt="Telegram 交流群" src="https://img.shields.io/badge/Telegram%20%E4%BA%A4%E6%B5%81%E7%BE%A4-26A5E4?style=for-the-badge&logo=telegram&logoColor=white"></a>
+  <a href="https://github.com/zenstory-ai/oh-story-claudecode/discussions"><img alt="GitHub Discussions" src="https://img.shields.io/badge/GitHub%20Discussions-181717?style=for-the-badge&logo=github&logoColor=white"></a>
+</p>
 
 ![OH STORY 本地写作工作台](demo/story-dashboard.png)
 

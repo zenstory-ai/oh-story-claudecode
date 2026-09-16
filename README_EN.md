@@ -1,12 +1,37 @@
 <!-- Last synced with README.md: 2026-09-16 -->
 
-**English** | [中文](README.md)
 
-# oh-story-claudecode
+<p align="center">
+  <img src="https://zenstory.ai/brand/zenstory-ai-mark.svg" alt="" width="76" height="76">
+</p>
 
-**A skill pack for writing Chinese web fiction: chart scanning, deconstruction, drafting, de-AI-ify and cover art, running inside the coding agent you already use.**
+<h1 align="center">Oh Story</h1>
 
-Project page: https://zenstory.ai/oh-story
+<p align="center">
+  <b>A skill pack for writing Chinese web fiction: chart scanning, deconstruction, drafting, de-AI-ify and cover art, running inside the coding agent you already use.</b>
+</p>
+
+<p align="center">
+  <a href="https://zenstory.ai/oh-story"><b>Project page</b></a>
+  &nbsp;·&nbsp;
+  <a href="#installation"><b>Install</b></a>
+  &nbsp;·&nbsp;
+  <a href="#faq"><b>FAQ</b></a>
+  &nbsp;·&nbsp;
+  <a href="README.md"><b>中文</b></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/zenstory-ai/oh-story-claudecode/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/zenstory-ai/oh-story-claudecode?style=flat-square&color=22D3EE&logo=github&logoColor=white&label=Stars"></a>
+  <a href="https://github.com/zenstory-ai/oh-story-claudecode/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/zenstory-ai/oh-story-claudecode?style=flat-square&color=081431&label=Release"></a>
+  <img alt="Skills 13" src="https://img.shields.io/badge/Skills-13-081431?style=flat-square">
+  <a href="./LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/License-MIT-1F6FEB?style=flat-square"></a>
+</p>
+
+<p align="center">
+  <a href="https://t.me/ohstoryclaudecode"><img alt="Telegram 交流群" src="https://img.shields.io/badge/Telegram%20%E4%BA%A4%E6%B5%81%E7%BE%A4-26A5E4?style=for-the-badge&logo=telegram&logoColor=white"></a>
+  <a href="https://github.com/zenstory-ai/oh-story-claudecode/discussions"><img alt="GitHub Discussions" src="https://img.shields.io/badge/GitHub%20Discussions-181717?style=for-the-badge&logo=github&logoColor=white"></a>
+</p>
 
 ![OH STORY local writing desk](demo/story-dashboard.png)
 
