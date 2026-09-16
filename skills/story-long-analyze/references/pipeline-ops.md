@@ -1,80 +1,158 @@
-# 管道运维参考
+# 长篇拆文运行、提交与恢复
 
-story-long-analyze 拆解管道的运维工具文档：`_progress.md` 模板、错误处理、恢复机制操作步骤。
+## 唯一状态与三个脚本
 
-> 质量阈值（置信度 / 覆盖率 / 重叠率）见 [material-decomposition.md 质量阈值体系](material-decomposition.md)。
+生产运行只使用：
 
----
+1. `build_chapter_index.py`：建立机械章界和逐章原文 hash；
+2. `inspect_existing_assets.py`：只读识别旧成果、当前成果、缺章和修复阶段；
+3. `manage_analysis_run.py`：只读计划，并负责批次提交、拆分、恢复、阶段标记和旧状态迁移。
 
-## _progress.md 模板
+`chapter_index.csv` 是机械章节边界唯一真源。批次和阶段状态只写在 `_progress.md` 的
+`story-long-analyze:runtime-state` 受管区。`_analysis_cache/` 保存完整结果和恢复证据，不承担状态库功能。
 
-```markdown
-# 深度拆解进度：{书名}
-- 小说：{标题} | 总章数：{N} | 输出目录：{路径} | 开始：{日期}
-- 最终状态：{pending/paused_after_stage1/completed/completed_with_errors}
-- schema_version: 2
-## 管道进度
-| 阶段 | 状态 | 进度 | 备注 |
-|------|------|------|------|
-## 章节边界（Stage 0 章节边界子步骤产物，唯一权威）
-| 章号 | 标题 | 起始行 | 字数 |
-|------|------|--------|------|
-## 分块进度
-| 块 | 章节 | 状态 |
-## 失败记录
-| 类型 | 章节/阶段 | 错误信息 | 重试状态 |
-|------|----------|---------|---------|
-## 质量检查
-| 检查项 | 阶段 | 结果 | 修正 |
-## 角色合并
-| 合并前 | 合并后 | 依据 | 确认 |
-## 断点
-- 最后处理：第{N}章 | 当前阶段 | 下一操作
+既有项目中的 `schema_version: 2` 沿用且不修改；该值只供报告，不用于否定旧成果。`_progress.md` 不再保存机械章节边界镜像。
+
+禁止创建 `run-plan.json`、`batch-checkpoints.json`、逐批 JSON receipt 或 Stage receipt。计划始终打印到标准输出，由当前运行直接消费。
+
+所有命令使用实际 Python 与 skill 根路径：
+
+```text
+"{PYTHON}" "{story-long-analyze skill 根}/scripts/{脚本名}.py" ...
 ```
 
-**schema_version 说明**：
+## 1. 先检查目录
 
-| 版本 | 含义 |
-|------|------|
-| 2 | 当前契约：含「章节边界」表（Stage 0 章节边界子步骤产物）。Stage 1/2/6 全部以该表为切片真值，不再各自跑 regex |
+```text
+"{PYTHON}" "{story-long-analyze skill 根}/scripts/inspect_existing_assets.py" --root "{拆文目录}" --compact
+```
 
-缺少 `schema_version: 2` 或「章节边界」表时不得续跑；从 Stage 0 章节边界子步骤重建 `_progress.md` 后再恢复。
+- 路径不存在、不是目录或不可读：非零退出，先修正路径。
+- 已存在的空目录：`empty / new_analysis`。
+- 完整旧项目：`direct_use`，不建索引、不读原文。
+- 部分项目：精确报告 `missing_semantic_chapters` 与 `missing_summary_chapters`。
+- 新旧投影混存：`mixed_sources: true` 并列明逐章来源，仍可直接使用完整项目。
+- `schema_version` 只报告，不参与否定旧项目，也不在检查或复用时改写。
+- `stage_repairs` 中的情绪、节奏和文风修复与 Stage 2 缺章分开处理。
 
-**最终状态值说明**：
+## 2. 需要原文时建立或校验索引
 
-| 状态值 | 含义 |
-|--------|------|
-| `pending` | 管道进行中，尚未跑完 |
-| `paused_after_stage1` | Stage 1 停靠点暂停——Stage 0/1 已完成，已产出 `快速预览.md`，等待用户决定是否继续 Stage 2-6。续跑时跳过 Stage 0/1，从 Stage 2 开始 |
-| `completed` | 全管道 Stage 0-6 完成 |
-| `completed_with_errors` | 全管道完成，但有单章/单阶段失败（详见「失败记录」表，拆文报告中注明） |
+完整旧成果默认直接使用和纯旧成果增强无需索引。全新、部分完成或明确重拆才运行：
 
----
+```text
+"{PYTHON}" "{story-long-analyze skill 根}/scripts/build_chapter_index.py" \
+  --source "{拆文目录}/原文/原文.txt" \
+  --output "{拆文目录}/chapter_index.csv" \
+  --locator-path "原文/原文.txt"
+```
 
-## 剧情单元清单补建（存量书）
+脚本只按 LF 计算物理行号，支持楔子、序章、第0章、任意正文起始章、番外、后记、多卷和中文大数。CSV 保存内部连续号、来源章号、卷、标题、行界、字符数、`chapter_sha256`、全源 hash 和解析器版本。
 
-触发：用户说「补剧情单元清单」，或写作侧检索发现 `剧情/README.md` 无「剧情单元清单」表。
+同源索引直接复用且不重写。原文变化时先非零退出；人工确认后加 `--rebuild`。重建会把上一版 CSV 原子保存为 `_analysis_cache/chapter_index.previous.csv`，供计划器判断实际变化章；它不是第二个状态表。追加新章时旧章 hash 保持稳定，输出仅列出新增或内容变化的 `pending_chapters`。会导致旧内部章号整体漂移，或旧摘要/深拆从序章、第0章、非第一章开始而身份无法确认时，返回 `chapter_mapping_ambiguous`，不得静默覆盖。
 
-动作：读存量 `拆文库/{书名}/剧情/*.md`（或 `对标/{书名}/剧情/*.md`）各剧情单元表头的 标题 / 类型 / 桥段标签 / 章节范围 字段，按 output-templates.md「剧情单元清单」表模板机械重建 `剧情/README.md` 的清单表；项目 `对标/{书名}/` 视图存在时同步一份。不读原文、不重跑任何 Stage、不改剧情单元内容、不动 `节奏.md` / `情绪模块.md`。旧剧情单元「章节范围」行没有字数信息时，体量列只写「共{N}章」、字数记「未知」，不得编造。
+## 3. 生成只读计划
 
-写作侧消费点对无清单的书自动回退逐文件检索（见 story-long-write 的 outline-structure-theory.md「对标节奏迁移」步骤 1），补建只是加速，不是阻塞项。
+```text
+"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" plan \
+  --root "{拆文目录}" \
+  --intent continue
+```
 
-## 错误处理
+意图：
 
-| 场景 | 处理 |
-|------|------|
-| 章节识别失败 | 提示确认格式；支持自定义正则 |
-| 分块中断 | 读 _progress.md 断点恢复 |
-| 聚合质量不达标 | 孤立情节二次分类；阈值放宽至 0.5 |
-| 角色合并冲突 | 记录待确认列表 |
-| 输出目录冲突 | 追加不覆盖；冲突标 `[重新分析]` |
+- `continue`：补缺失/失效语义章；已有语义但缺摘要时用旧成果投影；
+- `enhance`：只读既有拆文成果形成 `REUSE-{起章}-{止章}` 批次，原文读取数必须为 0；
+- `reanalyze`：忽略旧语义成果，按索引规划全部 `RAW-{起章}-{止章}`，并返回本次 `request_id`。
 
----
+计划只存在内存和标准输出，`state_written` 必须为 `false`。每块最多 10 章、25,000 字符；批次 ID 直接使用章节范围。`RAW` 只覆盖缺失或逐章原文 hash 已失效的章，`REUSE` 只读取计划列出的旧成果。黄金三章深拆属于已有语义成果，可以生成缺失摘要，无需再次读取前三章原文。
 
-## 恢复机制操作步骤
+明确重拆时，后续 `commit`、`split` 和恢复用的 `plan` 都传 `--request-id "{首次 plan 输出值}"`。同一请求 ID 的 completed 批次可复用；省略 ID 再执行 reanalyze 会生成新 ID，表示一次新的重拆请求。
 
-1. 管道启动时检查输出目录是否已有 `_progress.md`
-2. 校验 `schema_version: 2` 与「章节边界」表；任一缺失即停止，并提示从 Stage 0 章节边界子步骤重建进度文件
-3. 读取断点信息（最后处理章节 + 当前阶段 + 最终状态）
-4. **断点状态为 `paused_after_stage1`**（Stage 1 停靠点）→ 跳过 Stage 0/1，直接从 Stage 2 续跑逐章摘要，不重跑已完成的概要与黄金三章
-5. 其他断点状态 → 从断点所在块的起始章节恢复，覆盖该块已有输出
+## 4. 执行与提交一个批次
+
+`chapter-extractor` 只读取计划中一个批次。把完整输出保存为临时 Markdown 后提交：
+
+```text
+"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" commit \
+  --root "{拆文目录}" \
+  --input "{临时结果.md}" \
+  --batch-id "RAW-4-10" \
+  --range-sha256 "{plan 输出值}" \
+  --source-file "{plan 列出的来源}"
+```
+
+`REUSE` 批次不传 `--range-sha256`。完整增强可以只输出 `REUSED_CHAPTERS` 与跨章观察；需要补摘要时输出同一套紧凑章节块。
+明确重拆的提交另加 `--intent reanalyze --request-id "{plan request_id}"`。提交入口会再次检查 10 章与 25,000 字符上限；单个超长章仍允许独占。
+
+提交顺序固定：
+
+1. 在写文件前校验整批范围、标记和所有紧凑字段；
+2. 对 `RAW` 再算当前范围 hash，与计划值不一致就拒绝；
+3. 原子写入含完整模型输出和最终结束标记的批次缓存；
+4. 只创建缺失的 `章节/第N章_摘要.md`，任何已有摘要都保留；
+5. 最后更新 `_progress.md` 受管批次表为 `completed`。
+
+每条成功行记录章节范围、输入类型、原文范围 hash、状态和缓存路径。受管区外的 BOM、换行、作者备注及既有 `schema_version` 必须逐字节保留。
+
+## 5. 失败、拆分和重试
+
+模型输出不完整时不提交。批次过大或连续失败时：
+
+```text
+"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" split \
+  --root "{拆文目录}" --batch-id "RAW-4-10"
+```
+
+也可用 `--at 7` 指定左右边界。脚本在同一个 `_progress.md` 受管区把父块记为 `superseded`，写入两个相邻子块。重新运行 `plan` 后继续使用子块，不会按位置编号覆盖旧记录，也不会把子块重新合成父块。
+
+## 6. 中断恢复
+
+先重新运行 `plan`。已满足以下三项的成功批次不会出现：
+
+1. 范围内摘要都存在；
+2. 批次缓存完整，最后一个非空标记为 cache end；
+3. `RAW` 状态行的范围 hash 等于当前索引计算值。
+
+如果缓存已完整，但摘要或进度最后一步尚未落盘：
+
+```text
+"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" repair-progress --root "{拆文目录}"
+```
+
+恢复只从完整、范围 hash 有效的缓存补缺失摘要并更新状态；不覆盖用户修改过的文件。缓存缺结束标记或范围 hash 失效时报告错误并重跑相应批次。
+
+## 7. Stage 3–6
+
+Stage 3–6 各运行一次。文件成功原子落盘后再标记：
+
+```text
+"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" mark-stage \
+  --root "{拆文目录}" --stage stage3 --output "剧情/节奏.md"
+```
+
+阶段完成只看约定产物存在且进度行完成；没有依赖 hash 或 Stage receipt。`mark-stage` 会按阶段检查：Stage 1 的黄金三章与快速预览、Stage 2 的全部摘要、Stage 3 的情绪模块与节奏、Stage 4 的角色与设定、Stage 5 的报告、Stage 6 的文风。Stage 6 的单独重建见 [style-profile-generator.md](style-profile-generator.md)，允许按索引定点读取 4–6 段原文，不重扫全书，也不触发其他阶段。
+
+生成新的 `拆文报告.md` 前先执行：
+
+```text
+"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" mark-stage --root "{拆文目录}" --stage stage5 --prepare
+```
+
+若旧报告存在，命令会完整复制到 `_analysis_cache/legacy/拆文报告.md`；已存在的首份备份不覆盖。当前旧报告与首份备份不同时，另存一份带内容 hash 的历史备份。其他旧产物与已有摘要不得覆盖。新报告落盘后再用不带 `--prepare` 的 `mark-stage` 标记完成。
+
+## 8. 旧六脚本项目迁移
+
+```text
+"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" migrate-legacy --root "{拆文目录}"
+```
+
+迁移只读取旧 checkpoint、receipt 和缓存；不会删除它们。只有旧 receipt 的输出 hash 能验证对应缓存完整时，才生成兼容缓存并在摘要齐全时写成功状态。旧缓存没有结束标记时不得直接补标记冒充完整；无法验证的项目列入 `historical_unverified`，按实际缺口继续计划。
+
+## 9. 最终检查
+
+- 再运行检查器和计划器；完整项目应 `direct_use`，继续意图应无待处理批次；
+- 对比受保护路径 hash：旧 `章节/`、`剧情/`、`角色/`、`设定/`、`文风.md`、`拆文报告.md` 不得被增强或恢复流程改写；
+- 允许变化的旧项目文件只有 `_progress.md` 受管状态区和 `_analysis_cache/` 新证据；
+- 检查旧 `schema_version` 原值；
+- 检查新投影的主题、基调、情节点类型和“涉及”字段能被导入与写作流程读取；
+- 报告未执行的真实模型或跨平台检查，不得用静态 fixture 冒充。

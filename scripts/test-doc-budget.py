@@ -28,6 +28,7 @@ class DocBudgetCliTests(unittest.TestCase):
             return subprocess.run(
                 ["bash", str(CHECKER), "--root", str(root), "--manifest", str(manifest_path)],
                 text=True,
+                encoding="utf-8",
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 check=False,
