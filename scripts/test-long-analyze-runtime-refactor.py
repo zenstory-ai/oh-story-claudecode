@@ -712,6 +712,71 @@ def test_audit_legacy_source_change_regression() -> None:
                 "当前 RAW 完成后应停止重复提取，并保留下游阶段 pending")
 
 
+def test_local_rebuild_preserves_unchanged_batch_chapters() -> None:
+    with tempfile.TemporaryDirectory(prefix="long-local-rebuild-") as temporary:
+        root = Path(temporary) / "原批次"
+        source = write_source_and_index(root, 3)
+        model = Path(temporary) / "model.md"
+
+        def plan() -> dict:
+            result = run(MANAGE, "plan", "--root", root)
+            require(result.returncode == 0, result.stdout or result.stderr)
+            return json.loads(result.stdout)
+
+        def commit(batch: dict) -> None:
+            start, end = batch["chapter_range"]
+            model.write_text(compact_output(start, end), encoding="utf-8")
+            result = run(MANAGE, "commit", "--root", root, "--input", model,
+                         "--batch-id", batch["batch_id"], "--range-sha256", batch["range_sha256"])
+            require(result.returncode == 0, result.stdout or result.stderr)
+
+        def change_chapter(chapter: int) -> None:
+            source.write_text(source.read_text(encoding="utf-8").replace(
+                f"正文{chapter}。", f"正文{chapter}已改变。"), encoding="utf-8")
+            rebuilt = run(INDEX, "--source", source, "--output", root / "chapter_index.csv",
+                          "--locator-path", "原文/原文.txt", "--rebuild")
+            require(rebuilt.returncode == 0, rebuilt.stdout or rebuilt.stderr)
+
+        commit(plan()["batches"][0])
+        original_summaries = protected_snapshot(root)
+        parent_cache = root / "_analysis_cache" / "批次-RAW-1-3.md"
+        parent_bytes = parent_cache.read_bytes()
+
+        change_chapter(2)
+        changed = plan()
+        require([batch["batch_id"] for batch in changed["batches"]] == ["RAW-2-2"],
+                "局部变化只应分析第2章")
+        commit(changed["batches"][0])
+        progress_before = (root / "_progress.md").read_bytes()
+        for _ in range(2):
+            after = plan()
+            require(after["batches"] == [] and after["read_counts"]["raw_chapters"] == 0,
+                    "变化章补完后不能把旧父批次的未变化章重新规划：" + json.dumps(after, ensure_ascii=False))
+        require((root / "_progress.md").read_bytes() == progress_before, "重规划必须仍然只读")
+
+        # A second rebuild moves the parent's matching index into legacy evidence.
+        change_chapter(3)
+        next_plan = plan()
+        require([batch["batch_id"] for batch in next_plan["batches"]] == ["RAW-3-3"],
+                "连续重建仍须保留第1章完成资格，且不能重做刚补完的第2章")
+        commit(next_plan["batches"][0])
+        require(plan()["batches"] == [], "第二次局部补完后也不应留下原文任务")
+        require(protected_snapshot(root) == original_summaries and parent_cache.read_bytes() == parent_bytes,
+                "局部恢复不得改写已有摘要或旧父批次缓存")
+
+        # Historical index evidence cannot excuse a missing or truncated cache.
+        for broken in (None, parent_bytes[:len(parent_bytes) // 2]):
+            if broken is None:
+                parent_cache.unlink()
+            else:
+                parent_cache.write_bytes(broken)
+            retry = plan()
+            require([batch["batch_id"] for batch in retry["batches"]] == ["RAW-1-1"],
+                    "旧缓存缺失或截断时，未被新有效缓存覆盖的第1章仍须恢复")
+        parent_cache.write_bytes(parent_bytes)
+        require(plan()["batches"] == [], "完整旧缓存恢复后应再次复用未变化章")
+
+
 def main() -> int:
     test_index_contract()
     test_invalid_root_and_manage_entry()
@@ -724,6 +789,7 @@ def main() -> int:
     test_audit_recovery_and_request_regressions()
     test_audit_stage_compact_and_mapping_regressions()
     test_audit_legacy_source_change_regression()
+    test_local_rebuild_preserves_unchanged_batch_chapters()
     print("OK: single-state long-analyze runtime regressions passed")
     return 0
 

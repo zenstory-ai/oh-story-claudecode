@@ -367,16 +367,44 @@ def source_change_chapters(root: Path, rows: Sequence[Dict[str, Any]], state: Di
 
 
 def invalid_batch_targets(root: Path, rows: Optional[Sequence[Dict[str, Any]]],
-                          state: Dict[str, Any], source_changes: Set[int]) -> Tuple[Set[int], Set[int]]:
+                          state: Dict[str, Any]) -> Tuple[Set[int], Set[int]]:
     raw = set()
     reuse = set()
+    historical_indexes = None  # type: Optional[List[List[Dict[str, Any]]]]
     for batch in state["batches"].values():
         if batch.get("status") not in {"completed", "success"} or completed_batch(root, batch, rows):
             continue
         chapters = set(range(batch["start"], batch["end"] + 1))
         if batch.get("input_kind") == "raw-original":
-            changed = chapters & source_changes
-            raw.update(changed or chapters)
+            targets = chapters
+            if rows is not None:
+                if historical_indexes is None:
+                    historical_indexes = []
+                    cache_dir = root / "_analysis_cache"
+                    paths = [cache_dir / "chapter_index.previous.csv"]
+                    paths.extend(sorted((cache_dir / "legacy").glob("chapter_index.*.csv")))
+                    for path in paths:
+                        try:
+                            historical_indexes.append(read_index(root, path))
+                        except RunError:
+                            continue
+                current_hashes = {row["chapter"]: row["chapter_sha256"] for row in rows}
+                for previous in historical_indexes:
+                    try:
+                        if not completed_batch(root, batch, previous):
+                            continue
+                    except RunError:
+                        continue
+                    # A complete old cache still proves its unchanged chapters.
+                    # Use the full change boundary, not only changes awaiting
+                    # repair: an empty remainder must never invalidate the parent.
+                    targets = {
+                        row["chapter"] for row in previous
+                        if row["chapter"] in chapters
+                        and row["chapter_sha256"] != current_hashes.get(row["chapter"])
+                    }
+                    break
+            raw.update(targets)
         elif batch.get("input_kind") == "existing-results":
             reuse.update(chapters)
     return raw, reuse
@@ -445,7 +473,7 @@ def plan_command(args: argparse.Namespace) -> Dict[str, Any]:
     source_changes = source_change_chapters(root, index_rows, state) if index_rows else set()
     stale = stale_projection_chapters(root, index_rows, state) if index_rows else set()
     stale |= source_changes
-    invalid_raw, invalid_reuse = invalid_batch_targets(root, index_rows, state, source_changes)
+    invalid_raw, invalid_reuse = invalid_batch_targets(root, index_rows, state)
 
     raw_targets = set()  # type: Set[int]
     reuse_targets = set()  # type: Set[int]
