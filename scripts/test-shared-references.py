@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -26,6 +27,8 @@ def run(script: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(script), *args],
         text=True,
+        encoding="utf-8",
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
         capture_output=True,
         check=False,
     )
@@ -175,7 +178,8 @@ def test_cross_manifest_ownership() -> None:
             )
             assert result.returncode == 2, result.stdout + result.stderr
             assert "runtime manifest cannot manage Markdown" in result.stderr
-            assert source in result.stderr or target in result.stderr
+            normalized_stderr = result.stderr.replace("\\", "/")
+            assert source in normalized_stderr or target in normalized_stderr
             assert name in result.stderr
 
         runtime = runtime_manifest(
@@ -202,7 +206,7 @@ def test_cross_manifest_ownership() -> None:
         )
         assert result.returncode == 2, result.stdout + result.stderr
         assert "runtime manifest cannot manage Markdown" in result.stderr
-        assert "skills/z/references/cards/one.md" in result.stderr
+        assert "skills/z/references/cards/one.md" in result.stderr.replace("\\", "/")
         assert "runtime-tree:one.md" in result.stderr
 
         # A neighboring runtime manifest is ignored unless explicitly selected.
@@ -503,7 +507,7 @@ def test_undeclared_reference_symlink_cannot_escape_root() -> None:
             assert result.returncode == 2, result.stdout + result.stderr
             assert "MANIFEST ERROR:" in result.stderr
             assert "discovered reference" in result.stderr
-            assert "skills/undeclared/references/escape.md" in result.stderr
+            assert "skills/undeclared/references/escape.md" in result.stderr.replace("\\", "/")
             assert "escapes repository root" in result.stderr
             assert "Traceback" not in result.stderr
             assert outside_file.read_bytes() == canary
@@ -586,7 +590,7 @@ def test_agent_reference_reachability() -> None:
             result = run(CONSUMERS, "--root", str(root))
             assert result.returncode == 1, (snippet, result.stdout, result.stderr)
             assert "INVALID AGENT REFERENCE PREFIX" in result.stdout, result.stdout
-            assert f"templates/agents/narrative-writer.md:{line}:" in result.stdout, result.stdout
+            assert f"templates/agents/narrative-writer.md:{line}:" in result.stdout.replace("\\", "/"), result.stdout
             assert canonical in result.stdout, result.stdout
 
         write(writer, f"read {canonical}missing.md\n")

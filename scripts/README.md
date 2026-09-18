@@ -7,6 +7,8 @@
 
 `python scripts/test-writer-pipeline.py` 验证长篇取段器与 prompt 组装器的公开 CLI：存量卷纲、作用域、退役历史、原生路径、必需资料与召回降档；在三平台 CI 运行。
 
+`python scripts/test-long-analyze-runtime.py` 验证长篇拆文的单状态运行时：机械章节索引与逐章 hash、旧成果识别、只读计划、范围批次、兼容摘要投影、相邻拆分、原子提交和缓存恢复。实际运行只使用 `skills/story-long-analyze/scripts/` 下三个脚本：`build_chapter_index.py`、`inspect_existing_assets.py`、`manage_analysis_run.py`。
+
 ## 静态守卫（check-*）
 
 | 脚本 | 检查什么 | 何时跑 |
@@ -72,6 +74,7 @@
 | `test-antigravity-skills-deploy.py` | Antigravity 13 个已知 Skill 原子物化、未知 Skill 保留、symlink fail-closed/显式迁移与防穿透写回归 | 被 `check-antigravity-adapter.sh` 调用 |
 | `test-charcount-portable.sh` | 跨平台字符统计命令在三平台 + Windows 的正确性 | CI（调 check-python-invocation） |
 | `test-hook-encoding-portable.sh` | 部署 hook 在 Windows 中文系统的编码健壮性 | CI |
+| `test-long-analyze-runtime.py` | 长篇拆文索引、旧成果直接使用/增强/续跑/重拆路由、无重叠原文块、批次提交与恢复 | CI；改 story-long-analyze 运行时后 |
 | `test-opencode-cli-e2e.sh` | 真实 OpenCode CLI 加载 smoke（repo skills 发现 / 13 commands / 7 agents / plugin） | CLI compatibility CI；需已安装 `opencode` |
 | `test-skill-numbering.sh` | Step 重排级联安全、锚点 fail-closed、代码块引用、验证零写入/提交回滚、dry-run/write/幂等性 | Linux / Windows Git Bash / macOS CI |
 
