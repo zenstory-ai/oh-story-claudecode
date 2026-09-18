@@ -41,15 +41,17 @@ A long-form novel can easily reach hundreds of thousands of words across hundred
 
 The file system separates settings, outlines, prose, and tracking into independent dimensions. The conversation handles creation; the file system handles memory.
 
-Workspace-level author memory stays separate from any one book:
+Author memory stays separate from any one book's continuity tracking and lives in two stores so memory travels with the book: the workspace `.story/作者记忆/` holds global, genre and workflow preferences (`AP` ids), and each book directory's `.story/作者记忆/` holds only that book's preferences (`BP` ids). Both share the same layout:
 
 ```text
 .story/作者记忆/
 ├── _author-memory-state.json  # Single structured authority
 ├── 作者画像.md               # Confirmed preferences used in creation
-├── 待确认.md                 # Inferences, repeated corrections, conflict candidates
+├── 待确认.md                 # Candidates whose scope the author left vague, and conflict candidates
 └── 变更记录.md               # Auditable replacement and withdrawal history
 ```
+
+Only preferences the author states explicitly are recorded; nothing is inferred from repeated edits or finished drafts.
 
 **Long-form:**
 

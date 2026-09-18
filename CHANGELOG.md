@@ -12,6 +12,11 @@ compare 链接；小节名使用 Keep a Changelog 的六个英文类别（`Added
 
 ## [Unreleased]
 
+### Changed
+
+- 作者记忆拆成项目级与书级两个 store，记忆随书走（#435）：全局、题材、流程条目留在工作区 `.story/作者记忆/`（`AP`），本书条目改存书目录 `.story/作者记忆/`（`BP`），`query` 合并两级返回。书级读写须传 `--book-root`，没传直接报错，不再写进工作区；一份 `commit` 只写一个 store，`replace` / `conflicts_with` 不跨 store。升级前写在工作区的本书条目不再参与查询（不做双读），用新增的 `migrate --book-root` 一次性整批搬进书目录，证据与确认次数原样保留。
+- 作者记忆只记作者明确表达的偏好（#436）：捕获表移除 `repeated_correction` / `inferred_pattern` 两条推断写入管道，`record` / `commit` 拒绝这两个来源；待确认只剩「作者原话范围含糊」一种来源。存量 state 里的旧来源条目照常可读、可确认、可退役。
+
 ## [0.7.10] - 2026-09-09
 
 > 本版 `agents_version: 30`（v0.7.9 为 29），`setup_skill_version: 1.2.10`。更新技能包后，在写作项目根重新运行 `/story-setup`（Codex 用 `$story-setup`），再新开会话，加载新版写手、检查规则和参考文件。此前使用 main v30 的项目也需重新部署。

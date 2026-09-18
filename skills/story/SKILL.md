@@ -39,9 +39,9 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ## 作者记忆
 
-用户要求记住、查看、确认、替换或忘掉作者习惯时，加载 [references/author-memory.md](references/author-memory.md)，并只用本 skill 的 `scripts/author_memory_commit.py` 管理工作区级 `.story/作者记忆/`。常用变更走单事件 `record`；工具未返回 `ok: true` 和 `Author Memory Receipt` 前，不得声称已记住。显示画像或待确认项是只读操作；不存在时直接说明尚未建立。
+用户要求记住、查看、确认、替换或忘掉作者习惯时，加载 [references/author-memory.md](references/author-memory.md)，并只用本 skill 的 `scripts/author_memory_commit.py` 管理两级 `.story/作者记忆/`：全局、题材、流程条目在工作区（`AP`），本书条目在书目录（`BP`，传 `--book-root`）。常用变更走单事件 `record`；工具未返回 `ok: true` 和 `Author Memory Receipt` 前，不得声称已记住。显示画像或待确认项是只读操作；不存在时直接说明尚未建立。
 
-新增习惯必须保留用户原话和适用范围。一次性要求只执行不记录；小说事实写入本书设定/追踪；推断和重复修正先进入待确认；与已生效习惯冲突时显式 replace，不原地改写历史。用户没有指定工作区时，按协议定位已有作者记忆的最近祖先或当前创作工作区，禁止默认写到用户主目录。
+新增习惯必须保留用户原话和适用范围。一次性要求只执行不记录；小说事实写入本书设定/追踪；不从反复修改或成稿推断偏好，只记作者明确说的，原话范围含糊才进待确认；与已生效习惯冲突时显式 replace，不原地改写历史。项目级画像里还有「本书：」条目时，建议对该书运行 `migrate --book-root`。用户没有指定工作区时，按协议定位已有作者记忆的最近祖先或当前创作工作区，禁止默认写到用户主目录。
 
 ## Dashboard 工作台
 

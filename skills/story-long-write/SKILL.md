@@ -38,7 +38,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 3. **用模块组装，不要重新发明**。每个题材都有验证过的剧情模式——反转怎么铺、爽点怎么爆、感情怎么拉扯。找到对的模块，把对标书的具体角色看成功能位（对手/盟友/催化剂），再映射到你的角色。用你自己的素材填充这些功能位。
 4. **只加载必需信息**。写每章只读“不知道就会写错”的角色状态、待收伏笔、相关设定。其余留在文件系统里。
 5. **契约与推进决策走权威参考文件**。涉及读者契约、主角代理权、利益安全、期待债、终局储备（终局底牌/升级台阶）、机构/势力边界和 契约安全 / 需补强 / 契约破坏 风险判定时，先按 `references/reader-contract-and-progression.md` 校准，不在 SKILL.md 内复制长规则。
-6. **作者记忆**：按 [references/author-memory.md](references/author-memory.md) 查询本次相关 active 项、≤2KB，正文前原样传给执行者；当前请求、本书文风优先。长期声明用 `record` 写入并回传回执。
+6. **作者记忆**：按 [references/author-memory.md](references/author-memory.md) 带 `--book-root` 查询 ≤2KB active 项交执行者；当前请求、本书文风优先。长期声明用 `record` 写入、回传回执。
 
 | 题材 | 核心情绪 | 重点参考 |
 |------|---------|---------|

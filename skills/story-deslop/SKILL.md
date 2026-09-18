@@ -50,7 +50,7 @@ AI味不按语法错误处理，也不需要"修正"。它属于风格问题：�
 
 ### 作者习惯
 
-若作者记忆 state 已存在，改写前用 `scripts/author_memory_commit.py query --kind prose_style` 获取匹配的 active 文风条目（总输出 ≤2KB），并交给 inline/spawn 执行者作为自然倾向，不逐条展示或最大化命中，不牺牲连贯、节奏和字数；当前请求、原文剧情功能和本 skill 保护规则优先。用户明确声明长期文风习惯时，改写后按 [references/author-memory.md](references/author-memory.md) 用 `record` 写入并回传回执；重复修正/推断先待确认，一次性要求、检测器 findings 和助手自己的结果不记录。
+若作者记忆 state 已存在，改写前用 `scripts/author_memory_commit.py query --kind prose_style --book-root {书目录}` 获取匹配的 active 文风条目（总输出 ≤2KB），并交给 inline/spawn 执行者作为自然倾向，不逐条展示或最大化命中，不牺牲连贯、节奏和字数；当前请求、原文剧情功能和本 skill 保护规则优先。用户明确声明长期文风习惯时，改写后按 [references/author-memory.md](references/author-memory.md) 用 `record` 写入并回传回执；只记作者明确说的，一次性要求、反复修改、检测器 findings 和助手自己的结果不记录。
 
 ---
 

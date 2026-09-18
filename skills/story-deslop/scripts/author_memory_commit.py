@@ -3,8 +3,11 @@
 
 The language model supplies compact semantic transactions. This tool validates
 and applies them in memory, renders every derived view, and writes the JSON state
-last as the commit point. Author memory is workspace-level and deliberately
-separate from each book's story-continuity tracking.
+last as the commit point. Author memory lives in two kinds of store: the
+project-level store under the workspace holds global / genre / workflow items
+(`AP` ids); each book keeps its own book-level store under the book directory
+(`BP` ids) so memory travels with the book. Both stay separate from each book's
+story-continuity tracking.
 """
 
 from __future__ import annotations
@@ -64,6 +67,11 @@ SCOPE_LEVELS = ("global", "genre", "book", "workflow")
 STATUSES = ("active", "pending", "conflict", "rejected", "superseded")
 CONFIDENCE_LEVELS = ("low", "medium", "high")
 IMPORTANCE_LEVELS = ("low", "medium", "high")
+# 作者记忆只记作者明确表达的偏好。repeated_correction / inferred_pattern 两条
+# 由 agent 主动推断写入的管道已经移除（#436）：它们只在攒待确认清单的审阅负
+# 担，不是记忆质量；文档也明说不装全量消息 hook，隐式捕获本就承诺不了完整
+# 性。SOURCES 里保留这两个值只为存量 state 仍能通过校验、仍能 decide/forget，
+# 新写入一律按 WRITE_SOURCES 校验。
 SOURCES = (
     "explicit_user",
     "accepted_suggestion",
@@ -71,7 +79,17 @@ SOURCES = (
     "inferred_pattern",
     "manual",
 )
+WRITE_SOURCES = ("explicit_user", "accepted_suggestion", "manual")
 RANK = {"low": 0, "medium": 1, "high": 2}
+
+# 两级 store（#435）：项目级存 global/genre/workflow，ID 前缀 AP，位于
+# {工作区}/.story/作者记忆/；书级只存该书的 book 条目，ID 前缀 BP，位于
+# {书}/.story/作者记忆/，书归档、迁移时记忆随书走。ID 前缀就是路由键——
+# decide/forget 看 item_id 前缀，remember/replace 看 scope.level，一份事务
+# 只写一个 store。项目级 store 里升级前写入的存量 book 条目不再参与查询与估算，
+# 用 migrate 搬进书目录后才回来——不做双读，双读会让迁移永远没人做。
+STORE_PREFIX = {"project": "AP", "book": "BP"}
+ID_PREFIXES = tuple(STORE_PREFIX.values())
 
 
 class AuthorMemoryError(ValueError):
@@ -123,13 +141,31 @@ def choice(value: object, allowed: tuple[str, ...], label: str) -> str:
     return value
 
 
+def is_item_id(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) >= 3
+        and value[:2] in ID_PREFIXES
+        and value[2:].isdigit()
+        and int(value[2:]) >= 1
+    )
+
+
+def id_number(item_id: str) -> int:
+    return int(item_id[2:])
+
+
+def id_store(item_id: str) -> str:
+    return "book" if item_id.startswith(STORE_PREFIX["book"]) else "project"
+
+
 def clean_id_list(value: object, label: str, *, maximum: int = 32) -> list[str]:
     raw = as_list(value, label)
     require(len(raw) <= maximum, f"{label} may contain at most {maximum} items")
     result: list[str] = []
     for index, item in enumerate(raw):
         item_id = clean_text(item, f"{label}[{index}]", max_bytes=32)
-        require(item_id.startswith("AP") and item_id[2:].isdigit() and int(item_id[2:]) >= 1, f"{label}[{index}] is not an author-memory id")
+        require(is_item_id(item_id), f"{label}[{index}] is not an author-memory id")
         if item_id not in result:
             result.append(item_id)
     return result
@@ -180,16 +216,76 @@ def write_if_changed(path: Path, payload: str) -> None:
     atomic_write_text(path, payload)
 
 
-def memory_root(workspace: Path) -> Path:
-    return workspace.resolve() / ".story" / "作者记忆"
+# ---------------------------------------------------------------------------
+# Stores
+# ---------------------------------------------------------------------------
 
 
-def state_path(workspace: Path) -> Path:
-    return memory_root(workspace) / "_author-memory-state.json"
+class Store:
+    """一个 state 文件的落点：项目级（工作区）或书级（书目录）。"""
+
+    __slots__ = ("kind", "root", "book")
+
+    def __init__(self, kind: str, root: Path, book: str | None) -> None:
+        self.kind = kind
+        self.root = root
+        self.book = book
+
+    @property
+    def prefix(self) -> str:
+        return STORE_PREFIX[self.kind]
+
+    @property
+    def state_path(self) -> Path:
+        return self.root / "_author-memory-state.json"
+
+    @property
+    def label(self) -> str:
+        return "项目级" if self.kind == "project" else f"书级（{self.book}）"
 
 
-def empty_state() -> dict[str, Any]:
-    return {
+def project_store(workspace: Path) -> Store:
+    return Store("project", workspace.resolve() / ".story" / "作者记忆", None)
+
+
+def peek_book_name(state_path: Path) -> str | None:
+    """不校验整份 state，只取书名——书级 store 一旦建立，书名以 state 为准，
+    书目录改名不影响。"""
+    if not state_path.exists():
+        return None
+    document = read_json(state_path)
+    name = document.get("book") if isinstance(document, dict) else None
+    return name if isinstance(name, str) and name.strip() else None
+
+
+def book_store(book_root: Path, book: str | None) -> Store:
+    require(book_root.exists() and book_root.is_dir(), f"book root does not exist: {book_root}")
+    resolved = book_root.resolve()
+    root = resolved / ".story" / "作者记忆"
+    name = optional_text(book, "book", max_bytes=180)
+    stored = peek_book_name(root / "_author-memory-state.json")
+    if name is None:
+        name = stored if stored is not None else clean_text(resolved.name, "book root name", max_bytes=180)
+    elif stored is not None:
+        require(
+            name.casefold() == stored.casefold(),
+            f"--book「{name}」与 {root} 里记录的书「{stored}」不一致",
+        )
+    return Store("book", root, name)
+
+
+def resolve_target_store(kind: str, workspace: Path, book_root: Path | None, book: str | None) -> Store:
+    if kind == "project":
+        return project_store(workspace)
+    require(
+        book_root is not None,
+        "book 级条目须传 --book-root {书目录}——记忆随书存放在 {书}/.story/作者记忆/，不再写进工作区的项目级 store",
+    )
+    return book_store(book_root, book)
+
+
+def empty_state(book: str | None = None) -> dict[str, Any]:
+    state: dict[str, Any] = {
         "schema_version": STATE_SCHEMA_VERSION,
         "state_revision": 0,
         "next_item_number": 1,
@@ -197,6 +293,14 @@ def empty_state() -> dict[str, Any]:
         "journal": [],
         "applied_transactions": {},
     }
+    if book is not None:
+        state["book"] = book
+    return state
+
+
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
 
 
 def normalize_scope(value: object, label: str) -> dict[str, str | None]:
@@ -230,19 +334,19 @@ def normalize_item(value: object, label: str) -> dict[str, Any]:
     }
     require_known_keys(item, allowed, label)
     item_id = clean_text(item.get("id"), f"{label}.id", max_bytes=32)
-    require(item_id.startswith("AP") and item_id[2:].isdigit() and int(item_id[2:]) >= 1, f"{label}.id is invalid")
+    require(is_item_id(item_id), f"{label}.id is invalid")
     evidence = [normalize_evidence(entry, f"{label}.evidence[{index}]") for index, entry in enumerate(as_list(item.get("evidence"), f"{label}.evidence"))]
     require(bool(evidence), f"{label}.evidence must not be empty")
     status = choice(item.get("status"), STATUSES, f"{label}.status")
     conflicts = clean_id_list(item.get("conflicts_with"), f"{label}.conflicts_with")
     superseded_by = optional_text(item.get("superseded_by"), f"{label}.superseded_by", max_bytes=32)
     if superseded_by is not None:
-        require(superseded_by.startswith("AP") and superseded_by[2:].isdigit(), f"{label}.superseded_by is invalid")
+        require(is_item_id(superseded_by), f"{label}.superseded_by is invalid")
     return {
         "id": item_id,
         "kind": choice(item.get("kind"), KINDS, f"{label}.kind"),
         "scope": normalize_scope(item.get("scope"), f"{label}.scope"),
-        "assertion": clean_text(item.get("assertion"), f"{label}.assertion", max_bytes=768),
+        "assertion": clean_text(item.get("assertion"), f"{label}.assertion", max_bytes=LEGACY_ASSERTION_MAX_BYTES),
         "confidence": choice(item.get("confidence"), CONFIDENCE_LEVELS, f"{label}.confidence"),
         "importance": choice(item.get("importance"), IMPORTANCE_LEVELS, f"{label}.importance"),
         "status": status,
@@ -257,11 +361,23 @@ def normalize_item(value: object, label: str) -> dict[str, Any]:
     }
 
 
-def validate_state(value: object) -> dict[str, Any]:
+def scope_fits_store(scope: dict[str, str | None], book: str | None) -> bool:
+    if book is None:
+        return True  # 项目级：存量 book 条目仍合法，只为老库能通过校验并被 migrate 搬走
+    return scope["level"] == "book" and (scope["value"] or "").casefold() == book.casefold()
+
+
+def validate_state(value: object, *, store: Store) -> dict[str, Any]:
     state = as_mapping(value, "state")
-    allowed = {"schema_version", "state_revision", "next_item_number", "items", "journal", "applied_transactions"}
+    allowed = {"schema_version", "state_revision", "next_item_number", "items", "journal", "applied_transactions", "book"}
     require_known_keys(state, allowed, "state")
     require(state.get("schema_version") == STATE_SCHEMA_VERSION, f"state.schema_version must be {STATE_SCHEMA_VERSION}")
+    if store.kind == "book":
+        book = clean_text(state.get("book"), "state.book", max_bytes=180)
+        require(store.book is not None and book.casefold() == store.book.casefold(), f"state.book「{book}」与目标书「{store.book}」不一致")
+    else:
+        require("book" not in state, "project-level state must not carry state.book")
+        book = None
     revision = as_int(state.get("state_revision"), "state.state_revision")
     next_number = as_int(state.get("next_item_number"), "state.next_item_number", minimum=1)
     raw_items = as_mapping(state.get("items"), "state.items")
@@ -270,7 +386,9 @@ def validate_state(value: object) -> dict[str, Any]:
     for raw_id, raw_item in raw_items.items():
         normalized = normalize_item(raw_item, f"state.items.{raw_id}")
         require(raw_id == normalized["id"], f"state.items key {raw_id} does not match item id")
-        max_number = max(max_number, int(raw_id[2:]))
+        require(raw_id.startswith(store.prefix), f"state.items.{raw_id} does not belong to the {store.label} store（前缀应为 {store.prefix}）")
+        require(scope_fits_store(normalized["scope"], book), f"state.items.{raw_id} scope does not belong to book「{book}」")
+        max_number = max(max_number, id_number(raw_id))
         require(normalized["created_revision"] <= normalized["updated_revision"] <= revision, f"state.items.{raw_id} revision is ahead of state")
         items[raw_id] = normalized
     require(next_number > max_number, "state.next_item_number must be greater than every allocated item id")
@@ -317,7 +435,7 @@ def validate_state(value: object) -> dict[str, Any]:
         item_ids = clean_id_list(mapping.get("item_ids"), f"state.applied_transactions.{transaction_id}.item_ids")
         require(bool(item_ids), f"state.applied_transactions.{transaction_id}.item_ids must not be empty")
         require(all(item_id in items for item_id in item_ids), f"state.applied_transactions.{transaction_id}.item_ids references an unknown item")
-    return {
+    result = {
         "schema_version": STATE_SCHEMA_VERSION,
         "state_revision": revision,
         "next_item_number": next_number,
@@ -325,6 +443,15 @@ def validate_state(value: object) -> dict[str, Any]:
         "journal": copy.deepcopy(journal),
         "applied_transactions": copy.deepcopy(transactions),
     }
+    if book is not None:
+        result["book"] = book
+    return result
+
+
+def load_state(store: Store) -> dict[str, Any] | None:
+    if not store.state_path.exists():
+        return None
+    return validate_state(read_json(store.state_path), store=store)
 
 
 def normalize_preference(value: object, label: str, *, allow_status: bool) -> dict[str, Any]:
@@ -333,12 +460,17 @@ def normalize_preference(value: object, label: str, *, allow_status: bool) -> di
     if allow_status:
         allowed |= {"status", "conflicts_with"}
     require_known_keys(preference, allowed, label)
-    source = choice(preference.get("source"), SOURCES, f"{label}.source")
+    raw_source = preference.get("source")
+    require(
+        raw_source not in {"repeated_correction", "inferred_pattern"},
+        f"{label}.source「{raw_source}」已不再写入：作者记忆只记作者明确表达的偏好，"
+        f"不从重复修改或成稿轨迹推断；范围含糊的原话用 explicit_user 并置 status=pending",
+    )
+    source = choice(raw_source, WRITE_SOURCES, f"{label}.source")
     status = choice(preference.get("status"), ("active", "pending", "conflict"), f"{label}.status") if allow_status else "active"
     conflicts = clean_id_list(preference.get("conflicts_with", []), f"{label}.conflicts_with") if allow_status else []
     if status == "active":
         require(not conflicts, f"{label}.conflicts_with must be empty for active status")
-        require(source not in {"repeated_correction", "inferred_pattern"}, f"{label} inferred evidence must remain pending")
     elif status == "conflict":
         require(bool(conflicts), f"{label}.conflicts_with is required for conflict status")
     else:
@@ -421,15 +553,71 @@ def normalize_record_event(value: object) -> dict[str, Any]:
     return {"event_id": event_id, "operation": normalized["operations"][0]}
 
 
+# ---------------------------------------------------------------------------
+# Routing: which store does an operation belong to?
+# ---------------------------------------------------------------------------
+
+
+def scope_store_kind(scope: dict[str, str | None]) -> str:
+    return "book" if scope["level"] == "book" else "project"
+
+
+def store_kind_label(kind: str) -> str:
+    return "书级（BP）" if kind == "book" else "项目级（AP）"
+
+
+def operation_store_kind(operation: dict[str, Any], label: str) -> str:
+    action = operation["action"]
+    if action in {"decide", "forget"}:
+        return id_store(operation["item_id"])
+    preference = operation["preference"]
+    kind = scope_store_kind(preference["scope"])
+    if action == "remember":
+        for conflict_id in preference["conflicts_with"]:
+            require(
+                id_store(conflict_id) == kind,
+                f"{label}.conflicts_with 只能引用同一 store 的条目（{conflict_id} 在{store_kind_label(id_store(conflict_id))}）："
+                f"本书例外不算与全局规则冲突，直接 remember 为 book 条目即可",
+            )
+        return kind
+    for old_id in operation["old_ids"]:
+        require(
+            id_store(old_id) == kind,
+            f"{label} replace 不能跨 store：{old_id} 在{store_kind_label(id_store(old_id))}，新条目范围属于{store_kind_label(kind)}；"
+            f"跨 store 改版拆成 forget＋remember，存量 book 条目先 migrate",
+        )
+    return kind
+
+
+def transaction_store_kind(transaction: dict[str, Any]) -> str:
+    kinds = {
+        operation_store_kind(operation, f"transaction.operations[{index}]")
+        for index, operation in enumerate(transaction["operations"])
+    }
+    require(
+        len(kinds) == 1,
+        "一份事务只能写一个 store：项目级（global/genre/workflow 范围或 AP 编号）与书级（book 范围或 BP 编号）的操作要分开提交",
+    )
+    return kinds.pop()
+
+
+# ---------------------------------------------------------------------------
+# Transactions
+# ---------------------------------------------------------------------------
+
+
 def transaction_digest(transaction: dict[str, Any]) -> str:
     canonical = json.dumps(transaction, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def fingerprint(preference: dict[str, Any]) -> str:
+    """同一条偏好的身份：kind＋scope＋断言，scope.value 与 same_scope_value 同样按
+    casefold 比——否则「Urban」「urban」会各建一条，两条同断言一起挤进 prompt。"""
+    scope = preference["scope"]
     value = {
         "kind": preference["kind"],
-        "scope": preference["scope"],
+        "scope": {"level": scope["level"], "value": None if scope["value"] is None else scope["value"].casefold()},
         "assertion": preference["assertion"].casefold(),
     }
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -448,12 +636,32 @@ def require_new_item_assertion(preference: dict[str, Any]) -> None:
     )
 
 
+def require_scope_fits_store(state: dict[str, Any], scope: dict[str, str | None]) -> None:
+    book = state.get("book")
+    if book is None:
+        require(
+            scope["level"] != "book",
+            "book 级条目须传 --book-root {书目录}——记忆随书存放在 {书}/.story/作者记忆/，不再写进工作区的项目级 store",
+        )
+    else:
+        require(
+            scope_fits_store(scope, book),
+            f"book 条目的范围「{scope['value']}」与本书 store「{book}」不一致——只有这本书的条目才住在这个书目录",
+        )
+
+
+def next_item_id(state: dict[str, Any]) -> str:
+    prefix = STORE_PREFIX["book"] if state.get("book") is not None else STORE_PREFIX["project"]
+    item_id = f"{prefix}{state['next_item_number']:03d}"
+    state["next_item_number"] += 1
+    return item_id
+
+
 def allocate_item(state: dict[str, Any], preference: dict[str, Any], revision: int) -> dict[str, Any]:
     require_new_item_assertion(preference)
-    item_id = f"AP{state['next_item_number']:03d}"
-    state["next_item_number"] += 1
+    require_scope_fits_store(state, preference["scope"])
     return {
-        "id": item_id,
+        "id": next_item_id(state),
         "kind": preference["kind"],
         "scope": copy.deepcopy(preference["scope"]),
         "assertion": preference["assertion"],
@@ -487,6 +695,7 @@ def require_item(state: dict[str, Any], item_id: str, label: str) -> dict[str, A
 
 
 def apply_remember(state: dict[str, Any], preference: dict[str, Any], revision: int) -> str:
+    require_scope_fits_store(state, preference["scope"])
     for conflict_id in preference["conflicts_with"]:
         conflict = require_item(state, conflict_id, "remember")
         require(conflict["status"] == "active", f"remember conflict {conflict_id} must be active")
@@ -531,6 +740,23 @@ def apply_decide(state: dict[str, Any], operation: dict[str, Any], revision: int
     return f"{verb} {item['id']}：{item['assertion']}"
 
 
+def release_conflicts(state: dict[str, Any], removed_ids: set[str], revision: int) -> int:
+    """被撤下的 active 条目不再是任何候选的冲突对象；冲突对象清空的候选退回 pending。"""
+    released = 0
+    for candidate in state["items"].values():
+        if candidate["status"] != "conflict":
+            continue
+        retained = [item_id for item_id in candidate["conflicts_with"] if item_id not in removed_ids]
+        if retained == candidate["conflicts_with"]:
+            continue
+        candidate["conflicts_with"] = retained
+        candidate["updated_revision"] = revision
+        if not retained:
+            candidate["status"] = "pending"
+            released += 1
+    return released
+
+
 def apply_replace(state: dict[str, Any], operation: dict[str, Any], revision: int) -> str:
     old_items = [require_item(state, item_id, "replace") for item_id in operation["old_ids"]]
     for item in old_items:
@@ -543,19 +769,7 @@ def apply_replace(state: dict[str, Any], operation: dict[str, Any], revision: in
         item["status"] = "superseded"
         item["superseded_by"] = replacement["id"]
         item["updated_revision"] = revision
-    old_ids = {item["id"] for item in old_items}
-    released = 0
-    for candidate in state["items"].values():
-        if candidate["status"] != "conflict":
-            continue
-        retained = [item_id for item_id in candidate["conflicts_with"] if item_id not in old_ids]
-        if retained == candidate["conflicts_with"]:
-            continue
-        candidate["conflicts_with"] = retained
-        candidate["updated_revision"] = revision
-        if not retained:
-            candidate["status"] = "pending"
-            released += 1
+    released = release_conflicts(state, {item["id"] for item in old_items}, revision)
     replaced = ", ".join(item["id"] for item in old_items)
     suffix = f"；{released} 个其他冲突候选退回待确认" if released else ""
     return f"用 {replacement['id']} 替代 {replaced}：{replacement['assertion']}{suffix}"
@@ -569,20 +783,46 @@ def apply_forget(state: dict[str, Any], operation: dict[str, Any], revision: int
     item["reason"] = operation["reason"]
     item["updated_revision"] = revision
     add_evidence(item, operation["quote"], None)
-    released = 0
-    for candidate in state["items"].values():
-        if candidate["status"] != "conflict" or item["id"] not in candidate["conflicts_with"]:
-            continue
-        candidate["conflicts_with"] = [conflict_id for conflict_id in candidate["conflicts_with"] if conflict_id != item["id"]]
-        candidate["updated_revision"] = revision
-        if not candidate["conflicts_with"]:
-            candidate["status"] = "pending"
-            released += 1
+    released = release_conflicts(state, {item["id"]}, revision)
     suffix = f"；{released} 个冲突候选退回待确认" if released else ""
     return f"忘记 {item['id']}：{item['assertion']}{suffix}"
 
 
-def apply_transaction(state: dict[str, Any], transaction: dict[str, Any], digest: str) -> tuple[dict[str, Any], list[str]]:
+def committed_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def seal_transaction(
+    updated: dict[str, Any],
+    transaction_id: str,
+    digest: str,
+    summaries: list[str],
+    *,
+    store: Store,
+) -> dict[str, Any]:
+    """把本次修订写进 journal / applied_transactions，并整份校验。"""
+    revision = updated["state_revision"] + 1
+    updated["state_revision"] = revision
+    updated["journal"].append({
+        "revision": revision,
+        "transaction_id": transaction_id,
+        "committed_at": committed_now(),
+        "summaries": summaries,
+    })
+    item_ids = sorted(
+        (item_id for item_id, item in updated["items"].items() if item["updated_revision"] == revision),
+        key=id_number,
+    )
+    require(bool(item_ids), "transaction did not update any author-memory item")
+    updated["applied_transactions"][transaction_id] = {
+        "revision": revision,
+        "digest": digest,
+        "item_ids": item_ids,
+    }
+    return validate_state(updated, store=store)
+
+
+def apply_transaction(state: dict[str, Any], transaction: dict[str, Any], digest: str, *, store: Store) -> tuple[dict[str, Any], list[str]]:
     applied = state["applied_transactions"].get(transaction["transaction_id"])
     if applied is not None:
         require(applied["digest"] == digest, "transaction_id was already used with different content")
@@ -600,25 +840,12 @@ def apply_transaction(state: dict[str, Any], transaction: dict[str, Any], digest
             summaries.append(apply_replace(updated, operation, revision))
         else:
             summaries.append(apply_forget(updated, operation, revision))
-    committed_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-    updated["state_revision"] = revision
-    updated["journal"].append({
-        "revision": revision,
-        "transaction_id": transaction["transaction_id"],
-        "committed_at": committed_at,
-        "summaries": summaries,
-    })
-    item_ids = sorted(
-        (item_id for item_id, item in updated["items"].items() if item["updated_revision"] == revision),
-        key=lambda item_id: int(item_id[2:]),
-    )
-    require(bool(item_ids), "transaction did not update any author-memory item")
-    updated["applied_transactions"][transaction["transaction_id"]] = {
-        "revision": revision,
-        "digest": digest,
-        "item_ids": item_ids,
-    }
-    return validate_state(updated), summaries
+    return seal_transaction(updated, transaction["transaction_id"], digest, summaries, store=store), summaries
+
+
+# ---------------------------------------------------------------------------
+# Derived views
+# ---------------------------------------------------------------------------
 
 
 def scope_label(scope: dict[str, str | None]) -> str:
@@ -628,19 +855,26 @@ def scope_label(scope: dict[str, str | None]) -> str:
     return f"{labels[scope['level']]}：{scope['value']}"
 
 
+def store_caption(state: dict[str, Any]) -> str:
+    book = state.get("book")
+    if book is None:
+        return "项目级记忆（全局、题材、流程）；各书的书级记忆住在各自书目录的 .story/作者记忆/。"
+    return f"本书「{book}」的书级记忆；全局、题材、流程记忆住在工作区的 .story/作者记忆/。"
+
+
 def render_profile(state: dict[str, Any]) -> str:
     lines = [
         "# 作者画像",
         "",
         "<!-- 由 author_memory_commit.py 生成，请勿手改；修改请提交事务。 -->",
         "",
-        f"> 状态修订：{state['state_revision']}。仅列出已确认偏好；当前明确要求、本书设定与硬性门禁优先。",
+        f"> 状态修订：{state['state_revision']}。{store_caption(state)}仅列出已确认偏好；当前明确要求、本书设定与硬性门禁优先。",
         "",
     ]
     active = [item for item in state["items"].values() if item["status"] == "active"]
     for kind in KINDS:
         lines.extend([f"## {KIND_TITLES[kind]}", ""])
-        items = sorted((item for item in active if item["kind"] == kind), key=lambda item: int(item["id"][2:]))
+        items = sorted((item for item in active if item["kind"] == kind), key=lambda item: id_number(item["id"]))
         if not items:
             lines.extend(["- 暂无", ""])
             continue
@@ -661,10 +895,10 @@ def render_pending(state: dict[str, Any]) -> str:
         "",
         "<!-- 由 author_memory_commit.py 生成，请勿手改；修改请提交事务。 -->",
         "",
-        f"> 状态修订：{state['state_revision']}。待确认项不参与创作约束，也不应打断当前任务。",
+        f"> 状态修订：{state['state_revision']}。{store_caption(state)}待确认项不参与创作约束，也不应打断当前任务。",
         "",
     ]
-    items = sorted((item for item in state["items"].values() if item["status"] in {"pending", "conflict"}), key=lambda item: int(item["id"][2:]))
+    items = sorted((item for item in state["items"].values() if item["status"] in {"pending", "conflict"}), key=lambda item: id_number(item["id"]))
     if not items:
         lines.extend(["暂无待确认项。", ""])
     for item in items:
@@ -673,7 +907,7 @@ def render_pending(state: dict[str, Any]) -> str:
             "",
             f"- 候选习惯：{item['assertion']}",
             f"- 范围：{scope_label(item['scope'])}",
-            f"- 原话：\u201c{item['evidence'][-1]['quote']}\u201d",
+            f"- 原话：“{item['evidence'][-1]['quote']}”",
             f"- 依据：{item['reason']}",
             f"- 置信度 / 重要度：{item['confidence']} / {item['importance']}",
         ])
@@ -688,6 +922,8 @@ def render_journal(state: dict[str, Any]) -> str:
         "# 作者记忆变更记录",
         "",
         "<!-- 由 author_memory_commit.py 生成，请勿手改；最近记录在前。 -->",
+        "",
+        f"> {store_caption(state)}",
         "",
     ]
     if not state["journal"]:
@@ -711,26 +947,23 @@ def render_views(state: dict[str, Any]) -> dict[str, str]:
     return views
 
 
-def write_snapshot(workspace: Path, state: dict[str, Any]) -> None:
-    root = memory_root(workspace)
+def write_snapshot(store: Store, state: dict[str, Any]) -> None:
     views = render_views(state)
     state_payload = json_payload(state)
     require(len(state_payload.encode("utf-8")) <= STATE_MAX_BYTES, f"_author-memory-state.json exceeds {STATE_MAX_BYTES} bytes")
     for name, payload in views.items():
-        write_if_changed(root / name, payload)
+        write_if_changed(store.root / name, payload)
     # State is the authority and therefore the last commit point.
-    write_if_changed(state_path(workspace), state_payload)
+    write_if_changed(store.state_path, state_payload)
 
 
-def command_init(workspace: Path) -> dict[str, Any]:
-    require(workspace.exists() and workspace.is_dir(), f"workspace does not exist: {workspace}")
-    path = state_path(workspace)
-    if path.exists():
-        state = validate_state(read_json(path))
-    else:
-        state = empty_state()
-    write_snapshot(workspace, state)
-    return {"ok": True, "command": "init", "revision": state["state_revision"], "root": str(memory_root(workspace))}
+# ---------------------------------------------------------------------------
+# Query & budget
+# ---------------------------------------------------------------------------
+
+
+def same_scope_value(item_value: str | None, requested: str | None) -> bool:
+    return requested is not None and item_value is not None and item_value.casefold() == requested.casefold()
 
 
 def summarize_assertion(assertion: str, *, limit: int = 14) -> str:
@@ -755,23 +988,31 @@ def query_sort_key(item: dict[str, Any]) -> tuple[int, int, int, int, int]:
     重要度必须排在 scope 之前：超编时先丢的应当是不重要的条目，而不是「凡
     全局一律先丢」。scope 在前会让任意数量的 low 本书琐事挤掉 high 的全局
     铁律——那恰恰是作者最不愿意丢的那一类。同重要度之内才按本书例外优先。
+    两个 store 的修订号互不可比，但 book 条目只来自书级 store、其余只来自项目
+    级，同 scope 必同 store，所以按修订号比「最近更新」在合并后仍成立。
     """
     return (
         -RANK[item["importance"]],
         SCOPE_RANK[item["scope"]["level"]],
         -item["updated_revision"],
         -item["confirmation_count"],
-        int(item["id"][2:]),
+        id_number(item["id"]),
     )
 
 
-def fit_items(sorted_items: list[dict[str, Any]], revision: int) -> tuple[dict[str, Any], list[str]]:
+def fit_items(
+    sorted_items: list[dict[str, Any]],
+    revision: int,
+    *,
+    extra: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], list[str]]:
     """按 query 输出信封把条目装进 QUERY_MAX_BYTES：装不下的跳过而不中断
     （一条长的不挡后面的短条），漏下的 ID 报进 omitted_ids（封顶
     OMITTED_IDS_MAX 条，omitted 保留真实总数）。返回 (结果文档, 全部漏下 ID)。
 
     漏项恒按候选优先级排序，不按被丢弃的先后：收尾回吐的条目优先级高于循环
     里跳过的，若按追加顺序排，omitted_ids 的封顶正好会把最该报的那条切掉。
+    `extra` 是同样计入信封的附加字段（book_revision 等）。
     """
     result: dict[str, Any] = {
         "ok": True,
@@ -782,6 +1023,7 @@ def fit_items(sorted_items: list[dict[str, Any]], revision: int) -> tuple[dict[s
         "omitted": 0,
         "omitted_ids": [],
     }
+    result.update(extra or {})
     order = {item["id"]: index for index, item in enumerate(sorted_items)}
     kept: list[dict[str, Any]] = []
     dropped: set[str] = set()
@@ -808,6 +1050,48 @@ def fit_items(sorted_items: list[dict[str, Any]], revision: int) -> tuple[dict[s
     return result, ordered_omitted()
 
 
+def build_query_result(
+    candidates: list[dict[str, Any]],
+    project_state: dict[str, Any] | None,
+    book_state: dict[str, Any] | None,
+) -> tuple[dict[str, Any], list[str]]:
+    """真实查询与写入端估算共用的唯一信封构造：候选已按优先级排好，这里补上
+    book_revision 等附加字段再装填。两处信封差一个字段就是一次假阴性——回执
+    说没事、query 照样丢条。"""
+    extra: dict[str, Any] = {}
+    if book_state is not None:
+        extra["book_revision"] = book_state["state_revision"]
+    revision = project_state["state_revision"] if project_state is not None else 0
+    return fit_items(candidates, revision, extra=extra)
+
+
+def merged_query(
+    project_state: dict[str, Any] | None,
+    book_state: dict[str, Any] | None,
+    kinds: set[str],
+    requested_scopes: dict[str, str | None],
+) -> tuple[dict[str, Any], list[str]]:
+    """真实查询的纯函数部分：项目级按 kind／scope 过滤（存量 book 条目不参与，
+    migrate 后才回来），书级整个 store 就是这本书的，只按 status／kind 过滤；
+    合并后按 重要度→本书例外→最近更新 装填。"""
+
+    def relevant(item: dict[str, Any]) -> bool:
+        if item["status"] != "active" or item["kind"] not in kinds:
+            return False
+        level = item["scope"]["level"]
+        if level == "global":
+            return True
+        return level != "book" and same_scope_value(item["scope"]["value"], requested_scopes[level])
+
+    candidates: list[dict[str, Any]] = []
+    if project_state is not None:
+        candidates.extend(item for item in project_state["items"].values() if relevant(item))
+    if book_state is not None:
+        candidates.extend(active_of_kinds(book_state, tuple(kinds)))
+    candidates.sort(key=query_sort_key)
+    return build_query_result(candidates, project_state, book_state)
+
+
 def slice_weight(items: list[dict[str, Any]]) -> int:
     """切片在真实载荷里的占位：compact 字节＋每条在 JSON 数组里的分隔符。
 
@@ -817,40 +1101,67 @@ def slice_weight(items: list[dict[str, Any]]) -> int:
     return sum(compact_bytes(item) + 2 for item in items)
 
 
-def worst_case_items(state: dict[str, Any], kinds: tuple[str, ...]) -> list[dict[str, Any]]:
+def active_of_kinds(state: dict[str, Any] | None, kinds: tuple[str, ...]) -> list[dict[str, Any]]:
+    if state is None:
+        return []
+    return [item for item in state["items"].values() if item["status"] == "active" and item["kind"] in kinds]
+
+
+def worst_case_items(
+    project_state: dict[str, Any] | None,
+    book_state: dict[str, Any] | None,
+    kinds: tuple[str, ...],
+) -> list[dict[str, Any]]:
     """某个任务组合的最坏查询候选：全局条目＋各 scope 维度上最重的单一切片。
 
     一次查询只带一个 book/genre/workflow，不同书的条目不会同现，所以按切片
     取最重而不是全加起来，多书工作区才不会被粗算误伤。切片按 casefold 归并，
     与 same_scope_value 同一口径——否则只差大小写的同名书在这里算两个切片、
     在真实查询里却合成一个，估算就成了下界。
+
+    book 维度就是当前可见的书级 store（整个 store 是这本书的一片），所以写书级
+    条目时「本书＋全局」是精确的；写项目级条目而没传 --book-root 时看不到任何
+    书级 store，估算只覆盖项目级。项目级里的存量 book 条目不参与查询，也不参与
+    估算。
     """
-    pool = [i for i in state["items"].values() if i["status"] == "active" and i["kind"] in kinds]
-    worst = [i for i in pool if i["scope"]["level"] == "global"]
-    for level in ("book", "genre", "workflow"):
-        slices: dict[str, list[dict[str, Any]]] = {}
-        for i in pool:
-            if i["scope"]["level"] == level:
-                slices.setdefault((i["scope"]["value"] or "").casefold(), []).append(i)
-        if slices:
-            worst.extend(max(slices.values(), key=slice_weight))
+    pool = [item for item in active_of_kinds(project_state, kinds) if item["scope"]["level"] != "book"]
+    worst = [item for item in pool if item["scope"]["level"] == "global"]
+    slices: dict[str, dict[str, list[dict[str, Any]]]] = {"genre": {}, "workflow": {}}
+    for item in pool:
+        level = item["scope"]["level"]
+        if level != "global":
+            slices[level].setdefault((item["scope"]["value"] or "").casefold(), []).append(item)
+    for level in ("genre", "workflow"):
+        if slices[level]:
+            worst.extend(max(slices[level].values(), key=slice_weight))
+    worst.extend(active_of_kinds(book_state, kinds))
     worst.sort(key=query_sort_key)
     return worst
 
 
-def query_budget_warnings(state: dict[str, Any]) -> list[str]:
+def legacy_book_items(project_state: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """项目级 store 里升级前写入、还活着的 book 条目——只有 migrate 会碰它们。"""
+    if project_state is None:
+        return []
+    return [
+        item for item in project_state["items"].values()
+        if item["scope"]["level"] == "book" and item["status"] in {"active", "pending", "conflict"}
+    ]
+
+
+def query_budget_warnings(project_state: dict[str, Any] | None, book_state: dict[str, Any] | None) -> list[str]:
     """写入回执的预算提醒：每个任务组合按最坏查询情形试装，装不下的点名。
 
     写入永不因注入预算失败；提醒指向「整理作者记忆」。点名带断言首句——只给
-    APxxx 编号的话，作者不打开 作者画像.md 就无从判断丢的是什么。
+    编号的话，作者不打开 作者画像.md 就无从判断丢的是什么。
     """
     warnings: list[str] = []
     for task, kinds in QUERY_COMBOS.items():
-        worst = worst_case_items(state, kinds)
-        _, omitted = fit_items(worst, state["state_revision"])
+        worst = worst_case_items(project_state, book_state, kinds)
+        _, omitted = build_query_result(worst, project_state, book_state)
         if not omitted:
             continue
-        assertions = {i["id"]: i["assertion"] for i in worst}
+        assertions = {item["id"]: item["assertion"] for item in worst}
         shown = "；".join(f"{item_id}「{summarize_assertion(assertions[item_id])}」" for item_id in omitted[:3])
         more = f" 等 {len(omitted)} 条" if len(omitted) > 3 else ""
         warnings.append(
@@ -861,18 +1172,58 @@ def query_budget_warnings(state: dict[str, Any]) -> list[str]:
     return warnings
 
 
-def command_commit(workspace: Path, input_path: Path) -> dict[str, Any]:
-    require(state_path(workspace).exists(), "author memory is not initialized; run init first")
-    state = validate_state(read_json(state_path(workspace)))
+def visible_states(
+    store: Store,
+    updated: dict[str, Any],
+    workspace: Path,
+    book_root: Path | None,
+    book: str | None,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """写入后可见的两级状态：刚写的那份用内存里的，另一份只读加载（没有就 None）。"""
+    if store.kind == "project":
+        book_state = load_state(book_store(book_root, book)) if book_root is not None else None
+        return updated, book_state
+    return load_state(project_store(workspace)), updated
+
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
+
+
+def require_workspace(workspace: Path) -> None:
+    require(workspace.exists() and workspace.is_dir(), f"workspace does not exist: {workspace}")
+
+
+def store_fields(store: Store) -> dict[str, Any]:
+    fields: dict[str, Any] = {"store": store.kind, "root": str(store.root)}
+    if store.book is not None:
+        fields["book"] = store.book
+    return fields
+
+
+def command_init(workspace: Path, book_root: Path | None, book: str | None) -> dict[str, Any]:
+    require_workspace(workspace)
+    store = book_store(book_root, book) if book_root is not None else project_store(workspace)
+    state = load_state(store)
+    if state is None:
+        state = empty_state(store.book)
+    write_snapshot(store, state)
+    return {"ok": True, "command": "init", "revision": state["state_revision"], **store_fields(store)}
+
+
+def command_commit(workspace: Path, book_root: Path | None, book: str | None, input_path: Path) -> dict[str, Any]:
+    require_workspace(workspace)
     transaction = normalize_transaction(read_json(input_path))
+    store = resolve_target_store(transaction_store_kind(transaction), workspace, book_root, book)
+    require(store.state_path.exists(), f"{store.label} author memory is not initialized; run init first")
+    state = load_state(store)
     digest = transaction_digest(transaction)
-    updated, summaries = apply_transaction(state, transaction, digest)
+    updated, summaries = apply_transaction(state, transaction, digest, store=store)
     replayed = updated is state
-    if not replayed:
-        write_snapshot(workspace, updated)
-    else:
-        # Repair missing or stale views during an idempotent retry.
-        write_snapshot(workspace, state)
+    # 幂等重放时也重写快照，修复缺失或过期的派生视图。
+    write_snapshot(store, updated)
+    project_state, book_state = visible_states(store, updated, workspace, book_root, book)
     return {
         "ok": True,
         "command": "commit",
@@ -881,15 +1232,18 @@ def command_commit(workspace: Path, input_path: Path) -> dict[str, Any]:
         "replayed": replayed,
         "item_ids": updated["applied_transactions"][transaction["transaction_id"]]["item_ids"],
         "summaries": summaries,
-        "warnings": query_budget_warnings(updated),
+        "warnings": query_budget_warnings(project_state, book_state),
+        **store_fields(store),
     }
 
 
-def command_record(workspace: Path, input_path: Path) -> dict[str, Any]:
-    require(workspace.exists() and workspace.is_dir(), f"workspace does not exist: {workspace}")
+def command_record(workspace: Path, book_root: Path | None, book: str | None, input_path: Path) -> dict[str, Any]:
+    require_workspace(workspace)
     event = normalize_record_event(read_json(input_path))
-    path = state_path(workspace)
-    state = validate_state(read_json(path)) if path.exists() else empty_state()
+    store = resolve_target_store(operation_store_kind(event["operation"], "event.operation"), workspace, book_root, book)
+    state = load_state(store)
+    if state is None:
+        state = empty_state(store.book)
     transaction_id = f"record:{event['event_id']}"
     applied = state["applied_transactions"].get(transaction_id)
     expected_revision = applied["revision"] - 1 if applied is not None else state["state_revision"]
@@ -900,12 +1254,13 @@ def command_record(workspace: Path, input_path: Path) -> dict[str, Any]:
         "operations": [event["operation"]],
     }
     digest = transaction_digest(transaction)
-    updated, summaries = apply_transaction(state, transaction, digest)
+    updated, summaries = apply_transaction(state, transaction, digest, store=store)
     replayed = updated is state
-    write_snapshot(workspace, updated)
+    write_snapshot(store, updated)
     record = updated["applied_transactions"][transaction_id]
     item_ids = record["item_ids"]
     receipt = f"Author Memory Receipt: r{record['revision']} · {', '.join(item_ids)}"
+    project_state, book_state = visible_states(store, updated, workspace, book_root, book)
     return {
         "ok": True,
         "command": "record",
@@ -916,85 +1271,212 @@ def command_record(workspace: Path, input_path: Path) -> dict[str, Any]:
         "item_ids": item_ids,
         "receipt": receipt,
         "summaries": summaries,
-        "warnings": query_budget_warnings(updated),
+        "warnings": query_budget_warnings(project_state, book_state),
+        **store_fields(store),
     }
-
-
-def same_scope_value(item_value: str | None, requested: str | None) -> bool:
-    return requested is not None and item_value is not None and item_value.casefold() == requested.casefold()
 
 
 def command_query(
     workspace: Path,
+    book_root: Path | None,
     kinds: list[str] | None,
     book: str | None,
     genre: str | None,
     workflow: str | None,
 ) -> dict[str, Any]:
-    require(workspace.exists() and workspace.is_dir(), f"workspace does not exist: {workspace}")
+    require_workspace(workspace)
     require(
         bool(kinds),
         "query 必须显式传 --kind（按 references/author-memory.md 的任务映射表选类型），不再默认返回全部类型",
     )
-    path = state_path(workspace)
-    if not path.exists():
+    project_state = load_state(project_store(workspace))
+    book_state = load_state(book_store(book_root, book)) if book_root is not None else None
+    if project_state is None and book_state is None:
         return {"ok": True, "command": "query", "initialized": False, "revision": 0, "items": [], "omitted": 0, "omitted_ids": []}
-    state = validate_state(read_json(path))
-    requested_kinds = set(kinds)
     requested_scopes = {
-        "book": optional_text(book, "query.book", max_bytes=180),
         "genre": optional_text(genre, "query.genre", max_bytes=180),
         "workflow": optional_text(workflow, "query.workflow", max_bytes=180),
     }
-
-    def relevant(item: dict[str, Any]) -> bool:
-        if item["status"] != "active" or item["kind"] not in requested_kinds:
-            return False
-        level = item["scope"]["level"]
-        return level == "global" or same_scope_value(item["scope"]["value"], requested_scopes[level])
-
-    candidates = sorted(
-        (item for item in state["items"].values() if relevant(item)),
-        key=query_sort_key,
-    )
     # 装不下的**跳过而不中断**（一条长的不挡后面的短条），漏下的 ID 报进
     # omitted_ids：非空＝记忆超编该整理了，不是「没有更多了」。写入端的
-    # warnings 提醒与这里同一套装填逻辑（fit_items），估算即实况。
-    result, _ = fit_items(candidates, state["state_revision"])
+    # warnings 与这里共用 build_query_result 同一个信封，估算即实况。
+    result, _ = merged_query(project_state, book_state, set(kinds), requested_scopes)
     require(len((json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8")) <= QUERY_MAX_BYTES, "query result exceeds its fixed byte budget")
     return result
 
 
-def command_check(workspace: Path) -> dict[str, Any]:
-    path = state_path(workspace)
-    require(path.exists(), "author memory is not initialized")
-    state = validate_state(read_json(path))
+def check_store(store: Store) -> dict[str, Any]:
+    state = load_state(store)
+    require(state is not None, f"{store.label} author memory is not initialized")
     views = render_views(state)
-    root = memory_root(workspace)
     for name, expected in views.items():
-        view_path = root / name
+        view_path = store.root / name
         require(view_path.exists(), f"missing derived view: {view_path}")
         require(view_path.read_text(encoding="utf-8") == expected, f"derived view is stale or edited: {view_path}")
     counts = {status: sum(1 for item in state["items"].values() if item["status"] == status) for status in STATUSES}
-    return {"ok": True, "command": "check", "revision": state["state_revision"], "counts": counts}
+    return {"revision": state["state_revision"], "counts": counts}
+
+
+def command_check(workspace: Path, book_root: Path | None, book: str | None) -> dict[str, Any]:
+    require_workspace(workspace)
+    project = project_store(workspace)
+    result: dict[str, Any] = {"ok": True, "command": "check"}
+    if book_root is not None:
+        store = book_store(book_root, book)
+        result["book"] = {"name": store.book, "root": str(store.root), **check_store(store)}
+        if project.state_path.exists():
+            result["project"] = {"root": str(project.root), **check_store(project)}
+    else:
+        result["project"] = {"root": str(project.root), **check_store(project)}
+    # 兼容旧调用：顶层 revision / counts 指项目级 store。
+    primary = result.get("project") or result["book"]
+    result["revision"] = primary["revision"]
+    result["counts"] = primary["counts"]
+    return result
+
+
+MIGRATE_PREFIX = "migrate:"
+
+
+def migration_digest(item: dict[str, Any]) -> str:
+    """迁移事务的摘要只看条目不可变的身份：编号、类型、范围、断言。证据会随强化
+    增长、状态会随 decide/forget 变化，它们若进摘要，中途失败后作者动过条目就会
+    永远「already used with different content」。"""
+    return transaction_digest({"id": item["id"], "kind": item["kind"], "scope": item["scope"], "assertion": item["assertion"]})
+
+
+def migrated_item(source: dict[str, Any], new_id: str, revision: int, id_map: dict[str, str]) -> dict[str, Any]:
+    """把项目级的存量 book 条目原样搬进书级 store：断言、证据、确认次数、重要度
+    全部保留，只换编号与修订。冲突对象只保留同书已迁移的（重映射为 BP），
+    引用全局条目的冲突关系不再成立——本书例外按优先级覆盖全局，不算冲突——
+    对象清空的候选退回 pending。"""
+    item = copy.deepcopy(source)
+    item["id"] = new_id
+    item["created_revision"] = revision
+    item["updated_revision"] = revision
+    item["superseded_by"] = None
+    item["conflicts_with"] = [id_map[old] for old in source["conflicts_with"] if old in id_map]
+    if item["status"] == "conflict" and not item["conflicts_with"]:
+        item["status"] = "pending"
+    return item
+
+
+def migration_records(state: dict[str, Any]) -> dict[str, str]:
+    """书级 store 里「源 AP 编号 → 已建 BP 编号」；每个源条目一笔 migrate:APxxx 事务。"""
+    records: dict[str, str] = {}
+    for transaction_id, record in state["applied_transactions"].items():
+        if transaction_id.startswith(MIGRATE_PREFIX) and is_item_id(transaction_id[len(MIGRATE_PREFIX):]):
+            records[transaction_id[len(MIGRATE_PREFIX):]] = record["item_ids"][0]
+    return records
+
+
+def apply_single(state: dict[str, Any], transaction_id: str, digest: str, mutate, summaries: list[str], *, store: Store) -> dict[str, Any]:
+    updated = copy.deepcopy(state)
+    mutate(updated, updated["state_revision"] + 1)
+    return seal_transaction(updated, transaction_id, digest, summaries, store=store)
+
+
+def command_migrate(workspace: Path, book_root: Path | None, book: str | None) -> dict[str, Any]:
+    """把项目级 store 里某本书的存量 book 条目搬进该书目录的书级 store。
+
+    书级每个源条目一笔事务（migrate:APxxx，摘要只看不可变字段），所以每个源条目
+    至多迁一次，与本次批次里还有哪些条目无关、源条目状态怎么变都不会锁死；项目级
+    随后一笔事务把这批源条目标 superseded 并注明去向。先写书级再写项目级，中途
+    失败直接重跑：书级已有记录的直接复用编号，只补项目级。
+    """
+    require_workspace(workspace)
+    require(book_root is not None, "migrate 须传 --book-root {书目录}：书名到书目录的映射由调用方给出")
+    project = project_store(workspace)
+    store = book_store(book_root, book)
+    assert store.book is not None
+    project_state = load_state(project)
+    book_state = load_state(store)
+
+    def result(migrated: list[dict[str, str]]) -> dict[str, Any]:
+        return {
+            "ok": True,
+            "command": "migrate",
+            "migrated": migrated,
+            "project_revision": project_state["state_revision"] if project_state is not None else 0,
+            "revision": book_state["state_revision"] if book_state is not None else 0,
+            "warnings": query_budget_warnings(project_state, book_state),
+            **store_fields(store),
+        }
+
+    if project_state is None:
+        return result([])
+    legacy = sorted(
+        (item for item in legacy_book_items(project_state) if same_scope_value(item["scope"]["value"], store.book)),
+        key=lambda item: id_number(item["id"]),
+    )
+    if book_state is None:
+        if not legacy:
+            return result([])
+        book_state = empty_state(store.book)
+    id_map = migration_records(book_state)
+
+    # 1) 书级：还没迁的源条目各建一条 BP；已迁的复用编号。
+    for item in legacy:
+        if item["id"] in id_map:
+            continue
+        transaction_id = f"{MIGRATE_PREFIX}{item['id']}"
+        new_id = f"{STORE_PREFIX['book']}{book_state['next_item_number']:03d}"
+
+        preview = migrated_item(item, new_id, 1, id_map)
+
+        def create(updated: dict[str, Any], revision: int, source=item, new_id=new_id) -> None:
+            updated["next_item_number"] += 1
+            updated["items"][new_id] = migrated_item(source, new_id, revision, id_map)
+
+        book_state = apply_single(
+            book_state, transaction_id, migration_digest(item), create,
+            [f"迁移 {item['id']} → {new_id}（{preview['status']}）：{item['assertion']}"],
+            store=store,
+        )
+        id_map[item["id"]] = new_id
+    # 幂等重跑也重写快照，修复缺失或过期的派生视图。
+    write_snapshot(store, book_state)
+
+    # 2) 项目级：这批源条目标 superseded 并注明去向。
+    migrated = [{"from": item["id"], "to": id_map[item["id"]]} for item in legacy]
+    if legacy:
+        transaction_id = f"{MIGRATE_PREFIX}{store.book.casefold()}:r{project_state['state_revision'] + 1}"
+        digest = transaction_digest({"transaction_id": transaction_id, "migrated": migrated})
+
+        def move_out(updated: dict[str, Any], revision: int) -> None:
+            for item in legacy:
+                target = updated["items"][item["id"]]
+                target["status"] = "superseded"
+                target["superseded_by"] = None
+                target["conflicts_with"] = []
+                target["reason"] = f"已迁移到书级 store「{store.book}」：{id_map[item['id']]}"
+                target["updated_revision"] = revision
+            release_conflicts(updated, set(id_map), revision)
+
+        summaries = [f"迁出 {pair['from']} → {pair['to']}：{project_state['items'][pair['from']]['assertion']}" for pair in migrated]
+        project_state = apply_single(project_state, transaction_id, digest, move_out, summaries, store=project)
+        write_snapshot(project, project_state)
+    return result(migrated)
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
-    for command in ("init", "check"):
-        child = subparsers.add_parser(command)
+
+    def add_location(child: argparse.ArgumentParser) -> None:
         child.add_argument("--workspace", required=True, type=Path)
-    commit = subparsers.add_parser("commit")
-    commit.add_argument("--workspace", required=True, type=Path)
-    commit.add_argument("--input", required=True, type=Path)
-    record = subparsers.add_parser("record")
-    record.add_argument("--workspace", required=True, type=Path)
-    record.add_argument("--input", required=True, type=Path)
+        child.add_argument("--book-root", type=Path, help="书目录；书级条目（scope.level=book / BP 编号）的落点")
+        child.add_argument("--book", help="书名；传了 --book-root 时默认取 store 记录的书名或目录名")
+
+    for command in ("init", "check", "migrate"):
+        add_location(subparsers.add_parser(command))
+    for command in ("commit", "record"):
+        child = subparsers.add_parser(command)
+        add_location(child)
+        child.add_argument("--input", required=True, type=Path)
     query = subparsers.add_parser("query")
-    query.add_argument("--workspace", required=True, type=Path)
+    add_location(query)
     query.add_argument("--kind", action="append", choices=KINDS)
-    query.add_argument("--book")
     query.add_argument("--genre")
     query.add_argument("--workflow")
     return parser
@@ -1004,15 +1486,17 @@ def main() -> int:
     args = build_parser().parse_args()
     try:
         if args.command == "init":
-            result = command_init(args.workspace)
+            result = command_init(args.workspace, args.book_root, args.book)
         elif args.command == "commit":
-            result = command_commit(args.workspace, args.input)
+            result = command_commit(args.workspace, args.book_root, args.book, args.input)
         elif args.command == "record":
-            result = command_record(args.workspace, args.input)
+            result = command_record(args.workspace, args.book_root, args.book, args.input)
         elif args.command == "query":
-            result = command_query(args.workspace, args.kind, args.book, args.genre, args.workflow)
+            result = command_query(args.workspace, args.book_root, args.kind, args.book, args.genre, args.workflow)
+        elif args.command == "migrate":
+            result = command_migrate(args.workspace, args.book_root, args.book)
         else:
-            result = command_check(args.workspace)
+            result = command_check(args.workspace, args.book_root, args.book)
         emit(result)
         return 0
     except AuthorMemoryError as exc:
