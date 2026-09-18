@@ -33,7 +33,7 @@
   <a href="https://github.com/zenstory-ai/oh-story-claudecode/discussions"><img alt="GitHub Discussions" src="https://img.shields.io/badge/GitHub%20Discussions-181717?style=for-the-badge&logo=github&logoColor=white"></a>
 </p>
 
-<video src="https://github.com/user-attachments/assets/3ced907e-0055-4654-bc55-d30609dda53d" controls muted playsinline width="100%"></video>
+<video src="https://github.com/user-attachments/assets/c0beaa2f-7488-4231-becd-07b737057b0f" controls muted playsinline width="100%"></video>
 
 ## What it is
 
@@ -209,7 +209,7 @@ The same scene as it stands in chapter 21 scans **zero findings, exit 0**.
 Both passages are nearly the same length; the difference is that the first tells the reader what to
 feel, and the second hands the same beat to visible action and objects.
 
-Full comparison and all 9 findings: **[demo/去AI味对照/](demo/去AI味对照/README_EN.md)**
+Full comparison and all 8 findings: **[demo/去AI味对照/](demo/去AI味对照/README_EN.md)**
 
 ### Local workbench and covers
 
