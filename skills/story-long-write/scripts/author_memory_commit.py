@@ -29,14 +29,18 @@ PROFILE_MAX_BYTES = 12288
 PENDING_MAX_BYTES = 12288
 JOURNAL_MAX_BYTES = 24576
 QUERY_MAX_BYTES = 2048
+ASSERTION_MAX_BYTES = 120  # 断言限一句话；解释进 reason（不进 query 载荷）。存量校验仍按 768 兼容。
+OMITTED_IDS_MAX = 20  # omitted_ids 封顶，omitted 保留真实总数——漏项列表不许把载荷本身挤炸。
 
-# 写入即限载：query 的输出是要原样贴进执行 agent prompt 的注入载荷，
-# QUERY_MAX_BYTES 是低优先级偏好在 prompt 里的注意力预算，不该放大。
-# 防「作者以为载入了、实际被静默截断挤掉」的唯一可靠位置在写入端——
-# 下列任务组合（与 references/author-memory.md 的映射表同包跟版）在
-# 最坏查询情形下都必须装进 QUERY_MAX_BYTES，超限拒绝写入，先精简/
-# 合并/退役旧条目。最坏情形＝全局条目＋各 scope 维度上最重的单一切片
-# （一次查询只带一个 book/genre/workflow，不同书的条目不会同现）。
+# query 的输出是要原样贴进执行 agent prompt 的注入载荷，QUERY_MAX_BYTES
+# 是它在 prompt 里的注意力预算，不该放大。防「作者以为载入了、实际被静默
+# 截断挤掉」靠三层：①断言限 ASSERTION_MAX_BYTES，从源头短；②写入端按下列
+# 任务组合（与 references/author-memory.md 的映射表同包跟版）估算最坏查询
+# 情形——全局条目＋各 scope 维度上最重的单一切片（一次查询只带一个
+# book/genre/workflow，不同书的条目不会同现），装不下时在返回的 warnings
+# 里点名将被略过的条目、指向「整理作者记忆」，写入本身永不因预算失败；
+# ③查询按 本书例外→重要度→最近更新 排序装填，被略过的恒是较旧且重要度
+# 较低的条目，漏下的 ID 报进 omitted_ids。
 QUERY_COMBOS: dict[str, tuple[str, ...]] = {
     "正文初稿/续写": ("prose_style", "story_design"),
     "去AI味/改写": ("prose_style",),
@@ -338,7 +342,8 @@ def normalize_preference(value: object, label: str, *, allow_status: bool) -> di
     return {
         "kind": choice(preference.get("kind"), KINDS, f"{label}.kind"),
         "scope": normalize_scope(preference.get("scope"), f"{label}.scope"),
-        "assertion": clean_text(preference.get("assertion"), f"{label}.assertion", max_bytes=768),
+        # 写入端限一句话；normalize_item（存量校验）仍按 768 兼容老库。
+        "assertion": clean_text(preference.get("assertion"), f"{label}.assertion", max_bytes=ASSERTION_MAX_BYTES),
         "quote": clean_text(preference.get("quote"), f"{label}.quote", max_bytes=768),
         "source_ref": optional_text(preference.get("source_ref"), f"{label}.source_ref", max_bytes=240),
         "source": source,
@@ -704,30 +709,67 @@ def command_init(workspace: Path) -> dict[str, Any]:
     return {"ok": True, "command": "init", "revision": state["state_revision"], "root": str(memory_root(workspace))}
 
 
-def query_envelope_bytes(items: list[dict[str, Any]], revision: int) -> int:
-    """按 command_query 同款 JSON 信封计算字节——校验与真实输出必须同一把尺。"""
-    result = {
+def compact_item(item: dict[str, Any]) -> dict[str, Any]:
+    """query 载荷只带这四个字段——估算与真实输出必须同一把尺。"""
+    return {"id": item["id"], "kind": item["kind"], "scope": item["scope"], "assertion": item["assertion"]}
+
+
+def compact_bytes(item: dict[str, Any]) -> int:
+    return len(json.dumps(compact_item(item), ensure_ascii=False).encode("utf-8"))
+
+
+SCOPE_RANK = {"book": 0, "genre": 1, "workflow": 2, "global": 3}
+
+
+def query_sort_key(item: dict[str, Any]) -> tuple[int, int, int, int, int]:
+    """本书例外→重要度→最近更新→确认次数→编号。装填按此序，被略过的恒是
+    排尾的旧冷条目，作者不会觉得意外。"""
+    return (
+        SCOPE_RANK[item["scope"]["level"]],
+        -RANK[item["importance"]],
+        -item["updated_revision"],
+        -item["confirmation_count"],
+        int(item["id"][2:]),
+    )
+
+
+def fit_items(sorted_items: list[dict[str, Any]], revision: int) -> tuple[dict[str, Any], list[str]]:
+    """按 query 输出信封把条目装进 QUERY_MAX_BYTES：装不下的跳过而不中断
+    （一条长的不挡后面的短条），漏下的 ID 报进 omitted_ids（封顶
+    OMITTED_IDS_MAX 条，omitted 保留真实总数）。返回 (结果文档, 全部漏下 ID)。"""
+    result: dict[str, Any] = {
         "ok": True,
         "command": "query",
         "initialized": True,
         "revision": revision,
-        "items": [
-            {"id": i["id"], "kind": i["kind"], "scope": i["scope"], "assertion": i["assertion"]}
-            for i in items
-        ],
+        "items": [],
         "omitted": 0,
         "omitted_ids": [],
     }
-    return len((json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8"))
+    omitted: list[str] = []
+
+    def envelope_bytes() -> int:
+        result["omitted"] = len(omitted)
+        result["omitted_ids"] = omitted[:OMITTED_IDS_MAX]
+        return len((json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8"))
+
+    for item in sorted_items:
+        result["items"].append(compact_item(item))
+        if envelope_bytes() > QUERY_MAX_BYTES:
+            result["items"].pop()
+            omitted.append(item["id"])
+    # omitted 计数落定后包可能恰好贴边超出一两个字节，回吐条目直到装下。
+    while result["items"] and envelope_bytes() > QUERY_MAX_BYTES:
+        omitted.append(result["items"].pop()["id"])
+    envelope_bytes()
+    return result, omitted
 
 
-def enforce_query_budgets(state: dict[str, Any]) -> None:
-    """每个任务组合在最坏查询情形下必须装进 QUERY_MAX_BYTES，否则拒绝写入。
-
-    query 侧的截断只是最后的保险丝；真到那一步，作者以为载入的记忆已经静默
-    失效。所以闸门设在这里：写不进去就先盘点——精简判据句、合并同义条、退役
-    过时条。init/幂等重放不查（老库越限时仍可修复视图、可做减量盘点）。
-    """
+def query_budget_warnings(state: dict[str, Any]) -> list[str]:
+    """写入回执的预算提醒：每个任务组合按最坏查询情形试装——全局条目＋各
+    scope 维度最重的单一切片（切片轻重按 compact 字节算，与真实输出同一把
+    尺），装不下的点名。写入永不因预算失败；提醒指向「整理作者记忆」。"""
+    warnings: list[str] = []
     for task, kinds in QUERY_COMBOS.items():
         pool = [i for i in state["items"].values() if i["status"] == "active" and i["kind"] in kinds]
         worst = [i for i in pool if i["scope"]["level"] == "global"]
@@ -737,21 +779,16 @@ def enforce_query_budgets(state: dict[str, Any]) -> None:
                 if i["scope"]["level"] == level:
                     slices.setdefault(i["scope"]["value"] or "", []).append(i)
             if slices:
-                worst.extend(max(
-                    slices.values(),
-                    key=lambda items: sum(len(json.dumps(i, ensure_ascii=False).encode("utf-8")) for i in items),
-                ))
-        size = query_envelope_bytes(worst, state["state_revision"])
-        if size <= QUERY_MAX_BYTES:
-            continue
-        heaviest = sorted(worst, key=lambda i: -len(i["assertion"].encode("utf-8")))[:6]
-        detail = "；".join(f"{i['id']}({len(i['assertion'].encode('utf-8'))}B)" for i in heaviest)
-        require(
-            False,
-            f"「{task}」组合最坏查询 {size} 字节，超出注入预算 {QUERY_MAX_BYTES}——"
-            f"query 将静默截断，记忆看似载入实则失效。先精简/合并/退役旧条目再写入。"
-            f"该组合最重条目：{detail}",
-        )
+                worst.extend(max(slices.values(), key=lambda items: sum(map(compact_bytes, items))))
+        worst.sort(key=query_sort_key)
+        _, omitted = fit_items(worst, state["state_revision"])
+        if omitted:
+            shown = ", ".join(omitted[:6]) + (" 等" if len(omitted) > 6 else "")
+            warnings.append(
+                f"「{task}」最坏查询将略过 {len(omitted)} 条（{shown}，较旧且重要度较低）——"
+                f"超出 {QUERY_MAX_BYTES} 字节注入预算。说「整理作者记忆」可合并或退役旧条目。"
+            )
+    return warnings
 
 
 def command_commit(workspace: Path, input_path: Path) -> dict[str, Any]:
@@ -762,7 +799,6 @@ def command_commit(workspace: Path, input_path: Path) -> dict[str, Any]:
     updated, summaries = apply_transaction(state, transaction, digest)
     replayed = updated is state
     if not replayed:
-        enforce_query_budgets(updated)
         write_snapshot(workspace, updated)
     else:
         # Repair missing or stale views during an idempotent retry.
@@ -775,6 +811,7 @@ def command_commit(workspace: Path, input_path: Path) -> dict[str, Any]:
         "replayed": replayed,
         "item_ids": updated["applied_transactions"][transaction["transaction_id"]]["item_ids"],
         "summaries": summaries,
+        "warnings": query_budget_warnings(updated),
     }
 
 
@@ -795,8 +832,6 @@ def command_record(workspace: Path, input_path: Path) -> dict[str, Any]:
     digest = transaction_digest(transaction)
     updated, summaries = apply_transaction(state, transaction, digest)
     replayed = updated is state
-    if not replayed:
-        enforce_query_budgets(updated)
     write_snapshot(workspace, updated)
     record = updated["applied_transactions"][transaction_id]
     item_ids = record["item_ids"]
@@ -811,6 +846,7 @@ def command_record(workspace: Path, input_path: Path) -> dict[str, Any]:
         "item_ids": item_ids,
         "receipt": receipt,
         "summaries": summaries,
+        "warnings": query_budget_warnings(updated),
     }
 
 
@@ -826,11 +862,15 @@ def command_query(
     workflow: str | None,
 ) -> dict[str, Any]:
     require(workspace.exists() and workspace.is_dir(), f"workspace does not exist: {workspace}")
+    require(
+        bool(kinds),
+        "query 必须显式传 --kind（按 references/author-memory.md 的任务映射表选类型），不再默认返回全部类型",
+    )
     path = state_path(workspace)
     if not path.exists():
         return {"ok": True, "command": "query", "initialized": False, "revision": 0, "items": [], "omitted": 0, "omitted_ids": []}
     state = validate_state(read_json(path))
-    requested_kinds = set(kinds or KINDS)
+    requested_kinds = set(kinds)
     requested_scopes = {
         "book": optional_text(book, "query.book", max_bytes=180),
         "genre": optional_text(genre, "query.genre", max_bytes=180),
@@ -843,46 +883,14 @@ def command_query(
         level = item["scope"]["level"]
         return level == "global" or same_scope_value(item["scope"]["value"], requested_scopes[level])
 
-    scope_rank = {"book": 0, "genre": 1, "workflow": 2, "global": 3}
     candidates = sorted(
         (item for item in state["items"].values() if relevant(item)),
-        key=lambda item: (
-            scope_rank[item["scope"]["level"]],
-            -RANK[item["importance"]],
-            -item["confirmation_count"],
-            int(item["id"][2:]),
-        ),
+        key=query_sort_key,
     )
-    result: dict[str, Any] = {
-        "ok": True,
-        "command": "query",
-        "initialized": True,
-        "revision": state["state_revision"],
-        "items": [],
-        "omitted": 0,
-        "omitted_ids": [],
-    }
-    # 写入即限载（enforce_query_budgets）保证这里恒装得下；截断分支只是老库
-    # 未盘点时的过渡保险丝——装不下的**跳过而不中断**（一条长的不挡后面的短
-    # 条），漏下的 ID 逐个报进 omitted_ids：非空＝记忆超编该盘点了，不是
-    # 「没有更多了」。
-    for item in candidates:
-        compact = {
-            "id": item["id"],
-            "kind": item["kind"],
-            "scope": item["scope"],
-            "assertion": item["assertion"],
-        }
-        result["items"].append(compact)
-        payload = json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n"
-        if len(payload.encode("utf-8")) > QUERY_MAX_BYTES:
-            result["items"].pop()
-            result["omitted_ids"].append(item["id"])
-    # omitted 计数落定后包可能恰好贴边超出一两个字节，回吐条目直到装下。
-    result["omitted"] = len(result["omitted_ids"])
-    while result["items"] and len((json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8")) > QUERY_MAX_BYTES:
-        result["omitted_ids"].append(result["items"].pop()["id"])
-        result["omitted"] = len(result["omitted_ids"])
+    # 装不下的**跳过而不中断**（一条长的不挡后面的短条），漏下的 ID 报进
+    # omitted_ids：非空＝记忆超编该整理了，不是「没有更多了」。写入端的
+    # warnings 提醒与这里同一套装填逻辑（fit_items），估算即实况。
+    result, _ = fit_items(candidates, state["state_revision"])
     require(len((json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8")) <= QUERY_MAX_BYTES, "query result exceeds its fixed byte budget")
     return result
 

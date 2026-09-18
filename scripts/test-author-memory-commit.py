@@ -369,7 +369,7 @@ def main() -> None:
         auto_result = json.loads(record(auto_workspace, input_path, auto_event).stdout)
         assert auto_result["receipt"] == "Author Memory Receipt: r1 · AP001"
         assert state(auto_workspace)["state_revision"] == 1
-        # 写入即限载：装得下的一组照常入库
+        # 预算内的一组照常入库，回执不带提醒
         fitting = transaction(
             "tx-query-budget-fit",
             1,
@@ -393,7 +393,7 @@ def main() -> None:
                 ),
             }],
         )
-        commit(auto_workspace, input_path, fitting)
+        assert json.loads(commit(auto_workspace, input_path, fitting).stdout)["warnings"] == []
         fit_query = json.loads(run("query", "--workspace", str(auto_workspace), "--kind", "prose_style").stdout)
         assert fit_query["omitted_ids"] == []
         matching_design = json.loads(run(
@@ -407,39 +407,130 @@ def main() -> None:
         ).stdout)["items"] == []
         run("check", "--workspace", str(auto_workspace))
 
-        # 会把「正文初稿/续写」组合撑破 2048 的事务必须被拒绝，state 不动
+        # 断言限一句话：写入端超 120 字节直接拒；存量校验仍按 768 兼容（见下方直改 state 的用例）
+        long_assertion = transaction(
+            "tx-assertion-too-long",
+            state(auto_workspace)["state_revision"],
+            [{"action": "remember", "preference": preference("长" * 45, "太长的断言应当拆条。")}],
+        )
+        error = commit(auto_workspace, input_path, long_assertion, expect=2)
+        assert "exceeds 120 bytes" in error.stderr
+
+        # 提醒制：把「正文初稿/续写」组合撑到超编的写入照常成功，回执带 warnings
         before_revision = state(auto_workspace)["state_revision"]
-        overflowing = transaction(
-            "tx-query-budget-overflow",
+        crowding = transaction(
+            "tx-query-budget-crowding",
             before_revision,
             [
                 {
                     "action": "remember",
                     "preference": preference(
-                        f"长偏好 {index}：" + "用具体动作和物件承载信息" * 18,
-                        f"第 {index} 条用于验证写入即限载。",
+                        f"长偏好{index}：先给动作再给判断，段尾不落抒情句，比喻每场最多留一个。",
+                        f"第 {index} 条用于撑满注入预算。",
                     ),
                 }
-                for index in range(4)
+                for index in range(12)
             ],
         )
-        rejected = commit(auto_workspace, input_path, overflowing, expect=2)
-        assert "注入预算" in rejected.stderr, rejected.stderr
-        assert state(auto_workspace)["state_revision"] == before_revision
+        crowded = json.loads(commit(auto_workspace, input_path, crowding).stdout)
+        assert crowded["warnings"], "超编写入必须携带预算提醒"
+        assert any("整理作者记忆" in warning for warning in crowded["warnings"])
+        assert state(auto_workspace)["state_revision"] == before_revision + 1
 
-        # 老库过渡态（绕过工具直接充胀 state）：查询保险丝要响亮不静默——
-        # 预算内能装几条装几条，漏下的 ID 全部报进 omitted_ids
-        legacy_state = state(auto_workspace)
-        for item_id in ("AP001", "AP002", "AP003"):
-            legacy_state["items"][item_id]["assertion"] = "长" * 250
-        state_file = auto_workspace / ".story" / "作者记忆" / "_author-memory-state.json"
-        state_file.write_text(json.dumps(legacy_state, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-        fused = run("query", "--workspace", str(auto_workspace), "--kind", "prose_style")
-        assert len(fused.stdout.encode("utf-8")) <= 2048
-        fused_document = json.loads(fused.stdout)
-        assert fused_document["omitted_ids"], "老库超编必须报 omitted_ids"
-        assert fused_document["omitted"] == len(fused_document["omitted_ids"])
-        assert fused_document["items"], "跳过不中断——装得下的条目仍应返回"
+        # 减量清理：超编工作区逐条忘记必须照常成功（拒写制在这里会死锁）
+        cleanup_event = {
+            "schema_version": 1,
+            "event_id": "cleanup-step-1",
+            "operation": {
+                "action": "forget",
+                "item_id": crowded["item_ids"][0],
+                "quote": "这条先退役。",
+                "reason": "整理：逐条退役",
+            },
+        }
+        cleaned = json.loads(record(auto_workspace, input_path, cleanup_event).stdout)
+        assert cleaned["replayed"] is False
+        assert cleaned["warnings"], "仍超编时提醒应继续存在，但写入不失败"
+
+        # kind-less 查询直接报错，不再默认返回全部类型
+        kindless = run("query", "--workspace", str(auto_workspace), expect=2)
+        assert "--kind" in kindless.stderr
+
+        # 查询排序含 recency：同重要度下最近写入的条目排最前，被略过的是旧条目
+        recency_query = json.loads(run(
+            "query", "--workspace", str(auto_workspace), "--kind", "prose_style",
+        ).stdout)
+        assert len(recency_query["items"]) > 0
+        assert recency_query["items"][0]["id"] == crowded["item_ids"][1], "最近写入应排最前（首条已退役）"
+        assert recency_query["omitted_ids"], "超编查询必须报漏项"
+        assert recency_query["omitted"] == len(recency_query["omitted_ids"])
+
+        # 同一把尺＋跨书不合算：书甲引文重（写作时不读）、书乙断言多而重；
+        # 预算提醒必须按写作时真正读到的字段挑最重切片——旧尺子（按完整条目
+        # 字节）会挑中甲、漏掉乙的超编；两本书的条目也绝不加在一起算
+        ruler_workspace = Path(temporary) / "两书工作区"
+        ruler_workspace.mkdir()
+        heavy_quote = "甲书原话交代来龙去脉，" * 22
+        for index in range(3):
+            record(ruler_workspace, input_path, {
+                "schema_version": 1,
+                "event_id": f"book-a-{index}",
+                "operation": {"action": "remember", "preference": preference(
+                    f"甲书短偏好{index}", heavy_quote, scope_level="book", scope_value="甲",
+                )},
+            })
+        for index in range(4):
+            record(ruler_workspace, input_path, {
+                "schema_version": 1,
+                "event_id": f"global-{index}",
+                "operation": {"action": "remember", "preference": preference(
+                    f"全局偏好{index}：动词承重不用被动式，段尾不落抒情句，比喻每场只留一个。",
+                    f"第 {index} 条全局偏好。",
+                )},
+            })
+        last_b = None
+        for index in range(7):
+            last_b = json.loads(record(ruler_workspace, input_path, {
+                "schema_version": 1,
+                "event_id": f"book-b-{index}",
+                "operation": {"action": "remember", "preference": preference(
+                    f"乙书偏好{index}：情绪落在具体物件上，对话短句推进，收尾用动作不用感叹。",
+                    f"第 {index} 条乙书偏好。",
+                    scope_level="book",
+                    scope_value="乙",
+                )},
+            }).stdout)
+        assert any("正文初稿" in warning for warning in last_b["warnings"]), "书乙切片超编必须被点名"
+        book_a = json.loads(run(
+            "query", "--workspace", str(ruler_workspace),
+            "--kind", "prose_style", "--kind", "story_design", "--book", "甲",
+        ).stdout)
+        assert book_a["omitted_ids"] == [], "不同书的记忆不得加在一起算"
+        book_b = json.loads(run(
+            "query", "--workspace", str(ruler_workspace),
+            "--kind", "prose_style", "--kind", "story_design", "--book", "乙",
+        ).stdout)
+        assert book_b["omitted_ids"], "书乙自身切片超编必须体现在查询漏项"
+
+        # omitted_ids 封顶：极端超编（直改 state 模拟老库长断言）保留真实总数、
+        # 列表最多 20 条，载荷恒 ≤2048、绝不整包报错；768B 存量断言仍可校验通过
+        flood = state(ruler_workspace)
+        base_item = json.loads(json.dumps(flood["items"]["AP001"], ensure_ascii=False))
+        for number in range(100, 140):
+            clone = json.loads(json.dumps(base_item, ensure_ascii=False))
+            clone["id"] = f"AP{number}"
+            clone["assertion"] = f"直改状态的超长断言{number}：" + "长" * 200
+            clone["scope"] = {"level": "global", "value": None}
+            flood["items"][f"AP{number}"] = clone
+        flood["next_item_number"] = 200
+        state_file = ruler_workspace / ".story" / "作者记忆" / "_author-memory-state.json"
+        state_file.write_text(json.dumps(flood, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        flooded = run("query", "--workspace", str(ruler_workspace), "--kind", "prose_style")
+        assert len(flooded.stdout.encode("utf-8")) <= 2048
+        flooded_document = json.loads(flooded.stdout)
+        assert flooded_document["items"], "跳过不中断——装得下的条目仍应返回"
+        assert flooded_document["omitted"] > 20
+        assert len(flooded_document["omitted_ids"]) == 20
 
     injection_contracts = {
         REPO / "skills/story-long-write/references/workflow-chapter.md": (
@@ -456,6 +547,9 @@ def main() -> None:
         REPO / "skills/story-deslop/SKILL.md": (
             "query --kind prose_style",
             "作者偏好：{query 命中的 prose_style 项}",
+        ),
+        REPO / "skills/story-review/SKILL.md": (
+            "query --kind delivery --kind interaction --kind prose_style",
         ),
     }
     for path, required_fragments in injection_contracts.items():
