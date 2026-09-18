@@ -21,6 +21,10 @@ jobs:
         run: bash scripts/static-check.sh
       - name: Structured static-check regression
         run: python3 scripts/test-static-check.py
+      - name: Check agent decision notes
+        run: python3 scripts/check-agent-notes.py
+      - name: Agent decision notes regression
+        run: python3 scripts/test-agent-notes.py
       - name: Check workflow numbering
         run: python3 scripts/skill-numbering.py check
       - name: Workflow numbering regression

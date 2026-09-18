@@ -24,6 +24,7 @@
 | `check-hook-regex-sync.sh` | `detect-story-gaps.sh` 伏笔状态检测行为 | CI |
 | `check-hook-locale-safety.sh` | 部署 hook 在 Windows 中文 GBK 区域的字节安全 | CI |
 | `check-python-invocation.sh` | 技能文档禁止裸调 `python3`（须 python3→python→py 探测） | CI |
+| `check-agent-notes.py` + `test-agent-notes.py` | `.agents/notes/` 决策笔记的目录布局（状态/分类/日期文件名）、`Status` 与目录一致、必需小节（Problem / Decision 或 Proposal / Alternatives considered / Consequences）、禁止手工索引；test 用临时目录逐类违规回归 | CI；新增或移动笔记后 |
 | `check-plugin-packaging.py` | Claude/ZCode 两个 catalog 与两个原生 manifest 的单 bundle 身份、版本、默认组件发现和 13 个根 Skills | CI；改 plugin packaging 后 |
 | `check-claude-adapter.sh` | Claude marketplace、根 plugin manifest 与 13 个 skill 自动发现；可选真实 CLI 生命周期 | CI（静态）；`CLAUDE_REAL_CHECK=1`（真实 CLI） |
 | `check-opencode-adapter.sh` | OpenCode 适配层同步 + commands/agents/config 结构 + plugin 行为回归 | CI + sync CI（调 sync-opencode.py） |

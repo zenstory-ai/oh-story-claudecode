@@ -4,12 +4,12 @@
 
 ## 这个仓库是什么
 
-一个网文写作 skill 套件：13 个 skill（`skills/<name>/SKILL.md` + `references/`），加上面向 Claude Code、Codex、OpenCode、OpenClaw、Antigravity、ZCode、Reasonix 七个宿主的适配层。产品是写在 Markdown 里的写作方法与工作流契约，不是运行时程序。`scripts/` 下是仓库自己的守卫、测试和代码生成脚本（索引见 [scripts/README.md](scripts/README.md)），不是 skill 运行时脚本。
+一个网文写作 skill 套件：13 个 skill（`skills/<name>/SKILL.md` + `references/`），加上面向 Claude Code、Codex、OpenCode、OpenClaw、Antigravity、ZCode、Reasonix 七个编程 Agent（宿主）的适配层。产品是写在 Markdown 里的写作方法与工作流契约，不是运行时程序。`scripts/` 下是仓库自己的守卫、测试和代码生成脚本（索引见 [scripts/README.md](scripts/README.md)），不是 skill 运行时脚本。
 
 ## 改动前必须知道的规矩
 
 - **frontmatter 单行键值**：`description` 不用 `|`/`>` 块，`metadata` 是单行 JSON，OpenClaw 依赖这一点。
-- **不跨 skill 引用文件**：除基础组件 `browser-cdp` 外，一个 skill 的 SKILL.md / references 不得引用另一个 skill 的文件；共享内容走 `shared-references.json` / 共享资产清单登记。
+- **不跨 skill 引用文件**：除基础组件 `browser-cdp` 外，一个 skill 的 SKILL.md / references 不得引用另一个 skill 的文件；共享内容走 `scripts/shared-references.json` / `scripts/shared-assets.json` 登记。
 - **热路径有字数预算**：SKILL.md、references 和 agent 模板受 `scripts/doc-budget.json` 约束，加正文要么删等量旧文本，要么显式调高预算并说明。
 - **工作流编号是契约**：Step / Phase / Stage 编号与引用绑定由 `skill-numbering.py` 守卫，重排要跑它的级联而不是手改。
 - **改 agent 模板或 CLAUDE.md.tmpl 后必须重新生成适配层**（OpenCode、Codex、Antigravity 等）并提交生成结果，否则适配层 CI 红。
@@ -17,7 +17,7 @@
 - **改名或移动任一 `scripts/` 脚本**，要同步 `.github/workflows/*.yml`、CONTRIBUTING.md、scripts/README.md 和调用它的兄弟脚本。
 - 本文件不得出现 story-setup 用来识别已部署项目的标记文本（各端 AGENTS.md.tmpl 的标题行），否则在仓库根运行 story-setup 会把仓库误判为已部署项目。
 
-完整规则、各宿主适配维护步骤与提交流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+完整规则、各编程 Agent 适配维护步骤与提交流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 验证
 

@@ -49,6 +49,11 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 `references/` 中的文件由 skill 按需加载，不会全部塞进上下文。
 
+## 维护者指引与决策笔记
+
+- 仓库根的 [AGENTS.md](AGENTS.md) 是给维护本仓库的 coding agent 读的开发指引（改动前必知的硬规矩、验证入口、笔记规则）；`CLAUDE.md` 只有一行 `@AGENTS.md`，不维护第二份正文。它与 story-setup 部署到用户写作项目的 `AGENTS.md` / `CLAUDE.md` 无关。
+- 非平凡改动要在 `.agents/notes/{proposed,implemented,rejected}/{feature,bug-fix,simplification,architecture,process,testing}/yyyy-mm-dd-topic.md` 留一篇决策笔记（Problem / Decision 或 Proposal / Alternatives considered / Consequences），规则全文见 AGENTS.md「重要改动必须留笔记」；格式由 `scripts/check-agent-notes.py` 在 CI 守卫。检索：`rg --hidden <关键词> .agents/notes/`。
+
 ## 如何贡献
 
 ### 改进现有 skill
@@ -70,6 +75,7 @@ PR 自动运行 `.github/workflows/cross-platform.yml`。static-check job 跑以
 
 - `scripts/static-check.sh` — 结构化解析 frontmatter、精确 Markdown 路径/锚点、Agent 引用与 references 可达性；除基础组件 `browser-cdp` 外禁止跨 Skill 文件引用
 - `python3 scripts/skill-numbering.py check` — 工作流编号连续性、引用可绑定性及小数标签守卫
+- `python3 scripts/check-agent-notes.py` — `.agents/notes/` 决策笔记的目录布局、`Status` 与所在目录一致、必需小节；`python3 scripts/test-agent-notes.py` 为其行为回归
 - `scripts/check-current-skill-contracts.sh` — 按 `scripts/current-contract.json` 校验当前版本 / Phase / schema / 主产物 / 细纲契约，并拦截历史路径与静默兼容分支
 - `python3 scripts/test-current-skill-contracts.py` — current-contract manifest 与主产物 fail-fast 语义回归
 - `scripts/check-doc-budget.sh` — 热路径 SKILL/references/agent 模板的字数预算（按 `scripts/doc-budget.json`），防每次会话都要付的规则文本无声膨胀
@@ -101,6 +107,7 @@ PR 自动运行 `.github/workflows/cross-platform.yml`。static-check job 跑以
 ```bash
 bash scripts/static-check.sh
 python3 scripts/test-static-check.py
+python3 scripts/check-agent-notes.py
 python3 scripts/skill-numbering.py check
 bash scripts/test-skill-numbering.sh
 bash scripts/check-current-skill-contracts.sh
