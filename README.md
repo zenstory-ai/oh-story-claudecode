@@ -105,7 +105,7 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 章级检查   storyctl.py chapter check   字数 2068 / 目标 2300 · internal_pass
              ├ check-ai-patterns.js     0 命中
              ├ check-degeneration.js    0 命中
-             └ normalize-punctuation    0 命中（skill 读了 设定/文风.md，自行把本书的「……」登记进书级 .deslop-whitelist）
+             └ normalize-punctuation    0 命中
 追踪提交   storyctl.py chapter commit  tracking_committed=true · state_revision 0 → 1
 派生视图   tracking_commit.py check    上下文.md / 伏笔.md / 角色状态/ / 时间线/ / 逐章记录/ 全部由 state 重生成，逐字一致
 ```

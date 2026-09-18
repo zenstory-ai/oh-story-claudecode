@@ -113,7 +113,7 @@ Blueprint       细纲_第021章.md              tracking said "no blueprint for
 Chapter check   storyctl.py chapter check   2068 chars / target 2300 · internal_pass
                   ├ check-ai-patterns.js     0 hits
                   ├ check-degeneration.js    0 hits
-                  └ normalize-punctuation    0 hits (the skill read 设定/文风.md and registered this book's "……" in .deslop-whitelist by itself)
+                  └ normalize-punctuation    0 hits
 Tracking commit storyctl.py chapter commit  tracking_committed=true · state_revision 0 → 1
 Derived views   tracking_commit.py check    上下文.md / 伏笔.md / 角色状态/ / 时间线/ / 逐章记录/ all re-rendered from state, byte-identical
 ```
