@@ -29,6 +29,28 @@ PROFILE_MAX_BYTES = 12288
 PENDING_MAX_BYTES = 12288
 JOURNAL_MAX_BYTES = 24576
 QUERY_MAX_BYTES = 2048
+ASSERTION_MAX_BYTES = 120  # 新建条目的断言限一句话；解释进 reason（不进 query 载荷）。
+OMITTED_IDS_MAX = 20  # omitted_ids 封顶，omitted 保留真实总数——漏项列表不许把载荷本身挤炸。
+LEGACY_ASSERTION_MAX_BYTES = 768  # 存量条目的读取上限；强化老条目不受新上限约束。
+
+# query 的输出是要原样贴进执行 agent prompt 的注入载荷，QUERY_MAX_BYTES
+# 是它在 prompt 里的注意力预算，不该放大。防「作者以为载入了、实际被静默
+# 截断挤掉」靠三层：①新建条目的断言限 ASSERTION_MAX_BYTES，从源头短（强化
+# 已有条目不受限，否则存量长断言再也无法被确认，只会派生重复条目）；②写入
+# 端按下列任务组合（与 references/author-memory.md 的映射表同包跟版）估算
+# 最坏查询情形——全局条目＋各 scope 维度上最重的单一切片（一次查询只带一
+# 个 book/genre/workflow，不同书的条目不会同现；切片按 casefold 归并，与
+# same_scope_value 同一口径，轻重按 compact 字节＋列表分隔符算，与真实载荷
+# 同一把尺），装不下时在返回的 warnings 里点名将被略过的条目、指向「整理作
+# 者记忆」，写入本身永不因注入预算失败；③查询按 重要度→本书例外→最近更新
+# 排序装填，被略过的恒是重要度较低的条目，漏下的 ID 按同一优先级顺序报进
+# omitted_ids。
+QUERY_COMBOS: dict[str, tuple[str, ...]] = {
+    "正文初稿/续写": ("prose_style", "story_design"),
+    "去AI味/改写": ("prose_style",),
+    "设定/大纲": ("story_design", "workflow", "interaction"),
+    "审稿": ("delivery", "interaction", "prose_style"),
+}
 
 KINDS = ("prose_style", "story_design", "workflow", "delivery", "interaction")
 KIND_TITLES = {
@@ -324,7 +346,9 @@ def normalize_preference(value: object, label: str, *, allow_status: bool) -> di
     return {
         "kind": choice(preference.get("kind"), KINDS, f"{label}.kind"),
         "scope": normalize_scope(preference.get("scope"), f"{label}.scope"),
-        "assertion": clean_text(preference.get("assertion"), f"{label}.assertion", max_bytes=768),
+        # 这里按存量上限收；ASSERTION_MAX_BYTES 只在真正新建条目时校验
+        # （require_new_item_assertion），好让存量长断言仍能被强化。
+        "assertion": clean_text(preference.get("assertion"), f"{label}.assertion", max_bytes=LEGACY_ASSERTION_MAX_BYTES),
         "quote": clean_text(preference.get("quote"), f"{label}.quote", max_bytes=768),
         "source_ref": optional_text(preference.get("source_ref"), f"{label}.source_ref", max_bytes=240),
         "source": source,
@@ -411,7 +435,21 @@ def fingerprint(preference: dict[str, Any]) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
+def require_new_item_assertion(preference: dict[str, Any]) -> None:
+    """新建条目的断言限一句话。强化已有条目走不到这里——存量长断言必须还能
+    被确认，否则作者重申老偏好只会派生一条重复条目，库反而更挤。"""
+    size = len(preference["assertion"].encode("utf-8"))
+    require(
+        size <= ASSERTION_MAX_BYTES,
+        f"新条目的 assertion {size} 字节，超出 {ASSERTION_MAX_BYTES} 字节上限——"
+        f"断言限一句话，需要解释的背景写进 reason。若这是对已有条目的重申，"
+        f"原样使用该条目的 assertion 即可强化（不受本上限约束）；"
+        f"若确实是几条互不依赖的偏好，才拆成几条分别记录。",
+    )
+
+
 def allocate_item(state: dict[str, Any], preference: dict[str, Any], revision: int) -> dict[str, Any]:
+    require_new_item_assertion(preference)
     item_id = f"AP{state['next_item_number']:03d}"
     state["next_item_number"] += 1
     return {
@@ -607,7 +645,12 @@ def render_profile(state: dict[str, Any]) -> str:
             lines.extend(["- 暂无", ""])
             continue
         for item in items:
-            lines.append(f"- **{item['id']}**〔{scope_label(item['scope'])}｜{item['confidence']}｜确认 {item['confirmation_count']} 次〕{item['assertion']}")
+            # 必须显示 importance：它决定超编时谁留在 prompt 里，而「整理作者
+            # 记忆」只以本文件为输入——不显示就无从判断该退役哪条。
+            lines.append(
+                f"- **{item['id']}**〔{scope_label(item['scope'])}｜重要 {item['importance']}"
+                f"｜把握 {item['confidence']}｜确认 {item['confirmation_count']} 次〕{item['assertion']}"
+            )
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -690,6 +733,134 @@ def command_init(workspace: Path) -> dict[str, Any]:
     return {"ok": True, "command": "init", "revision": state["state_revision"], "root": str(memory_root(workspace))}
 
 
+def summarize_assertion(assertion: str, *, limit: int = 14) -> str:
+    return assertion if len(assertion) <= limit else assertion[:limit] + "…"
+
+
+def compact_item(item: dict[str, Any]) -> dict[str, Any]:
+    """query 载荷只带这四个字段——估算与真实输出必须同一把尺。"""
+    return {"id": item["id"], "kind": item["kind"], "scope": item["scope"], "assertion": item["assertion"]}
+
+
+def compact_bytes(item: dict[str, Any]) -> int:
+    return len(json.dumps(compact_item(item), ensure_ascii=False).encode("utf-8"))
+
+
+SCOPE_RANK = {"book": 0, "genre": 1, "workflow": 2, "global": 3}
+
+
+def query_sort_key(item: dict[str, Any]) -> tuple[int, int, int, int, int]:
+    """重要度→本书例外→最近更新→确认次数→编号。
+
+    重要度必须排在 scope 之前：超编时先丢的应当是不重要的条目，而不是「凡
+    全局一律先丢」。scope 在前会让任意数量的 low 本书琐事挤掉 high 的全局
+    铁律——那恰恰是作者最不愿意丢的那一类。同重要度之内才按本书例外优先。
+    """
+    return (
+        -RANK[item["importance"]],
+        SCOPE_RANK[item["scope"]["level"]],
+        -item["updated_revision"],
+        -item["confirmation_count"],
+        int(item["id"][2:]),
+    )
+
+
+def fit_items(sorted_items: list[dict[str, Any]], revision: int) -> tuple[dict[str, Any], list[str]]:
+    """按 query 输出信封把条目装进 QUERY_MAX_BYTES：装不下的跳过而不中断
+    （一条长的不挡后面的短条），漏下的 ID 报进 omitted_ids（封顶
+    OMITTED_IDS_MAX 条，omitted 保留真实总数）。返回 (结果文档, 全部漏下 ID)。
+
+    漏项恒按候选优先级排序，不按被丢弃的先后：收尾回吐的条目优先级高于循环
+    里跳过的，若按追加顺序排，omitted_ids 的封顶正好会把最该报的那条切掉。
+    """
+    result: dict[str, Any] = {
+        "ok": True,
+        "command": "query",
+        "initialized": True,
+        "revision": revision,
+        "items": [],
+        "omitted": 0,
+        "omitted_ids": [],
+    }
+    order = {item["id"]: index for index, item in enumerate(sorted_items)}
+    kept: list[dict[str, Any]] = []
+    dropped: set[str] = set()
+
+    def ordered_omitted() -> list[str]:
+        return sorted(dropped, key=order.__getitem__)
+
+    def envelope_bytes() -> int:
+        omitted = ordered_omitted()
+        result["items"] = [compact_item(item) for item in kept]
+        result["omitted"] = len(omitted)
+        result["omitted_ids"] = omitted[:OMITTED_IDS_MAX]
+        return len((json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8"))
+
+    for item in sorted_items:
+        kept.append(item)
+        if envelope_bytes() > QUERY_MAX_BYTES:
+            kept.pop()
+            dropped.add(item["id"])
+    # omitted 计数落定后包可能恰好贴边超出一两个字节，回吐条目直到装下。
+    while kept and envelope_bytes() > QUERY_MAX_BYTES:
+        dropped.add(kept.pop()["id"])
+    envelope_bytes()
+    return result, ordered_omitted()
+
+
+def slice_weight(items: list[dict[str, Any]]) -> int:
+    """切片在真实载荷里的占位：compact 字节＋每条在 JSON 数组里的分隔符。
+
+    只比 compact 字节会挑错切片——条目多、单条短的切片字节和更小，实际占位
+    却更大，于是估算判「装得下」而真实查询溢出（warnings 假阴性）。
+    """
+    return sum(compact_bytes(item) + 2 for item in items)
+
+
+def worst_case_items(state: dict[str, Any], kinds: tuple[str, ...]) -> list[dict[str, Any]]:
+    """某个任务组合的最坏查询候选：全局条目＋各 scope 维度上最重的单一切片。
+
+    一次查询只带一个 book/genre/workflow，不同书的条目不会同现，所以按切片
+    取最重而不是全加起来，多书工作区才不会被粗算误伤。切片按 casefold 归并，
+    与 same_scope_value 同一口径——否则只差大小写的同名书在这里算两个切片、
+    在真实查询里却合成一个，估算就成了下界。
+    """
+    pool = [i for i in state["items"].values() if i["status"] == "active" and i["kind"] in kinds]
+    worst = [i for i in pool if i["scope"]["level"] == "global"]
+    for level in ("book", "genre", "workflow"):
+        slices: dict[str, list[dict[str, Any]]] = {}
+        for i in pool:
+            if i["scope"]["level"] == level:
+                slices.setdefault((i["scope"]["value"] or "").casefold(), []).append(i)
+        if slices:
+            worst.extend(max(slices.values(), key=slice_weight))
+    worst.sort(key=query_sort_key)
+    return worst
+
+
+def query_budget_warnings(state: dict[str, Any]) -> list[str]:
+    """写入回执的预算提醒：每个任务组合按最坏查询情形试装，装不下的点名。
+
+    写入永不因注入预算失败；提醒指向「整理作者记忆」。点名带断言首句——只给
+    APxxx 编号的话，作者不打开 作者画像.md 就无从判断丢的是什么。
+    """
+    warnings: list[str] = []
+    for task, kinds in QUERY_COMBOS.items():
+        worst = worst_case_items(state, kinds)
+        _, omitted = fit_items(worst, state["state_revision"])
+        if not omitted:
+            continue
+        assertions = {i["id"]: i["assertion"] for i in worst}
+        shown = "；".join(f"{item_id}「{summarize_assertion(assertions[item_id])}」" for item_id in omitted[:3])
+        more = f" 等 {len(omitted)} 条" if len(omitted) > 3 else ""
+        warnings.append(
+            f"「{task}」最坏查询装不下 {len(omitted)} 条，它们不会进入 prompt："
+            f"{shown}{more}——超出 {QUERY_MAX_BYTES} 字节注入预算。"
+            f"说「整理作者记忆」可合并同义条、退役过时条。"
+        )
+    return warnings
+
+
 def command_commit(workspace: Path, input_path: Path) -> dict[str, Any]:
     require(state_path(workspace).exists(), "author memory is not initialized; run init first")
     state = validate_state(read_json(state_path(workspace)))
@@ -710,6 +881,7 @@ def command_commit(workspace: Path, input_path: Path) -> dict[str, Any]:
         "replayed": replayed,
         "item_ids": updated["applied_transactions"][transaction["transaction_id"]]["item_ids"],
         "summaries": summaries,
+        "warnings": query_budget_warnings(updated),
     }
 
 
@@ -744,6 +916,7 @@ def command_record(workspace: Path, input_path: Path) -> dict[str, Any]:
         "item_ids": item_ids,
         "receipt": receipt,
         "summaries": summaries,
+        "warnings": query_budget_warnings(updated),
     }
 
 
@@ -759,11 +932,15 @@ def command_query(
     workflow: str | None,
 ) -> dict[str, Any]:
     require(workspace.exists() and workspace.is_dir(), f"workspace does not exist: {workspace}")
+    require(
+        bool(kinds),
+        "query 必须显式传 --kind（按 references/author-memory.md 的任务映射表选类型），不再默认返回全部类型",
+    )
     path = state_path(workspace)
     if not path.exists():
-        return {"ok": True, "command": "query", "initialized": False, "revision": 0, "items": [], "omitted": 0}
+        return {"ok": True, "command": "query", "initialized": False, "revision": 0, "items": [], "omitted": 0, "omitted_ids": []}
     state = validate_state(read_json(path))
-    requested_kinds = set(kinds or KINDS)
+    requested_kinds = set(kinds)
     requested_scopes = {
         "book": optional_text(book, "query.book", max_bytes=180),
         "genre": optional_text(genre, "query.genre", max_bytes=180),
@@ -776,38 +953,14 @@ def command_query(
         level = item["scope"]["level"]
         return level == "global" or same_scope_value(item["scope"]["value"], requested_scopes[level])
 
-    scope_rank = {"book": 0, "genre": 1, "workflow": 2, "global": 3}
     candidates = sorted(
         (item for item in state["items"].values() if relevant(item)),
-        key=lambda item: (
-            scope_rank[item["scope"]["level"]],
-            -RANK[item["importance"]],
-            -item["confirmation_count"],
-            int(item["id"][2:]),
-        ),
+        key=query_sort_key,
     )
-    result: dict[str, Any] = {
-        "ok": True,
-        "command": "query",
-        "initialized": True,
-        "revision": state["state_revision"],
-        "items": [],
-        "omitted": len(candidates),
-    }
-    for item in candidates:
-        compact = {
-            "id": item["id"],
-            "kind": item["kind"],
-            "scope": item["scope"],
-            "assertion": item["assertion"],
-        }
-        result["items"].append(compact)
-        result["omitted"] = len(candidates) - len(result["items"])
-        payload = json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n"
-        if len(payload.encode("utf-8")) > QUERY_MAX_BYTES:
-            result["items"].pop()
-            result["omitted"] += 1
-            break
+    # 装不下的**跳过而不中断**（一条长的不挡后面的短条），漏下的 ID 报进
+    # omitted_ids：非空＝记忆超编该整理了，不是「没有更多了」。写入端的
+    # warnings 提醒与这里同一套装填逻辑（fit_items），估算即实况。
+    result, _ = fit_items(candidates, state["state_revision"])
     require(len((json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8")) <= QUERY_MAX_BYTES, "query result exceeds its fixed byte budget")
     return result
 
