@@ -1356,6 +1356,14 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
             "story-explorer must retrieve only active CBA cards",
         )
     )
+    findings.extend(
+        require_pattern(
+            repo_root / "skills/story-long-write/references/project-files.md",
+            r"Top 3[–-]8[^\n]*CBA[^\n]*不传 IA/NM",
+            "long-write-cba-budget",
+            "long writing must bound public inspiration retrieval to Top 3-8 CBA cards without IA/NM",
+        )
+    )
 
     # 三处消费方都必须明确取消逐点字数，避免旧 Σ 契约从任一部署面回流。
     for relative in OUTLINE_SEMANTIC_CAPACITY_CONSUMERS:
