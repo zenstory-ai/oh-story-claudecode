@@ -1312,6 +1312,51 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
         )
     )
 
+    # 三层灵感库管道：复用 EM 卡、裸 ID 引用、可选轴不阻塞——三条红线各有一个可机检锚点。
+    inspiration_library = repo_root / "skills/story-long-analyze/references/inspiration-library.md"
+    for pattern, code, message in (
+        (r"原子灵感", "inspiration-atom-layer", "inspiration library must define the atom layer"),
+        (r"单小说灵感合并", "inspiration-novel-merge-layer", "inspiration library must define the single-novel merge layer"),
+        (r"跨书灵感聚合", "inspiration-cross-book-layer", "inspiration library must define the cross-book aggregation layer"),
+        (r"只是索引行，没有文件", "inspiration-atom-is-index-row", "inspiration atoms must stay index rows without card files"),
+        (r"禁止在卡里堆路径链接|卡内无路径引用", "inspiration-no-path-in-card", "NM/CBA cards must reference sources by bare id, not paths"),
+        (r"单书拆文不自动入库", "inspiration-no-auto-ingest", "single-book analysis must not auto-ingest into the library"),
+    ):
+        findings.extend(require_pattern(inspiration_library, pattern, code, message))
+    findings.extend(
+        require_pattern(
+            repo_root / "skills/story-long-analyze/SKILL.md",
+            r"references/inspiration-library\.md",
+            "inspiration-pipeline-routed",
+            "story-long-analyze must route the optional inspiration pipeline",
+        )
+    )
+    long_write_recall = repo_root / "skills/story-long-write/references/benchmark-recall.md"
+    findings.extend(
+        require_pattern(
+            long_write_recall,
+            r"\(a0\)[^\n]*selected_inspiration_aggregates[^\n]*不阻塞",
+            "long-write-inspiration-optional-axis",
+            "long-write (a0) must stay an optional non-blocking inspiration axis",
+        )
+    )
+    findings.extend(
+        require_pattern(
+            repo_root / "skills/story-long-write/references/cross-book-recall.md",
+            r"layer=跨书灵感聚合[^\n]*status=active",
+            "cross-book-active-cba-only",
+            "inspiration recall must retrieve only active cross-book aggregation cards",
+        )
+    )
+    findings.extend(
+        require_pattern(
+            explorer_template,
+            r"layer=跨书灵感聚合[^\n]*status=active",
+            "explorer-cba-query",
+            "story-explorer must retrieve only active CBA cards",
+        )
+    )
+
     # 三处消费方都必须明确取消逐点字数，避免旧 Σ 契约从任一部署面回流。
     for relative in OUTLINE_SEMANTIC_CAPACITY_CONSUMERS:
         findings.extend(

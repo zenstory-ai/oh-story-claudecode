@@ -177,8 +177,8 @@
     },
     {
       "path": "skills/story-long-write/references/benchmark-recall.md",
-      "budget": 2900,
-      "why": "每章写前读取；原 workflow-chapter 的召回条件与 (a)-(g) 原文迁移。"
+      "budget": 3000,
+      "why": "每章写前读取；原 workflow-chapter 的召回条件与 (a)-(g) 原文迁移。新增 (a0) 公共灵感标签召回入口（三层灵感库，可选轴不阻塞），预算相应上调。"
     },
     {
       "path": "skills/story-long-write/references/project-files.md",
@@ -282,33 +282,33 @@
       "branches": [
         {
           "label": "基础",
-          "budget": 75150,
+          "budget": 75370,
           "files": []
         },
         {
           "label": "悬疑",
-          "budget": 80750,
+          "budget": 80970,
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ]
         },
         {
           "label": "反转",
-          "budget": 80950,
+          "budget": 81170,
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ]
         },
         {
           "label": "悬疑+反转",
-          "budget": 86550,
+          "budget": 86770,
           "files": [
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
           ]
         }
       ],
-      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。"
+      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。含 benchmark-recall (a0) 灵感召回新增（各分支 +220）。"
     },
     {
       "label": "长篇日更 direct/solo",
@@ -332,33 +332,33 @@
       "branches": [
         {
           "label": "基础",
-          "budget": 86950,
+          "budget": 87170,
           "files": []
         },
         {
           "label": "悬疑",
-          "budget": 92550,
+          "budget": 92770,
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ]
         },
         {
           "label": "反转",
-          "budget": 92650,
+          "budget": 92870,
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ]
         },
         {
           "label": "悬疑+反转",
-          "budget": 98250,
+          "budget": 98470,
           "files": [
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
           ]
         }
       ],
-      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。"
+      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。含 (a0) 灵感召回与跨书召回灵感节新增（各分支 +220）。"
     },
     {
       "label": "短篇 Phase 2",
@@ -565,21 +565,21 @@
         {
           "label": "基础",
           "files": [],
-          "budget": 78150
+          "budget": 78370
         },
         {
           "label": "悬疑",
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ],
-          "budget": 83750
+          "budget": 83970
         },
         {
           "label": "反转",
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ],
-          "budget": 83850
+          "budget": 84070
         },
         {
           "label": "悬疑+反转",
@@ -587,10 +587,10 @@
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
           ],
-          "budget": 89450
+          "budget": 89670
         }
       ],
-      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。"
+      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。含 (a0) 灵感召回与跨书召回灵感节新增（各分支 +220）。"
     },
     {
       "label": "长篇开书并写首章主会话直接写正文",

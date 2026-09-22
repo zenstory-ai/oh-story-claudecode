@@ -1,7 +1,7 @@
 ---
 name: story-long-analyze
 version: 1.0.0
-description: "长篇网文拆文。保留黄金三章、逐章摘要、剧情、情绪、节奏、角色、设定和文风接口，以连续章节块完成因果、双时间线、关系与三维节奏分析；兼容旧成果直接使用、按需增强和断点续跑。"
+description: "长篇网文拆文。保留黄金三章、逐章摘要、剧情、情绪、节奏、角色、设定和文风接口，以连续章节块完成因果、双时间线、关系与三维节奏分析；兼容旧成果直接使用、按需增强和断点续跑。含可选三层灵感库管道（灵感库、跨书灵感聚合、更新灵感库）。"
 metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudecode"}}
 ---
 # story-long-analyze：长篇网文拆文
@@ -144,6 +144,10 @@ chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locato
 ## Stage 6：文风与单独重建
 
 加载 [references/style-profile-generator.md](references/style-profile-generator.md)。优先使用已有 `文风.md` 和有效 `_style-sample.txt`；样本不足时允许依据索引选择 4–6 章、定点读取原文行段。只缺文风时直接运行 Stage 6，不重跑 Stage 1–5。没有有效样本、索引或原文时明确失败，不生成锚点全空的可用档案。
+
+## 三层灵感库管道（可选后置）
+
+用户提出「灵感库 / 提炼灵感 / 跨书灵感聚合 / 更新灵感库」时加载 [references/inspiration-library.md](references/inspiration-library.md)。复用 Stage 3 的 EM 机制卡：`inspiration_index.py register-atoms` 机械登记原子灵感索引（无 IA 文件），再按该文档做单书合并与带受控标签的跨书聚合；卡内只用 `书名/EM-xxx` 裸 ID，禁路径引用。缺情绪模块的书先走上方按需增强，不在灵感层代拆。单书拆文不自动入库。
 
 ## 状态、旧项目与最终回归
 
