@@ -37,10 +37,14 @@ Related: [2026-09-22-long-analyze-single-state-runtime](../architecture/2026-09-
    列出；`novel_count`/`atom_count` 由闭包自动核算。
 4. **NM 只在同书 ≥2 卡同构时创建**，内容为合并增量（理由/差异/反例），不复述机制；
    取消首版「每个 IA 必须归属一个 NM」的覆盖率要求。
-5. **消费面**：写前召回新增可选轴 (a0)（Top 3 active CBA →
+5. **消费面全阶段挂点**：写前召回新增可选轴 (a0)（Top 3 active CBA →
    `selected_inspiration_aggregates`，无库/零命中记 gap 不阻塞，降档照常执行）；
-   cross-book-recall 增「公共灵感标签召回」节（八轴标签、核心轴门槛、Top 3–8 预算）；
-   story-explorer `benchmark_style_load` 附带同一召回。专名泄漏登记时按 `角色/` 目录
+   写手 prompt 组装脚本新增「跨书灵感」槽（脚本探测 `灵感库/灵感索引.csv`，无库直接
+   封槽、有库留空槽归主会话按 (a0) 填）；开书（适用阶段=设定）、卷纲（=卷纲）、细纲
+   （=细纲）各加一条可选召回旁注；cross-book-recall 增「公共灵感标签召回」节（八轴
+   标签、核心轴门槛、Top 3–8 预算），并明确该通道**独立于多对标 ≥2 本触发条件**；
+   story-explorer `benchmark_style_load` 附带同一召回；project-files 权威读取顺序第 6
+   条钉死预算与冲突裁决。专名泄漏登记时按 `角色/` 目录
    机械扫描（「不可照搬」字段除外——点名专名是其职责）。
 6. **缺料走 #386 的按需增强**：无 `剧情/情绪模块.md` 时返回 `repair_action` 指向
    `--intent enhance`（原文读取可为 0），灵感层不代拆、不补写。版本号与发布安排留给

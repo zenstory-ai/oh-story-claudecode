@@ -124,6 +124,20 @@ class PipelineTests(unittest.TestCase):
         self.assertNotIn('不能串卡', prompt)
         self.assertIn('召回降档：成立', result.stdout)
         self.assertNotIn('以上是 prompt 正文', prompt)
+        self.assertIn('——— 跨书灵感 ———', prompt)
+        self.assertIn('inspiration_library_missing', prompt)
+
+    def test_builder_inspiration_slot_opens_with_library(self):
+        index = self.book / '灵感库' / '灵感索引.csv'
+        index.parent.mkdir(parents=True, exist_ok=True)
+        index.write_text('item_id,layer,title,source_book,path,source_ids,novel_count,atom_count,grade,tags,status\n', encoding='utf-8')
+        out = self.book / 'prompt-lib.txt'
+        result = self.call('build_writer_prompt.py', '--project', self.book, '--chapter', 1, '--out', out)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        prompt = out.read_text(encoding='utf-8')
+        self.assertIn('selected_inspiration_aggregates', prompt)
+        self.assertNotIn('inspiration_library_missing', prompt)
+        self.assertIn('跨书灵感：发现', result.stdout)
 
     def test_incomplete_replacements_keep_full_recall(self):
         original = self.volume.read_text(encoding='utf-8')

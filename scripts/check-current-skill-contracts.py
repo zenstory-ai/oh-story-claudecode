@@ -1364,6 +1364,29 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
             "long writing must bound public inspiration retrieval to Top 3-8 CBA cards without IA/NM",
         )
     )
+    setup_workflow = repo_root / "skills/story-long-write/references/workflow-setup.md"
+    for pattern, code, message in (
+        (r"适用阶段=设定", "inspiration-hook-setup", "book setup must offer optional inspiration recall"),
+        (r"适用阶段=卷纲", "inspiration-hook-volume", "volume outlining must offer optional inspiration recall"),
+        (r"适用阶段=细纲", "inspiration-hook-outline", "chapter outlining must offer optional inspiration recall"),
+    ):
+        findings.extend(require_pattern(setup_workflow, pattern, code, message))
+    findings.extend(
+        require_pattern(
+            repo_root / "skills/story-long-write/scripts/build_writer_prompt.py",
+            r"跨书灵感",
+            "writer-prompt-inspiration-slot",
+            "writer prompt builder must carry the cross-book inspiration slot",
+        )
+    )
+    findings.extend(
+        require_pattern(
+            repo_root / "skills/story-long-write/references/cross-book-recall.md",
+            r"独立于[^\n]*多对标触发条件",
+            "inspiration-decoupled-from-multi-benchmark",
+            "inspiration channel must not depend on the >=2 benchmark trigger",
+        )
+    )
 
     # 三处消费方都必须明确取消逐点字数，避免旧 Σ 契约从任一部署面回流。
     for relative in OUTLINE_SEMANTIC_CAPACITY_CONSUMERS:
