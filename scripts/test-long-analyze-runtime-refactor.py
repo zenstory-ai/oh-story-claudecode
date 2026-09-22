@@ -383,6 +383,10 @@ def test_split_survives_replanning() -> None:
 def test_panlong_acceptance_samples() -> None:
     source_demo = ROOT / "demo" / "拆文库" / "盘龙"
     require(source_demo.is_dir(), "盘龙验收样本缺失")
+    if not (source_demo / "原文" / "原文.txt").is_file():
+        # 原文按 .gitignore 版权策略不入库；缺席时明确跳过，不让 CI 因夹具红。
+        print("SKIP: test_panlong_acceptance_samples (panlong raw text absent by copyright policy)")
+        return
     with tempfile.TemporaryDirectory(prefix="long-panlong-acceptance-") as temporary:
         area = Path(temporary)
 
@@ -683,6 +687,9 @@ def test_audit_stage_compact_and_mapping_regressions() -> None:
 
 def test_audit_legacy_source_change_regression() -> None:
     source_demo = ROOT / "demo" / "拆文库" / "盘龙"
+    if not (source_demo / "原文" / "原文.txt").is_file():
+        print("SKIP: test_audit_legacy_source_change_regression (panlong raw text absent by copyright policy)")
+        return
     with tempfile.TemporaryDirectory(prefix="long-audit-source-change-") as temporary:
         root = Path(temporary) / "盘龙"
         shutil.copytree(source_demo, root)
