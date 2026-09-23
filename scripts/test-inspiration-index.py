@@ -334,13 +334,67 @@ def test_validate_cba_closure_and_markers() -> None:
                                   source_ids="测试书/EM-001", tags=CBA_TAGS))
         require(not MODULE["validate"](root), "单书 CBA＋标记齐全必须通过：" + ";".join(MODULE["validate"](root)))
 
-        matches = MODULE["query"](root, ["题材=玄幻", "情绪=期待"], 6)
-        require([match["item_id"] for match in matches] == ["CBA-001"], "带核心轴命中必须返回该 CBA")
-        require(not MODULE["query"](root, ["风险=泄底过早"], 6), "只命中非核心轴不得返回")
+        payload = MODULE["query"](root, ["题材=玄幻", "情绪=期待"], 6)
+        require([match["item_id"] for match in payload["matches"]] == ["CBA-001"], "带核心轴命中必须返回该 CBA")
+        require(payload["unmatched_tags"] == [], f"值都在库内时不得报 unmatched：{payload}")
+        require(not MODULE["query"](root, ["风险=泄底过早"], 6)["matches"], "只命中非核心轴不得返回")
+        drift = MODULE["query"](root, ["题材=东方玄幻"], 6)
+        require(not drift["matches"] and drift["unmatched_tags"] == ["题材=东方玄幻"],
+                f"漂移值必须被点名而不是静默零命中：{drift}")
+        require(drift["axis_inventory"]["题材"] == ["玄幻"], f"须给出该轴现存值供纠词：{drift}")
 
         resolved = MODULE["resolve"](root, ["测试书/EM-002", "CBA-001"])
         require(resolved["ok"] and resolved["resolved"][0]["location"].endswith("情绪模块.md#EM-002"),
                 f"EM 引用必须解析回情绪模块锚点:{resolved}")
+
+
+VOCABULARY_TEXT = """# 标签词表
+
+## 题材
+- 玄幻
+## 读者需求
+- 认知反转
+## 情绪
+- 期待
+## 剧情功能
+- 信息揭示
+## 适用阶段
+- 正文
+## 风险
+- 泄底过早
+"""
+
+
+def test_vocabulary_guard() -> None:
+    with tempfile.TemporaryDirectory(prefix="ilib-") as temporary:
+        base = Path(temporary)
+        root = make_workspace(base)
+        module_path = base / "拆文库" / "测试书" / "剧情" / "情绪模块.md"
+        MODULE["register_atoms"](root, module_path, "测试书")
+        write(root / "跨书灵感聚合" / "CBA-001_卡.md",
+              "# CBA-001：卡\n\n- 验证状态：单书假设\n- 来源：测试书/EM-001\n")
+        append_row(root, base_row(item_id="CBA-001", layer="跨书灵感聚合", title="卡",
+                                  source_book="测试书", path="跨书灵感聚合/CBA-001_卡.md",
+                                  source_ids="测试书/EM-001", tags=CBA_TAGS))
+        require(not MODULE["validate"](root), "无词表文件时维持旧行为不报错")
+        write(root / "标签词表.md", VOCABULARY_TEXT)
+        require(not MODULE["validate"](root), "标签值全在词表内必须通过：" + ";".join(MODULE["validate"](root)))
+        require(MODULE["query"](root, ["题材=玄幻", "情绪=期待"], 6)["vocabulary_loaded"], "query 须报告词表已加载")
+
+        write(root / "标签词表.md", VOCABULARY_TEXT.replace("- 泄底过早", "- 铺垫不足"))
+        errors = MODULE["validate"](root)
+        require(any("tag_value_not_in_vocabulary:风险=泄底过早" in error for error in errors),
+                f"表外值必须点名：{errors}")
+
+        write(root / "标签词表.md", VOCABULARY_TEXT.replace("- 认知反转", "- 认知反转\n- 反转"))
+        errors = MODULE["validate"](root)
+        require(any("tag_vocabulary_near_duplicate:读者需求" in error for error in errors),
+                f"同轴互为子串的近义值必须拦下：{errors}")
+
+        write(root / "标签词表.md", "# 标签词表\n\n## 题材\n- 玄幻\n")
+        errors = MODULE["validate"](root)
+        require(any("vocabulary_axis_missing" in error for error in errors),
+                f"词表缺必填轴必须报：{errors}")
 
 
 def test_coverage_reports_uncovered_atoms() -> None:
@@ -410,6 +464,7 @@ def main() -> int:
     test_workspace_gate_and_check_atoms()
     test_multiline_values_and_leak_tiering()
     test_validate_cba_closure_and_markers()
+    test_vocabulary_guard()
     test_coverage_reports_uncovered_atoms()
     test_validate_rejects_path_reference_in_card()
     test_validate_set_mismatch_and_nm_rules()

@@ -91,8 +91,9 @@ item_id,layer,title,source_book,path,source_ids,novel_count,atom_count,grade,tag
 - IA 行 `path` 为空、`grade` 取 `full/index`；NM/CBA 行 `grade` 留空；IA/NM 的 `tags` 留空，避免写作绕过聚合层。
 - `source_ids` 来源图：IA 行＝单个 `EM-xxx`；NM 行＝同书 ≥2 个 `EM-xxx`（`|` 分隔）；CBA 行＝`书名/EM-xxx` 与 `书名/NM-xxx` 混合列表（必须带书名前缀）。引用 NM 时其成员 EM 自动并入闭包，**不需要也不应该再展开列出**；`novel_count`＝闭包内不同小说数，`atom_count`＝闭包内不同 EM 数。
 - 标签序列化为 `轴=值1|值2；轴=值`。CBA 必填轴：题材、读者需求、情绪、剧情功能、适用阶段、风险；可选轴：关系动作、节奏位置。同义值先归一；不用「好看/有趣/高级」等不可执行词。
-- `validate` 校验：表头、ID 前缀、EM↔IA 集合一致、NM/CBA 闭包与计数、必填标签轴、单书 active CBA ≤3、验证状态标记、**卡内无路径引用**。
-- `query --tag 轴=值 …` 只筛 `layer=跨书灵感聚合` 且 `status=active`，核心轴（题材/读者需求/情绪/剧情功能/适用阶段）2 分、其余 1 分，无核心轴命中不返回，按分数/来源数/ID 稳定排序取 Top 3–8。
+- **标签值受控于库内 `灵感库/标签词表.md`**（每轴一节 `## 轴`、一行一值 `- 值`）：建库首轮聚合把用到的值落盘成首版，此后打标先读词表。扩表走同义判定——候选新值逐一与该轴现有值语义比对，重合或从属就用现有值，确属新维度才追加一行；词表膨胀就是查询失效的前兆。query 命中靠值的精确匹配，写入侧与查询侧共用这一张表。
+- `validate` 校验：表头、ID 前缀、EM↔IA 集合一致、NM/CBA 闭包与计数、必填标签轴、单书 active CBA ≤3、验证状态标记、**卡内无路径引用**；词表存在时另拒表外值（`tag_value_not_in_vocabulary`）、同轴互为子串的近义值对（`tag_vocabulary_near_duplicate`）与缺必填轴的词表（`vocabulary_axis_missing`）——词表缺失时这三项不查（旧库兼容），应尽快补建。
+- `query --tag 轴=值 …` 只筛 `layer=跨书灵感聚合` 且 `status=active`，核心轴（题材/读者需求/情绪/剧情功能/适用阶段）2 分、其余 1 分，无核心轴命中不返回，按分数/来源数/ID 稳定排序取 Top 3–8。返回值另带 `unmatched_tags`（请求值在全库该轴零出现）与 `axis_inventory`（所查各轴现存值）：零命中先按它们纠词重查一次，仍零命中才算「库里没有」。
 - `resolve --ref 书名/EM-xxx --ref CBA-001` 把裸 ID 解析为可读位置——需要时才查，不预先展开进任何卡。
 
 ## 写作侧消费约定

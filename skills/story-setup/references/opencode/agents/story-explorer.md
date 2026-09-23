@@ -174,7 +174,7 @@ steps: 15
    - 对存在的 `{对标书路径}/剧情/节奏.md`，从关键信息推进、情绪触动点、爆发/冷却中选择 1 条 `rhythm_reference`，写入 `rhythm_source_path`。
    - 两份文件冲突时保留两条来源摘要，返回 `gaps.module_rhythm_conflict: true`；二者优先于报告和故事线，禁止自行改写。
    - 若两个权威文件都存在但对同一章节/模块的读者情绪或爆发点描述互相矛盾，保留两条原文摘要，并返回 `gaps.module_rhythm_conflict: true` 与 `gaps.conflict: "..."`；调用方按两个权威文件优先于 `拆文报告.md` / `故事线.md` 的规则处理，禁止自行改写
-   - **公共灵感召回（可选）**：向上探工作区根 `灵感库/灵感索引.csv`；存在时按调用方标签只筛 `layer=跨书灵感聚合` 且 `status=active` 的行取 Top 3，读取对应 CBA 卡组装 `selected_inspiration_aggregates`（CBA ID、命中标签、机制链、可变参数、成立条件、风险、来源数量）；不沿来源 ID 回查 EM/NM。无灵感库记 `gaps.inspiration_library_missing: true`、零命中记 `gaps.inspiration_tag_no_match: true`，都不阻塞后续步骤
+   - **公共灵感召回（可选）**：向上探工作区根 `灵感库/灵感索引.csv`；存在时按调用方标签（值须来自同目录 `标签词表.md` 的受控值）只筛 `layer=跨书灵感聚合` 且 `status=active` 的行取 Top 3，读取对应 CBA 卡组装 `selected_inspiration_aggregates`（CBA ID、命中标签、机制链、可变参数、成立条件、风险、来源数量）；不沿来源 ID 回查 EM/NM。无灵感库记 `gaps.inspiration_library_missing: true`；零命中先对照词表或索引现存值纠正一次标签再筛，仍零命中记 `gaps.inspiration_tag_no_match: true`，都不阻塞后续步骤
 6. **读文风**：
    - `Read {对标书路径}/文风.md`
    - 不存在 → 返回 `gaps.profile_missing: true, expected_path: "..."`，**不继续后续步骤**；书目录本身有效，不得改填 `benchmark_book_missing`——调用方按 `custom_style` 决定继续或停止

@@ -411,6 +411,9 @@ def validate(root: Path, workspace: Path | None = None) -> list[str]:
     except ValueError as exc:
         ws = None
         workspace_error = str(exc)
+    vocabulary = load_vocabulary(root)
+    if vocabulary is not None:
+        errors.extend(vocabulary_errors(vocabulary))
     seen: set[tuple[str, str, str]] = set()
     ia_by_book: dict[str, dict[str, dict[str, str]]] = {}
     nm_by_book: dict[str, dict[str, dict[str, str]]] = {}
@@ -458,6 +461,12 @@ def validate(root: Path, workspace: Path | None = None) -> list[str]:
             missing = REQUIRED_CBA_AXES - set(tags)
             if missing:
                 errors.append(f"line_{number}:cba_tags_missing:{'|'.join(sorted(missing))}")
+            if vocabulary is not None:
+                for axis, values in sorted(tags.items()):
+                    if axis not in vocabulary:
+                        continue
+                    for value in sorted(values - set(vocabulary[axis])):
+                        errors.append(f"line_{number}:tag_value_not_in_vocabulary:{axis}={value}——先对照 标签词表.md：同义就用表内值，确属新维度先受控扩表")
             novel_count = positive_int(row.get("novel_count", ""))
             if novel_count is None:
                 errors.append(f"line_{number}:novel_count_invalid")
@@ -550,6 +559,46 @@ def validate(root: Path, workspace: Path | None = None) -> list[str]:
     return errors
 
 
+def load_vocabulary(root: Path) -> dict[str, list[str]] | None:
+    """读 `灵感库/标签词表.md`：`## 轴` 小节下的 `- 值` 行。文件不存在返回 None。"""
+    path = root / "标签词表.md"
+    if not path.is_file():
+        return None
+    vocabulary: dict[str, list[str]] = {}
+    current_axis: str | None = None
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError):
+        return None
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            axis = stripped[3:].strip()
+            current_axis = axis if axis in TAG_AXES else None
+            if current_axis is not None:
+                vocabulary.setdefault(current_axis, [])
+            continue
+        if current_axis is not None and stripped.startswith("- "):
+            value = stripped[2:].split("（")[0].split("(")[0].strip()
+            if value and value not in vocabulary[current_axis]:
+                vocabulary[current_axis].append(value)
+    return vocabulary
+
+
+def vocabulary_errors(vocabulary: dict[str, list[str]]) -> list[str]:
+    """词表自身的健康检查：必填轴齐全、同轴无互为子串的近义值对（同义膨胀前兆）。"""
+    errors = [
+        f"vocabulary_axis_missing:{axis}"
+        for axis in sorted(REQUIRED_CBA_AXES - set(vocabulary))
+    ]
+    for axis, values in sorted(vocabulary.items()):
+        for index, value in enumerate(values):
+            for other in values[index + 1:]:
+                if value in other or other in value:
+                    errors.append(f"tag_vocabulary_near_duplicate:{axis}:{value}~{other}——疑似同义值，保留一个或改名拉开语义")
+    return errors
+
+
 def coverage(root: Path) -> dict[str, Any]:
     """增量入库的机械导航：报出未进入任何 active CBA 闭包的原子。
 
@@ -610,11 +659,15 @@ def requested_tags(values: list[str]) -> dict[str, set[str]]:
     return tags
 
 
-def query(root: Path, values: list[str], limit: int) -> list[dict[str, Any]]:
+def query(root: Path, values: list[str], limit: int) -> dict[str, Any]:
+    """返回 matches 之外还带纠词元数据：请求值在全库零出现时点名
+    `unmatched_tags`，并给出所查各轴的现存值清单——零命中先纠词重查，
+    而不是把词表漂移误记成「库里没有」。"""
     rows, errors = load_rows(root)
     if errors:
         raise ValueError(";".join(errors))
     wanted = requested_tags(values)
+    axis_values: dict[str, set[str]] = {axis: set() for axis in wanted}
     matches: list[dict[str, Any]] = []
     for row in rows:
         if row.get("layer") != "跨书灵感聚合" or row.get("status") != "active":
@@ -622,6 +675,8 @@ def query(root: Path, values: list[str], limit: int) -> list[dict[str, Any]]:
         tags, tag_errors = parse_tags(row.get("tags", ""))
         if tag_errors:
             continue
+        for axis in axis_values:
+            axis_values[axis].update(tags.get(axis, set()))
         score = 0
         matched: list[str] = []
         core_match = False
@@ -646,7 +701,17 @@ def query(root: Path, values: list[str], limit: int) -> list[dict[str, Any]]:
             }
         )
     matches.sort(key=lambda item: (-item["score"], -item["novel_count"], -item["atom_count"], item["item_id"]))
-    return matches[: max(3, min(limit, 8))]
+    unmatched = [
+        f"{axis}={value}"
+        for axis in sorted(wanted)
+        for value in sorted(wanted[axis] - axis_values[axis])
+    ]
+    return {
+        "matches": matches[: max(3, min(limit, 8))],
+        "unmatched_tags": unmatched,
+        "axis_inventory": {axis: sorted(found) for axis, found in sorted(axis_values.items())},
+        "vocabulary_loaded": load_vocabulary(root) is not None,
+    }
 
 
 def resolve(root: Path, refs: list[str]) -> dict[str, Any]:
@@ -743,11 +808,11 @@ def main() -> int:
         print(json.dumps(payload, ensure_ascii=False))
         return 0 if payload["ok"] else 1
     try:
-        matches = query(args.root, args.tag, args.limit)
+        payload = query(args.root, args.tag, args.limit)
     except ValueError as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
         return 2
-    print(json.dumps({"ok": True, "matches": matches}, ensure_ascii=False))
+    print(json.dumps({"ok": True, **payload}, ensure_ascii=False))
     return 0
 
 
