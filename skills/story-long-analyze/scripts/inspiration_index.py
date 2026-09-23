@@ -86,26 +86,31 @@ def parse_em_module(module_text: str) -> tuple[list[dict[str, str]], list[tuple[
     """Return (complete cards, index-only entries) from 情绪模块.md text.
 
     完整卡＝`### EM-xxx 名称` 小节内的字段行，表格 `|字段|内容|` 与粗体列表 `- **字段**：内容` 都接受；
+    粗体字段同行没写值时，吸收其后到下一个字段/标题为止的列表或段落行作为多行值。
     索引条目＝「其他机制索引」小节里出现 EM-xxx 的行（机制ID｜名称｜…）。
     """
     lines = module_text.split("\n")
     cards: list[dict[str, str]] = []
     index_entries: list[tuple[str, str]] = []
     current: dict[str, str] | None = None
+    pending_field: str | None = None
     in_index_section = False
     for line in lines:
         stripped = line.strip()
         if stripped.startswith("## "):
             in_index_section = "其他机制索引" in stripped
             current = None
+            pending_field = None
             continue
         header = EM_HEADER_RE.match(stripped)
         if header:
             current = {"em_id": header.group(1), "title": header.group(2)}
             cards.append(current)
             in_index_section = False
+            pending_field = None
             continue
         if current is not None and stripped.startswith("|"):
+            pending_field = None
             cells = [cell.strip() for cell in stripped.strip("|").split("|")]
             if len(cells) >= 2:
                 key = normalize_em_field(cells[0])
@@ -115,7 +120,20 @@ def parse_em_module(module_text: str) -> tuple[list[dict[str, str]], list[tuple[
         if current is not None:
             bold = EM_BOLD_FIELD_RE.match(stripped)
             if bold:
-                current[normalize_em_field(bold.group(1))] = bold.group(2).strip()
+                key = normalize_em_field(bold.group(1))
+                value = bold.group(2).strip()
+                current[key] = value
+                pending_field = None if value else key
+                continue
+            if pending_field is not None and stripped.startswith("#"):
+                pending_field = None
+                continue
+            if pending_field is not None and stripped:
+                appended = stripped.lstrip("-*").strip()
+                if appended:
+                    current[pending_field] = (
+                        f"{current[pending_field]}；{appended}" if current[pending_field] else appended
+                    )
                 continue
         if in_index_section and stripped:
             match = EM_INDEX_ID_RE.search(stripped)
@@ -146,6 +164,20 @@ def resolve_workspace(root: Path, explicit: Path | None = None) -> Path:
             break
         candidate = candidate.parent
     raise ValueError("workspace_not_located:从 --root 向上未找到含 拆文库/ 的目录——用 --workspace 显式指定")
+
+
+EM_ARROW_RE = re.compile(r"→|⟶|->")
+
+
+def replaceable_antipattern_hits(value: str, names: set[str]) -> list[str]:
+    """「专名→任意X」反模式：箭头左侧命中角色名单即高置信真引用。"""
+    hits: set[str] = set()
+    for segment in re.split(r"[；;，,、｜|]", value):
+        if not EM_ARROW_RE.search(segment):
+            continue
+        left = EM_ARROW_RE.split(segment)[0]
+        hits.update(name for name in names if name in left)
+    return sorted(hits)
 
 
 def character_names(workspace: Path, book: str) -> set[str]:
@@ -214,14 +246,37 @@ def analyze_module(root: Path, module_path: Path, book: str,
             errors.append(f"em_id_duplicate:{em_id}")
             continue
         seen.add(em_id)
-        missing = [field for field in EM_REQUIRED_FIELDS if not card.get(field, "").strip()]
-        if missing:
-            errors.append(f"{em_id}:em_fields_missing:{'|'.join(missing)}——请回 story-long-analyze Stage 3 补全该模块卡")
-        abstract_text = card["title"] + " " + " ".join(card.get(field, "") for field in EM_LEAK_SCAN_FIELDS)
-        leaked = sorted(name for name in names if name in abstract_text)
-        if leaked:
-            errors.append(f"{em_id}:source_specific_name_in_mechanism:{'|'.join(leaked)}——请回 Stage 3 去专名后重试")
-        if not missing and not leaked:
+        card_errors = 0
+        absent = [field for field in EM_REQUIRED_FIELDS if field not in card]
+        empty = [field for field in EM_REQUIRED_FIELDS if field in card and not card[field].strip()]
+        if absent:
+            errors.append(f"{em_id}:em_fields_missing:{'|'.join(absent)}——请回 story-long-analyze Stage 3 补全该模块卡")
+            card_errors += 1
+        if empty:
+            errors.append(f"{em_id}:em_field_value_empty:{'|'.join(empty)}——字段在但值为空；多行值须紧跟字段名行（支持列表/段落）")
+            card_errors += 1
+
+        field_texts = {"标题": card.get("title", "")}
+        field_texts.update({field: card.get(field, "") for field in EM_LEAK_SCAN_FIELDS})
+        hit_locations = {
+            name: [field for field, text in field_texts.items() if name in text]
+            for name in sorted(names)
+            if any(name in text for text in field_texts.values())
+        }
+        antipattern = replaceable_antipattern_hits(card.get("可替换项", ""), names)
+        non_portable = card.get("不可照搬", "")
+        for name in antipattern:
+            errors.append(f"{em_id}:replaceable_antipattern:{name}——「专名→任意X」把专名写进抽象字段，改写成「功能位→任意X」")
+            card_errors += 1
+        for name, locations in hit_locations.items():
+            if name in antipattern:
+                continue
+            if name in non_portable:
+                errors.append(f"{em_id}:source_specific_name_in_mechanism:{name}@{'|'.join(locations)}——本卡「不可照搬」已点名该专名却仍在抽象字段使用，请回 Stage 3 去专名后重试")
+                card_errors += 1
+            else:
+                warnings.append(f"{em_id}:leak_suspect:{name}@{'|'.join(locations)}——角色卡名与通用职能词无法机械区分，请人工复核；确认是专名请回 Stage 3 修卡")
+        if card_errors == 0:
             atom_rows.append(_ia_row(book, em_id, card["title"], grade="full"))
     for em_id, title in index_entries:
         if em_id in seen:

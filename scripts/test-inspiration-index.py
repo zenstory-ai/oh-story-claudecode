@@ -242,6 +242,85 @@ def test_workspace_gate_and_check_atoms() -> None:
                 f"干净书 check-atoms 须给出卡数：{clean}")
 
 
+MULTILINE_MODULE = """# 情绪模块：多行书
+
+## 可复现模块卡
+
+### EM-001 多行值卡
+
+- **读者想看什么**：延迟兑现。
+- **情绪链**：搁置 → 揭示
+- **戏剧单元**：日常物件在危机中揭示身份。
+- **可替换项**：
+  - 物件可以换成任何“被低估的日常之物”
+  - 危机场景可以换成任何“公开检验场合”
+- **不可照搬**：原书物件外形
+"""
+
+TIERING_MODULE = """# 情绪模块：分级书
+
+## 可复现模块卡
+
+### EM-001 空值卡
+
+| 字段 | 内容 |
+|---|---|
+| 读者想看什么 | 有需求。 |
+| 情绪链 | 有链。 |
+| 戏剧单元 | 有单元。 |
+| 可替换项 |  |
+| 不可照搬 | 专名。 |
+
+### EM-002 反模式卡
+
+| 字段 | 内容 |
+|---|---|
+| 读者想看什么 | 压制者被反杀。 |
+| 情绪链 | 缺口 → 爆发 |
+| 戏剧单元 | 公开场合反证。 |
+| 可替换项 | 王二→任何欺压者 |
+| 不可照搬 | 原书场景顺序 |
+
+### EM-003 嫌疑卡
+
+| 字段 | 内容 |
+|---|---|
+| 读者想看什么 | 剑客式的以武证道。 |
+| 情绪链 | 蓄势 → 出手 |
+| 戏剧单元 | 沉默强者一击定局。 |
+| 可替换项 | 场景、对手 |
+| 不可照搬 | 原书招式名 |
+"""
+
+
+def test_multiline_values_and_leak_tiering() -> None:
+    with tempfile.TemporaryDirectory(prefix="ilib-") as temporary:
+        base = Path(temporary)
+        root = make_workspace(base, book="多行书", module_text=MULTILINE_MODULE)
+        module_path = base / "拆文库" / "多行书" / "剧情" / "情绪模块.md"
+        payload = MODULE["register_atoms"](root, module_path, "多行书")
+        require(payload["atoms_full"] == 1, f"多行字段值必须被吸收成有效值：{payload}")
+
+    with tempfile.TemporaryDirectory(prefix="ilib-") as temporary:
+        base = Path(temporary)
+        root = make_workspace(base, book="分级书", module_text=TIERING_MODULE)
+        for name in ("王二", "剑客"):
+            write(base / "拆文库" / "分级书" / "角色" / f"{name}.md", f"# {name}\n")
+        module_path = base / "拆文库" / "分级书" / "剧情" / "情绪模块.md"
+        report = MODULE["check_atoms"](root, module_path, "分级书")
+        require(not report["ok"], f"空值与反模式必须拦下：{report}")
+        require(any("em_field_value_empty" in error and "可替换项" in error for error in report["errors"]),
+                f"字段在而值空必须报 em_field_value_empty：{report['errors']}")
+        require(not any("em_fields_missing" in error for error in report["errors"]),
+                f"空值不得误报成缺字段：{report['errors']}")
+        require(any("replaceable_antipattern" in error and "王二" in error for error in report["errors"]),
+                f"「专名→任意X」必须报反模式：{report['errors']}")
+        require(any("leak_suspect" in warning and "剑客" in warning and "@" in warning for warning in report["warnings"]),
+                f"未经佐证的名单命中降为带位置的 warning：{report['warnings']}")
+        require(not any("source_specific_name_in_mechanism" in error and "剑客" in error for error in report["errors"]),
+                f"嫌疑命中不得直接按泄漏报错：{report['errors']}")
+
+
 def test_validate_cba_closure_and_markers() -> None:
     with tempfile.TemporaryDirectory(prefix="ilib-") as temporary:
         base = Path(temporary)
@@ -311,6 +390,7 @@ def main() -> int:
     test_parse_genre_variants()
     test_register_rejects_incomplete_and_leaky_cards()
     test_workspace_gate_and_check_atoms()
+    test_multiline_values_and_leak_tiering()
     test_validate_cba_closure_and_markers()
     test_validate_rejects_path_reference_in_card()
     test_validate_set_mismatch_and_nm_rules()
