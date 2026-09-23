@@ -197,7 +197,7 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 │   └── 势力/           # {势力名}.md（每势力一文件）
 ├── 拆文报告.md
 ├── chapter_index.csv    # 机械章界、原文定位、源 hash 与解析器版本
-├── 人物关系图/          # 核心人物关系.png / 关键关系演变.png（可用时）
+├── 人物关系图/          # 核心人物关系.md / 关键关系演变.md（mermaid 默认；明确要图片才有同名 PNG）
 ├── 文风.md          # Stage 6 文风：写作技法视图 + 原文范例锚点
 └── _progress.md
 ```

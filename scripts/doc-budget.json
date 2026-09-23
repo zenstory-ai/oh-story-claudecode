@@ -177,8 +177,8 @@
     },
     {
       "path": "skills/story-long-write/references/benchmark-recall.md",
-      "budget": 3000,
-      "why": "每章写前读取；原 workflow-chapter 的召回条件与 (a)-(g) 原文迁移。新增 (a0) 公共灵感标签召回入口（三层灵感库，可选轴不阻塞），预算相应上调。"
+      "budget": 3045,
+      "why": "每章写前读取；原 workflow-chapter 的召回条件与 (a)-(g) 原文迁移。新增 (a0) 公共灵感标签召回入口（三层灵感库，可选轴不阻塞），预算相应上调。＋30：(f) 限定角色/设定并注明剧情单元不重复检索；L2 章容量按新旧摘要分叉（篇幅档/情节点数）。"
     },
     {
       "path": "skills/story-long-write/references/project-files.md",
@@ -224,7 +224,7 @@
   "paths": [
     {
       "label": "长篇日更主会话",
-      "budget": 43930,
+      "budget": 43980,
       "files": [
         "skills/story-long-write/SKILL.md",
         "skills/story-long-write/references/workflow-daily.md",
@@ -234,11 +234,11 @@
         "skills/story-long-write/references/reference-index.md",
         "skills/story-long-write/references/benchmark-recall.md"
       ],
-      "why": " 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。含灵感库可选挂点增量。"
+      "why": " 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。含灵感库可选挂点增量。＋30：匹配章 (e) 新旧摘要分叉。"
     },
     {
       "label": "长篇开书",
-      "budget": 31530,
+      "budget": 31590,
       "files": [
         "skills/story-long-write/SKILL.md",
         "skills/story-long-write/references/workflow-setup.md",
@@ -246,7 +246,7 @@
         "skills/story-long-write/references/project-files.md",
         "skills/story-long-write/references/reference-index.md"
       ],
-      "why": " 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +200：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。含灵感库可选挂点增量。"
+      "why": " 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +200：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。含灵感库可选挂点增量。＋60：节奏总览锚（阶段边界/关键点）与循环单元/AX/双时间线建卡消费接线。"
     },
     {
       "label": "正文 agent 基础规则（不含条件参考）",
@@ -282,12 +282,12 @@
       "branches": [
         {
           "label": "基础",
-          "budget": 75560,
+          "budget": 75610,
           "files": []
         },
         {
           "label": "悬疑",
-          "budget": 81160,
+          "budget": 81180,
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ]
@@ -344,21 +344,21 @@
         },
         {
           "label": "反转",
-          "budget": 93060,
+          "budget": 93125,
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ]
         },
         {
           "label": "悬疑+反转",
-          "budget": 98660,
+          "budget": 98710,
           "files": [
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
           ]
         }
       ],
-      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。含 (a0) 灵感召回与跨书召回灵感节新增（各分支 +220）。"
+      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。含 (a0) 灵感召回与跨书召回灵感节新增（各分支 +220）。＋40：匹配章 (e) 新旧摘要分叉（反转分支）。"
     },
     {
       "label": "短篇 Phase 2",
@@ -590,7 +590,7 @@
           "budget": 89860
         }
       ],
-      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。含 (a0) 灵感召回与跨书召回灵感节新增（各分支 +220）。"
+      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。含 (a0) 灵感召回与跨书召回灵感节新增（各分支 +220）。＋40：匹配章 (e) 新旧摘要分叉（反转分支）。"
     },
     {
       "label": "长篇开书并写首章主会话直接写正文",
@@ -615,21 +615,21 @@
         {
           "label": "基础",
           "files": [],
-          "budget": 90130
+          "budget": 90250
         },
         {
           "label": "悬疑",
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ],
-          "budget": 95730
+          "budget": 95850
         },
         {
           "label": "反转",
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ],
-          "budget": 95830
+          "budget": 96010
         },
         {
           "label": "悬疑+反转",
@@ -637,10 +637,10 @@
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
           ],
-          "budget": 101430
+          "budget": 101600
         }
       ],
-      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。含灵感库三阶段挂点与 (a0) 增量。"
+      "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。含灵感库三阶段挂点与 (a0) 增量。＋100~150/分支：节奏四节消费接线与匹配章新旧摘要分叉。"
     },
     {
       "label": "短篇执行指令（入口+Phase 3/4，不含技法参考）",
