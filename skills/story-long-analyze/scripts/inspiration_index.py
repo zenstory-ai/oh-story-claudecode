@@ -40,8 +40,13 @@ CORE_QUERY_AXES = {"题材", "读者需求", "情绪", "剧情功能", "适用�
 EM_REQUIRED_FIELDS = ("读者想看什么", "情绪链", "戏剧单元", "可替换项", "不可照搬")
 # 专名泄漏扫描范围：排除「不可照搬」——该字段的职责就是点名原书专名
 EM_LEAK_SCAN_FIELDS = ("读者想看什么", "情绪链", "戏剧单元", "可替换项")
-EM_HEADER_RE = re.compile(r"^###\s+(EM-[0-9]{3,})\s+(.+?)\s*$")
-EM_INDEX_ID_RE = re.compile(r"(EM-[0-9]{3,})")
+EM_HEADER_RE = re.compile(r"^###\s+(EM-[0-9]{2,})\s*(?:[·\-—]\s*)?(.+?)\s*$")
+EM_INDEX_ID_RE = re.compile(r"(EM-[0-9]{2,})")
+# 字段行的两种体裁：表格 `| 字段 | 值 |` 与粗体列表 `- **字段**：值`（前导 `- ` 可省）
+EM_BOLD_FIELD_RE = re.compile(r"^-?\s*\*\*(.+?)\*\*\s*[:：]\s*(.*)$")
+# 同义字段名归一；表头行的首列词不作为字段
+EM_FIELD_ALIASES = {"不可照搬项": "不可照搬", "可替换项目": "可替换项"}
+EM_TABLE_HEADER_KEYS = {"字段", "维度", "---", ""}
 CARD_PATH_RE = re.compile(r"\]\(|\.md\)|原子灵感/|单小说灵感合并/|跨书灵感聚合/|拆文库/")
 
 
@@ -72,10 +77,15 @@ def csv_text(rows: list[dict[str, str]]) -> str:
     return "﻿" + buffer.getvalue()
 
 
+def normalize_em_field(key: str) -> str:
+    """去掉字段名上的粗体标记与空白，再按同义表归一。"""
+    return EM_FIELD_ALIASES.get(key.strip().strip("*").strip(), key.strip().strip("*").strip())
+
+
 def parse_em_module(module_text: str) -> tuple[list[dict[str, str]], list[tuple[str, str]]]:
     """Return (complete cards, index-only entries) from 情绪模块.md text.
 
-    完整卡＝`### EM-xxx 名称` 小节内的 |字段|内容| 表；
+    完整卡＝`### EM-xxx 名称` 小节内的字段行，表格 `|字段|内容|` 与粗体列表 `- **字段**：内容` 都接受；
     索引条目＝「其他机制索引」小节里出现 EM-xxx 的行（机制ID｜名称｜…）。
     """
     lines = module_text.split("\n")
@@ -97,9 +107,16 @@ def parse_em_module(module_text: str) -> tuple[list[dict[str, str]], list[tuple[
             continue
         if current is not None and stripped.startswith("|"):
             cells = [cell.strip() for cell in stripped.strip("|").split("|")]
-            if len(cells) >= 2 and cells[0] not in {"字段", "---", ""} and not set(cells[0]) <= {"-"}:
-                current[cells[0]] = cells[1]
+            if len(cells) >= 2:
+                key = normalize_em_field(cells[0])
+                if key not in EM_TABLE_HEADER_KEYS and not set(key) <= {"-"}:
+                    current[key] = cells[1]
             continue
+        if current is not None:
+            bold = EM_BOLD_FIELD_RE.match(stripped)
+            if bold:
+                current[normalize_em_field(bold.group(1))] = bold.group(2).strip()
+                continue
         if in_index_section and stripped:
             match = EM_INDEX_ID_RE.search(stripped)
             if match:

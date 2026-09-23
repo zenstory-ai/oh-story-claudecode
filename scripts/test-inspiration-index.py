@@ -82,6 +82,34 @@ LEAKY_CARD = """# 情绪模块：泄漏书
 """
 
 
+GENRE_VARIANT_MODULE = """# 情绪模块：体裁书
+
+## 其他机制索引
+
+EM-07｜延迟报偿｜关系铺垫｜第 12 章｜TR-002
+
+## 可复现模块卡
+
+### EM-01 · 短编号分隔符卡
+
+| 维度 | 内容 |
+|---|---|
+| **读者想看什么** | 被低估者翻面。 |
+| **情绪链** | 缺口 → 爆发 |
+| **戏剧单元** | 公开场合用结果反证。 |
+| **可替换项** | 场景、道具 |
+| **不可照搬项** | 原书台词 |
+
+### EM-02 — 粗体列表卡
+
+- **读者想看什么**：延迟满足的兑现。
+- **情绪链**：搁置 → 异变 → 揭示
+- **戏剧单元**：日常物件在危机中揭示身份。
+- **可替换项**：物件形态
+- **不可照搬**：原书物件外形
+"""
+
+
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise AssertionError(message)
@@ -135,6 +163,19 @@ def test_register_and_idempotence() -> None:
         MODULE["register_atoms"](root, module_path, "测试书")
         require((root / "灵感索引.csv").read_bytes() == first, "重复登记必须逐字节幂等")
         require(not MODULE["validate"](root), "干净登记必须通过校验")
+
+
+def test_parse_genre_variants() -> None:
+    with tempfile.TemporaryDirectory(prefix="ilib-") as temporary:
+        base = Path(temporary)
+        root = make_workspace(base, book="体裁书", module_text=GENRE_VARIANT_MODULE)
+        module_path = base / "拆文库" / "体裁书" / "剧情" / "情绪模块.md"
+        payload = MODULE["register_atoms"](root, module_path, "体裁书")
+        require(payload["atoms_full"] == 2 and payload["atoms_index"] == 1,
+                f"短编号/分隔符/粗体表格/粗体列表/同义字段名都必须被识别：{payload}")
+        rows = index_rows(root)
+        require([row["item_id"] for row in rows] == ["IA-01", "IA-02", "IA-07"], f"IA 编号必须镜像短编号 EM：{rows}")
+        require(not MODULE["validate"](root), "体裁变体登记后必须通过校验")
 
 
 def test_register_rejects_incomplete_and_leaky_cards() -> None:
@@ -225,6 +266,7 @@ def test_validate_set_mismatch_and_nm_rules() -> None:
 
 def main() -> int:
     test_register_and_idempotence()
+    test_parse_genre_variants()
     test_register_rejects_incomplete_and_leaky_cards()
     test_validate_cba_closure_and_markers()
     test_validate_rejects_path_reference_in_card()
