@@ -37,6 +37,8 @@ story-long-analyze 的可选后置管道：把 Stage 3 已抽象好的 EM 机制
 
 - 完整卡（读者想看什么/情绪链/戏剧单元/可替换项/不可照搬 五字段齐）登记为 `grade=full`；「其他机制索引」条目登记为 `grade=index`。
 - 五字段缺失报 `em_fields_missing`、机制字段（标题/读者想看什么/情绪链/戏剧单元/可替换项）泄漏主要角色名报 `source_specific_name_in_mechanism`，都指回 Stage 3 修复；「不可照搬」字段例外——点名原书专名正是它的职责。
+- 泄漏门的角色名单取自工作区 `拆文库/{书}/角色/`。工作区从 `--root` 向上探测含 `拆文库/` 的目录，探测不到报 `workspace_not_located`（可加 `--workspace` 显式指定），不得回退空名单静默通过；输出恒带 `character_roster` 数，书目录在而 `角色/` 缺失报 `character_roster_missing` warning，提示人工确认无专名。
+- 所有卡的所有问题一次收集报全（`errors` 数组），有任一 error 即整体不写盘。落盘 `剧情/情绪模块.md` 后先用只读的 `check-atoms`（与 register-atoms 同参数）自检：输出卡数、索引数、名单规模与全部问题，不写任何文件。
 - 一次原子写入、重跑逐字节幂等。本步不得调用模型重新概括机制。
 
 ### 2. 单小说灵感合并

@@ -128,6 +128,26 @@ def parse_em_module(module_text: str) -> tuple[list[dict[str, str]], list[tuple[
     return cards, index_entries
 
 
+def resolve_workspace(root: Path, explicit: Path | None = None) -> Path:
+    """定位含 `拆文库/` 的工作区——泄漏门名单与 EM 集合校验都依赖它。
+
+    显式 `--workspace` 优先；否则从 `--root` 起向上最多探测 5 级。
+    定位失败必须报错而不是回退空名单：名单为空集时泄漏检查等于没跑。
+    """
+    if explicit is not None:
+        if (explicit / "拆文库").is_dir():
+            return explicit
+        raise ValueError(f"workspace_invalid:{explicit} 下没有 拆文库/")
+    candidate = root.resolve()
+    for _ in range(6):
+        if (candidate / "拆文库").is_dir():
+            return candidate
+        if candidate.parent == candidate:
+            break
+        candidate = candidate.parent
+    raise ValueError("workspace_not_located:从 --root 向上未找到含 拆文库/ 的目录——用 --workspace 显式指定")
+
+
 def character_names(workspace: Path, book: str) -> set[str]:
     role_dir = workspace / "拆文库" / book / "角色"
     names: set[str] = set()
@@ -153,40 +173,94 @@ def load_rows(root: Path) -> tuple[list[dict[str, str]], list[str]]:
     return rows, errors
 
 
-def register_atoms(root: Path, module_path: Path, book: str) -> dict[str, Any]:
+class RegisterError(ValueError):
+    """携带完整问题清单的登记失败——一次报全，避免逐轮试跑。"""
+
+    def __init__(self, errors: list[str], warnings: list[str] | None = None) -> None:
+        super().__init__("\n".join(errors))
+        self.errors = errors
+        self.warnings = warnings or []
+
+
+def analyze_module(root: Path, module_path: Path, book: str,
+                   workspace: Path | None = None) -> dict[str, Any]:
+    """解析并检查一本书的 EM 卡，收集全部 errors/warnings，不写盘。"""
+    errors: list[str] = []
+    warnings: list[str] = []
+    try:
+        ws = resolve_workspace(root, workspace)
+    except ValueError as exc:
+        raise RegisterError([str(exc)]) from exc
     try:
         module_text = module_path.read_text(encoding="utf-8-sig")
     except (OSError, UnicodeError) as exc:
-        raise ValueError(f"emotion_module_unreadable:{exc}") from exc
+        raise RegisterError([f"emotion_module_unreadable:{exc}"]) from exc
     cards, index_entries = parse_em_module(module_text)
     if not cards and not index_entries:
-        raise ValueError("emotion_module_has_no_em_cards")
+        raise RegisterError(["emotion_module_has_no_em_cards"])
 
-    names = character_names(root.parent, book)
+    book_dir = ws / "拆文库" / book
+    if not book_dir.is_dir():
+        errors.append(f"book_dir_not_found:拆文库/{book}——工作区 {ws} 下没有这本书，泄漏门无法取角色名单")
+    names = character_names(ws, book)
+    if not names and book_dir.is_dir():
+        warnings.append(f"character_roster_missing:拆文库/{book}/角色/ 不存在或为空——泄漏门本次没有名单可查，请人工确认卡内无专名")
+
     seen: set[str] = set()
     atom_rows: list[dict[str, str]] = []
     for card in cards:
         em_id = card["em_id"]
         if em_id in seen:
-            raise ValueError(f"em_id_duplicate:{em_id}")
+            errors.append(f"em_id_duplicate:{em_id}")
+            continue
         seen.add(em_id)
         missing = [field for field in EM_REQUIRED_FIELDS if not card.get(field, "").strip()]
         if missing:
-            raise ValueError(f"{em_id}:em_fields_missing:{'|'.join(missing)}——请回 story-long-analyze Stage 3 补全该模块卡")
+            errors.append(f"{em_id}:em_fields_missing:{'|'.join(missing)}——请回 story-long-analyze Stage 3 补全该模块卡")
         abstract_text = card["title"] + " " + " ".join(card.get(field, "") for field in EM_LEAK_SCAN_FIELDS)
         leaked = sorted(name for name in names if name in abstract_text)
         if leaked:
-            raise ValueError(f"{em_id}:source_specific_name_in_mechanism:{'|'.join(leaked)}——请回 Stage 3 去专名后重试")
-        atom_rows.append(_ia_row(book, em_id, card["title"], grade="full"))
+            errors.append(f"{em_id}:source_specific_name_in_mechanism:{'|'.join(leaked)}——请回 Stage 3 去专名后重试")
+        if not missing and not leaked:
+            atom_rows.append(_ia_row(book, em_id, card["title"], grade="full"))
     for em_id, title in index_entries:
         if em_id in seen:
             continue
         seen.add(em_id)
         atom_rows.append(_ia_row(book, em_id, title, grade="index"))
+    return {
+        "book": book,
+        "cards_full": len(cards),
+        "cards_index": sum(1 for em_id, _ in index_entries if em_id not in {card["em_id"] for card in cards}),
+        "character_roster": len(names),
+        "errors": errors,
+        "warnings": warnings,
+        "atom_rows": atom_rows,
+    }
+
+
+def check_atoms(root: Path, module_path: Path, book: str,
+                workspace: Path | None = None) -> dict[str, Any]:
+    """只读自检：报出一本书的卡数、名单规模与全部问题，不写任何文件。"""
+    try:
+        report = analyze_module(root, module_path, book, workspace)
+    except RegisterError as exc:
+        return {"ok": False, "book": book, "errors": exc.errors, "warnings": exc.warnings}
+    report.pop("atom_rows")
+    report["ok"] = not report["errors"]
+    return report
+
+
+def register_atoms(root: Path, module_path: Path, book: str,
+                   workspace: Path | None = None) -> dict[str, Any]:
+    report = analyze_module(root, module_path, book, workspace)
+    if report["errors"]:
+        raise RegisterError(report["errors"], report["warnings"])
+    atom_rows = report["atom_rows"]
 
     existing, errors = load_rows(root) if (root / "灵感索引.csv").is_file() else ([], [])
     if errors:
-        raise ValueError(";".join(errors))
+        raise RegisterError(errors, report["warnings"])
     preserved = [
         row
         for row in existing
@@ -208,6 +282,8 @@ def register_atoms(root: Path, module_path: Path, book: str) -> dict[str, Any]:
         "atoms_full": sum(1 for row in atom_rows if row["grade"] == "full"),
         "atoms_index": sum(1 for row in atom_rows if row["grade"] == "index"),
         "index_writes": 1,
+        "character_roster": report["character_roster"],
+        "warnings": report["warnings"],
     }
 
 
@@ -262,8 +338,8 @@ def source_ids(raw: str) -> list[str]:
     return [item.strip() for item in re.split(r"[|；]", raw) if item.strip()]
 
 
-def load_book_em_ids(root: Path, source_book: str) -> tuple[set[str], str | None]:
-    module_path = root.parent / "拆文库" / source_book / "剧情" / "情绪模块.md"
+def load_book_em_ids(workspace: Path, source_book: str) -> tuple[set[str], str | None]:
+    module_path = workspace / "拆文库" / source_book / "剧情" / "情绪模块.md"
     try:
         module_text = module_path.read_text(encoding="utf-8-sig")
     except (OSError, UnicodeError):
@@ -273,8 +349,13 @@ def load_book_em_ids(root: Path, source_book: str) -> tuple[set[str], str | None
     return ids, None
 
 
-def validate(root: Path) -> list[str]:
+def validate(root: Path, workspace: Path | None = None) -> list[str]:
     rows, errors = load_rows(root)
+    try:
+        ws: Path | None = resolve_workspace(root, workspace)
+    except ValueError as exc:
+        ws = None
+        workspace_error = str(exc)
     seen: set[tuple[str, str, str]] = set()
     ia_by_book: dict[str, dict[str, dict[str, str]]] = {}
     nm_by_book: dict[str, dict[str, dict[str, str]]] = {}
@@ -343,9 +424,14 @@ def validate(root: Path) -> list[str]:
             errors.append(f"book_{book}:active_single_book_cba_limit_exceeded:{count}")
 
     for book, atoms in ia_by_book.items():
-        em_ids, module_error = load_book_em_ids(root, book)
-        if module_error:
-            errors.append(f"book_{book}:{module_error}")
+        if ws is None:
+            errors.append(f"book_{book}:{workspace_error}")
+            module_error: str | None = "workspace_not_located"
+            em_ids = set()
+        else:
+            em_ids, module_error = load_book_em_ids(ws, book)
+            if module_error:
+                errors.append(f"book_{book}:{module_error}")
         registered: set[str] = set()
         for item_id, row in atoms.items():
             refs = source_ids(row.get("source_ids", ""))
@@ -491,8 +577,15 @@ def parse_args() -> argparse.Namespace:
     register_parser.add_argument("--root", required=True, type=Path)
     register_parser.add_argument("--module", required=True, type=Path)
     register_parser.add_argument("--book", required=True)
+    register_parser.add_argument("--workspace", type=Path, default=None)
+    check_parser = subparsers.add_parser("check-atoms")
+    check_parser.add_argument("--root", required=True, type=Path)
+    check_parser.add_argument("--module", required=True, type=Path)
+    check_parser.add_argument("--book", required=True)
+    check_parser.add_argument("--workspace", type=Path, default=None)
     validate_parser = subparsers.add_parser("validate")
     validate_parser.add_argument("--root", required=True, type=Path)
+    validate_parser.add_argument("--workspace", type=Path, default=None)
     query_parser = subparsers.add_parser("query")
     query_parser.add_argument("--root", required=True, type=Path)
     query_parser.add_argument("--tag", action="append", default=[])
@@ -507,14 +600,20 @@ def main() -> int:
     args = parse_args()
     if args.command == "register-atoms":
         try:
-            payload = register_atoms(args.root, args.module, args.book.strip())
+            payload = register_atoms(args.root, args.module, args.book.strip(), args.workspace)
         except ValueError as exc:
-            print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
+            errors = getattr(exc, "errors", None) or [str(exc)]
+            warnings = getattr(exc, "warnings", [])
+            print(json.dumps({"ok": False, "errors": errors, "warnings": warnings}, ensure_ascii=False))
             return 2
         print(json.dumps(payload, ensure_ascii=False))
         return 0
+    if args.command == "check-atoms":
+        report = check_atoms(args.root, args.module, args.book.strip(), args.workspace)
+        print(json.dumps(report, ensure_ascii=False))
+        return 0 if report["ok"] else 1
     if args.command == "validate":
-        errors = validate(args.root)
+        errors = validate(args.root, args.workspace)
         print(json.dumps({"ok": not errors, "errors": errors}, ensure_ascii=False))
         return 0 if not errors else 1
     if args.command == "resolve":

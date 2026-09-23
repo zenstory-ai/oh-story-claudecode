@@ -200,6 +200,48 @@ def test_register_rejects_incomplete_and_leaky_cards() -> None:
             require("source_specific_name_in_mechanism" in str(exc) and "张三" in str(exc), f"须点名泄漏专名：{exc}")
 
 
+def test_workspace_gate_and_check_atoms() -> None:
+    with tempfile.TemporaryDirectory(prefix="ilib-") as temporary:
+        base = Path(temporary)
+        # 沙箱布局：root 上方没有 拆文库/ → 必须显式失败，不得静默空名单
+        orphan_root = base / "孤立" / "灵感库"
+        write(base / "孤立" / "情绪模块.md", EM_MODULE_TEXT)
+        try:
+            MODULE["register_atoms"](orphan_root, base / "孤立" / "情绪模块.md", "测试书")
+            raise AssertionError("找不到工作区必须报错")
+        except ValueError as exc:
+            require("workspace_not_located" in str(exc), f"须报 workspace_not_located：{exc}")
+
+        root = make_workspace(base)
+        module_path = base / "拆文库" / "测试书" / "剧情" / "情绪模块.md"
+        payload = MODULE["register_atoms"](root, module_path, "测试书")
+        require(payload["character_roster"] == 0, f"名单规模必须报出：{payload}")
+        require(any("character_roster_missing" in warning for warning in payload["warnings"]),
+                f"无 角色/ 的书必须给 warning：{payload}")
+
+        # 一次报全：缺字段与泄漏并存时两个错误码同时出现
+        write(base / "拆文库" / "问题书" / "剧情" / "情绪模块.md",
+              INCOMPLETE_CARD + "\n### EM-002 张三登场\n\n| 字段 | 内容 |\n|---|---|\n"
+              "| 读者想看什么 | 张三翻盘。 |\n| 情绪链 | 链。 |\n| 戏剧单元 | 单元。 |\n"
+              "| 可替换项 | 场景 |\n| 不可照搬 | 张三的台词 |\n")
+        write(base / "拆文库" / "问题书" / "角色" / "张三.md", "# 张三\n")
+        try:
+            MODULE["register_atoms"](root, base / "拆文库" / "问题书" / "剧情" / "情绪模块.md", "问题书")
+            raise AssertionError("问题卡必须报错")
+        except ValueError as exc:
+            require("em_fields_missing" in str(exc) and "source_specific_name_in_mechanism" in str(exc),
+                    f"必须一次报出全部问题：{exc}")
+
+        # check-atoms 只读：报告同样的问题且不动索引
+        before = (root / "灵感索引.csv").read_bytes()
+        report = MODULE["check_atoms"](root, base / "拆文库" / "问题书" / "剧情" / "情绪模块.md", "问题书")
+        require(not report["ok"] and len(report["errors"]) == 2, f"check-atoms 须报全错误：{report}")
+        require((root / "灵感索引.csv").read_bytes() == before, "check-atoms 不得写盘")
+        clean = MODULE["check_atoms"](root, module_path, "测试书")
+        require(clean["ok"] and clean["cards_full"] == 2 and clean["cards_index"] == 1,
+                f"干净书 check-atoms 须给出卡数：{clean}")
+
+
 def test_validate_cba_closure_and_markers() -> None:
     with tempfile.TemporaryDirectory(prefix="ilib-") as temporary:
         base = Path(temporary)
@@ -268,6 +310,7 @@ def main() -> int:
     test_register_and_idempotence()
     test_parse_genre_variants()
     test_register_rejects_incomplete_and_leaky_cards()
+    test_workspace_gate_and_check_atoms()
     test_validate_cba_closure_and_markers()
     test_validate_rejects_path_reference_in_card()
     test_validate_set_mismatch_and_nm_rules()
