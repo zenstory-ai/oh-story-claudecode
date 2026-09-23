@@ -550,6 +550,59 @@ def validate(root: Path, workspace: Path | None = None) -> list[str]:
     return errors
 
 
+def coverage(root: Path) -> dict[str, Any]:
+    """增量入库的机械导航：报出未进入任何 active CBA 闭包的原子。
+
+    跨书聚合的 LLM 工作只需要看 uncovered 原子与现存单书假设卡，
+    不必重读已覆盖的 EM 卡。只读，不写盘。
+    """
+    rows, errors = load_rows(root)
+    if errors:
+        raise ValueError(";".join(errors))
+    ia_by_book: dict[str, set[str]] = {}
+    nm_members: dict[tuple[str, str], set[str]] = {}
+    for row in rows:
+        if row.get("status", "").strip() != "active":
+            continue
+        book = row.get("source_book", "").strip()
+        if row.get("layer") == "原子灵感":
+            for ref in source_ids(row.get("source_ids", "")):
+                ia_by_book.setdefault(book, set()).add(ref)
+        elif row.get("layer") == "单小说灵感合并":
+            nm_members[(book, row.get("item_id", "").strip())] = set(source_ids(row.get("source_ids", "")))
+    covered: set[tuple[str, str]] = set()
+    single_book_hypotheses: list[str] = []
+    for row in rows:
+        if row.get("layer") != "跨书灵感聚合" or row.get("status", "").strip() != "active":
+            continue
+        if positive_int(row.get("novel_count", "")) == 1:
+            single_book_hypotheses.append(row.get("item_id", "").strip())
+        for raw_ref in source_ids(row.get("source_ids", "")):
+            if "/" not in raw_ref:
+                continue
+            book, ref = raw_ref.rsplit("/", 1)
+            if ref.startswith("NM-"):
+                covered.update((book, em_ref) for em_ref in nm_members.get((book, ref), set()))
+            else:
+                covered.add((book, ref))
+    books: dict[str, dict[str, Any]] = {}
+    uncovered_total = 0
+    for book in sorted(ia_by_book):
+        uncovered = sorted(em for em in ia_by_book[book] if (book, em) not in covered)
+        uncovered_total += len(uncovered)
+        books[book] = {
+            "atoms": len(ia_by_book[book]),
+            "covered": len(ia_by_book[book]) - len(uncovered),
+            "uncovered": uncovered,
+        }
+    return {
+        "ok": True,
+        "books": books,
+        "uncovered_total": uncovered_total,
+        "single_book_hypotheses": sorted(single_book_hypotheses),
+    }
+
+
 def requested_tags(values: list[str]) -> dict[str, set[str]]:
     tags, errors = parse_tags("；".join(values))
     if errors:
@@ -641,6 +694,8 @@ def parse_args() -> argparse.Namespace:
     validate_parser = subparsers.add_parser("validate")
     validate_parser.add_argument("--root", required=True, type=Path)
     validate_parser.add_argument("--workspace", type=Path, default=None)
+    coverage_parser = subparsers.add_parser("coverage")
+    coverage_parser.add_argument("--root", required=True, type=Path)
     query_parser = subparsers.add_parser("query")
     query_parser.add_argument("--root", required=True, type=Path)
     query_parser.add_argument("--tag", action="append", default=[])
@@ -671,6 +726,14 @@ def main() -> int:
         errors = validate(args.root, args.workspace)
         print(json.dumps({"ok": not errors, "errors": errors}, ensure_ascii=False))
         return 0 if not errors else 1
+    if args.command == "coverage":
+        try:
+            payload = coverage(args.root)
+        except ValueError as exc:
+            print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
+            return 2
+        print(json.dumps(payload, ensure_ascii=False))
+        return 0
     if args.command == "resolve":
         try:
             payload = resolve(args.root, args.ref)

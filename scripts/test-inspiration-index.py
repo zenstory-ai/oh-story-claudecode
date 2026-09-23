@@ -343,6 +343,24 @@ def test_validate_cba_closure_and_markers() -> None:
                 f"EM 引用必须解析回情绪模块锚点:{resolved}")
 
 
+def test_coverage_reports_uncovered_atoms() -> None:
+    with tempfile.TemporaryDirectory(prefix="ilib-") as temporary:
+        base = Path(temporary)
+        root = make_workspace(base)
+        module_path = base / "拆文库" / "测试书" / "剧情" / "情绪模块.md"
+        MODULE["register_atoms"](root, module_path, "测试书")
+        write(root / "跨书灵感聚合" / "CBA-001_压低预期后兑现.md",
+              "# CBA-001：压低预期后兑现\n\n- 验证状态：单书假设\n- 来源：测试书/EM-001\n")
+        append_row(root, base_row(item_id="CBA-001", layer="跨书灵感聚合", title="压低预期后兑现",
+                                  source_book="测试书", path="跨书灵感聚合/CBA-001_压低预期后兑现.md",
+                                  source_ids="测试书/EM-001", tags=CBA_TAGS))
+        payload = MODULE["coverage"](root)
+        book = payload["books"]["测试书"]
+        require(book["atoms"] == 3 and book["covered"] == 1, f"闭包覆盖数必须准确：{payload}")
+        require(book["uncovered"] == ["EM-002", "EM-004"], f"未覆盖原子必须点名：{payload}")
+        require(payload["single_book_hypotheses"] == ["CBA-001"], f"单书假设卡必须列出待复核：{payload}")
+
+
 def test_validate_rejects_path_reference_in_card() -> None:
     with tempfile.TemporaryDirectory(prefix="ilib-") as temporary:
         base = Path(temporary)
@@ -392,6 +410,7 @@ def main() -> int:
     test_workspace_gate_and_check_atoms()
     test_multiline_values_and_leak_tiering()
     test_validate_cba_closure_and_markers()
+    test_coverage_reports_uncovered_atoms()
     test_validate_rejects_path_reference_in_card()
     test_validate_set_mismatch_and_nm_rules()
     print("OK: inspiration index regressions passed")
