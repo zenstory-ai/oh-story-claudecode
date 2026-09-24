@@ -37,8 +37,8 @@
     },
     {
       "path": "skills/story-short-write/references/workflow-design.md",
-      "budget": 2350,
-      "why": "短篇 Phase 2 首屏门禁必读；原入口构思/设计/验收原文迁出，非新增技法，Phase 3/4 不预加载。"
+      "budget": 2400,
+      "why": "短篇 Phase 2 首屏门禁必读；原入口构思/设计/验收原文迁出，非新增技法，Phase 3/4 不预加载。 +50：向作者汇报构思只讲故事与待拍板问题，不报脚本、检查 ID 与表格列数。"
     },
     {
       "path": "skills/story-setup/references/templates/agents/narrative-writer.md",
@@ -212,13 +212,13 @@
     },
     {
       "path": "skills/story-short-write/references/workflow-draft.md",
-      "budget": 4600,
-      "why": "Phase 3 写作细则由原 SKILL 原文迁入；根据同稿实验将小节完整性与完成门槛保留入口，原规则未增写。"
+      "budget": 4750,
+      "why": "Phase 3 写作细则由原 SKILL 原文迁入；根据同稿实验将小节完整性与完成门槛保留入口，原规则未增写。 +150：写前参数验收写出完整命令并前置于动笔，计数改用交付验收脚本——#418 拆分后本文件只指向 Phase 4 命令，实测模型先写正文、从未写前验收，再用 40 轮自写计数挤进字数范围。"
     },
     {
       "path": "skills/story-short-write/references/workflow-revision.md",
-      "budget": 1700,
-      "why": "Phase 4 精修细则由原 SKILL 原文迁入；含最终扫描与交付验收。"
+      "budget": 1850,
+      "why": "Phase 4 精修细则由原 SKILL 原文迁入；含最终扫描与交付验收。 +150：给作者的交付说明模板（写了什么/待拍板问题附默认/下一步），自查结果收成一句大白话——实测交付报告逐条列脚本名与表格列数，作者看不懂。"
     }
   ],
   "paths": [
@@ -649,8 +649,8 @@
         "skills/story-short-write/references/workflow-draft.md",
         "skills/story-short-write/references/workflow-revision.md"
       ],
-      "budget": 11500,
-      "why": "合计约束原入口拆分后的执行指令，避免迁出文件不计入预算；原短篇入口预算11300，新增200仅容纳阶段入口和相对路径说明。"
+      "budget": 11950,
+      "why": "合计约束原入口拆分后的执行指令，避免迁出文件不计入预算；原短篇入口预算11300，新增200仅容纳阶段入口和相对路径说明。 +450：Phase 3 自足的写前参数验收命令与计数口径、Phase 4 给作者的交付说明，见 workflow-draft / workflow-revision 两条登记。"
     }
   ]
 }

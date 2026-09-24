@@ -53,4 +53,33 @@ const shortDesign = fs.readFileSync(path.join(repoRoot, 'skills/story-short-writ
 assert.match(shortDesign, /check-phase2-contract\.js --json/)
 assert.match(shortDesign, /最多做 2 轮定向 repair/)
 
+// Phase 3 must be self-sufficient: #418 left workflow-draft pointing at "the Phase 4
+// command", which only lived in workflow-revision; a real run wrote prose first and
+// never ran the precheck. Pin the route, the literal command and its position.
+function phaseSection(heading) {
+  const start = short.indexOf(heading)
+  assert(start >= 0, `short SKILL.md must keep ${heading}`)
+  const next = short.indexOf('\n### Phase ', start + heading.length)
+  return short.slice(start, next < 0 ? undefined : next)
+}
+assert.match(shortGate, /Phase 3 写正文前完整读取 `references\/workflow-draft\.md`/)
+assert.match(shortGate, /Phase 4 精修前完整读取 `references\/workflow-revision\.md`/)
+assert(phaseSection('### Phase 3：').includes('(references/workflow-draft.md)'), 'Phase 3 must route workflow-draft.md')
+assert(phaseSection('### Phase 4：').includes('(references/workflow-revision.md)'), 'Phase 4 must route workflow-revision.md')
+
+const shortDraft = fs.readFileSync(path.join(repoRoot, 'skills/story-short-write/references/workflow-draft.md'), 'utf8')
+const precheck = shortDraft.match(/`node \{skill 根\}\/scripts\/check-delivery-contract\.js ([^`]*)`/)
+assert(precheck, 'workflow-draft must spell out the check-delivery-contract precheck command')
+for (const flag of ['--check-contract', '--min-chars {MIN}', '--max-chars {MAX}', '--sections {N}', '--min-section-chars']) {
+  assert(precheck[1].includes(flag), `workflow-draft precheck must pass ${flag}`)
+}
+const draftingStep = shortDraft.indexOf('**写前准备**')
+assert(draftingStep > 0 && precheck.index < draftingStep, 'workflow-draft precheck must come before the drafting step')
+assert.doesNotMatch(shortDraft, /Phase 4 的交付命令/, 'workflow-draft must not defer the precheck command to Phase 4')
+assert.match(shortDraft, /不自写 Python 计数/)
+
+const shortRevision = fs.readFileSync(path.join(repoRoot, 'skills/story-short-write/references/workflow-revision.md'), 'utf8')
+const finalCheck = shortRevision.match(/`node scripts\/check-delivery-contract\.js ([^`]*)`/)
+assert(finalCheck && !finalCheck[1].includes('--check-contract'), 'workflow-revision must keep the final delivery check')
+
 process.stdout.write('reference-gates: source policy holds\n')

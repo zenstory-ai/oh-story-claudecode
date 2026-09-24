@@ -7,7 +7,7 @@ Phase 3 写手负责内容覆盖与格式自检，不提前执行完整语义去
 加载 `references/writing-workflow.md` 中的精修清单完成检查。
 重点：开头钩子、情绪曲线、反转铺垫、每句话价值、格式规范、AI 腔。文件模式依次运行 `node scripts/check-ai-patterns.js --check --fail-on=blocking 正文.md`、`node scripts/check-outline-copy.js --outline 小节大纲.md 正文.md`、`node scripts/normalize-punctuation.js 正文.md`、`node scripts/check-degeneration.js --check 正文.md`。blocking 或确属细纲照搬先改正文再复扫；其他提示仅作读感复核，功能性写法可保留。
 
-上述修改全部落盘后，运行 `node scripts/check-delivery-contract.js --json --min-chars {MIN} --max-chars {MAX} --sections {N} {短篇目录}`。exit 0 才可交付；exit 1 只按 `repair_scope` 最小修复并重跑受影响的质量检查与本命令，最多 2 轮；仍失败则报告检查 ID 并停止。exit 2、脚本缺失或不可执行时不得声称交付契约通过。本 verifier 只验用户字数、节数与排版形状，不替代正文质量判断。
+上述修改全部落盘后，运行 `node scripts/check-delivery-contract.js --json --min-chars {MIN} --max-chars {MAX} --sections {N} {短篇目录}`。exit 0 才可交付；exit 1 只按 `repair_scope` 最小修复并重跑受影响的质量检查与本命令，最多 2 轮；仍失败则停止，按下方交付说明告诉作者哪项没达标、差多少。exit 2、脚本缺失或不可执行时不得声称交付契约通过。本 verifier 只验用户字数、节数与排版形状，不替代正文质量判断。
 
 #### Agent 调用：narrative-writer（去AI味）+ consistency-checker
 
@@ -23,3 +23,10 @@ Phase 3 写手负责内容覆盖与格式自检，不提前执行完整语义去
 - 正文中不得出现任何 `<!-- 自检 -->` 或类似的检查标记注释
 
 不通过 → 回退补足。
+
+**交付说明（给作者看）**：只用大白话，按三块写：
+1. 写了什么：标题、一句话核心钩子或反转、总字数、几节。
+2. 要作者拍板的事：每件写成一句问题并附推荐默认（如「结尾要不要再留个小反转？默认不留」）；没有就省略。
+3. 下一步可选：精修某段、去 AI 味、换平台改写等。
+
+自查结果只写一句（如「自查过字数、分节和常见 AI 腔，都过了」；没过就说哪项差多少）。不写脚本名、检查 ID、字段名、参数或大纲表格格式。

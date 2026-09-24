@@ -24,7 +24,7 @@ narrative-writer 模板每章每次 spawn 都要付，近 300 行里铁律与技
 ## Consequences
 
 - **收益**：短篇 `SKILL.md` 39.6k → 11.4k 字节；写手定义 293 → 110 行；参考按需读，写前只付当前阶段的文本。
-- **代价与已知上限**：一次任务要读多个文件，「读完再写」只靠 Reference Gate 文字约束（`rg` 摘读不算读完），弱模型可能跳读——#415 补的「preserve reference reads」就是为此；路由文字本身占预算（paths 的 `why` 登记 +900）。重访信号：若实测子代理漏读外移技法的比例回升（narrative-writer 的预算 `why` 记录过同一章 6 轮全部漏读 `writing-craft.md` 的历史），应把该条收回模板，而不是继续外移。
+- **代价与已知上限**：一次任务要读多个文件，「读完再写」只靠 Reference Gate 文字约束（`rg` 摘读不算读完），弱模型可能跳读——#415 补的「preserve reference reads」就是为此；路由文字本身占预算（paths 的 `why` 登记 +900）。拆分还会切断跨文件引用：#418 后短篇 `workflow-draft.md` 的写前参数验收只写「给 Phase 4 的交付命令加 `--check-contract`」，命令本体留在 `workflow-revision.md`，实测模型先写正文、从未写前验收；修复与守卫见 [短篇写前验收回归](../bug-fix/2026-09-24-short-write-precheck-regression.md)。迁出时每个阶段文件须自带它要执行的命令。重访信号：若实测子代理漏读外移技法的比例回升（narrative-writer 的预算 `why` 记录过同一章 6 轮全部漏读 `writing-craft.md` 的历史），应把该条收回模板，而不是继续外移。
 
 ## Verification
 
