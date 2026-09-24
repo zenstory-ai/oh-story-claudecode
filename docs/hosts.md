@@ -40,7 +40,7 @@ repo 内直接使用：Codex 会扫描 `$REPO_ROOT/.agents/skills`（指向 `ski
 
 ## OpenCode
 
-全局安装后 opencode 自动从 `~/.claude/skills/` 发现 skills；首次用自然语言触发 story-setup（如「用 story-setup 部署网文写作环境」），**部署后退出重进 `opencode -c`** 才能用 slash command。部分 hook 行为与 Claude Code 有差异（session-start / session-end / compact 等），详见 [CONTRIBUTING.md](../CONTRIBUTING.md) 的 OpenCode 章节。
+需要 **OpenCode 2.x**（`curl -fsSL https://opencode.ai/v2/install | bash` 或 `npm i -g @opencode/cli`）；1.x 加载不了写正文守卫插件，story-setup 会拦下并提示升级，已按 1.x 部署过的项目升级后重跑 story-setup。全局安装后 opencode 自动从 `~/.claude/skills/` 发现 skills；首次用自然语言触发 story-setup（如「用 story-setup 部署网文写作环境」），部署后 slash command 自动加载，没出现就运行 `opencode reload`。部分 hook 行为与 Claude Code 有差异（session-start / session-end / compact 等），详见 [CONTRIBUTING.md](../CONTRIBUTING.md) 的 OpenCode 章节。
 
 ## OpenClaw
 

@@ -5,13 +5,25 @@ description: |
   被 story-review、story-long-write（Phase 5）、story-short-write（Phase 4）调用。
   不做任何创作判断。
 mode: subagent
-permission:
-  "*": deny
-  read: allow
-  glob: allow
-  grep: allow
-  edit: deny
-  bash: deny
+permissions:
+  - action: "*"
+    resource: "*"
+    effect: deny
+  - action: read
+    resource: "*"
+    effect: allow
+  - action: glob
+    resource: "*"
+    effect: allow
+  - action: grep
+    resource: "*"
+    effect: allow
+  - action: edit
+    resource: "*"
+    effect: deny
+  - action: shell
+    resource: "*"
+    effect: deny
 steps: 15
 ---
 

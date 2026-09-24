@@ -5,13 +5,25 @@ description: |
   被 story-long-write（Phase 4-5）和 story-short-write（Phase 3-4）调用。
   也可执行完整去AI味流程和格式合规检查。
 mode: subagent
-permission:
-  "*": deny
-  read: allow
-  glob: allow
-  grep: allow
-  edit: allow
-  bash: allow
+permissions:
+  - action: "*"
+    resource: "*"
+    effect: deny
+  - action: read
+    resource: "*"
+    effect: allow
+  - action: glob
+    resource: "*"
+    effect: allow
+  - action: grep
+    resource: "*"
+    effect: allow
+  - action: edit
+    resource: "*"
+    effect: allow
+  - action: shell
+    resource: "*"
+    effect: allow
 steps: 30
 ---
 

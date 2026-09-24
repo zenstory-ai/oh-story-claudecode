@@ -73,8 +73,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - name: Install current OpenCode CLI
-        run: npm install --global opencode-ai@latest
+      # OpenCode 2.x 发布在 @opencode/cli；opencode-ai 停在 1.x，本适配不再支持。
+      - name: Install current OpenCode 2.x CLI
+        run: npm install --global @opencode/cli@latest
       - name: Run real OpenCode CLI adapter test
         run: bash scripts/test-opencode-cli-e2e.sh
       - name: Check generated agent permissions with real tools

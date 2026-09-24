@@ -9,6 +9,14 @@
 
 `.story-deployed` 缺失任一字段，或 `agents_version` 缺失 / 非整数 / 小于 `30`，都视为待更新部署。直接重新运行 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或自然语言点名）；不在运行时逐级兼容历史模板。如项目 `agents_version` 大于 `30`，说明本地 story-setup 比项目旧：先更新 oh-story-claudecode，不得用 v30 降级覆盖。历史版本改动见仓库根目录 `CHANGELOG.md`。
 
+## OpenCode 只支持 2.x（下一版本）
+
+OpenCode 2.0 起发布在 npm 包 `@opencode/cli`（`opencode-ai` 停在 1.x）。本适配只支持 2.x：1.x 的插件 loader 读不了新版 `story-hooks.ts`，在 1.x 上会没有写正文守卫与写后兜底。
+
+1. 升级 OpenCode：`curl -fsSL https://opencode.ai/v2/install | bash` 或 `npm i -g @opencode/cli`，确认 `opencode --version` 为 2.x。
+2. 更新技能包后，在写作项目根重跑 story-setup：替换 `.opencode/plugins/story-hooks.ts` 与 `.opencode/agents/`（改为 2.x 原生 `permissions:` 规则列表，已配的 `model:` 会保留），并从 `opencode.json` / `opencode.jsonc` 删除旧的 story-hooks 插件注册。
+3. 这次变更随下一次发版抬 `agents_version`；发版前 session-start 不会提示重新部署，OpenCode 用户需要手动重跑。
+
 ## 插件打包身份迁移（v0.7.9 同版本修复）
 
 Claude Code / ZCode 市场改为单一 `oh-story` 插件，仍包含全部 13 个 Skills。该迁移始于 v0.7.9 的同版本修复，仍使用旧插件身份的用户需手动迁移；`npx skills` 安装无需迁移。卸载前备份要保留的插件数据，以下操作仅针对旧插件记录，保留写作项目及 story-setup 部署文件。

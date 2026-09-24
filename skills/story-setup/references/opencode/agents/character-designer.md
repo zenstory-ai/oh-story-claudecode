@@ -4,13 +4,25 @@ description: |
   对话质量、角色关系设计。被 story-long-write（Phase 2,4）和 story-short-write（Phase 2,3）调用。
   也可审查角色一致性和对话质量。
 mode: subagent
-permission:
-  "*": deny
-  read: allow
-  glob: allow
-  grep: allow
-  edit: allow
-  bash: deny
+permissions:
+  - action: "*"
+    resource: "*"
+    effect: deny
+  - action: read
+    resource: "*"
+    effect: allow
+  - action: glob
+    resource: "*"
+    effect: allow
+  - action: grep
+    resource: "*"
+    effect: allow
+  - action: edit
+    resource: "*"
+    effect: allow
+  - action: shell
+    resource: "*"
+    effect: deny
 steps: 25
 ---
 

@@ -6,10 +6,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import tomllib
 from pathlib import Path
 
@@ -71,16 +73,23 @@ def codex_documents(directory: Path) -> dict[str, dict[str, object]]:
 
 
 def opencode_permissions(path: Path) -> dict[str, str]:
+    """Read the generated 2.x `permissions:` rule list as {action: effect}, in rule order."""
     permissions: dict[str, str] = {}
     in_permissions = False
+    action = ""
     for line in path.read_text(encoding="utf-8").splitlines():
-        if line == "permission:":
+        if line == "permissions:":
             in_permissions = True
             continue
         if in_permissions and line.startswith("  "):
-            key, separator, value = line.strip().partition(":")
-            if separator and value.strip() in {"allow", "deny", "ask"}:
-                permissions[key.strip('"')] = value.strip()
+            key, _, value = line.strip().removeprefix("- ").partition(":")
+            value = value.strip().strip('"')
+            if key == "action":
+                action = value
+            elif key == "resource":
+                assert value == "*", (path, line)
+            elif key == "effect":
+                permissions[action] = value
             continue
         if in_permissions:
             break
@@ -244,7 +253,7 @@ def test_permissions_follow_capabilities_not_names() -> None:
             path.stem: opencode_permissions(path)
             for path in (generated / "agents").glob("*.md")
         }
-        reader = {"*": "deny", "read": "allow", "glob": "allow", "grep": "allow", "edit": "deny", "bash": "deny"}
+        reader = {"*": "deny", "read": "allow", "glob": "allow", "grep": "allow", "edit": "deny", "shell": "deny"}
         assert permissions["renamed-reader"] == reader
         only_read = {**reader, "glob": "deny", "grep": "deny"}
         for name in ("implicit-reader", "denials-win", "story-researcher"):
@@ -252,7 +261,7 @@ def test_permissions_follow_capabilities_not_names() -> None:
         assert permissions["mixed-read-like"] == {**reader, "read": "deny", "grep": "deny"}
         for name in ("renamed-writer", "write-without-edit", "edit-without-write"):
             assert permissions[name] == {**only_read, "edit": "allow"}, name
-        assert permissions["shell-reader"] == {**only_read, "bash": "allow"}
+        assert permissions["shell-reader"] == {**only_read, "shell": "allow"}
 
         result = subprocess.run(
             ["node", str(ANTIGRAVITY_GENERATOR), "--source", str(source), "--dest", str(root / "agy")],
@@ -287,11 +296,11 @@ def test_empty_and_inherited_tools_are_distinct() -> None:
             generated = prepare_opencode_root(root / name / "opencode", source)
             permissions = opencode_permissions(generated / f"agents/{name}.md")
             if name in {"empty", "all-denied"}:
-                assert permissions == {"*": "deny", "read": "deny", "glob": "deny", "grep": "deny", "edit": "deny", "bash": "deny"}
+                assert permissions == {"*": "deny", "read": "deny", "glob": "deny", "grep": "deny", "edit": "deny", "shell": "deny"}
             elif name == "inherit":
                 assert permissions == {}
             else:
-                assert permissions == {"glob": "deny", "edit": "deny", "bash": "deny"}
+                assert permissions == {"glob": "deny", "edit": "deny", "shell": "deny"}
             result = subprocess.run(
                 ["node", str(ANTIGRAVITY_GENERATOR), "--source", str(source), "--dest", str(root / name / "agy")],
                 text=True, capture_output=True,
@@ -336,7 +345,12 @@ def test_invalid_capability_declarations_fail_closed() -> None:
 
 
 def test_opencode_runtime(cli: str) -> None:
-    """Exercise the V1 tool registry and allow/deny checks without model calls."""
+    """Exercise the real OpenCode 2.x tool registry through `opencode run --agent`.
+
+    OpenCode 2.x drops every tool whose last matching rule is a blanket deny from the tool list
+    it sends to the model, so the tool names the mock model receives are the runtime verdict.
+    A few scripted tool calls then prove that allowed tools really execute and denied ones don't.
+    """
     with tempfile.TemporaryDirectory(prefix="opencode-agent-permissions-") as tmp:
         root = Path(tmp).resolve()
         source = root / "sources"
@@ -353,75 +367,114 @@ def test_opencode_runtime(cli: str) -> None:
         project = root / "project"
         shutil.copytree(generated / "agents", project / ".opencode/agents")
         shutil.copytree(OPENCODE_BASELINE / "agents", project / ".opencode/agents", dirs_exist_ok=True)
-        (project / "opencode.json").write_text(json.dumps({
-            "model": "fixture/probe",
-            "provider": {"fixture": {
-                "npm": "@ai-sdk/openai-compatible",
-                "options": {"baseURL": "http://127.0.0.1:9/v1", "apiKey": "fixture"},
-                "models": {"probe": {"name": "probe", "limit": {"context": 10000, "output": 1000}}},
-            }},
-        }), encoding="utf-8")
         (project / "canary.txt").write_text("PERMISSION_CANARY\n", encoding="utf-8")
+        # OpenCode 从当前目录向上找到项目根为止发现 .opencode/；项目根由 git 仓库界定。
+        subprocess.run(["git", "init", "-q", str(project)], check=True)
+        home = root / "home"
         env = {k: v for k, v in os.environ.items() if not k.startswith(("OPENCODE_", "ANTHROPIC_", "OPENAI_", "XDG_"))}
-        env["HOME"] = str(root / "home")
+        env["HOME"] = str(home)
         for kind in ("CONFIG", "DATA", "CACHE", "STATE"):
-            env[f"XDG_{kind}_HOME"] = str(root / "home" / kind.lower())
+            env[f"XDG_{kind}_HOME"] = str(home / kind.lower())
+        # `opencode run` 取 $PWD 作会话目录；subprocess 的 cwd= 不改继承来的 PWD，不显式设就会跑到调用方目录。
+        env["PWD"] = str(project)
+        mock_log = root / "mock-requests.jsonl"
+        mock_script = root / "mock-script.json"
+        mock = subprocess.Popen(
+            ["node", str(REPO_ROOT / "scripts/opencode-mock-llm.mjs")],
+            env={**env, "MOCK_LOG": str(mock_log), "MOCK_SCRIPT": str(mock_script)},
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            port = int(mock.stdout.readline())
+            config_dir = home / "config/opencode"
+            config_dir.mkdir(parents=True)
+            (config_dir / "opencode.json").write_text(json.dumps({
+                "providers": {"mock": {
+                    "name": "Mock",
+                    "package": "@opencode/ai/providers/openai-compatible",
+                    "settings": {"baseURL": f"http://127.0.0.1:{port}/v1", "apiKey": "fixture"},
+                    "models": {"probe": {"name": "probe"}},
+                }},
+            }), encoding="utf-8")
 
-        def invoke(name: str, *args: str) -> subprocess.CompletedProcess[str]:
-            return subprocess.run(
-                [cli, "debug", "agent", name, "--pure", *args],
-                cwd=project, env=env, text=True, capture_output=True, timeout=90,
-            )
-
-        for name in ("reader", "empty", "chapter-extractor", "character-designer", "consistency-checker",
-                     "narrative-writer", "story-architect", "story-explorer", "story-researcher"):
-            result = invoke(name)
-            assert result.returncode == 0, result.stdout + result.stderr
-            tools = json.loads(result.stdout)["tools"]
-            for tool in ("task", "webfetch", "skill"):
-                assert tools[tool] is False, (name, tool, tools)
-            if name == "empty":
-                assert not any(tools.values()), tools
-            elif name != "reader":
-                assert all(tools[t] for t in ("read", "glob", "grep")), (name, tools)
-                assert tools["bash"] == (name in {"narrative-writer", "story-researcher"}), (name, tools)
-
-        checks = [
-            ("reader", "read", {"filePath": str(project / "canary.txt")}, True),
-            ("reader", "write", {"filePath": str(project / "reader-write.txt"), "content": "DENIED"}, False),
-            ("reader", "bash", {"command": "printf DENIED > shell-write.txt", "description": "Write fixture"}, False),
-            ("glob-only", "read", {"filePath": str(project / "canary.txt")}, False),
-            ("glob-only", "grep", {"pattern": "PERMISSION_CANARY", "path": "."}, False),
-            ("glob-only", "glob", {"pattern": "canary.txt"}, True),
-            ("inherit-minus-glob", "read", {"filePath": str(project / "canary.txt")}, True),
-            ("inherit-minus-glob", "glob", {"pattern": "canary.txt"}, False),
-            ("inherit-minus-glob", "grep", {"pattern": "PERMISSION_CANARY", "path": "."}, True),
-            ("writer", "write", {"filePath": str(project / "created.txt"), "content": "CREATED"}, True),
-            ("shell", "bash", {"command": "printf SHELL_OK", "description": "Fixture shell control"}, True),
-            ("empty", "read", {"filePath": str(project / "canary.txt")}, False),
-            ("empty", "write", {"filePath": str(project / "empty-write.txt"), "content": "DENIED"}, False),
-        ]
-        for name, tool, params, allowed in checks:
-            result = invoke(name, "--tool", tool, "--params", json.dumps(params))
-            output = result.stdout + result.stderr
-            if allowed:
-                assert result.returncode == 0, (name, tool, output)
-                if tool in {"read", "grep"}:
-                    assert "PERMISSION_CANARY" in output, output
-                elif tool == "glob":
-                    assert "canary.txt" in output, output
+            # location 的 agent 是异步加载的，冷启动的服务上 `run --agent` 会先于加载报 Agent not found。
+            # 先把后台服务预热到能列出全部 agent，之后每次 run 都复用这个服务。
+            expected_agents = {path.stem for path in (project / ".opencode/agents").glob("*.md")}
+            for _ in range(60):
+                listed = subprocess.run(
+                    [cli, "debug", "agents"], cwd=project, env=env, text=True, capture_output=True, timeout=60,
+                )
+                try:
+                    if expected_agents <= {item.get("id") for item in json.loads(listed.stdout)}:
+                        break
+                except json.JSONDecodeError:
+                    pass
+                time.sleep(1)
             else:
-                assert result.returncode != 0 and "disabled" in output.lower(), (name, tool, output)
-            print(f"  OpenCode {name}/{tool}: {'allow' if allowed else 'deny'}")
-        assert (project / "created.txt").read_text(encoding="utf-8") == "CREATED"
-        for filename in ("reader-write.txt", "shell-write.txt", "empty-write.txt"):
-            assert not (project / filename).exists(), filename
-        assert (project / "canary.txt").read_text(encoding="utf-8") == "PERMISSION_CANARY\n"
+                raise AssertionError(f"OpenCode never listed the fixture agents: {listed.stdout}{listed.stderr}")
+
+            def run_agent(name: str, calls: list[dict[str, object]] | None = None) -> tuple[set[str], str]:
+                mock_script.write_text(json.dumps(calls or []), encoding="utf-8")
+                mock_log.write_text("", encoding="utf-8")
+                result = subprocess.run(
+                    [cli, "run", "--agent", name, "--model", "mock/probe", "go"],
+                    cwd=project, env=env, text=True, capture_output=True, timeout=120,
+                    stdin=subprocess.DEVNULL,  # run 会把非 TTY 的 stdin 读作消息，继承管道会一直等 EOF
+                )
+                assert result.returncode == 0, (name, result.stdout + result.stderr)
+                rows = [json.loads(line) for line in mock_log.read_text(encoding="utf-8").splitlines() if line]
+                tools = {tool["function"]["name"] for row in rows for tool in row["body"].get("tools") or []}
+                results = [
+                    content if isinstance(content := message.get("content"), str) else json.dumps(content, ensure_ascii=False)
+                    for row in rows
+                    for message in row["body"].get("messages", [])
+                    if message.get("role") == "tool"
+                ]
+                return tools, "\n".join(results)
+
+            read_like = {"read", "glob", "grep"}
+            for name in ("chapter-extractor", "character-designer", "consistency-checker",
+                         "narrative-writer", "story-architect", "story-explorer", "story-researcher"):
+                tools, _ = run_agent(name)
+                assert read_like <= tools, (name, tools)
+                assert ("shell" in tools) == (name in {"narrative-writer", "story-researcher"}), (name, tools)
+                assert not tools & {"subagent", "webfetch", "websearch", "skill", "execute"}, (name, tools)
+                print(f"  OpenCode {name}: {', '.join(sorted(tools))}")
+
+            tools, results = run_agent("reader", [
+                {"name": "write", "arguments": {"path": "reader-write.txt", "content": "DENIED"}},
+            ])
+            assert tools == {"read"}, tools
+            assert not (project / "reader-write.txt").exists()
+            assert re.search(r'No tool named \\?"write\\?"', results), results
+            tools, _ = run_agent("glob-only")
+            assert tools == {"glob"}, tools
+            tools, _ = run_agent("inherit-minus-glob")
+            assert {"read", "grep"} <= tools and not tools & {"glob", "write", "edit", "patch", "shell"}, tools
+            tools, _ = run_agent("writer", [
+                {"name": "write", "arguments": {"path": "created.txt", "content": "CREATED"}},
+            ])
+            assert {"read", "write", "edit"} <= tools <= {"read", "write", "edit", "patch"}, tools
+            assert (project / "created.txt").read_text(encoding="utf-8") == "CREATED"
+            tools, results = run_agent("shell", [
+                {"name": "shell", "arguments": {"command": "printf SHELL_OK", "description": "Fixture shell control"}},
+            ])
+            assert tools == {"read", "shell"}, tools
+            assert "SHELL_OK" in results, results
+            tools, _ = run_agent("empty")
+            assert tools == set(), tools
+            print("  OpenCode fixtures: reader/glob-only/inherit-minus-glob/writer/shell/empty match capabilities")
+            assert (project / "canary.txt").read_text(encoding="utf-8") == "PERMISSION_CANARY\n"
+        finally:
+            subprocess.run([cli, "service", "stop"], env=env, capture_output=True, timeout=60)
+            mock.terminate()
+            mock.wait(timeout=10)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--opencode", help="OpenCode V1 executable for real tool permission checks")
+    parser.add_argument("--opencode", help="OpenCode 2.x executable for real tool permission checks")
     args = parser.parse_args()
     test_generated_agents_are_in_sync()
     test_permissions_follow_capabilities_not_names()

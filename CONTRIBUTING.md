@@ -87,7 +87,7 @@ PR 自动运行 `.github/workflows/cross-platform.yml`。static-check job 跑以
 - `python3 scripts/check-plugin-packaging.py` — Claude/ZCode catalog、原生 manifest、统一 bundle 身份、版本与 13 个根 Skills 检查
 - `python3 scripts/test-plugin-packaging.py` — 通过公开 CLI 对 catalog/manifest 做黑盒变异回归
 - `scripts/check-claude-adapter.sh` — Claude marketplace、根 plugin manifest 与 13 个 skill 自动发现检查；可选真实 CLI 生命周期
-- `scripts/check-opencode-adapter.sh` — OpenCode adapter 同步、commands/agents/config 结构与 plugin 真实行为检查
+- `scripts/check-opencode-adapter.sh` — OpenCode adapter 同步、commands/agents 结构与 plugin 真实行为检查
 - `scripts/check-openclaw-skills.sh` — OpenClaw 单行 frontmatter、`metadata.openclaw` 与可选真实 CLI 发现检查
 - `scripts/check-codex-adapter.sh` — Codex repo skills symlink、custom-agent TOML、hook 生成确定性与 launcher 契约
 - `scripts/test-codex-hooks.sh` — Codex hooks 合成事件测试
@@ -241,7 +241,7 @@ bash scripts/check-zcode-adapter.sh
 
 ## OpenCode 模板同步
 
-本项目同时支持 Claude Code、Google Antigravity、OpenCode、Codex、ZCode、OpenClaw 和 Reasonix（Phase 1）。OpenCode 的 agent 模板和项目指令模板由 `scripts/sync-opencode.py` 从 Claude Code 模板自动生成。
+本项目同时支持 Claude Code、Google Antigravity、OpenCode、Codex、ZCode、OpenClaw 和 Reasonix（Phase 1）。OpenCode 只适配 2.x（npm 包 `@opencode/cli`；停在 1.x 的 `opencode-ai` 不再支持，story-setup 部署前按版本拦截）。OpenCode 的 agent 模板和项目指令模板由 `scripts/sync-opencode.py` 从 Claude Code 模板自动生成。
 
 ### 何时需要同步
 
@@ -256,27 +256,27 @@ bash scripts/check-zcode-adapter.sh
 python3 scripts/sync-opencode.py
 python3 scripts/sync-opencode.py --check  # 可选：只校验，不改文件
 bash scripts/check-opencode-adapter.sh
-bash scripts/test-opencode-cli-e2e.sh  # 可选：需要本机已安装 opencode
+bash scripts/test-opencode-cli-e2e.sh  # 可选：需要本机已安装 OpenCode 2.x（npm i -g @opencode/cli）
 ```
 
 权限从 Claude 真源的 `tools` / `disallowedTools` 推导，禁止项先从声明工具中移除，不按 agent 名字特判。跨端映射有以下边界：
 
 - 三个生成器支持行内数组（如 `[Read, Glob, Grep]`，项可加成对引号）。Claude 官方也支持逗号字符串，但本项目生成器不支持该格式。未知或不支持的工具在发布生成文件前报错。
-- OpenCode V1 支持 Read、Glob、Grep、Write、Edit、Bash。显式 `tools` 先设置 `"*": deny`，再开放声明的能力，未声明的 shell、委派、MCP 等保持禁止；缺省 `tools` 才继承。Read/Glob/Grep 独立映射，空列表生成全禁用配置。Write 或 Edit 任一有效都会开放聚合 `edit` 权限（write/edit/apply_patch），无法保留这几个编辑工具之间的限制；Write 本身也可覆盖文件，并非“只能创建”。
+- OpenCode 2.x 支持 Read、Glob、Grep、Write、Edit、Bash，生成原生 `permissions:` 规则列表（`action`/`resource`/`effect`，Bash 对应 action `shell`）。显式 `tools` 先写 `*` 的 deny 规则，再开放声明的能力，未声明的 shell、委派、MCP 等保持禁止；缺省 `tools` 才继承。OpenCode 取最后一条命中的规则，列表顺序即优先级。Read/Glob/Grep 独立映射，空列表生成全禁用配置。Write 或 Edit 任一有效都会开放聚合 `edit` 权限（write/edit/patch），无法保留这几个编辑工具之间的限制；Write 本身也可覆盖文件，并非“只能创建”。
 - Codex 支持上述六种工具，以及 NotebookEdit、PowerShell 的可写能力分类。它只推导文件系统 `sandbox_mode`，不能表达 Claude 的完整工具白名单。显式声明中只有 Read/Glob/Grep 有效时设置 read-only；存在可写能力时继承父会话沙箱。缺省 `tools` 也继承，不根据部分禁止项假定所有继承工具均只读。零有效工具无法由该字段表达，因此拒绝生成。
 - Antigravity 只支持上述六种工具的映射，要求显式非空有效工具列表；不能映射的项报错，不静默丢弃。
 
-回归命令：`python3 scripts/test-agent-permissions.py`；传入 `--opencode /path/to/opencode` 可用真实 OpenCode V1 CLI 验证工具允许/拒绝，无需模型请求。
+回归命令：`python3 scripts/test-agent-permissions.py`；传入 `--opencode /path/to/opencode` 用真实 OpenCode 2.x CLI 加本地 mock 模型（`scripts/opencode-mock-llm.mjs`）验证：每个 agent 实际拿到的工具清单，以及允许/拒绝工具的真实执行，不需要模型账号。
 
 脚本会：
 1. 将 `templates/agents/` 下的 Claude Code agent 转换为 opencode 格式，写入 `opencode/agents/`
 2. 将 `CLAUDE.md.tmpl` 复制到 `opencode/AGENTS.md.tmpl`，替换 `.claude/` 路径引用
 3. 输出同步结果摘要
-4. 可选真实 CLI smoke 会在临时项目里验证 13 个 slash commands、7 个 agents 与 `story-hooks.ts` 插件能被 OpenCode 解析加载
+4. 可选真实 CLI e2e 在临时项目里验证 13 个 skills / slash commands、7 个 agents、`story-hooks.ts` 插件状态为 active，并用 mock 模型在真实运行时验证写正文守卫、写后兜底与压缩前注入
 
 ### CI 检测
 
-PR 中如果修改了 Claude Code 模板文件，CI 会自动检测 opencode 模板是否同步，并额外检查 `opencode.json.patch`、13 个 command、7 个 agent 的结构以及 `plugin.ts` 的实际守卫/收尾行为。如果 CI 报错，请在本地运行同步脚本和 `bash scripts/check-opencode-adapter.sh`，再提交结果。
+PR 中如果修改了 Claude Code 模板文件，CI 会自动检测 opencode 模板是否同步，并额外检查 13 个 command、7 个 agent 的结构以及 `plugin.ts` 的实际守卫/收尾行为。`cli-compat.yml` 安装 `@opencode/cli@latest` 跑真实 CLI e2e 与运行时权限测试。如果 CI 报错，请在本地运行同步脚本和 `bash scripts/check-opencode-adapter.sh`，再提交结果。
 
 ### 手动维护的部分
 
@@ -284,7 +284,6 @@ PR 中如果修改了 Claude Code 模板文件，CI 会自动检测 opencode 模
 
 - `skills/story-setup/references/opencode/plugin.ts` — hooks 逻辑
 - `skills/story-setup/references/opencode/commands/` — slash commands
-- `skills/story-setup/references/opencode/opencode.json.patch` — 配置片段
 
 ### sync-opencode.py 已知局限
 
@@ -301,17 +300,16 @@ PR 中如果修改了 Claude Code 模板文件，CI 会自动检测 opencode 模
 - **agent 文件** 双份部署：`.opencode/agents/`（opencode 系统使用）+ `agents/`（Glob 可见副本）
 - **subagent 检测**：所有 spawn agent 的 skill（story-review、story-long-write、story-deslop、story-import、story-long-analyze、story-short-write）只检查当前运行时的 canonical 目录：Claude `.claude/agents/`、OpenCode `.opencode/agents/`、Codex `.codex/agents/`、Antigravity `.agents/agents/`；不得因其他端文件存在而误判。ZCode 3.3.4 与 OpenClaw Phase 1 不部署项目 agents，走 solo/direct fallback。
 
-**插件输出不可见**：opencode 插件的 `output.extra.system` 已移除（真实 API 中不存在此字段）。系统提示注入改用 `experimental.session.compacting` 的 `output.context` 传递写作上下文。
+**插件在后台服务里运行**：2.x 由一个后台服务进程服务多个项目，插件里的 `process.cwd()` 不是用户项目；项目根与相对路径起点一律取 `ctx.location.directory`（其 git toplevel）。压缩前注入用 `ctx.session.hook("compaction")` 往摘要请求的 `system` 追加写作上下文位置。
 
-**session-start 系统提示注入不支持**：OpenCode 公开 Plugin API 中无 `chat.message` 或等效 hook，部署状态检测和写作进度无法在会话开始时注入模型上下文。用户可手动运行 `/story-setup` 查看状态。
+**session-start 系统提示注入未接入**：2.x 的 `ctx.session.hook("context")` 可在每次模型请求前改 system，但本适配尚未接入会话开始的部署状态与写作进度提示。用户可手动运行 `/story-setup` 查看状态。
 
 **其它 hook 差异**：`detect-gaps`（缺口检测）插件未移植，会话开始不注入提示（仅保留 compact 摘要与写正文前的大纲守卫）；`session-end` opencode 无等价事件、暂不支持；`validate-commit` 改用 git 原生 `pre-commit` hook（适用于所有 CLI）。
 
 ### OpenCode 使用注意事项
 
-- **首次部署后需要重启 opencode**：story-setup 部署的 `.opencode/commands/` 下的 slash command 在 opencode 重启后才会生效。退出 opencode 后执行 `opencode -c` 重新进入即可。
+- **部署后的 slash command**：2.x 会自动重载 `.opencode/commands/`、agents、插件与配置；若没有出现，运行 `opencode reload`，或退出后执行 `opencode -c` 重新进入。
 - **首次部署使用自然语言触发**：新项目中没有 slash command，需要用自然语言触发 story-setup（如「请使用 story-setup skill，帮我部署网文写作环境」）。
-- **opencode 配置不热加载**：修改 `opencode.json`、agent 文件或 plugin 后均需重启 opencode。
 - **browser-cdp 长耗时操作可能卡死**：opencode 无后台任务机制，长耗时浏览器操作需用户按 `ESC` 打断（SKILL.md 已内置超时包装指引）。
 
 ## OpenClaw 适配维护

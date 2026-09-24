@@ -37,7 +37,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 4. 检查 `.active-book` 文件是否存在
    - 存在 → 显示当前活跃书目
    - 不存在 → 跳过
-5. 检查 `opencode.json` 或 `.opencode/` 是否存在
+5. 检查 `opencode.json`、`opencode.jsonc` 或 `.opencode/` 是否存在
    - 存在 → 识别为 opencode 项目，`target_cli = opencode`
    - 不存在 → 跳过
 6. 检查 `.codex/`、`.codex/config.toml`、`.codex/agents/`、`.codex/hooks.json`、`AGENTS.md` 中的 Codex 段
@@ -63,7 +63,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 12. 如 `.claude/` 或 `CLAUDE.md`、OpenCode、Codex、Antigravity、ZCode、OpenClaw、Reasonix、generic 标记同时存在 → 使用 AskUserQuestion 让用户选择目标环境（选项：Claude Code / OpenCode / Codex / Google Antigravity / ZCode / OpenClaw / Reasonix / 通用 Web AI 或其他 Agent / 任意组合）
 13. 如八类标记都不存在（全新项目）→ 使用 AskUserQuestion 让用户选择目标环境
-   - 用户选择 opencode → `target_cli = opencode`，部署时创建 `opencode.json` 和 `.opencode/`
+   - 用户选择 opencode → `target_cli = opencode`，部署时创建 `.opencode/`
    - 用户选择 claude-code → 按现有逻辑处理
    - 用户选择 codex → `target_cli = codex`，部署时创建 `.codex/`
    - 用户选择 antigravity → `target_cli = antigravity`，部署时创建 `.agents/skills`、`.agents/agents`、`.agents/rules`、`.agents/hooks` 并合并 `.agents/hooks.json`
@@ -101,7 +101,6 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | `skills/story-setup/references/opencode/plugin.ts` | `.opencode/plugins/story-hooks.ts` | story-setup managed | replace | TypeScript plugin file exists | target_cli 含 opencode |
 | `skills/story-setup/references/opencode/story_hook_core.js` | `.opencode/plugins/lib/story_hook_core.js` | story-setup managed | replace | Node syntax valid；与 ZCode 副本字节一致；被 story-hooks.ts import | target_cli 含 opencode |
 | `skills/story-setup/references/opencode/commands/` | `.opencode/commands/` | story-setup managed | replace | 13 command files exist | target_cli 含 opencode |
-| `skills/story-setup/references/opencode/opencode.json.patch` | merge into `opencode.json` | user+managed | merge by plugin/permission key | plugin entry registered | target_cli 含 opencode |
 | repository `skills/story-setup/references/agent-references/` | `skills/story-setup/references/agent-references/` | story-setup managed | replace | every reference resolves | target_cli 含 opencode |
 | `skills/story-setup/references/opencode/pre-commit.sh` | `.git/hooks/pre-commit` | user+managed | append or create | file exists and is executable；含 marker 块则替换块内容，不含则检测 exit 0 位置智能插入 | target_cli 含 opencode |
 | `skills/story-setup/references/codex/AGENTS.md.tmpl` | `AGENTS.md` | user+managed | marker/section merge | contains Codex story skill routing sections | target_cli 含 codex |
@@ -128,14 +127,15 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | repository `skills/{browser-cdp,story*}/` | `skills/{browser-cdp,story*}/` | story-setup managed for known skill names | replace known skill dirs only | 13 `SKILL.md` files exist; OpenClaw-compatible frontmatter | target_cli 含 openclaw 或 generic 或 reasonix |
 | repository `skills/story-setup/references/agent-references/` | 随上一行整份 skill 拷贝落地，本行 no-op | story-setup managed | 不单独复制 | every reference resolves | target_cli 含 openclaw 或 generic 或 reasonix |
 
-### opencode.json 合并算法
+### OpenCode 部署前置（先于上表任何 OpenCode 行执行）
 
-部署 `opencode.json.patch` 时按以下规则合并：
+只适配 OpenCode 2.x：1.x 的插件 loader 读不了 `story-hooks.ts`，只记一行日志后照常运行，写正文守卫整场缺席。
 
-1. 读取现有 `opencode.json`（如存在），解析 JSON
-2. 合并 `plugin` 数组：将 `./.opencode/plugins/story-hooks.ts` 加入数组，去重
-3. 保留用户已有的其他配置字段（`permission`、`model`、`provider` 等），不覆盖
-4. 写入合并后的 `opencode.json`
+1. 运行 `opencode --version`，取第一个 `主.次.修` 版本号：
+   - 主版本 ≥ 2 → 继续
+   - 主版本 < 2 → 停止 OpenCode 部署（其它 target 照常），告诉用户先升级到 2.x（`curl -fsSL https://opencode.ai/v2/install | bash` 或 `npm i -g @opencode/cli`），装好后重跑 story-setup
+   - 命令不可用或解析不出版本 → 继续部署，安装报告首行写明「未能确认 OpenCode 版本；本适配需要 2.x，1.x 下写正文守卫不会加载」
+2. 插件由 OpenCode 自动发现 `.opencode/plugins/*.ts` 加载，不写 `opencode.json`。项目根已有 `opencode.json` / `opencode.jsonc` 时，从其 `plugin`、`plugins` 数组删掉指向 `.opencode/plugins/story-hooks.ts` 的项（旧版部署留下；2.x 丢弃单文件路径并告警），数组删空就删掉该键，其余内容原样保留。
 
 ### Step 2：部署 CLAUDE.md
 
@@ -203,7 +203,7 @@ OpenCode agents 部署是 `replace`，会覆盖上次写入的 `model:`。所以
 
 ##### Step 2：获取模型列表
 
-优先执行 `opencode models --verbose`，它输出含 cost（input/output/cache 单价）、context、capabilities 的 metadata；不可用或解析失败时回退到 `opencode models` 纯文本（每行 `provider/model`）。两者都用 60000ms（60 秒）超时，因为首次运行需加载 models.dev 缓存。
+优先在项目根执行 `opencode api model.list -H "x-opencode-directory:<项目根绝对路径>"`，输出 JSON：`data[]` 每项的 `providerID/id` 即模型 ID，`cost[]` 为每百万 token 的 input/output 单价（空数组即无成本数据），`limit.context` 为上下文长度；不可用或解析失败时回退到 `opencode models` 纯文本（每行 `provider/model`）。两者都用 60000ms（60 秒）超时，因为首次运行需加载 models.dev 缓存。
 
 - 成功 → 进入「模型分级」
 - 超时 → 重试一次（缓存可能未预热）；仍然超时则按「保留已有模型配置」缓存回填已有 `model:`、跳过自动配置，在安装报告中输出手动配置指南
@@ -211,9 +211,9 @@ OpenCode agents 部署是 `replace`，会覆盖上次写入的 `model:`。所以
 
 ##### Step 3：模型分级
 
-**优先按成本分级（有 `--verbose` 时）**：按每模型实际 cost 从低到高分档——低端取最便宜/免费档、中端取中价档、高端取最贵或上下文/能力最强档。免费模型按真实 cost=0 归低端，**不按名字里的营销词**（如 `nemotron-3-ultra-free` 名含 `ultra` 但 cost=0，应归低端）。无 cost 数据的模型也据此进入候选，不被丢弃。
+**优先按成本分级（有 `model.list` 成本数据时）**：按每模型实际 cost 从低到高分档——低端取最便宜/免费档、中端取中价档、高端取最贵或上下文/能力最强档。免费模型按真实 cost=0 归低端，**不按名字里的营销词**（如 `nemotron-3-ultra-free` 名含 `ultra` 但 cost=0，应归低端）。无 cost 数据的模型也据此进入候选，不被丢弃。
 
-**回退按关键词分级（无 `--verbose` 或无 cost 时）**：按模型 ID 中最后一个 `/` 之后的模型名按 `-`、`.`、`_` 分割为段，逐段精确匹配关键词（不区分大小写）。例如 `minimax-m3` 拆为 `[minimax, m3]`，不匹配 `mini` 也不匹配 `max`；`claude-haiku-4.5` 拆为 `[claude, haiku, 4, 5]`，匹配 `haiku`。关键词分级是启发式，安装报告中标注 `分级依据：关键词（heuristic）`。
+**回退按关键词分级（只有 `opencode models` 或无 cost 时）**：按模型 ID 中最后一个 `/` 之后的模型名按 `-`、`.`、`_` 分割为段，逐段精确匹配关键词（不区分大小写）。例如 `minimax-m3` 拆为 `[minimax, m3]`，不匹配 `mini` 也不匹配 `max`；`claude-haiku-4.5` 拆为 `[claude, haiku, 4, 5]`，匹配 `haiku`。关键词分级是启发式，安装报告中标注 `分级依据：关键词（heuristic）`。
 
 | 等级 | 匹配关键词 | 对应 Agent |
 |------|-----------|-----------|
@@ -274,15 +274,19 @@ OpenCode agents 部署是 `replace`，会覆盖上次写入的 `model:`。所以
 
 ##### Step 5：写入 model 字段
 
-对应用户选择的 agent 文件（`.opencode/agents/*.md`，由部署清单中 OpenCode agents 部署步骤在此步骤之前已部署），在 frontmatter 末尾、closing `---` 之前，以**零缩进的顶层字段**插入 `model:`（不要插进 `permission:` 等多行 map 的缩进块内部）。值含 YAML 特殊字符时加引号，确保不破坏 frontmatter：
+对应用户选择的 agent 文件（`.opencode/agents/*.md`，由部署清单中 OpenCode agents 部署步骤在此步骤之前已部署），在 frontmatter 末尾、closing `---` 之前，以**零缩进的顶层字段**插入 `model:`（不要插进 `permissions:` 规则列表等多行块的缩进内部）。值含 YAML 特殊字符时加引号，确保不破坏 frontmatter：
 
 ```yaml
 ---
 description: ...
 mode: subagent
-permission:
-  read: allow
-  edit: deny
+permissions:
+  - action: "*"
+    resource: "*"
+    effect: deny
+  - action: read
+    resource: "*"
+    effect: allow
 steps: 12
 model: provider/model-id
 ---
@@ -430,16 +434,17 @@ Reasonix（DeepSeek-Reasonix CLI）当前只部署 skills 与 `AGENTS.md`，不�
       手动配置方法：编辑 .opencode/agents/{agent名}.md，在 frontmatter 中添加：
         model: provider/model-id
 
-      可用模型列表与成本可通过 opencode models --verbose 查看（输出含每模型 cost/context）。
+      可用模型列表可通过 opencode models 查看；成本与上下文长度见 opencode api model.list 的 cost/limit 字段。
       模型库与定价见 OpenCode 官方模型源 https://models.dev/。
       ```
 7. 验证 opencode 部署（仅当 target_cli 含 opencode 时）：
-    - 检查 `.opencode/agents/` 下的 7 个 agent 定义文件是否存在，且 frontmatter 包含 `mode: subagent` 和 `permission` 字段
+    - 检查 `.opencode/agents/` 下的 7 个 agent 定义文件是否存在，且 frontmatter 包含 `mode: subagent` 和 `permissions` 规则列表
     - 检查 `.opencode/plugins/story-hooks.ts` 是否存在
-    - 检查 `.opencode/plugins/lib/story_hook_core.js` 存在且 `node --check` 通过（story-hooks.ts import 之，与 `.zcode` 副本字节一致的共享写正文守卫核；置于 `lib/` 子目录以避开 OpenCode 单层 `.opencode/plugins/*.js` 插件自动发现）
+    - 检查 `.opencode/plugins/lib/story_hook_core.js` 存在且 `node --check` 通过（story-hooks.ts import 之，与 `.zcode` 副本字节一致的共享写正文守卫核；置于 `lib/` 子目录以避开 OpenCode 对 `.opencode/plugins/*.js` 的插件自动发现，`lib/` 里不得放 `index.*` / `server.*`）
      - 检查 `.opencode/commands/` 下的 13 个 command 文件是否存在
     - 检查 `skills/story-setup/references/agent-references/` 下 reference 文件完整且数量与源目录一致
-    - 检查 `opencode.json` 的 `plugin` 数组是否包含 story-hooks 条目
+    - 检查 `opencode.json` / `opencode.jsonc`（如有）的 `plugin`、`plugins` 数组不再含指向 story-hooks.ts 的项
+    - `opencode` 可用时在项目根执行 `opencode api plugin.list -H "x-opencode-directory:<项目根绝对路径>"`，确认 `id` 为 `oh-story.story-hooks` 的条目 `state.status` 为 `active`（首次请求可能返回空列表，隔几秒重试）
     - 检查 `.git/hooks/pre-commit` 是否存在且有执行权限（Windows 上跳过执行权限检查）
     - 检查 `.opencode/agents/` 下 agent 文件 frontmatter 可被 YAML 解析、`model:`（如有配置）是合法顶层标量，而非仅 grep 到 `model:` 子串
 8. 验证 Codex 部署（仅当 target_cli 含 codex 时）：

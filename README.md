@@ -337,7 +337,7 @@ consistency-checker（Haiku，一致性）、character-designer、story-research
 
 ### 能在 Codex、Google Antigravity、OpenCode 里用吗，还是只支持 Claude Code？
 
-oh-story-claudecode 内置适配 Claude Code、Google Antigravity、OpenCode、ZCode、OpenClaw、Codex CLI 和 Reasonix。Codex 会直接扫描仓库内 `.agents/skills` 发现 13 个 skill，用 `$story-setup` 调用；Antigravity 用 `/skills` 或自然语言运行 `story-setup` 并选择 `target_cli=antigravity`；能读取项目文件的 Web AI / Agent 环境也可以按通用 skills 路径使用。
+oh-story-claudecode 内置适配 Claude Code、Google Antigravity、OpenCode、ZCode、OpenClaw、Codex CLI 和 Reasonix。Codex 会直接扫描仓库内 `.agents/skills` 发现 13 个 skill，用 `$story-setup` 调用；Antigravity 用 `/skills` 或自然语言运行 `story-setup` 并选择 `target_cli=antigravity`；OpenCode 需要 2.x，1.x 加载不了写正文守卫插件；能读取项目文件的 Web AI / Agent 环境也可以按通用 skills 路径使用。
 
 ### 需要 GPU 或自己部署模型吗？
 

@@ -22,25 +22,11 @@ echo "Repo: $REPO_ROOT"
 
 assert_dir "$ROOT"
 assert_file "$ROOT/AGENTS.md.tmpl"
-assert_file "$ROOT/opencode.json.patch"
 assert_file "$ROOT/plugin.ts"
 assert_file "$ROOT/story_hook_core.js"
 assert_dir "$ROOT/agents"
 assert_dir "$ROOT/commands"
 assert_file "scripts/sync-opencode.py"
-
-python3 -m json.tool "$ROOT/opencode.json.patch" >/dev/null
-python3 - <<'PY'
-import json
-from pathlib import Path
-cfg = json.loads(Path('skills/story-setup/references/opencode/opencode.json.patch').read_text())
-assert cfg.get('$schema') == 'https://opencode.ai/config.json', cfg
-plugins = cfg.get('plugin')
-assert isinstance(plugins, list), plugins
-assert './.opencode/plugins/story-hooks.ts' in plugins, plugins
-PY
-
-echo "  OK config patch"
 
 # Snapshot the generated surface so --check itself is held to its read-only contract,
 # including when a developer already has unrelated worktree changes.
@@ -340,6 +326,28 @@ read_only = {'chapter-extractor', 'consistency-checker', 'story-explorer'}
 base = Path('skills/story-setup/references/opencode/agents')
 found = {p.stem for p in base.glob('*.md')}
 assert found == expected, found
+
+
+def permission_rules(fm: str):
+    """2.x 原生 `permissions:` 列表 → [(action, resource, effect)]，保持书写顺序。"""
+    rules, current, inside = [], {}, False
+    for line in fm.split('\n'):
+        if line == 'permissions:':
+            inside = True
+            continue
+        if not inside:
+            continue
+        if not line.startswith('  '):
+            break
+        if line.startswith('  - '):
+            current = {}
+        key, _, value = line.strip().removeprefix('- ').partition(':')
+        current[key] = value.strip().strip('"')
+        if len(current) == 3:
+            rules.append((current['action'], current['resource'], current['effect']))
+    return rules
+
+
 for p in sorted(base.glob('*.md')):
     text = p.read_text()
     assert text.startswith('---\n'), f'{p}: missing frontmatter'
@@ -349,12 +357,16 @@ for p in sorted(base.glob('*.md')):
         raise AssertionError(f'{p}: malformed frontmatter')
     assert 'mode: subagent' in fm, f'{p}: missing mode: subagent'
     assert 'description:' in fm, f'{p}: missing description'
-    assert 'read: allow' in fm, f'{p}: missing read allow'
+    assert '\npermission:' not in fm, f'{p}: legacy 1.x permission map'
+    rules = permission_rules(fm)
+    assert rules and rules[0] == ('*', '*', 'deny'), f'{p}: permissions must open with a blanket deny: {rules}'
+    assert ('read', '*', 'allow') in rules, f'{p}: missing read allow'
     assert 'steps:' in fm, f'{p}: missing steps limit'
     if p.stem in read_only:
-        assert 'edit: deny' in fm, f'{p}: read-only agent must deny edit'
+        assert ('edit', '*', 'deny') in rules, f'{p}: read-only agent must deny edit'
+        assert ('shell', '*', 'deny') in rules, f'{p}: read-only agent must deny shell'
     else:
-        assert 'edit: allow' in fm, f'{p}: write-capable agent must allow edit'
+        assert ('edit', '*', 'allow') in rules, f'{p}: write-capable agent must allow edit'
     assert '.claude/skills/story-setup/references/agent-references/' not in text, f'{p}: leaked Claude reference path'
     assert '.opencode/skills/story-setup/references/agent-references/' not in text, f'{p}: stale hidden OpenCode reference fallback'
     if p.stem in {'character-designer', 'consistency-checker', 'narrative-writer', 'story-architect'}:
@@ -363,11 +375,11 @@ PY
 
 echo "  OK agent templates"
 
-# frontmatter 解析必须锚定独占一行的 `---`（值里的三连字符不得截断 permission/steps），
-# 且 disallowedTools 里的 Bash 必须落成真正的标量 deny：OpenCode 未声明 bash 权限时
-# 默认允许 bash，只有 edit: deny 的只读 agent 仍能借 shell 重定向写正文。
-# 不给任何“只读命令”例外：上游 shell.ts 只把 command 的**直接父节点** redirected_statement
-# 纳入鉴权，`( allowlisted-command ) > 正文.md` 的 command 直接父节点是 subshell，能绕过字面量白名单。
+# frontmatter 解析必须锚定独占一行的 `---`（值里的三连字符不得截断 permissions/steps），
+# 且 disallowedTools 里的 Bash 必须落成整条 shell deny：OpenCode 未声明 shell 权限时默认允许，
+# 只有 edit deny 的只读 agent 仍能借 shell 重定向写正文。不给任何“只读命令”例外：命令级
+# 白名单挡不住 `( allowlisted-command ) > 正文.md` 这类外层重定向，只有整条 deny 能让运行时
+# 把 shell 工具从清单里摘掉。
 python3 - "scripts/sync-opencode.py" <<'PY'
 import importlib.util
 import sys
@@ -407,10 +419,10 @@ except ValueError as error:
 else:
     raise AssertionError('restricted agent instructions must not require Bash')
 
-# 正文没提该命令 → 一条都不放（标量 deny 还会让上游 disabled() 把 bash 工具整个摘掉）
+# 正文没提该命令 → 一条都不放（整条 deny 让运行时把 shell 工具整个摘掉）
 plain = module.convert_claude_to_opencode(fm, '只读 agent，正文没有任何 shell 步骤\n')
-assert plain['permission']['bash'] == 'deny', (
-    f'read-only agent whose body never asks for a command must get a plain bash deny: {plain}'
+assert plain['permissions']['shell'] == 'deny', (
+    f'read-only agent whose body never asks for a command must get a plain shell deny: {plain}'
 )
 
 # 生成器必须**大声失败**，而不是默默产出一个跑不动或被撬开的 agent。
@@ -423,163 +435,80 @@ else:
     raise AssertionError('generator must fail loudly when the body needs an ungranted command')
 
 
-def bash_rules_in_file_order(fm_text: str):
-    """按**文件里的书写顺序**取 bash 规则——顺序就是优先级，不能走 dict/set。
-
-    同时兼容标量写法 `bash: deny`：上游 fromConfig() 把它展开成单条 `*` 规则。
-    """
+def rules_in_file_order(fm_text: str):
+    """按**文件里的书写顺序**取 permissions 规则——顺序就是优先级，不能走 dict/set。"""
     import re
-    rules = []
-    in_bash = False
-    for line in fm_text.split('\n'):
-        scalar = re.match(r'^ {2}bash:\s*(\S+)\s*$', line)
-        if scalar:
-            rules.append(('*', scalar.group(1)))
-            in_bash = False
-            continue
-        if re.match(r'^ {2}bash:\s*$', line):
-            in_bash = True
-            continue
-        if in_bash:
-            matched = re.match(r'^ {4}"(.+)":\s*(\S+)\s*$', line)
-            if matched:
-                rules.append((matched.group(1), matched.group(2)))
-                continue
-            if line.strip():
-                in_bash = False
-    return rules
+    return re.findall(r'^  - action: "?([^"\n]+)"?\n    resource: "?([^"\n]+)"?\n    effect: (\S+)$', fm_text, re.M)
 
 
-# format_frontmatter 不得对键排序：一排序，生成器里「宽 deny 在前、窄 allow 在后」的
+# format_frontmatter 不得对规则排序：一排序，生成器里「宽 deny 在前、窄 allow 在后」的
 # 顺序就被静默抹掉。用逆字母序的插入顺序探它。
-probe = {
-    'permission': {
-        'read': 'allow',
-        'bash': {'zzz cmd': 'deny', '*': 'deny', 'aaa cmd': 'allow'},
-    }
-}
-probe_rules = bash_rules_in_file_order(module.format_frontmatter(probe))
-assert probe_rules == [('zzz cmd', 'deny'), ('*', 'deny'), ('aaa cmd', 'allow')], (
-    f'format_frontmatter reordered permission globs (must preserve dict order): {probe_rules}'
+probe = {'permissions': {'zzz': 'deny', '*': 'deny', 'aaa': 'allow'}}
+probe_rules = rules_in_file_order(module.format_frontmatter(probe))
+assert probe_rules == [('zzz', '*', 'deny'), ('*', '*', 'deny'), ('aaa', '*', 'allow')], (
+    f'format_frontmatter reordered permission rules (must preserve dict order): {probe_rules}'
 )
 
-# 生成器自身的输出：只读 agent 必须是不可覆盖的标量 deny。
-generated_rules = bash_rules_in_file_order(module.format_frontmatter(plain))
-assert generated_rules == [('*', 'deny')], generated_rules
+# 生成器自身的输出：只读 agent 的 shell 必须是整条 deny。
+generated_rules = rules_in_file_order(module.format_frontmatter(plain))
+assert ('shell', '*', 'deny') in generated_rules, generated_rules
 PY
 
 echo "  OK generator makes read-only Bash unavailable and rejects contradictory instructions"
 
-# 生成产物的**裁决矩阵**（#265 二轮 review）。这里独立复刻上游 opencode v1.18.5 的判定，
-# 刻意不复用 sync-opencode.py 里的同名函数——复用的话，复刻本身写错时测试会跟着一起错：
-#   util/wildcard.ts     match()
-#   permission/index.ts  fromConfig() / evaluate()（findLast）/ Permission.ask()
-#   tool/shell.ts        source()（带重定向时取整条 redirected_statement）/ collect()
+# 生成产物的**裁决矩阵**。这里独立复刻上游 OpenCode 2.x 的判定，刻意不复用 sync-opencode.py
+# 里的解析——复用的话，复刻本身写错时测试会跟着一起错：
+#   core/src/tool.ts   whollyDisabled()：取最后一条 action 命中的规则，resource 为 * 且 deny 时
+#                      把工具整个摘出发给模型的清单；write/edit/patch 共用 action edit
+#   util/wildcard.ts   match()
+# 运行时的真实判定由 test-agent-permissions.py --opencode 在真 CLI 上覆盖；这里是无 CLI 时的静态网。
 python3 - <<'PY'
 import re
 from pathlib import Path
 
 
 def wildcard_match(value: str, pattern: str) -> bool:
-    value = value.replace('\\', '/')
-    pattern = pattern.replace('\\', '/')
     escaped = re.sub(r'[.+^${}()|\[\]\\]', r'\\\g<0>', pattern)
     escaped = escaped.replace('*', '.*').replace('?', '.')
-    # 上游原注释：pattern 以 " *" 结尾时让尾段可选，好让 "ls *" 也匹配 "ls"。
-    # 正是这一步让前缀 glob 吃下带重定向的整条语句。
-    if escaped.endswith(' .*'):
-        escaped = escaped[:-3] + '( .*)?'
     return re.match('^' + escaped + '$', value, flags=re.DOTALL) is not None
 
 
-def evaluate(rules, pattern: str) -> str:
-    """findLast：最后一条命中的规则生效；一条都不命中时上游默认 ask。"""
-    action = 'ask'
-    for rule_pattern, rule_action in rules:
-        if wildcard_match(pattern, rule_pattern):
-            action = rule_action
-    return action
+def wholly_disabled(action: str, rules) -> bool:
+    matched = [rule for rule in rules if wildcard_match(action, rule[0])]
+    return bool(matched) and matched[-1][1] == '*' and matched[-1][2] == 'deny'
 
 
-def resolve(rules, patterns) -> str:
-    """Permission.ask()：任一 pattern 判 deny，整条 shell 调用即被拒。"""
-    verdict = 'allow'
-    for pattern in patterns:
-        action = evaluate(rules, pattern)
-        if action == 'deny':
-            return 'deny'
-        if action != 'allow':
-            verdict = 'ask'
-    return verdict
+def rules_in_file_order(fm_text: str):
+    return re.findall(r'^  - action: "?([^"\n]+)"?\n    resource: "?([^"\n]+)"?\n    effect: (\S+)$', fm_text, re.M)
 
 
-def bash_rules_in_file_order(fm_text: str):
-    rules = []
-    in_bash = False
-    for line in fm_text.split('\n'):
-        scalar = re.match(r'^ {2}bash:\s*(\S+)\s*$', line)
-        if scalar:
-            rules.append(('*', scalar.group(1)))
-            in_bash = False
-            continue
-        if re.match(r'^ {2}bash:\s*$', line):
-            in_bash = True
-            continue
-        if in_bash:
-            matched = re.match(r'^ {4}"(.+)":\s*(\S+)\s*$', line)
-            if matched:
-                rules.append((matched.group(1), matched.group(2)))
-                continue
-            if line.strip():
-                in_bash = False
-    return rules
-
-
-NEEDED = 'git rev-parse --show-toplevel'
-TARGET = 'book/正文/第001章.md'
-# 每项 =（展示用命令, collect() 会产生的 scan.patterns）。一条 shell 命令可能含多个
-# tree-sitter `command` 节点；带重定向的节点取整条 redirected_statement 的文本。
-ESCAPES = [
-    (f'{NEEDED} > {TARGET}', [f'{NEEDED} > {TARGET}']),
-    (f'{NEEDED} >> {TARGET}', [f'{NEEDED} >> {TARGET}']),
-    (f'{NEEDED} 2> {TARGET}', [f'{NEEDED} 2> {TARGET}']),
-    # 上游 source() 只检查 command 的直接父节点。套一层 subshell/compound 后，collect()
-    # 看见的 pattern 仍是裸 NEEDED，外层重定向没有进入鉴权 pattern。
-    (f'( {NEEDED} ) > {TARGET}', [NEEDED]),
-    (f'{{ {NEEDED}; }} > {TARGET}', [NEEDED]),
-    (f'{NEEDED} | tee {TARGET}', [NEEDED, f'tee {TARGET}']),
-    (f'{NEEDED} && cat > {TARGET}', [NEEDED, f'cat > {TARGET}']),
-    (f'{NEEDED}; rm -rf /', [NEEDED, 'rm -rf /']),
-    ('git rev-parse HEAD', ['git rev-parse HEAD']),
-    ('git push', ['git push']),
-    ('rm -rf /', ['rm -rf /']),
-    ("python3 -c 'print(1)'", ["python3 -c 'print(1)'"]),
-    ('echo x > 第1章.md', ['echo x > 第1章.md']),
-    ('bash -c "cat /etc/passwd"', ['bash -c "cat /etc/passwd"']),
-]
-
+# 工具 → 它在权限里对应的 action（工具的 options.permission，缺省为工具名）
+TOOL_ACTION = {
+    'read': 'read', 'glob': 'glob', 'grep': 'grep',
+    'write': 'edit', 'edit': 'edit', 'patch': 'edit',
+    'shell': 'shell', 'subagent': 'subagent', 'webfetch': 'webfetch', 'websearch': 'websearch',
+    'skill': 'skill', 'question': 'question', 'execute': 'execute',
+}
+READ_LIKE = {'read', 'glob', 'grep'}
 read_only = {'chapter-extractor', 'consistency-checker', 'story-explorer'}
+shell_agents = {'narrative-writer', 'story-researcher'}
 base = Path('skills/story-setup/references/opencode/agents')
-for name in sorted(read_only):
-    fm_text = (base / f'{name}.md').read_text(encoding='utf-8').split('\n---\n', 1)[0]
-    rules = bash_rules_in_file_order(fm_text)
-    assert rules, f'{name}: read-only agent must declare a bash restriction'
-    assert rules == [('*', 'deny')], (
-        f'{name}: read-only Bash must be a scalar deny without exceptions: {rules}'
+for path in sorted(base.glob('*.md')):
+    name = path.stem
+    rules = rules_in_file_order(path.read_text(encoding='utf-8').split('\n---\n', 1)[0])
+    available = {tool for tool, action in TOOL_ACTION.items() if not wholly_disabled(action, rules)}
+    expected = set(READ_LIKE)
+    if name not in read_only:
+        expected |= {'write', 'edit', 'patch'}
+    if name in shell_agents:
+        expected |= {'shell'}
+    assert available == expected, (
+        f'{name}: tools left for the model {sorted(available)} != {sorted(expected)}'
+        f'（rules in file order: {rules}）'
     )
-    assert resolve(rules, [NEEDED]) == 'deny', (
-        f'{name}: bare {NEEDED!r} must also be denied'
-    )
-    # 反向：重定向/追加/stderr 重定向/管道/串联，以及任意越权命令，一律 deny
-    for shown, patterns in ESCAPES:
-        got = resolve(rules, patterns)
-        assert got == 'deny', (
-            f'{name}: `{shown}` resolved to {got!r}, must be deny — 只读 agent 不得借'
-            f'重定向/管道/串联覆写作者正文（rules in file order: {rules}）'
-        )
 PY
 
-echo "  OK read-only agents deny bare commands plus redirection/subshell/pipe/chain escapes"
+echo "  OK generated permissions leave each agent exactly its capability tools (2.x whollyDisabled)"
 
 # 生成必须幂等：跑两遍产物一致。否则 --check 会在无人改模板时随机报 out-of-sync。
 python3 - "scripts/sync-opencode.py" "$TMP_DIR" <<'PY'
@@ -662,18 +591,19 @@ PY
 
 echo "  OK slash command templates (含 \$ARGUMENTS 占位符与 ZCode 对齐)"
 
-assert_grep 'experimental\.session\.compacting' "$ROOT/plugin.ts" "OpenCode plugin must inject pre-compact context"
-assert_grep 'tool\.execute\.before' "$ROOT/plugin.ts" "OpenCode plugin must guard tool writes"
+assert_grep 'session\.hook\("compaction"' "$ROOT/plugin.ts" "OpenCode plugin must inject pre-compact context"
+assert_grep 'tool\.hook\("execute\.before"' "$ROOT/plugin.ts" "OpenCode plugin must guard tool writes"
 assert_grep 'proseBlockReason' "$ROOT/plugin.ts" "OpenCode plugin must keep outline-before-prose guard"
-assert_grep 'tool\.execute\.after' "$ROOT/plugin.ts" "OpenCode plugin must run the prose backstop after writes"
+assert_grep 'tool\.hook\("execute\.after"' "$ROOT/plugin.ts" "OpenCode plugin must run the prose backstop after writes"
+assert_grep 'ctx\.location\.directory' "$ROOT/plugin.ts" "OpenCode plugin must locate the project from ctx.location (2.x service cwd is not the project)"
 assert_grep 'proseAfterWrite' "$ROOT/plugin.ts" "OpenCode plugin must surface backstop findings on the write result"
 assert_grep 'from "\./lib/story_hook_core\.js"' "$ROOT/plugin.ts" "OpenCode plugin must consume the shared prose-guard core"
-# CI has no opencode CLI to actually load the plugin, so this is a structural proxy: the
-# deploy manifest must place the core under .opencode/plugins/lib/, never flat in
-# .opencode/plugins/ (a flat *.js there is auto-loaded by OpenCode as a broken second plugin).
+# This job has no opencode CLI (the real load is asserted by test-opencode-cli-e2e.sh), so this is a
+# structural proxy: the deploy manifest must place the core under .opencode/plugins/lib/, never flat
+# in .opencode/plugins/ (a flat *.js there is auto-loaded by OpenCode as a broken second plugin).
 assert_grep '\.opencode/plugins/lib/story_hook_core\.js' "$REPO_ROOT/skills/story-setup/SKILL.md" "SKILL.md deploy manifest must target .opencode/plugins/lib/story_hook_core.js, not a flat .opencode/plugins/story_hook_core.js"
 assert_grep '正文' "$ROOT/plugin.ts" "OpenCode plugin must inspect prose targets"
-assert_grep '@opencode-ai/plugin' "$ROOT/plugin.ts" "OpenCode plugin must import OpenCode plugin types"
+assert_grep '@opencode/plugin' "$ROOT/plugin.ts" "OpenCode plugin must import OpenCode 2.x plugin types"
 # The shared prose-guard core (light net / outline guard / wordcount·landing·dup-title) deploys
 # alongside plugin.ts and is imported by it; it must be byte-identical to the ZCode copy and valid JS.
 ZCODE_CORE="$REPO_ROOT/skills/story-setup/references/zcode/hooks/story_hook_core.js"
@@ -681,7 +611,7 @@ cmp -s "$ROOT/story_hook_core.js" "$ZCODE_CORE" || fail "story_hook_core.js drif
 node --check "$ROOT/story_hook_core.js" || fail "story_hook_core.js is not valid JavaScript"
 assert_grep 'proseNetFindings' "$ROOT/story_hook_core.js" "shared core must carry the light prose net (parity with codex/claude)"
 # #242: runtime behavioral test — actually loads the plugin against the deployed core layout and
-# exercises the before/after/compacting hooks (stronger than the structural greps above).
+# exercises the execute.before/after and compaction hooks (stronger than the structural greps above).
 node --experimental-strip-types scripts/test-opencode-plugin.mjs
 assert_grep 'AGENTS\.md|OpenCode' "$ROOT/AGENTS.md.tmpl" "OpenCode AGENTS template must be present"
 assert_grep 'story-long-write|story-short-write|story-review' "$ROOT/AGENTS.md.tmpl" "OpenCode AGENTS template must mention story skill routing"

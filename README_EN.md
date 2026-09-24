@@ -353,7 +353,7 @@ I built this skill pack to help me through a job-hunting transition :joy:, and I
 
 ### Does it work in Codex, Google Antigravity or OpenCode, or only in Claude Code?
 
-oh-story-claudecode ships adapters for Claude Code, Google Antigravity, OpenCode, ZCode, OpenClaw, Codex CLI and Reasonix. Codex discovers the 13 skills by scanning `.agents/skills` in the repo and invokes them with `$story-setup`; in Antigravity run `story-setup` via `/skills` or natural language and choose `target_cli=antigravity`. Any Web AI or agent environment that can read project files can use the generic skills path.
+oh-story-claudecode ships adapters for Claude Code, Google Antigravity, OpenCode, ZCode, OpenClaw, Codex CLI and Reasonix. Codex discovers the 13 skills by scanning `.agents/skills` in the repo and invokes them with `$story-setup`; in Antigravity run `story-setup` via `/skills` or natural language and choose `target_cli=antigravity`. OpenCode needs 2.x, since 1.x cannot load the prose-guard plugin. Any Web AI or agent environment that can read project files can use the generic skills path.
 
 ### Do I need a GPU or to host a model?
 

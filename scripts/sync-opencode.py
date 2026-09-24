@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 """Sync Claude Code agent templates to OpenCode format.
 
-Scans templates/agents/*.md, converts frontmatter to opencode format,
-and writes to opencode/agents/. Also syncs CLAUDE.md.tmpl -> AGENTS.md.tmpl.
+Scans templates/agents/*.md, converts frontmatter to OpenCode 2.x format
+(native `permissions:` rule list), and writes to opencode/agents/. Also syncs
+CLAUDE.md.tmpl -> AGENTS.md.tmpl.
 """
 
 import argparse
@@ -24,12 +25,13 @@ BODY_COMMAND_RE = re.compile(r"(?:执行|运行|跑) `([^`]+)`")
 # 只在同一行出现委派主语时豁免，避免把「自己跑」写成委派句式蒙混过关。
 BODY_DELEGATION_RE = re.compile(r"(调用方|父流程|主会话|用户|由.{0,6}提示)")
 CAPABILITY_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
+# OpenCode 2.x 权限 action → 授予它的 Claude 工具。edit 一个 action 同时管 write/edit/patch。
 TOOL_PERMISSIONS = {
     "read": {"Read"},
     "glob": {"Glob"},
     "grep": {"Grep"},
     "edit": {"Write", "Edit"},
-    "bash": {"Bash"},
+    "shell": {"Bash"},
 }
 SUPPORTED_TOOLS = set().union(*TOOL_PERMISSIONS.values())
 
@@ -56,7 +58,7 @@ def parse_frontmatter(content: str) -> tuple[dict, str]:
     """Extract YAML-like frontmatter and body from markdown content."""
     # 结束分隔符必须是独占一行的 `---`（锚定 "\n---\n"），不能用 content.split("---", 2)：
     # 后者会被 frontmatter 值里的三连字符（描述里的 `---`、注释里的 `---`）当成结束标记，
-    # 把剩余键连同 permission/steps 一起截断进正文，且静默 exit 0。
+    # 把剩余键连同 permissions/steps 一起截断进正文，且静默 exit 0。
     # 与同源生成器 generate-codex-agents.py 的解析口径保持一致。
     if not content.startswith("---\n"):
         return {}, content
@@ -128,14 +130,15 @@ def convert_claude_to_opencode(fm: dict, body: str) -> dict:
     effective_tools = (set(tools) if explicit_tools else SUPPORTED_TOOLS) - denied_tools
 
     # OpenCode defaults to allow. A declared list must also close unlisted tools,
-    # including task and MCP. Keep the wildcard first: later rules override it.
+    # including subagent and MCP. Keep the wildcard first: OpenCode picks the last
+    # matching rule, so later rules override it.
     perm = {"*": "deny"} if explicit_tools else {}
-    # edit combines write/edit/apply_patch; either source tool grants mutation.
-    for permission, source_tools in TOOL_PERMISSIONS.items():
+    # edit combines write/edit/patch; either source tool grants mutation.
+    for action, source_tools in TOOL_PERMISSIONS.items():
         if explicit_tools:
-            perm[permission] = "allow" if effective_tools & source_tools else "deny"
+            perm[action] = "allow" if effective_tools & source_tools else "deny"
         elif source_tools <= denied_tools:
-            perm[permission] = "deny"
+            perm[action] = "deny"
     mentioned_bash = body_bash_commands(body)
     if "Bash" not in effective_tools and mentioned_bash:
         raise ValueError(
@@ -144,7 +147,7 @@ def convert_claude_to_opencode(fm: dict, body: str) -> dict:
             + "；改写正文以使用宿主已提供的工作区和 Read/Glob/Grep，不得开放 shell 例外。"
         )
     if perm:
-        result["permission"] = perm
+        result["permissions"] = perm
 
     if "maxTurns" in fm:
         try:
@@ -191,19 +194,16 @@ def format_frontmatter(fm: dict) -> str:
     """Format frontmatter dict to YAML-like string."""
     lines = ["---"]
     for key, value in fm.items():
-        if key == "permission" and isinstance(value, dict):
-            lines.append("permission:")
-            for pk, pv in value.items():
-                if isinstance(pv, dict):
-                    # 命令 glob 形式（如 bash）：glob 键必须加引号，裸 `*` 在 YAML 里是别名标记。
-                    # 严禁对这里的键排序：OpenCode 用 findLast 解析，后写的规则覆盖先写的，
-                    # 键顺序即优先级。必须按 dict 的插入顺序原样输出。
-                    lines.append(f"  {pk}:")
-                    for glob, action in pv.items():
-                        lines.append(f'    "{glob}": {action}')
-                else:
-                    permission_key = '"*"' if pk == "*" else pk
-                    lines.append(f"  {permission_key}: {pv}")
+        if key == "permissions":
+            # 2.x 原生规则列表：每条 action/resource/effect 三键齐全。严禁排序：OpenCode 取
+            # 最后一条命中的规则，列表顺序即优先级，必须按 dict 插入顺序原样输出。
+            # 裸 `*` 在 YAML 里是别名标记，必须加引号。
+            lines.append("permissions:")
+            for action, effect in value.items():
+                action_text = '"*"' if action == "*" else action
+                lines.append(f"  - action: {action_text}")
+                lines.append('    resource: "*"')
+                lines.append(f"    effect: {effect}")
         elif key == "description" and "\n" in value:
             lines.append("description: |")
             for desc_line in value.split("\n"):
@@ -521,9 +521,6 @@ def main() -> int:
     print("\n3. Manual maintenance required:")
     print("  - skills/story-setup/references/opencode/plugin.ts (hooks logic)")
     print("  - skills/story-setup/references/opencode/commands/ (slash commands)")
-    print(
-        "  - skills/story-setup/references/opencode/opencode.json.patch (config fragment)"
-    )
     print("\nDone.")
     return 0
 

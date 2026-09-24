@@ -38,7 +38,7 @@ Add this repository in Plugin Management and install `oh-story` to access all 13
 
 ## OpenCode
 
-After global install, opencode auto-discovers skills from `~/.claude/skills/`; trigger story-setup with natural language on first use (e.g., "use story-setup to deploy the web novel environment"), then **exit and re-enter with `opencode -c`** for slash commands to work. Some hook behaviors differ from Claude Code (session-start / session-end / compact, etc.) — see the OpenCode section in [CONTRIBUTING.md](../CONTRIBUTING.md).
+Requires **OpenCode 2.x** (`curl -fsSL https://opencode.ai/v2/install | bash` or `npm i -g @opencode/cli`). 1.x cannot load the prose-guard plugin, so story-setup stops and asks you to upgrade; projects deployed under 1.x should re-run story-setup after upgrading. After global install, opencode auto-discovers skills from `~/.claude/skills/`; trigger story-setup with natural language on first use (e.g., "use story-setup to deploy the web novel environment"). Slash commands load automatically after deployment; if they don't appear, run `opencode reload`. Some hook behaviors differ from Claude Code (session-start / session-end / compact, etc.) — see the OpenCode section in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## OpenClaw
 
