@@ -46,11 +46,12 @@ function parseArgs(argv) {
 }
 
 function parseFrontmatter(text, source) {
-  if (!text.startsWith("---\n")) fail(`${source}: missing frontmatter`)
-  const end = text.indexOf("\n---\n", 4)
+  const normalized = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n")
+  if (!normalized.startsWith("---\n")) fail(`${source}: missing frontmatter`)
+  const end = normalized.indexOf("\n---\n", 4)
   if (end < 0) fail(`${source}: unterminated frontmatter`)
-  const raw = text.slice(4, end)
-  const body = text.slice(end + 5).replace(/^\s+/, "")
+  const raw = normalized.slice(4, end)
+  const body = normalized.slice(end + 5).replace(/^\s+/, "")
   const data = {}
   const lines = raw.split(/\r?\n/)
   for (let index = 0; index < lines.length; index++) {

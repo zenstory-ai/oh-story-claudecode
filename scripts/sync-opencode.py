@@ -6,6 +6,8 @@ Scans templates/agents/*.md, converts frontmatter to OpenCode 2.x format
 CLAUDE.md.tmpl -> AGENTS.md.tmpl.
 """
 
+from __future__ import annotations
+
 import argparse
 import os
 import re

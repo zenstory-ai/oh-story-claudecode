@@ -16,7 +16,7 @@ Writing skills internally coordinate 7 specialized agents:
 | **consistency-checker** | Haiku | Consistency check — fact conflict scanning, foreshadowing tracking, S1-S4 grading reports |
 | **story-researcher** | Sonnet | Research — CDP search + full-text extraction, multi-source cross-verification, structured reference files |
 | **story-explorer** | Haiku | Story query — read-only character/foreshadowing/setting/progress lookup, quick context loading |
-| **chapter-extractor** | Haiku | Chapter extraction — summaries, plot points, character mentions, parallel deconstruction unit |
+| **chapter-extractor** | Haiku | Continuous chapter blocks / legacy-asset normalization — chapter facts, per-chapter plot points, and cross-chapter plot arcs |
 
 Agents load writing theory from `references/` on demand (character design, dialogue techniques, twist toolbox, etc. — 100+ methodology files), without reserving context window space.
 
