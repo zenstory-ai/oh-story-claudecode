@@ -61,6 +61,7 @@ English version: [Keep an AI-written novel consistent over 100+ chapters](keep-a
 ## 相关
 
 - 安装：`npx skills add zenstory-ai/oh-story-claudecode -y -g`，然后在 Agent 里运行 `/story-setup`。
-- 站点指南（含三章示例）：https://zenstory.ai/oh-story/long-novel-continuity
+- 站点指南（含三章示例）：https://zenstory.ai/zh/oh-story/long-novel-continuity
+- 细纲模板（每章要改变什么、哪些信息先不给）：https://zenstory.ai/zh/oh-story/chapter-outline-template
 - 追踪实现：`skills/story-long-write/references/state-tracking.md`、`tracking-transaction.md`
 - 仓库地址：https://github.com/zenstory-ai/oh-story-claudecode（原 `worldwonderer/oh-story-claudecode`，旧链接自动跳转）

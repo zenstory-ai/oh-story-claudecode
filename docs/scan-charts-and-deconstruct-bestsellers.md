@@ -63,4 +63,5 @@ Stage 3 还做角色合并（跨章去重、别名归一，置信度 ≥0.85 自
 
 - 触发：`/story-long-scan`、`/长篇扫榜`、"长篇什么火"；`/story-long-analyze`、`/长篇拆文`、"帮我拆这本书"。
 - 参考方法：`skills/story-long-analyze/references/material-decomposition.md`、`deconstruction-notes.md`
+- 站点指南：[小说拆书怎么拆](https://zenstory.ai/zh/oh-story/learn-from-fiction)（从原文证据到自己的新场景）、[黄金三章怎么写](https://zenstory.ai/zh/oh-story/novel-opening)（开篇交付清单与自查表）
 - 仓库地址：https://github.com/zenstory-ai/oh-story-claudecode（原 `worldwonderer/oh-story-claudecode`，旧链接自动跳转）

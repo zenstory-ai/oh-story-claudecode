@@ -58,5 +58,6 @@ Most articles about agent skills illustrate them with developer tooling: fronten
 - Repository: https://github.com/zenstory-ai/oh-story-claudecode (formerly `worldwonderer/oh-story-claudecode`; old links redirect)
 - English README: [README_EN.md](../README_EN.md)
 - Site guide for first-time users: https://zenstory.ai/oh-story/agent-skills-for-writers
+- Install to first chapter in Claude Code or Codex, step by step: https://zenstory.ai/oh-story/claude-code-novel-writing
 - Sibling packs by the same org: short drama (`drama-skills`), novel to game (`novel-to-game`), video recap (`video-recap-skills`), DeepSeek harness plugin (`oh-story-dsh`)
 - Continuity mechanism in detail: [keep-ai-novel-consistent-over-100-chapters.md](keep-ai-novel-consistent-over-100-chapters.md)
