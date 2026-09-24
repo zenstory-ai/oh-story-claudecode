@@ -31,7 +31,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 "{PYTHON}" "{story-long-analyze skill 根}/scripts/inspect_existing_assets.py" --root "拆文库/{书名}" --compact
 ```
 
-路径错误必须停止。完整旧项目返回 `direct_use` 后直接使用，不建索引、不读原文。只有用户明确要求增强才读取旧成果。已有摘要一律不覆盖：要重拆某章就先删掉它的 `章节/第N章_摘要.md`，整本重拆就换一个新目录。`schema_version` 只报告，不作为新旧门禁，也不得在复用时改写。
+路径错误必须停止。完整旧项目返回 `direct_use` 后直接使用，不建索引、不读原文。只有用户明确要求增强才读取旧成果。已有摘要一律不覆盖：要重拆某章就删掉它的 `章节/第N章_摘要.md` 和覆盖它的 `_analysis_cache/批次-*.md`（只删摘要会从缓存原样补回），整本重拆就换一个新目录。`schema_version` 只报告，不作为新旧门禁，也不得在复用时改写。
 
 ## Phase 2：唯一管道与三种情况
 
@@ -57,7 +57,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 | 阶段 | 输入 | 主要输出 | 完成判断 |
 |---|---|---|---|
-| 0 机械索引 | 原文 | `chapter_index.csv` | 章界、逐章 hash 和全源 hash 有效 |
+| 0 机械索引 | 原文 | `chapter_index.csv`、`概要.md` 初稿（Stage 5 覆盖） | 章界、逐章 hash 和全源 hash 有效 |
 | 1 黄金三章 | 前三章原文 | 深度拆解、快速预览、可选 `_style-sample.txt` | 老接口完整；同次阅读保存可用样本 |
 | 2 连续块提取 | 只读计划列出的旧成果或原文块 | 批次缓存；缺失逐章摘要投影 | 缓存完整、摘要存在、状态范围 hash 有效 |
 | 3 剧情与机制 | 批次缓存和可信旧成果 | 剧情单元、故事线、节奏、情绪模块 | 文件存在、阶段状态完成 |
@@ -81,7 +81,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locator,status,chapter_sha256,source_sha256,parser_version
 ```
 
-只按 LF 计物理行。支持楔子、序章、第0章、任意正文起始章、番外、后记、中文大数、英文章号、多卷重置和卷章组合。目录与正文标题重复时先剔掉目录块；落表前校验章号连续、无重复和边界有效，其中特殊章独立编号，正文允许从任意首章开始。原文变化先拒绝；确认后用 `--rebuild`。追加章节不使前面逐章 hash 失效，只有新章进入待处理；改动已拆章节的原文只会让该批缓存重读，已有摘要不刷新（要刷新就删掉对应摘要再续跑）。旧章映射会整体漂移或旧成果从序章、第0章、非第一章开头而无法确认身份时，停止并明确报告。
+只按 LF 计物理行。支持楔子、序章、第0章、任意正文起始章、番外、后记、中文大数、英文章号、多卷重置和卷章组合。目录与正文标题重复时先剔掉目录块；落表前校验章号连续、无重复和边界有效，其中特殊章独立编号，正文允许从任意首章开始。原文变化先拒绝；确认后用 `--rebuild`。追加章节不使前面逐章 hash 失效，只有新章进入待处理；改动已拆章节的原文只会让该批缓存重读，已有摘要不刷新（要刷新就删掉对应摘要和批次缓存再续跑）。旧章映射会整体漂移或旧成果从序章、第0章、非第一章开头而无法确认身份时，停止并明确报告。
 
 ## Stage 2：计划、提取、提交
 
@@ -91,19 +91,19 @@ chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locato
 "{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" plan --root "{拆文目录}" --intent continue
 ```
 
-用户明确增强改为 `--intent enhance`。计划不落盘，批次 ID 固定为 `RAW-{起章}-{止章}` 或 `REUSE-{起章}-{止章}`。计划与提交都拒绝超过 5 章或 25,000 字符的非单章原文块；同一章不能出现在两个原文块。计划原文读取数为 0 时不得派发原文任务。
+用户明确增强改为 `--intent enhance`。计划不落盘，批次 ID 固定为 `RAW-{起章}-{止章}` 或 `REUSE-{起章}-{止章}`。计划与提交都拒绝超过 3 章或 25,000 字符的非单章原文块；同一章不能出现在两个原文块。计划原文读取数为 0 时不得派发原文任务。
 
 ### 两种互斥输入
 
 - `raw-original`：只按索引读取计划范围，一次产生紧凑逐章事实和跨章观察；
-- `existing-results`：只读 `source_files` 列出的摘要或黄金三章，不得打开原文。完整旧项目增强只产批次观察；缺摘要时可以从已有事实生成紧凑章块。
+- `existing-results`：只读 `source_files` 列出的摘要或黄金三章，不得打开原文。完整旧项目增强只产批次观察；本批含摘要缺口时必须为每章生成紧凑章块。
 
 `chapter-extractor` 输出字段为：概要、因果、关键行动、局面结果、涉及人物、信息变化、状态变化、三维节奏、章尾钩子、证据，以及情节点列表（原文块每章 10–20 个、长章最多 30 个，格式见 output-templates）。不得另做章节卡表。
 
 提交：
 
 ```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" commit --root "{拆文目录}" --input "{临时结果.md}" --batch-id "RAW-4-8" --range-sha256 "{plan 输出值}" --source-file "{plan 来源}"
+"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" commit --root "{拆文目录}" --input "{临时结果.md}" --batch-id "RAW-4-6" --range-sha256 "{plan 输出值}" --source-file "{plan 来源}"
 ```
 
 提交脚本先完整校验（原文块每章情节点不足 10 或超过 30 即整批拒收），再按“缓存 → 缺失摘要 → `_progress.md`”写入。摘要投影逐个情节点固定主题、基调和类型枚举，映射不上时主题/基调写“其他”；保留“关键事件”“情节点”“涉及”“基调”等旧消费者字段。任何已有摘要均不覆盖，结果里的 `kept_existing_summary_chapters` 列出被保留的章。
@@ -111,11 +111,11 @@ chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locato
 ### 拆分与恢复
 
 ```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" split --root "{拆文目录}" --batch-id "RAW-4-8"
+"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" split --root "{拆文目录}" --batch-id "RAW-4-6"
 "{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" repair-progress --root "{拆文目录}"
 ```
 
-拆分将父块记为 `superseded` 并持久化两个相邻子块，重规划不会合回。恢复只信任带结束标记且范围 hash 有效的完整缓存，只补缺失摘要，最后更新进度；不覆盖用户文件。
+拆分将父块记为 `superseded` 并持久化两个相邻子块，重规划不会合回。计划不再有批次、全部摘要落盘后运行 `manage_analysis_run.py mark-stage --stage stage2`；Stage 1 的黄金三章与快速预览落盘后同样标 `--stage stage1`。恢复只信任带结束标记且范围 hash 有效的完整缓存，只补缺失摘要，最后更新进度；不覆盖用户文件。
 
 ## Stage 3：剧情、双时间线与三维节奏
 
@@ -145,7 +145,7 @@ chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locato
 
 ## 状态、旧项目与最终回归
 
-运行状态只有 `_progress.md` 受管区；既有 `schema_version: 2` 原值保留；`chapter_index.csv` 是机械索引；缓存是恢复证据。有阶段记录后，受管区的 `最终状态` 由脚本按六个阶段状态写出（全部完成为 `completed`，否则 `pending`；只做增强的旧项目沿用原值），会话 hooks 靠它判断拆文是否完成，不要手改。不得创建运行计划、checkpoint、逐批 JSON receipt 或 Stage receipt。
+运行状态只有 `_progress.md` 受管区；既有 `schema_version: 2` 原值保留；`chapter_index.csv` 是机械索引；缓存是恢复证据。有阶段记录后，受管区的 `最终状态` 由脚本按 Stage 3–6 的阶段状态写出（都完成为 `completed`，否则 `pending`）；旧项目沿用自己原有的 `最终状态` 行，全部完成时由脚本改为 `completed`，不写第二行，会话 hooks 靠它判断拆文是否完成，不要手改。不得创建运行计划、checkpoint、逐批 JSON receipt 或 Stage receipt。
 
 最终必须回归：黄金三章、逐章摘要、情绪模块、节奏、角色、设定、文风、导入、对标和写作仍可用；旧完整项目直接使用；部分项目只补精确缺章；混存项目报告来源但不重拆；增强/恢复不改旧产物与原 schema。
 
