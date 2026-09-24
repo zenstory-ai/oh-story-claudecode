@@ -9,11 +9,9 @@
 
 职责边界:
 - 脚本做确定性部分：固定首行、定位、标题行字面量、细纲指针、文风全文路径与裁决、
-  上一章结尾、降档判定与情绪/节奏槽、灵感库存在性探测、固定块指针。
+  上一章结尾、降档判定与情绪/节奏槽、固定块指针。
 - 主会话填八槽：执行安排 / 本章意图 / 参考技法 / 本节速记 / 涉及角色 / genre_prose_card /
-  必读设定 / author_preferences。降档不成立时情绪与节奏槽也归主会话；
-  工作区有灵感库时另有「跨书灵感」槽（(a0) 的 selected_inspiration_aggregates），
-  无灵感库时脚本直接封槽。
+  必读设定 / author_preferences。降档不成立时情绪与节奏槽也归主会话。
   材料槽对应原流程步骤 3「写前准备」的四项输出（本节速记 / 情绪目标 / 涉及角色 /
   参考技法）加上题材卡、设定补漏与作者偏好——都是判断，脚本做不了。
 - 续写状态卡校验后由主会话筛选，在「本节速记」槽内写入本章需要的状态。
@@ -309,29 +307,6 @@ def build(project: Path, chapter: int, report: list):
         "再给后组和机器剩余区间。只有用户明确要求一次成文时才填「全章，直接写最终路径」。")
     parts.append(f"——— 本章意图（一句话）———\n{SLOT_MARK}")
     parts.append(slot_recall)
-
-    # ---- 跨书灵感槽：(a0) 可选轴，降档也照常；无灵感库时脚本直接封槽不留空 ----
-    inspiration_index = None
-    probe = project
-    for _ in range(5):
-        candidate = probe / "灵感库" / "灵感索引.csv"
-        if candidate.is_file():
-            inspiration_index = candidate
-            break
-        if probe.parent == probe:
-            break
-        probe = probe.parent
-    if inspiration_index is None:
-        parts.append("——— 跨书灵感 ———\n无灵感库（inspiration_library_missing），本槽跳过")
-        report.append("跨书灵感：未发现 灵感库/灵感索引.csv，槽已封")
-    else:
-        parts.append(
-            "——— 跨书灵感 ———\n"
-            f"{SLOT_MARK} 按 benchmark-recall (a0) 以本章标签查 Top 3 active CBA，"
-            "填 selected_inspiration_aggregates（CBA ID、命中标签、机制链、可变参数、"
-            "成立条件、风险、来源数量）；零命中写「无（inspiration_tag_no_match）」。"
-            "只影响设计选择，不覆盖细纲事实、项目设定或自定义文风。")
-        report.append(f"跨书灵感：发现 {inspiration_index}，槽归主会话按 (a0) 填写")
     # 伏笔与卷级禁忌走「主会话筛选后写进速记」这条原设计路线（步骤 3 状态筛选），
     # 不由脚本整栏注入——筛选是判断，而整栏注入还会把伏笔栏里的作者侧真相一并下放。
     # 代价是它依赖主会话逐章想起来，所以这里把提示语写成写死的三问清单。

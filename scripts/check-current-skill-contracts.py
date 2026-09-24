@@ -1331,29 +1331,12 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
             "story-long-analyze must route the optional inspiration pipeline",
         )
     )
-    long_write_recall = repo_root / "skills/story-long-write/references/benchmark-recall.md"
-    findings.extend(
-        require_pattern(
-            long_write_recall,
-            r"\(a0\)[^\n]*selected_inspiration_aggregates[^\n]*不阻塞",
-            "long-write-inspiration-optional-axis",
-            "long-write (a0) must stay an optional non-blocking inspiration axis",
-        )
-    )
     findings.extend(
         require_pattern(
             repo_root / "skills/story-long-write/references/cross-book-recall.md",
             r"layer=跨书灵感聚合[^\n]*status=active",
             "cross-book-active-cba-only",
             "inspiration recall must retrieve only active cross-book aggregation cards",
-        )
-    )
-    findings.extend(
-        require_pattern(
-            explorer_template,
-            r"layer=跨书灵感聚合[^\n]*status=active",
-            "explorer-cba-query",
-            "story-explorer must retrieve only active CBA cards",
         )
     )
     findings.extend(
@@ -1371,14 +1354,6 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
         (r"适用阶段=细纲", "inspiration-hook-outline", "chapter outlining must offer optional inspiration recall"),
     ):
         findings.extend(require_pattern(setup_workflow, pattern, code, message))
-    findings.extend(
-        require_pattern(
-            repo_root / "skills/story-long-write/scripts/build_writer_prompt.py",
-            r"跨书灵感",
-            "writer-prompt-inspiration-slot",
-            "writer prompt builder must carry the cross-book inspiration slot",
-        )
-    )
     findings.extend(
         require_pattern(
             repo_root / "skills/story-long-write/references/cross-book-recall.md",

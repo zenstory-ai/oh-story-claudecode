@@ -115,10 +115,7 @@ OpenClaw / Reasonix / generic 三条路径的 skill 副本在项目 `skills/` �
 ## 三层灵感库契约（版本号与发布安排待维护者定）
 
 - story-long-analyze 新增可选「三层灵感库管道」：复用 Stage 3 的 EM 机制卡——IA 只是索引登记行（无文件），NM 只记合并增量，CBA 是唯一自包含写作消费卡；卡内禁路径引用，来源用 `书名/EM-xxx` 裸 ID，溯源经 `灵感索引.csv` 或 `resolve` 子命令。
-- story-explorer `benchmark_style_load` 在工作区有 `灵感库/` 时附带 Top 3 active CBA 召回（`selected_inspiration_aggregates`），无库/零命中记 gap 不阻塞。
-- 写前召回新增可选轴 (a0) 公共灵感标签召回；降档路径照常执行 (a0)。
-
-重新部署后新开会话，使新 agent 定义生效。
+- story-long-write 在开书（适用阶段=设定）、卷纲、细纲三处可选召回 active CBA；逐章写前召回与写手 prompt 不接灵感库。无库或零命中只记 gap，不阻塞。
 
 ## v30 当前契约
 

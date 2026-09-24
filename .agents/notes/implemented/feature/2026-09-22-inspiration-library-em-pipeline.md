@@ -4,6 +4,7 @@ Status: implemented
 Date: 2026-09-22
 Issue: PR #387（依赖 PR #386）
 Related: [2026-09-22-long-analyze-single-state-runtime](../architecture/2026-09-22-long-analyze-single-state-runtime.md)
+Related（接手收口）：[2026-09-23-inspiration-library-takeover](../simplification/2026-09-23-inspiration-library-takeover.md)——逐章挂点与子串近义判定已在该篇撤回
 
 ## Problem
 

@@ -117,7 +117,7 @@ def require(condition: bool, message: str) -> None:
 
 def write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8", newline="\n")
+    path.write_bytes(text.encode("utf-8"))
 
 
 def make_workspace(base: Path, book: str = "测试书", module_text: str = EM_MODULE_TEXT) -> Path:
@@ -134,7 +134,7 @@ def append_row(root: Path, row: dict[str, str]) -> None:
     rows = index_rows(root)
     rows.append(row)
     text = MODULE["csv_text"](rows)
-    (root / "灵感索引.csv").write_text(text, encoding="utf-8", newline="")
+    (root / "灵感索引.csv").write_bytes(text.encode("utf-8"))
 
 
 def base_row(**overrides: str) -> dict[str, str]:
@@ -386,10 +386,10 @@ def test_vocabulary_guard() -> None:
         require(any("tag_value_not_in_vocabulary:风险=泄底过早" in error for error in errors),
                 f"表外值必须点名：{errors}")
 
-        write(root / "标签词表.md", VOCABULARY_TEXT.replace("- 认知反转", "- 认知反转\n- 反转"))
+        write(root / "标签词表.md", VOCABULARY_TEXT.replace("- 认知反转", "- 认知反转\n* 高潮前\n- 高潮"))
         errors = MODULE["validate"](root)
-        require(any("tag_vocabulary_near_duplicate:读者需求" in error for error in errors),
-                f"同轴互为子串的近义值必须拦下：{errors}")
+        require(not errors and "高潮前" in MODULE["load_vocabulary"](root)["读者需求"],
+                f"子串关系的正常值（高潮前/高潮）不能被当成同义拦下，`* 值` 也要读入：{errors}")
 
         write(root / "标签词表.md", "# 标签词表\n\n## 题材\n- 玄幻\n")
         errors = MODULE["validate"](root)
@@ -457,6 +457,49 @@ def test_validate_set_mismatch_and_nm_rules() -> None:
         require(not MODULE["validate"](root), "NM 展开闭包必须通过：" + ";".join(MODULE["validate"](root)))
 
 
+def test_parser_and_gate_hardening() -> None:
+    card = "| 字段 | 内容 |\n|---|---|\n| 读者想看什么 | 甲 |\n| 情绪链 | 乙 |\n| 戏剧单元 | 丙 |\n| 可替换项 | 丁 |\n| 不可照搬 | 戊 |\n"
+    with tempfile.TemporaryDirectory(prefix="ilib-harden-") as temporary:
+        base = Path(temporary)
+        module_path = base / "拆文库" / "测试书" / "剧情" / "情绪模块.md"
+
+        root = make_workspace(base, module_text="## 可复现模块卡\n\n### EM-002\n\n" + card)
+        report = MODULE["check_atoms"](root, module_path, "测试书")
+        require(any("EM-002:em_title_missing" in error for error in report["errors"]),
+                f"无标题卡头不能被截成 EM-00 静默登记：{report}")
+
+        swallowed = "## 可复现模块卡\n\n### EM-001 第一卡\n\n" + card + "\n#### EM-002 第二卡\n\n" + card
+        make_workspace(base, module_text=swallowed)
+        report = MODULE["check_atoms"](root, module_path, "测试书")
+        require(any("em_header_unrecognized" in error for error in report["errors"]),
+                f"认不出的 EM 标题不能把下一张卡并进上一张：{report}")
+        make_workspace(base, module_text=swallowed.replace("#### EM-002", "### **EM-002**"))
+        report = MODULE["check_atoms"](root, module_path, "测试书")
+        require(report["ok"] and report["cards_full"] == 2, f"粗体卡头应识别为独立卡：{report}")
+
+        make_workspace(base, module_text="## 可复现模块卡\n\n### EM-001 卡\n\n" + card + "| 情绪链 | 重复 |\n")
+        report = MODULE["check_atoms"](root, module_path, "测试书")
+        require(any("EM-001:em_field_duplicate:情绪链" in error for error in report["errors"]), f"同卡重复字段必须报：{report}")
+
+        make_workspace(base, book="乙书", module_text=LEAKY_CARD)
+        make_workspace(base)
+        report = MODULE["check_atoms"](root, base / "拆文库" / "乙书" / "剧情" / "情绪模块.md", "测试书")
+        require(any("module_book_mismatch" in error for error in report["errors"]), f"--book 与 --module 必须同书：{report}")
+
+        write(base / "拆文库" / "泄漏书" / "角色" / "主角" / "01-张三.md", "角色卡")
+        leaky_root = make_workspace(base, book="泄漏书", module_text=LEAKY_CARD.replace("| 可替换项 | 场景 |", "| 可替换项 | 张三 → 任意主角 |"))
+        report = MODULE["check_atoms"](leaky_root, base / "拆文库" / "泄漏书" / "剧情" / "情绪模块.md", "泄漏书")
+        require(report["character_roster"] == 1 and any("replaceable_antipattern:张三" in error for error in report["errors"]),
+                f"子目录与编号前缀的角色卡也要进泄漏门名单：{report}")
+
+        MODULE["register_atoms"](root, module_path, "测试书")
+        with (root / "灵感索引.csv").open("a", encoding="utf-8") as handle:
+            handle.write("CBA-009,跨书灵感聚合,短行\n")
+        errors = MODULE["validate"](root)
+        require(any("column_count_mismatch" in error for error in errors), f"列数不对的行必须报错而不是崩溃：{errors}")
+        require(MODULE["coverage"] is not None, "coverage 可用")
+
+
 def main() -> int:
     test_register_and_idempotence()
     test_parse_genre_variants()
@@ -468,6 +511,7 @@ def main() -> int:
     test_coverage_reports_uncovered_atoms()
     test_validate_rejects_path_reference_in_card()
     test_validate_set_mismatch_and_nm_rules()
+    test_parser_and_gate_hardening()
     print("OK: inspiration index regressions passed")
     return 0
 

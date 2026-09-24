@@ -40,10 +40,11 @@ CORE_QUERY_AXES = {"题材", "读者需求", "情绪", "剧情功能", "适用�
 EM_REQUIRED_FIELDS = ("读者想看什么", "情绪链", "戏剧单元", "可替换项", "不可照搬")
 # 专名泄漏扫描范围：排除「不可照搬」——该字段的职责就是点名原书专名
 EM_LEAK_SCAN_FIELDS = ("读者想看什么", "情绪链", "戏剧单元", "可替换项")
-EM_HEADER_RE = re.compile(r"^###\s+(EM-[0-9]{2,})\s*(?:[·\-—]\s*)?(.+?)\s*$")
+EM_HEADER_RE = re.compile(r"^###\s+\**(EM-[0-9]{2,})(?![0-9])\**\s*(?:[·\-—：:｜|]\s*)?(.*?)\s*$")
+EM_ANY_HEADING_RE = re.compile(r"^#{1,6}\s")
 EM_INDEX_ID_RE = re.compile(r"(EM-[0-9]{2,})")
 # 字段行的两种体裁：表格 `| 字段 | 值 |` 与粗体列表 `- **字段**：值`（前导 `- ` 可省）
-EM_BOLD_FIELD_RE = re.compile(r"^-?\s*\*\*(.+?)\*\*\s*[:：]\s*(.*)$")
+EM_BOLD_FIELD_RE = re.compile(r"^[-*]?\s*\*\*([^*]+?)(?:[:：]\*\*|\*\*\s*[:：])\s*(.*)$")
 # 同义字段名归一；表头行的首列词不作为字段
 EM_FIELD_ALIASES = {"不可照搬项": "不可照搬", "可替换项目": "可替换项"}
 EM_TABLE_HEADER_KEYS = {"字段", "维度", "---", ""}
@@ -82,16 +83,18 @@ def normalize_em_field(key: str) -> str:
     return EM_FIELD_ALIASES.get(key.strip().strip("*").strip(), key.strip().strip("*").strip())
 
 
-def parse_em_module(module_text: str) -> tuple[list[dict[str, str]], list[tuple[str, str]]]:
-    """Return (complete cards, index-only entries) from 情绪模块.md text.
+def parse_em_module(module_text: str) -> tuple[list[dict[str, str]], list[tuple[str, str]], list[str]]:
+    """Return (complete cards, index-only entries, structural problems) from 情绪模块.md text.
 
     完整卡＝`### EM-xxx 名称` 小节内的字段行，表格 `|字段|内容|` 与粗体列表 `- **字段**：内容` 都接受；
     粗体字段同行没写值时，吸收其后到下一个字段/标题为止的列表或段落行作为多行值。
     索引条目＝「其他机制索引」小节里出现 EM-xxx 的行（机制ID｜名称｜…）。
+    认不出的 EM 标题行和同卡重复字段记为问题：它们意味着下一张卡被并进了上一张。
     """
     lines = module_text.split("\n")
     cards: list[dict[str, str]] = []
     index_entries: list[tuple[str, str]] = []
+    problems: list[str] = []
     current: dict[str, str] | None = None
     pending_field: str | None = None
     in_index_section = False
@@ -109,12 +112,19 @@ def parse_em_module(module_text: str) -> tuple[list[dict[str, str]], list[tuple[
             in_index_section = False
             pending_field = None
             continue
+        if EM_ANY_HEADING_RE.match(stripped) and EM_INDEX_ID_RE.search(stripped):
+            problems.append(f"em_header_unrecognized:{stripped[:40]}——EM 卡标题须写成 `### EM-xxx 名称`")
+            current = None
+            pending_field = None
+            continue
         if current is not None and stripped.startswith("|"):
             pending_field = None
             cells = [cell.strip() for cell in stripped.strip("|").split("|")]
             if len(cells) >= 2:
                 key = normalize_em_field(cells[0])
                 if key not in EM_TABLE_HEADER_KEYS and not set(key) <= {"-"}:
+                    if key in current:
+                        problems.append(f"{current['em_id']}:em_field_duplicate:{key}")
                     current[key] = cells[1]
             continue
         if current is not None:
@@ -122,6 +132,8 @@ def parse_em_module(module_text: str) -> tuple[list[dict[str, str]], list[tuple[
             if bold:
                 key = normalize_em_field(bold.group(1))
                 value = bold.group(2).strip()
+                if key in current:
+                    problems.append(f"{current['em_id']}:em_field_duplicate:{key}")
                 current[key] = value
                 pending_field = None if value else key
                 continue
@@ -143,7 +155,7 @@ def parse_em_module(module_text: str) -> tuple[list[dict[str, str]], list[tuple[
                 if name == match.group(1) and len(parts) >= 2:
                     name = parts[1]
                 index_entries.append((match.group(1), name))
-    return cards, index_entries
+    return cards, index_entries, problems
 
 
 def resolve_workspace(root: Path, explicit: Path | None = None) -> Path:
@@ -184,8 +196,8 @@ def character_names(workspace: Path, book: str) -> set[str]:
     role_dir = workspace / "拆文库" / book / "角色"
     names: set[str] = set()
     if role_dir.is_dir():
-        for entry in role_dir.glob("*.md"):
-            stem = entry.stem
+        for entry in role_dir.rglob("*.md"):
+            stem = re.sub(r"^\d+[-_.、\s]*", "", entry.stem)
             if stem and stem != "角色关系" and len(stem) >= 2:
                 names.add(stem)
     return names
@@ -197,7 +209,12 @@ def load_rows(root: Path) -> tuple[list[dict[str, str]], list[str]]:
     try:
         with index_path.open("r", encoding="utf-8-sig", newline="") as handle:
             reader = csv.DictReader(handle)
-            rows = list(reader)
+            rows = []
+            for number, row in enumerate(reader, start=2):
+                if None in row or None in row.values():
+                    errors.append(f"line_{number}:column_count_mismatch")
+                    continue
+                rows.append(row)
             if tuple(reader.fieldnames or ()) != COLUMNS:
                 errors.append("index_header_mismatch")
     except (OSError, UnicodeError, csv.Error) as exc:
@@ -227,13 +244,16 @@ def analyze_module(root: Path, module_path: Path, book: str,
         module_text = module_path.read_text(encoding="utf-8-sig")
     except (OSError, UnicodeError) as exc:
         raise RegisterError([f"emotion_module_unreadable:{exc}"]) from exc
-    cards, index_entries = parse_em_module(module_text)
+    cards, index_entries, problems = parse_em_module(module_text)
     if not cards and not index_entries:
         raise RegisterError(["emotion_module_has_no_em_cards"])
+    errors.extend(problems)
 
     book_dir = ws / "拆文库" / book
     if not book_dir.is_dir():
         errors.append(f"book_dir_not_found:拆文库/{book}——工作区 {ws} 下没有这本书，泄漏门无法取角色名单")
+    elif book_dir.resolve() not in module_path.resolve().parents:
+        errors.append(f"module_book_mismatch:{module_path} 不在 拆文库/{book}/ 下——--book 与 --module 必须是同一本书")
     names = character_names(ws, book)
     if not names and book_dir.is_dir():
         warnings.append(f"character_roster_missing:拆文库/{book}/角色/ 不存在或为空——泄漏门本次没有名单可查，请人工确认卡内无专名")
@@ -247,6 +267,9 @@ def analyze_module(root: Path, module_path: Path, book: str,
             continue
         seen.add(em_id)
         card_errors = 0
+        if not card["title"].strip():
+            errors.append(f"{em_id}:em_title_missing——EM 卡标题须写成 `### {em_id} 名称`")
+            card_errors += 1
         absent = [field for field in EM_REQUIRED_FIELDS if field not in card]
         empty = [field for field in EM_REQUIRED_FIELDS if field in card and not card[field].strip()]
         if absent:
@@ -282,6 +305,8 @@ def analyze_module(root: Path, module_path: Path, book: str,
         if em_id in seen:
             continue
         seen.add(em_id)
+        for name in sorted(name for name in names if name in title):
+            warnings.append(f"{em_id}:leak_suspect:{name}@索引标题——请人工复核；确认是专名请回 Stage 3 修索引条目")
         atom_rows.append(_ia_row(book, em_id, title, grade="index"))
     return {
         "book": book,
@@ -399,7 +424,7 @@ def load_book_em_ids(workspace: Path, source_book: str) -> tuple[set[str], str |
         module_text = module_path.read_text(encoding="utf-8-sig")
     except (OSError, UnicodeError):
         return set(), "emotion_module_unreadable"
-    cards, index_entries = parse_em_module(module_text)
+    cards, index_entries, _ = parse_em_module(module_text)
     ids = {card["em_id"] for card in cards} | {em_id for em_id, _ in index_entries}
     return ids, None
 
@@ -476,16 +501,10 @@ def validate(root: Path, workspace: Path | None = None) -> list[str]:
                 errors.append(f"line_{number}:source_ids_missing")
             if novel_count == 1 and "单书假设" not in card_text:
                 errors.append(f"line_{number}:single_book_hypothesis_marker_missing")
-            if novel_count == 1 and row.get("status", "").strip() == "active" and book:
-                active_single_book_cba[book] = active_single_book_cba.get(book, 0) + 1
             if novel_count is not None and novel_count >= 2 and "跨书重复验证" not in card_text:
                 errors.append(f"line_{number}:cross_book_validation_marker_missing")
         elif tags:
             errors.append(f"line_{number}:tags_reserved_for_cba")
-
-    for book, count in active_single_book_cba.items():
-        if count > 3:
-            errors.append(f"book_{book}:active_single_book_cba_limit_exceeded:{count}")
 
     for book, atoms in ia_by_book.items():
         if ws is None:
@@ -552,10 +571,16 @@ def validate(root: Path, workspace: Path | None = None) -> list[str]:
             errors.append(f"{cba_id}:cba_requires_sources")
             continue
         novels = {book for book, _ in expanded}
+        if len(novels) == 1 and row.get("status", "").strip() == "active":
+            only = next(iter(novels))
+            active_single_book_cba[only] = active_single_book_cba.get(only, 0) + 1
         if positive_int(row.get("novel_count", "")) != len(novels):
             errors.append(f"{cba_id}:cba_novel_count_mismatch")
         if positive_int(row.get("atom_count", "")) != len(expanded):
             errors.append(f"{cba_id}:cba_atom_count_mismatch")
+    for book, count in sorted(active_single_book_cba.items()):
+        if count > 3:
+            errors.append(f"book_{book}:active_single_book_cba_limit_exceeded:{count}")
     return errors
 
 
@@ -578,7 +603,7 @@ def load_vocabulary(root: Path) -> dict[str, list[str]] | None:
             if current_axis is not None:
                 vocabulary.setdefault(current_axis, [])
             continue
-        if current_axis is not None and stripped.startswith("- "):
+        if current_axis is not None and stripped[:2] in {"- ", "* "}:
             value = stripped[2:].split("（")[0].split("(")[0].strip()
             if value and value not in vocabulary[current_axis]:
                 vocabulary[current_axis].append(value)
@@ -586,17 +611,11 @@ def load_vocabulary(root: Path) -> dict[str, list[str]] | None:
 
 
 def vocabulary_errors(vocabulary: dict[str, list[str]]) -> list[str]:
-    """词表自身的健康检查：必填轴齐全、同轴无互为子串的近义值对（同义膨胀前兆）。"""
-    errors = [
+    """词表自身的健康检查：必填轴齐全。同义判定交给扩表时的人工比对。"""
+    return [
         f"vocabulary_axis_missing:{axis}"
         for axis in sorted(REQUIRED_CBA_AXES - set(vocabulary))
     ]
-    for axis, values in sorted(vocabulary.items()):
-        for index, value in enumerate(values):
-            for other in values[index + 1:]:
-                if value in other or other in value:
-                    errors.append(f"tag_vocabulary_near_duplicate:{axis}:{value}~{other}——疑似同义值，保留一个或改名拉开语义")
-    return errors
 
 
 def coverage(root: Path) -> dict[str, Any]:
@@ -611,10 +630,8 @@ def coverage(root: Path) -> dict[str, Any]:
     ia_by_book: dict[str, set[str]] = {}
     nm_members: dict[tuple[str, str], set[str]] = {}
     for row in rows:
-        if row.get("status", "").strip() != "active":
-            continue
         book = row.get("source_book", "").strip()
-        if row.get("layer") == "原子灵感":
+        if row.get("layer") == "原子灵感" and row.get("status", "").strip() == "active":
             for ref in source_ids(row.get("source_ids", "")):
                 ia_by_book.setdefault(book, set()).add(ref)
         elif row.get("layer") == "单小说灵感合并":
@@ -772,7 +789,17 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     args = parse_args()
+    try:
+        return run(args)
+    except (OSError, UnicodeError) as exc:
+        print(json.dumps({"ok": False, "error": f"io_error:{exc}"}, ensure_ascii=False))
+        return 2
+
+
+def run(args: argparse.Namespace) -> int:
     if args.command == "register-atoms":
         try:
             payload = register_atoms(args.root, args.module, args.book.strip(), args.workspace)

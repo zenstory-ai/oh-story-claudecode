@@ -1,6 +1,7 @@
 # Agent Note: 灵感库登记管道加固——泄漏门定位、一次报全与增量导航
 
 Status: implemented
+Related（接手收口）：[2026-09-23-inspiration-library-takeover](../simplification/2026-09-23-inspiration-library-takeover.md)——逐章挂点与子串近义判定已在该篇撤回
 
 首个真实规模灵感库（20 本书、150+ 原子）建库实测暴露的一批管道缺陷，在 #439 分支上收口。
 

@@ -39,7 +39,7 @@ story-long-analyze 的可选后置管道：把 Stage 3 已抽象好的 EM 机制
 - 五字段缺失报 `em_fields_missing`，字段在而值空报 `em_field_value_empty`（多行值合法：值可写在字段名行之后、下一个字段/标题之前的列表或段落里）。机制字段（标题/读者想看什么/情绪链/戏剧单元/可替换项）的专名检查分两级：本卡「不可照搬」已点名该词却仍在抽象字段使用、或 `可替换项` 写成「专名→任意X」（报 `replaceable_antipattern`），都是高置信真引用，报 `source_specific_name_in_mechanism` error；仅角色卡文件名子串命中而无佐证的降为 `leak_suspect` warning 并列出命中字段，人工复核。都指回 Stage 3 修复；「不可照搬」字段本身例外——点名原书专名正是它的职责。
 - 泄漏门的角色名单取自工作区 `拆文库/{书}/角色/`。工作区从 `--root` 向上探测含 `拆文库/` 的目录，探测不到报 `workspace_not_located`（可加 `--workspace` 显式指定），不得回退空名单静默通过；输出恒带 `character_roster` 数，书目录在而 `角色/` 缺失报 `character_roster_missing` warning，提示人工确认无专名。
 - 所有卡的所有问题一次收集报全（`errors` 数组），有任一 error 即整体不写盘。落盘 `剧情/情绪模块.md` 后先用只读的 `check-atoms`（与 register-atoms 同参数）自检：输出卡数、索引数、名单规模与全部问题，不写任何文件。
-- 一次原子写入、重跑逐字节幂等。本步不得调用模型重新概括机制。
+- 一次原子写入、重跑逐字节幂等；多本书逐本串行登记，不要并行跑 `register-atoms`。`--module` 必须是 `拆文库/{--book}/` 下的文件（`module_book_mismatch`）；卡头须为 `### EM-xxx 名称`，缺名称报 `em_title_missing`，认不出的 EM 标题行报 `em_header_unrecognized`，同卡重复字段报 `em_field_duplicate`——三者都意味着卡被截断或并进了上一张。本步不得调用模型重新概括机制。
 
 ### 2. 单小说灵感合并
 
@@ -92,13 +92,13 @@ item_id,layer,title,source_book,path,source_ids,novel_count,atom_count,grade,tag
 - `source_ids` 来源图：IA 行＝单个 `EM-xxx`；NM 行＝同书 ≥2 个 `EM-xxx`（`|` 分隔）；CBA 行＝`书名/EM-xxx` 与 `书名/NM-xxx` 混合列表（必须带书名前缀）。引用 NM 时其成员 EM 自动并入闭包，**不需要也不应该再展开列出**；`novel_count`＝闭包内不同小说数，`atom_count`＝闭包内不同 EM 数。
 - 标签序列化为 `轴=值1|值2；轴=值`。CBA 必填轴：题材、读者需求、情绪、剧情功能、适用阶段、风险；可选轴：关系动作、节奏位置。同义值先归一；不用「好看/有趣/高级」等不可执行词。
 - **标签值受控于库内 `灵感库/标签词表.md`**（每轴一节 `## 轴`、一行一值 `- 值`）：建库首轮聚合把用到的值落盘成首版，此后打标先读词表。扩表走同义判定——候选新值逐一与该轴现有值语义比对，重合或从属就用现有值，确属新维度才追加一行；词表膨胀就是查询失效的前兆。query 命中靠值的精确匹配，写入侧与查询侧共用这一张表。
-- `validate` 校验：表头、ID 前缀、EM↔IA 集合一致、NM/CBA 闭包与计数、必填标签轴、单书 active CBA ≤3、验证状态标记、**卡内无路径引用**；词表存在时另拒表外值（`tag_value_not_in_vocabulary`）、同轴互为子串的近义值对（`tag_vocabulary_near_duplicate`）与缺必填轴的词表（`vocabulary_axis_missing`）——词表缺失时这三项不查（旧库兼容），应尽快补建。
+- `validate` 校验：表头、ID 前缀、EM↔IA 集合一致、NM/CBA 闭包与计数、必填标签轴、单书 active CBA ≤3、验证状态标记、**卡内无路径引用**；词表存在时另拒表外值（`tag_value_not_in_vocabulary`）与缺必填轴的词表（`vocabulary_axis_missing`）——词表缺失时这两项不查（旧库兼容），应尽快补建；同义值靠扩表时的人工比对，不做机械子串判定。列数不对的索引行报 `column_count_mismatch`。
 - `query --tag 轴=值 …` 只筛 `layer=跨书灵感聚合` 且 `status=active`，核心轴（题材/读者需求/情绪/剧情功能/适用阶段）2 分、其余 1 分，无核心轴命中不返回，按分数/来源数/ID 稳定排序取 Top 3–8。返回值另带 `unmatched_tags`（请求值在全库该轴零出现）与 `axis_inventory`（所查各轴现存值）：零命中先按它们纠词重查一次，仍零命中才算「库里没有」。
 - `resolve --ref 书名/EM-xxx --ref CBA-001` 把裸 ID 解析为可读位置——需要时才查，不预先展开进任何卡。
 
 ## 写作侧消费约定
 
-写作模块只读标签命中的 active CBA 全卡（Top 3–8），不沿来源下钻 EM/NM；CBA 不作文风样本，也不触发原文读取；同一 CBA 最多派生 2 个候选变化。IA/NM 层不直接进入正文 prompt。消费入口见 story-long-write 的写前召回 (a0) 与 story-explorer 的 `benchmark_style_load`。
+写作模块只读标签命中的 active CBA 全卡（Top 3–8），不沿来源下钻 EM/NM；CBA 不作文风样本，也不触发原文读取；同一 CBA 最多派生 2 个候选变化。消费入口只在 story-long-write 的开书、卷纲、细纲三处（适用阶段=设定/卷纲/细纲）；逐章写前召回和写手 prompt 不读灵感库，灵感经细纲进入正文。
 
 ## 断点与禁止事项
 
