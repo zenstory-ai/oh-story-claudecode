@@ -125,6 +125,19 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('召回降档：成立', result.stdout)
         self.assertNotIn('以上是 prompt 正文', prompt)
 
+    def test_bare_out_archives_into_book_work_dir(self):
+        result = self.call('build_writer_prompt.py', '--project', self.book, '--chapter', 1, '--out')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        work = (self.book / '.story/work/第001章').resolve()
+        archived = work / 'writer_prompt.md'
+        self.assertTrue(archived.is_file())
+        self.assertIn(f'留档：{archived}', result.stdout)
+        prompt = archived.read_text(encoding='utf-8')
+        # Segment paths are concrete, book-local and never under 正文/ or /tmp.
+        self.assertIn(str(work / '前组.md'), prompt)
+        self.assertIn(str(work / '后组.md'), prompt)
+        self.assertFalse((self.book / '正文').exists() and any((self.book / '正文').iterdir()))
+
     def test_incomplete_replacements_keep_full_recall(self):
         original = self.volume.read_text(encoding='utf-8')
         for broken in ['missing-card', 'empty-card', 'placeholder-emotion', 'missing-unit', 'missing-engine', 'missing-tempo']:

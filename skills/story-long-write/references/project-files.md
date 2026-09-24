@@ -57,6 +57,7 @@
 │   └── 时间线/{作者真相.md,读者已知.md}
 ├── 参考资料/
 │   └── {topic}.md             # story-researcher 输出的研究资料
+├── .story/work/第NNN章/        ← 本章临时文件（分组 segment、prompt 留档、事务 JSON），提交后自动删除
 ```
 
 **产物映射表**（创建模板详见 [references/artifact-protocols.md](artifact-protocols.md)）：
@@ -70,7 +71,7 @@
 | 设定/文风.md（自定义文风·优先级最高） | 本书 | 用户自写（Claude Code 可代写）；导入/拆解不覆盖 | Phase 4 每章写作前：含实质内容则取代对标文风作权威风格基 |
 | 对标/{书名}/文风.md | 对标书 | analyze Stage 6 输出 → story-import 显式绑定或本 skill 首次引用时同步 | Phase 4 每章写作前（文风召回；有自定义文风时降为参考/句长兜底） |
 | 大纲/卷纲_第X卷.md | 卷 | Phase 3 | **一律走取段器 `outline_view.py --unit/--contract/--toc`，不整读**（见「路径与术语约定」）；段位契约与 checker 见 artifact-protocols.md |
-| 追踪/_tracking-state.json | 全书 | 首次细纲完成后或首章写前初始化 | 唯一结构化权威，不进正文 prompt；每章运行 `tracking_commit.py check` 读取章号和修订号 |
+| 追踪/_tracking-state.json | 全书 | 首次写正文前初始化（规划阶段不建） | 唯一结构化权威，不进正文 prompt；每章运行 `tracking_commit.py check` 读取章号和修订号 |
 | 追踪/伏笔.md | 全书当前视图 | 与 state 同时初始化 | 续写状态卡缺项时按 ID 定点查询；每 ID 只一行 |
 | 追踪/时间线/{作者真相.md,读者已知.md} | 全书当前事实/认知派生视图 | 与 state 同时初始化 | 按作者真相或读者认知的实际问题选择视图 |
 | 对标/{书名}/拆文报告.md | 对标书 | 用户手动+analyze | Phase 2 核心设定、Phase 3 大纲、Phase 4 写作 |

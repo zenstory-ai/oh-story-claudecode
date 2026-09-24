@@ -30,6 +30,9 @@ for _name in dir(core):
 
 CHAPTER_CHECK_SCHEMA = "story-chapter-check/v1"
 CHAPTER_ERROR_SCHEMA = "story-chapter-error/v1"
+# 书内工作目录：分组 segment、writer prompt 留档、逐章事务 JSON 的唯一落点。
+# 与 build_writer_prompt.py 同一口径；提交成功后整目录删除，失败时原样保留供重跑。
+WORK_ROOT = (".story", "work")
 
 
 class CliArgumentError(ValueError):
@@ -70,6 +73,32 @@ def _read_json_object(path: Path, label: str) -> dict[str, Any]:
         raise WordcountError(f"unable to read {label}: {exc}") from exc
     require(isinstance(value, dict), f"{label} must be an object")
     return value
+
+
+def chapter_work_dir(project: Path, chapter: int) -> Path:
+    width = max(3, len(str(chapter)))
+    return project.resolve().joinpath(*WORK_ROOT, f"第{chapter:0{width}d}章")
+
+
+def _remove_chapter_work_dir(project: Path, chapter: int) -> str | None:
+    """Delete this chapter's scratch directory after a successful commit.
+
+    Only the per-chapter directory is removed; `.story/work` and `.story` are
+    pruned only when empty, so book-level author memory under `.story/` stays.
+    """
+    path = chapter_work_dir(project, chapter)
+    if path.is_symlink():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
+    else:
+        return None
+    for parent in (path.parent, path.parent.parent):
+        try:
+            parent.rmdir()
+        except OSError:
+            break
+    return "/".join((*WORK_ROOT, path.name))
 
 
 def _project_files(project: Path, chapter: int) -> tuple[Path, Path, int]:
@@ -220,6 +249,12 @@ def chapter_commit(project: Path, chapter: int, input_path: Path, *, accept_curr
     checked["tracking_committed"] = state["last_committed_chapter"] >= chapter
     checked["next_chapter_started"] = state["last_committed_chapter"] > chapter
     checked["wordcount"] = state["wordcount_records"].get(str(chapter))
+    # The commit is already durable; a cleanup failure is reported, never turned into a failed commit.
+    try:
+        checked["work_dir_removed"] = _remove_chapter_work_dir(project, chapter)
+    except OSError as exc:
+        checked["work_dir_removed"] = None
+        checked["work_dir_cleanup_error"] = str(exc)
     return checked
 
 

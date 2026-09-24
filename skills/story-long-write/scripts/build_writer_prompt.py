@@ -2,7 +2,12 @@
 """build_writer_prompt.py — 确定性组装 narrative-writer 的 spawn prompt 骨架。
 
 用法:
-    python build_writer_prompt.py --project <书目录> --chapter N [--out <文件>]
+    python build_writer_prompt.py --project <书目录> --chapter N [--out [<文件>]]
+
+`--out` 不带路径时留档到本章工作目录 `<书目录>/.story/work/第NNN章/writer_prompt.md`。
+分组 segment、prompt 留档和逐章事务 JSON 都只放这个书内工作目录——不写系统 /tmp
+（多本书/多会话同章号会互相覆盖，Windows 也没有 /tmp），也不写进 正文/（会被当成章节）。
+`storyctl.py chapter commit` 成功后自动删除该章工作目录。
 
 跑在「写前准备」第一步。stdout 分两区，`===` 分隔线以上是 prompt 正文
 （主会话照抄，空槽以外一字不改），以下是核对报告（不进 prompt）。
@@ -31,6 +36,13 @@ from outline_view import parse as parse_volume
 TAIL_CHARS = 400          # 上一章结尾注入的目标字符数（按整行回退，不切半句）
 STATE_SECTIONS = ("当前位置", "长期约束", "核心角色状态", "活跃伏笔", "近三章速记", "下一章承诺", "连贯性风险")
 SLOT_MARK = "［主会话填］"
+WORK_ROOT = (".story", "work")
+
+
+def chapter_work_dir(project: Path, chapter: int) -> Path:
+    """本章临时文件的唯一落点；与 storyctl.py 提交后清理的目录同一口径。"""
+    width = max(3, len(str(chapter)))
+    return project.joinpath(*WORK_ROOT, f"第{chapter:0{width}d}章")
 
 
 def read_text(path: Path):
@@ -300,11 +312,14 @@ def build(project: Path, chapter: int, report: list):
         report.append("召回降档：不成立（" + "、".join(why) + "）—— 全量召回归主会话")
 
     # ---- 需要主会话判断的槽位 ----
+    work_dir = chapter_work_dir(project, chapter)
     parts.append(
         "——— 执行安排 ———\n"
         f"{SLOT_MARK} 全章细纲用于整体编排。默认按自然转场或因果停顿分前后两组，"
-        "填写当前组的情节点/片段及临时输出路径；先只写前组，父流程测一次 checkpoint 后"
-        "再给后组和机器剩余区间。只有用户明确要求一次成文时才填「全章，直接写最终路径」。")
+        "填写当前组的情节点/片段；先只写前组，父流程测一次 checkpoint 后"
+        "再给后组和机器剩余区间。只有用户明确要求一次成文时才填「全章，直接写最终路径」。\n"
+        f"分组临时文件：前组 {work_dir / '前组.md'}，后组 {work_dir / '后组.md'}"
+        "（只写这里，不写 /tmp 或 正文/）。")
     parts.append(f"——— 本章意图（一句话）———\n{SLOT_MARK}")
     parts.append(slot_recall)
     # 伏笔与卷级禁忌走「主会话筛选后写进速记」这条原设计路线（步骤 3 状态筛选），
@@ -360,7 +375,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--project", required=True)
     parser.add_argument("--chapter", required=True, type=int)
-    parser.add_argument("--out", default=None)
+    parser.add_argument("--out", nargs="?", const="", default=None,
+                        help="prompt 留档路径；不带值时留档到本章工作目录 writer_prompt.md")
     args = parser.parse_args(argv)
 
     project = Path(args.project).resolve()
@@ -391,9 +407,16 @@ def main(argv=None):
             f"标题预检：《{title}》" + ("与既有章重名 → " + "、".join(clashes)
                                        if clashes else "无重名"))
 
-    if args.out:
-        io.open(args.out, "w", encoding="utf-8", newline="\n").write(prompt)
-        report.append(f"留档：{args.out}")
+    if args.out is not None:
+        out = Path(args.out) if args.out else chapter_work_dir(project, args.chapter) / "writer_prompt.md"
+        try:
+            out.parent.mkdir(parents=True, exist_ok=True)
+            with io.open(out, "w", encoding="utf-8", newline="\n") as handle:
+                handle.write(prompt)
+        except OSError as exc:
+            sys.stderr.write(f"留档写入失败：{out}（{exc}）\n")
+            return 2
+        report.append(f"留档：{out}")
 
     sys.stdout.write(prompt)
     sys.stdout.write("\n" + "=" * 60 + "\n")

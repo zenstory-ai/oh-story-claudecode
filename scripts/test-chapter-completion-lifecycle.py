@@ -216,6 +216,46 @@ class FinalChapterFlowTests(unittest.TestCase):
         self.assertNotIn("wordcount_events", state)
         self.assertNotIn("wordcount_policy", state)
 
+    def test_chapter_work_dir_survives_failure_and_is_removed_after_commit(self) -> None:
+        work = self.project / ".story/work/第001章"
+        work.mkdir(parents=True)
+        memory = self.project / ".story/作者记忆"
+        memory.mkdir(parents=True)
+        (work / "前组.md").write_text("# 前组\n" + "字" * 400, encoding="utf-8")
+        (work / "writer_prompt.md").write_text("prompt", encoding="utf-8")
+        tracking_input = work / "tracking.json"
+
+        def commit(expect: int) -> dict[str, object]:
+            tracking_input.write_text(
+                json.dumps(transaction(1, self.state()["state_revision"]), ensure_ascii=False), encoding="utf-8"
+            )
+            return self.run_process([
+                sys.executable, str(STORYCTL), "chapter", "commit", "--project", str(self.project),
+                "--chapter", "1", "--input", str(tracking_input),
+            ], expect=expect)
+
+        # A rejected commit keeps every scratch file so the same transaction can be rerun.
+        self.write_contract(1, 800)
+        rejected = commit(2)
+        self.assertIn("outside the user band", rejected["message"])
+        self.assertTrue(tracking_input.is_file())
+        self.assertTrue((work / "前组.md").is_file())
+
+        self.write_contract(1, 1000)
+        committed = commit(0)
+        self.assertTrue(committed["tracking_committed"])
+        self.assertEqual(committed["work_dir_removed"], ".story/work/第001章")
+        self.assertFalse(work.exists())
+        self.assertFalse((self.project / ".story/work").exists())
+        # Book-level author memory shares .story/ and must never be touched.
+        self.assertTrue(memory.is_dir())
+        self.assertEqual(sorted(path.name for path in (self.project / "正文").iterdir()), ["第001章_测试.md"])
+
+        # No work dir for the next chapter is simply reported as nothing to remove.
+        self.write_contract(2, 1000)
+        second = self.run_chapter("commit", 2, document=transaction(2, self.state()["state_revision"]))
+        self.assertIsNone(second["work_dir_removed"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

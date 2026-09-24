@@ -71,6 +71,31 @@ EXTERNAL_URL_RE = re.compile(
 )
 # 花括号枚举（含逗号）是「逐个点名」，可以展开成具体路径；`{题材}` 这种单占位符不是枚举。
 BRACE_LIST_RE = re.compile(r"\{([^{}/]*,[^{}/]*)\}")
+# 面向作者的汇报模板：信息串为 author-report 的围栏块是直接说给作者听的话，
+# 不得出现脚本/字段/参数名、状态码或内部清单名（SKILL.md「面向作者的汇报」）。
+AUTHOR_REPORT_INFO = "author-report"
+_NO_ASCII_BEFORE = r"(?<![A-Za-z0-9_])"
+_NO_ASCII_AFTER = r"(?![A-Za-z0-9_])"
+AUTHOR_REPORT_JARGON = (
+    (re.compile(r"[A-Za-z0-9]+(?:_[A-Za-z0-9]+)+"), "snake_case 字段名"),
+    # 作者要亲手输入的 `/story-*` 命令不算黑话，斜杠后的 kebab-case 放行。
+    (re.compile(r"(?<![A-Za-z0-9_/-])[a-z]+(?:-[a-z]+)+" + _NO_ASCII_AFTER), "kebab-case 动作/参数名"),
+    (re.compile(r"\.(?:py|js|mjs|json|sh)" + _NO_ASCII_AFTER), "脚本或数据文件名"),
+    (re.compile(r"(?<![\w-])--[A-Za-z]"), "命令行参数"),
+    (re.compile(_NO_ASCII_BEFORE + r"S[1-4]" + _NO_ASCII_AFTER), "一致性分级代号"),
+    (re.compile(_NO_ASCII_BEFORE + r"[EFL]\d+(?:-\d+)?" + _NO_ASCII_AFTER + r"(?!\s*[（(])"), "不带故事标签的编号"),
+    (
+        re.compile(
+            _NO_ASCII_BEFORE
+            + r"(?:commit|discard|borderline|invalid|internal|pass|fail|under|over|tracking|state|revision"
+            + r"|checkpoint|segment|schema|delta|Constraint Lock|Notice|Fallback)"
+            + _NO_ASCII_AFTER,
+            re.IGNORECASE,
+        ),
+        "工程术语",
+    ),
+    (re.compile(r"安全七检|七检|供给自查|供给单|内带|用户带|二档|三档|收编|契约检查器|状态码|追踪事务"), "内部清单名"),
+)
 # 跨 skill 扫描覆盖全部文本资产。模板（*.md.tmpl / *.json.patch）与前端资产同样会被
 # story-setup 部署进作者项目，漏扫等于把「skill 自包含」这条红线在部署面上放空。
 SKILL_TEXT_SUFFIXES = {
@@ -282,6 +307,48 @@ def parse_document(path: Path) -> Document:
     return document
 
 
+def author_report_blocks(path: Path) -> list[tuple[int, list[tuple[int, str]]]]:
+    """Return (opening line, [(line, text), ...]) for each author-report fence."""
+    blocks: list[tuple[int, list[tuple[int, str]]]] = []
+    current: list[tuple[int, str]] | None = None
+    fence = ""
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if current is None:
+            opening = OPEN_FENCE_RE.match(line)
+            if opening and opening.group(2).strip().split(" ")[0] == AUTHOR_REPORT_INFO:
+                fence = opening.group(1)
+                current = []
+                blocks.append((line_number, current))
+            continue
+        if re.fullmatch(r"[ ]{0,3}" + re.escape(fence[0]) + "{" + str(len(fence)) + r",}[ \t]*", line):
+            current = None
+            continue
+        current.append((line_number, line))
+    return blocks
+
+
+def author_report_issues(path: Path) -> list[Issue]:
+    issues: list[Issue] = []
+    for _opening, lines in author_report_blocks(path):
+        for line_number, text in lines:
+            # 与 check-author-reports.py 同一约定：块尾「技术备注：」一行留给排障，不按白话要求检查。
+            if text.lstrip().startswith("技术备注："):
+                continue
+            for pattern, label in AUTHOR_REPORT_JARGON:
+                match = pattern.search(text)
+                if match:
+                    issues.append(
+                        Issue(
+                            "error",
+                            "author-report-jargon",
+                            path,
+                            line_number,
+                            f"作者汇报模板含{label}「{match.group(0)}」；改成作者能懂的白话",
+                        )
+                    )
+    return issues
+
+
 def parse_frontmatter(path: Path) -> tuple[dict[str, str], int | None]:
     lines = path.read_text(encoding="utf-8").splitlines()
     if not lines or lines[0].strip() != "---":
@@ -466,6 +533,8 @@ def validate_skill(
     issues.extend(cross_skill_path_issues(skill_dir, root))
 
     markdown_paths = sorted(path for path in skill_dir.rglob("*.md") if path.is_file())
+    for markdown_path in markdown_paths:
+        issues.extend(author_report_issues(markdown_path))
     documents = {path.resolve(): parse_document(path) for path in markdown_paths}
     resolved_by_document: dict[Path, set[Path]] = {path.resolve(): set() for path in markdown_paths}
 
