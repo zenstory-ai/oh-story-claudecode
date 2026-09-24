@@ -40,19 +40,22 @@ COMPACT_FIELDS = (
     "三维节奏", "章尾钩子", "证据",
 )
 POINT_HEADER_RE = re.compile(r"^P(\d+)\s+\*\*(.+?)\*\*\s*[：:]\s*(.+)$")
-POINT_TAG_RE = re.compile(r"^主题标签\s*([^|｜]*?)\s*[|｜]\s*基调\s*[：:]\s*(.*?)\s*$")
+POINT_TAG_RE = re.compile(r"^主题标签\s*[：:]?\s*([^|｜]*?)\s*[|｜]\s*基调\s*[：:]?\s*(.*?)\s*$")
 THEMES = ("爱情", "亲情", "友情", "权力", "金钱", "成长", "复仇", "悬念", "搞笑", "热血", "日常", "其他")
 TONES = ("紧张", "轻松", "悲伤", "热血", "爽", "甜", "温馨", "恐怖", "压抑", "其他")
 POINT_TYPES = ("转折点", "信息揭示", "冲突", "解决", "铺垫", "行动", "对话", "状态变化")
 THEME_ALIASES = {"恋爱": "爱情", "权谋": "权力", "政治": "权力", "幽默": "搞笑"}
-TONE_ALIASES = {"悲痛": "悲伤", "伤感": "悲伤", "痛快": "爽", "惊悚": "恐怖"}
+TONE_ALIASES = {"悲痛": "悲伤", "伤感": "悲伤", "悲愤": "悲伤", "痛快": "爽", "解气": "爽", "惊悚": "恐怖",
+                "恐惧": "恐怖", "危险": "紧张", "危急": "紧张", "绝望": "压抑", "无力": "压抑", "释然": "轻松"}
 POINT_ALIASES = {"揭示": "信息揭示", "转折": "转折点", "变化": "状态变化", "动作": "行动",
                  "交谈": "对话", "化解": "解决"}
 MIN_PLOT_POINTS = 10
 MAX_PLOT_POINTS = 30
-MAX_CHAPTERS = 5
+MAX_CHAPTERS = 3
 MAX_CHARS = 25_000
-FINAL_STAGES = ("stage1", "stage2", "stage3", "stage4", "stage5", "stage6")
+# Stage 3-6 each run once over complete Stage 2 output; their rows decide 最终状态.
+FINAL_STAGES = ("stage3", "stage4", "stage5", "stage6")
+LEGACY_FINAL_RE = re.compile(r"(?m)^([ \t]*(?:[-*][ \t]*)?最终状态[ \t]*[：:][ \t]*)([A-Za-z0-9_]+)")
 
 
 class RunError(ValueError):
@@ -199,18 +202,16 @@ def load_state(progress: Path) -> Tuple[Dict[str, Any], bytes]:
 
 
 def final_status(stages: Dict[str, Dict[str, str]]) -> str:
-    """Value for the ``最终状态`` line that session hooks read."""
+    """Value for the ``最终状态`` line that session hooks read (Stage 3-6 rows)."""
     statuses = [stages.get(stage, {}).get("status") for stage in FINAL_STAGES]
     if all(status in {"completed", "completed_with_errors"} for status in statuses):
         return "completed_with_errors" if "completed_with_errors" in statuses else "completed"
     return "pending"
 
 
-def render_state(state: Dict[str, Any], newline: str) -> str:
+def render_state(state: Dict[str, Any], newline: str, final_line: bool = True) -> str:
     lines = [STATE_START, "## 长篇拆文运行状态", ""]
-    # Only projects the runtime tracks by stage get the line; an enhanced legacy
-    # project keeps its own 最终状态 as the single value hooks read.
-    if state["stages"]:
+    if final_line and state["stages"]:
         lines.extend(["- 最终状态：%s" % final_status(state["stages"]), ""])
     lines.extend(["### 批次状态",
                   "| 批次ID | 章节范围 | 输入 | 原文范围hash | 状态 | 父批次 | 缓存 |",
@@ -232,8 +233,18 @@ def render_state(state: Dict[str, Any], newline: str) -> str:
 def write_state(progress: Path, state: Dict[str, Any]) -> bool:
     raw = progress.read_bytes() if progress.is_file() else b""
     text, bom, newline = decode_progress(raw)
-    block = render_state(state, newline)
     pattern = re.compile(re.escape(STATE_START) + r".*?" + re.escape(STATE_END), re.DOTALL)
+    # Hooks read the first 最终状态 in the file. A legacy project keeps its own
+    # line as that single value; the runtime only promotes it once all six
+    # stages are complete and never demotes it.
+    existing = pattern.search(text)
+    head = text[:existing.start()] if existing else text
+    legacy = LEGACY_FINAL_RE.search(head)
+    status = final_status(state["stages"])
+    if legacy and status != "pending" and legacy.group(2) != status:
+        head = head[:legacy.start(2)] + status + head[legacy.end(2):]
+        text = head + (text[existing.start():] if existing else "")
+    block = render_state(state, newline, final_line=legacy is None)
     if pattern.search(text):
         updated = pattern.sub(lambda _: block, text, count=1)
     else:
@@ -327,9 +338,13 @@ def invalid_batch_targets(root: Path, rows: Optional[Sequence[Dict[str, Any]]],
     raw = set()
     reuse = set()
     for batch in state["batches"].values():
-        if batch.get("status") not in {"completed", "success"} or completed_batch(root, batch, rows):
-            continue
         chapters = set(range(batch["start"], batch["end"] + 1))
+        # Split children stay owed until committed, even when summaries exist.
+        pending_child = batch.get("parent") and batch.get("status") == "planned"
+        if not pending_child and (
+            batch.get("status") not in {"completed", "success"} or completed_batch(root, batch, rows)
+        ):
+            continue
         if batch.get("input_kind") == "raw-original":
             raw.update(chapters)
         elif batch.get("input_kind") == "existing-results":
@@ -460,6 +475,8 @@ def plan_command(args: argparse.Namespace) -> Dict[str, Any]:
             "batch_id": batch_id, "chapter_range": [item["start"], item["end"]],
             "input_kind": item["input_kind"], "range_sha256": current_range_hash,
             "source_files": sources, "cache": "_analysis_cache/批次-%s.md" % batch_id,
+            "chapter_chars": [index_by_chapter[chapter]["char_count"] for chapter in range(item["start"], item["end"] + 1)]
+            if item["input_kind"] == "raw-original" else [],
         })
     required_stages = list(report.get("stage_repairs", []))
     if batches or recoverable_caches:
@@ -497,14 +514,15 @@ def compact_field(body: str, name: str) -> str:
 
 
 def map_enum(value: str, allowed: Sequence[str], aliases: Dict[str, str], default: str = "其他") -> str:
-    value = value.strip()
-    if value in allowed:
-        return value
-    if value in aliases:
-        return aliases[value]
-    for item in allowed:
-        if item != "其他" and value.startswith(item):
-            return item
+    """Map one enum value; with several listed values, the first that maps wins."""
+    for token in [value.strip()] + re.split(r"[、/，,；;\s]+", value.strip()):
+        if token in allowed:
+            return token
+        if token in aliases:
+            return aliases[token]
+        for item in allowed:
+            if item != "其他" and token.startswith(item):
+                return item
     return default
 
 
@@ -519,10 +537,14 @@ def parse_plot_points(body: str, chapter: int, minimum: int) -> List[Dict[str, A
         header = POINT_HEADER_RE.match(stripped)
         if header:
             segments = [item.strip() for item in re.split(r"[|｜]", header.group(3))]
-            if not segments[0].startswith("类型") or len(segments) < 2 or not segments[1]:
+            # Tolerate the tag written inline at the end of the P line.
+            inline = POINT_TAG_RE.match(" | ".join(segments[-2:])) if len(segments) >= 3 else None
+            rest = segments[1:-2] if inline else segments[1:]
+            if not segments[0].startswith("类型") or not rest or not rest[0]:
                 raise RunError("plot_point_invalid", "chapter %s P%s needs 类型 and 白描" % (chapter, header.group(1)))
             points.append({"number": int(header.group(1)), "title": header.group(2).strip(),
-                           "type": segments[0][2:], "rest": segments[1:], "quote": [], "tag": None})
+                           "type": segments[0][2:].lstrip(" ：:"), "rest": rest, "quote": [],
+                           "tag": (inline.group(1), inline.group(2)) if inline else None})
             continue
         if not stripped or stripped == "---":
             continue
@@ -742,10 +764,22 @@ def repair_command(args: argparse.Namespace) -> Dict[str, Any]:
     root = require_root(args.root)
     index_rows = read_index(root, args.index) if (args.index or root / "chapter_index.csv").is_file() else None
     paths = [cache_path(root, args.batch_id)] if args.batch_id else sorted((root / "_analysis_cache").glob("批次-*.md"))
+    state, _ = load_state(root / "_progress.md")
     repaired = []
     skipped = []
     errors = []
     for path in paths:
+        # A cache replaced by a split or by other committed batches is history, not a repair target.
+        batch_id = path.stem[len("批次-"):]
+        if BATCH_ID_RE.fullmatch(batch_id):
+            _, start, end = parse_batch_id(batch_id)
+            covered = set()
+            for other in state["batches"].values():
+                if other["batch_id"] != batch_id and completed_batch(root, other, index_rows):
+                    covered.update(range(other["start"], other["end"] + 1))
+            if state["batches"].get(batch_id, {}).get("status") == "superseded" or set(range(start, end + 1)) <= covered:
+                skipped.append({"cache": path.relative_to(root).as_posix(), "reason": "superseded"})
+                continue
         try:
             metadata = parse_cache(path)
             repaired.append(commit_from_cache(root, metadata, path, index_rows))

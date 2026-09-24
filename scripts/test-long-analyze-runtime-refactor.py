@@ -394,14 +394,14 @@ def test_plan_commit_repair_and_state_preservation() -> None:
 def test_split_survives_replanning() -> None:
     with tempfile.TemporaryDirectory(prefix="long-split-refactor-") as temporary:
         root = Path(temporary)
-        write_source_and_index(root, 7)
+        write_source_and_index(root, 5)
         first = json.loads(run(MANAGE, "plan", "--root", root).stdout)
-        require(first["batches"][0]["batch_id"] == "RAW-1-5", "恰好5章必须合法成块")
-        split = run(MANAGE, "split", "--root", root, "--batch-id", "RAW-1-5", "--at", 2)
-        require(split.returncode == 0 and json.loads(split.stdout)["children"] == ["RAW-1-2", "RAW-3-5"], split.stdout)
+        require(first["batches"][0]["batch_id"] == "RAW-1-3", "恰好3章必须合法成块")
+        split = run(MANAGE, "split", "--root", root, "--batch-id", "RAW-1-3", "--at", 1)
+        require(split.returncode == 0 and json.loads(split.stdout)["children"] == ["RAW-1-1", "RAW-2-3"], split.stdout)
         second = json.loads(run(MANAGE, "plan", "--root", root).stdout)
         ids = [batch["batch_id"] for batch in second["batches"]]
-        require("RAW-1-2" in ids and "RAW-3-5" in ids and "RAW-1-5" not in ids, "拆分必须相邻且重规划不能合回父块")
+        require("RAW-1-1" in ids and "RAW-2-3" in ids and "RAW-1-3" not in ids, "拆分必须相邻且重规划不能合回父块")
 
 
 def test_panlong_acceptance_samples() -> None:
@@ -558,17 +558,38 @@ def test_audit_recovery_regressions() -> None:
                 and "| RAW-1-2 | 1-2 | raw-original |" in (state_only / "_progress.md").read_text(encoding="utf-8-sig"),
                 "repair-progress 必须能从完整缓存恢复单一状态表")
 
+        truncated_split = area / "截断后拆分"
+        write_source_and_index(truncated_split, 5)
+        split_plan = json.loads(run(MANAGE, "plan", "--root", truncated_split).stdout)
+        model.write_text(compact_output(1, 3), encoding="utf-8")
+        require(run(MANAGE, "commit", "--root", truncated_split, "--input", model, "--batch-id", "RAW-1-3",
+                    "--range-sha256", split_plan["batches"][0]["range_sha256"]).returncode == 0, "拆分样本提交失败")
+        split_cache = truncated_split / "_analysis_cache" / "批次-RAW-1-3.md"
+        split_cache.write_bytes(split_cache.read_bytes()[:200])
+        require(run(MANAGE, "split", "--root", truncated_split, "--batch-id", "RAW-1-3", "--at", "1").returncode == 0, "拆分失败")
+        after_split = json.loads(run(MANAGE, "plan", "--root", truncated_split).stdout)
+        require([b["batch_id"] for b in after_split["batches"]][:2] == ["RAW-1-1", "RAW-2-3"],
+                "失效批次拆分后子块必须被规划，不能因摘要已在而丢掉：" + json.dumps(after_split["batches"], ensure_ascii=False))
+        for batch in after_split["batches"]:
+            start, end = batch["chapter_range"]
+            model.write_text(compact_output(start, end), encoding="utf-8")
+            require(run(MANAGE, "commit", "--root", truncated_split, "--input", model, "--batch-id", batch["batch_id"],
+                        "--range-sha256", batch["range_sha256"]).returncode == 0, "子块提交失败")
+        require(json.loads(run(MANAGE, "plan", "--root", truncated_split).stdout)["batches"] == []
+                and run(MANAGE, "repair-progress", "--root", truncated_split).returncode == 0,
+                "子块补完后不再规划，被取代的旧缓存也不能让 repair-progress 永久报错")
+
         oversized = area / "超限提交"
-        write_source_and_index(oversized, 6)
+        write_source_and_index(oversized, 4)
         oversized_model = area / "oversized.md"
-        oversized_model.write_text(compact_output(1, 6), encoding="utf-8")
+        oversized_model.write_text(compact_output(1, 4), encoding="utf-8")
         index_rows = rows(oversized / "chapter_index.csv")
         payload = "range-v1\n" + "".join(f"{row['chapter']}:{row['chapter_sha256']}\n" for row in index_rows)
         range_hash = hashlib.sha256(payload.encode("ascii")).hexdigest()
         refused = run(MANAGE, "commit", "--root", oversized, "--input", oversized_model,
-                      "--batch-id", "RAW-1-6", "--range-sha256", range_hash)
+                      "--batch-id", "RAW-1-4", "--range-sha256", range_hash)
         require(refused.returncode != 0 and json.loads(refused.stdout)["error"] == "batch_too_large",
-                "提交入口必须拒绝超过5章的手工批次")
+                "提交入口必须拒绝超过3章的手工批次")
 
         sparse = area / "情节点不足"
         write_source_and_index(sparse, 1)
@@ -613,7 +634,12 @@ def test_audit_stage_and_mapping_regressions() -> None:
         (root / "设定" / "世界观").mkdir(parents=True)
         (root / "设定" / "世界观" / "背景.md").write_text("有效世界设定", encoding="utf-8")
         (root / "拆文报告.md").write_text("有效拆文报告", encoding="utf-8")
-        for stage in ("stage1", "stage2", "stage3", "stage4", "stage5", "stage6"):
+        for stage in ("stage3", "stage4", "stage5", "stage6"):
+            marked = run(MANAGE, "mark-stage", "--root", root, "--stage", stage)
+            require(marked.returncode == 0, marked.stdout or marked.stderr)
+        require("- 最终状态：completed" in (root / "_progress.md").read_text(encoding="utf-8-sig"),
+                "Stage 3-6 按文档各标一次即算完成，不依赖 Stage 1/2 行")
+        for stage in ("stage1", "stage2"):
             marked = run(MANAGE, "mark-stage", "--root", root, "--stage", stage)
             require(marked.returncode == 0, marked.stdout or marked.stderr)
         complete = json.loads(run(INSPECT, "--root", root).stdout)
@@ -628,6 +654,20 @@ def test_audit_stage_and_mapping_regressions() -> None:
                                     hook_lib.as_posix(), (root / "_progress.md").as_posix()],
                                    capture_output=True, text=True, check=False)
             require(probe.returncode == 1, "hooks 必须把拆完的书判为已完成：" + probe.stderr)
+
+        resumed = area / "旧项目续拆完成"
+        shutil.copytree(root, resumed)
+        progress_text = (resumed / "_progress.md").read_text(encoding="utf-8-sig")
+        progress_text = re.sub(r"(?s)<!-- story-long-analyze:runtime-state:start -->.*?<!-- story-long-analyze:runtime-state:end -->\n?", "", progress_text)
+        (resumed / "_progress.md").write_text("# 旧进度\n- 最终状态：paused_after_stage1\n" + progress_text, encoding="utf-8")
+        require(run(MANAGE, "mark-stage", "--root", resumed, "--stage", "stage1").returncode == 0, "旧项目标记失败")
+        require("最终状态：paused_after_stage1" in (resumed / "_progress.md").read_text(encoding="utf-8"),
+                "未全部完成时不改旧项目的最终状态")
+        for stage in ("stage2", "stage3", "stage4", "stage5", "stage6"):
+            require(run(MANAGE, "mark-stage", "--root", resumed, "--stage", stage).returncode == 0, "旧项目标记失败")
+        resumed_text = (resumed / "_progress.md").read_text(encoding="utf-8")
+        require(resumed_text.count("最终状态") == 1 and "- 最终状态：completed" in resumed_text,
+                "旧项目续拆完成后只改写原有的最终状态行，不另写第二行：" + resumed_text)
 
         prologue = area / "序章旧项目"
         (prologue / "原文").mkdir(parents=True)
