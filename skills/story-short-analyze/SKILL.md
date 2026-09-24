@@ -74,11 +74,20 @@ word_count = 全文字数
 ```
 存在 _meta.json？
   ├─ 否 → 直接进入新一轮拆解
-  └─ 是 → 询问用户三选一：
+  └─ 是 → 询问用户三选一（问法见下）：
        (a) 覆盖：归档旧产出到 拆文库/{书名}/_archive_{时间戳}/ 后从 Stage 2 重跑
        (b) 续跑：读 _meta.json.last_stage_in_progress（非空 → 从该 Stage 整段重跑）
                  或读 _meta.json.stages_completed[]（从 max+1 续跑）
        (c) 取消
+```
+
+问作者时不提文件名、字段名和 Stage 编号：
+
+```author-report
+《{书名}》之前拆过，{拆到一半，停在"{当前阶段的白话名，如反转与写作手法}" | 已经拆完}。怎么处理？
+1. 接着上次往下拆（推荐，已拆的部分保留）
+2. 旧结果存档，从头重拆
+3. 先不拆了
 ```
 
 完整 resume 契约见 [references/output-contract.md](references/output-contract.md)。
@@ -190,7 +199,7 @@ Stage 6 内容写完后，**不**立刻 append `6` 到 `stages_completed[]`。�
 按 [references/output-contract.md](references/output-contract.md) 「structure_counts 数值校验」表
 逐项检查 `_meta.json` 里 Stage 6 写入的结构计数。阈值与 carve-out 以 output-contract.md 为准（单一权威，不在此重复内联表以免漂移）——特别注意两条合法产出态：`reversal_type` 枚举**含「无反转」**（甜宠/喜剧/报应型）；`reversal_type=无反转` 时 **`setup_clues` 跳过该行、不计入阻断**。
 
-任一项不达标 → 阻断；列出未达标字段，提示用户回到对应 Stage 补足。
+任一项不达标 → 阻断，回到对应 Stage 补足；原文确实没有、补不出来时，用故事话告诉作者缺什么（如「反转前的铺垫线索只找到 1 条」），不报字段名和 Stage 编号。
 
 ### Step 3：`output-templates.md` [BLOCK] 项扫描
 
@@ -200,7 +209,15 @@ Stage 6 内容写完后，**不**立刻 append `6` 到 `stages_completed[]`。�
 ### Step 4：通过
 
 「拆文报告 AI 腔自检」「structure_counts 数值校验」和「BLOCK 项扫描」全通过 → 清空 `_meta.json.last_stage_in_progress`，append `6` 到
-`stages_completed[]`，提示用户「拆解完成，可调用 `/story-short-write` 写下一篇」。
+`stages_completed[]`，按下方格式告诉作者：
+
+```author-report
+《{书名}》拆完了，结果在 `拆文库/{书名}/`。
+- 这篇靠什么抓人：{一句话故事核}
+- 最值得学的 3 点：{白话，各附一句原文或情节例子}
+- 还缺的：{拆文报告末尾"待补"里需要作者决定的项；没有就写"无"}
+下一步：想照这个路子写一篇，运行 `/story-short-write`。
+```
 
 ---
 

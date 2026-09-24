@@ -18,7 +18,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 若作者记忆 state 已存在，审查前用 `scripts/author_memory_commit.py query --kind delivery --kind interaction --kind prose_style --book-root {书目录}` 获取本次相关 active 条目（`--kind` 必传；不传 `--book-root` 就拿不到本书级偏好；总输出 ≤2KB）。它们只能帮助解释意图和组织报告，不能降低 rubric 严重度、把事实冲突判为无问题或跳过平台门禁；当前请求仍优先。完整规则见 [references/author-memory.md](references/author-memory.md)。
 
-用户对报告格式或协作方式作出稳定声明时，在本轮审查完成后用 `record` 记录并回传回执；只记作者明确说的，一次性要求不记录，不从反复修改推断。审查发现、工具告警和助手建议本身绝不自动学习。
+用户对报告格式或协作方式作出稳定声明时，在本轮审查完成后用 `record` 记录，并按 author-memory.md「回执怎么告诉作者」转告；只记作者明确说的，一次性要求不记录，不从反复修改推断。审查发现、工具告警和助手建议本身绝不自动学习。
 
 ---
 
@@ -27,7 +27,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 - `/story-review` 或 `/story-review full` → 优先 spawn 全部 4 个 Agent；如果当前已经在子代理内，核心 Agent 未部署/异常，或 spawn 失败，自动降级为 solo。
 - `/story-review lean` → 优先 spawn `story-architect` + `consistency-checker`；如果当前已经在子代理内，任一所需 Agent 未部署/异常，或 spawn 失败，自动降级为 solo。
 - `/story-review solo` → 不 spawn Agent，由当前会话执行基础审查。
-- 未指定 → 默认 full，并在报告里写明最终实际执行模式。
+- 未指定 → 默认 full，并在报告开头用一句话说明这次实际是怎么审的。
 
 ---
 
@@ -45,10 +45,10 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
       - **OpenCode agent（`.opencode/agents/`）**：文件名即 agent 名（OpenCode 不要求在 frontmatter 中写 `name:`），读取 frontmatter 确认 `mode: subagent` 和 `permissions:` 规则列表存在且可解析即可（2.x 用复数 `permissions:`，旧版单数 `permission:` 视为待重新部署）；frontmatter 缺失或不可解析视为 malformed。
       - **Codex agent（`.codex/agents/`）**：文件名为 `{agent}.toml`，TOML 必须可解析，且包含 `name`、`description`、`developer_instructions`；`name` 必须与目标 agent 完全一致。
       - **Antigravity agent（`.agents/agents/`）**：路径为 `.agents/agents/agent-name/agent.md`（`agent-name` 为目标 agent 名），frontmatter 必须可解析，且 `name` 与目标 agent 一致、`mainAgent: false`、`subagent: true`、`tools` 非空；缺失或不匹配视为 malformed。
-   - 如果目标模式所需任一文件缺失或 malformed，**不要尝试 spawn 缺失/异常 Agent**；自动降级为 `solo`，并在报告开头写明：`Fallback: missing agents -> solo` 或 `Fallback: malformed agents -> solo`，列出问题文件，建议用户运行 `/story-setup`。
+   - 如果目标模式所需任一文件缺失或 malformed，**不要尝试 spawn 缺失/异常 Agent**；自动降级为 `solo`，报告开头用一句话告诉作者「审稿助手缺失或损坏，这次由我一个人审；运行 `/story-setup` 后可多视角审」，降级原因 `missing agents -> solo` / `malformed agents -> solo` 与问题文件写进技术备注行。
 5. **确认 Agent 工具可用**：Claude/OpenCode/Codex 需要当前运行时的子 Agent/Task 调用能力，Antigravity 需要 `invoke_subagent`；不可用时直接降级为 `solo`，报告 `Fallback: agent tool unavailable -> solo`。
 6. **运行时失败降级**：如果任何 Agent spawn 返回失败、`subagent_type` / `agent` / `agent_type` / `TypeName` 不可用、frontmatter/TOML 运行时解析失败或子 Agent 无法启动，停止继续 spawn，改用 `solo` 重新审查，并报告 `Fallback: spawn failed -> solo` 与失败的 agent 名；不要把部分成功的 Agent 结果当成 full/lean 结论。
-7. **确定实际模式**：报告中必须同时列出 `Requested Mode` 与 `Effective Mode`。
+7. **确定实际模式**：请求模式与实际模式都写进报告末尾的技术备注行。
 
 ---
 
@@ -56,16 +56,12 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 `story-review` 的核心审查标准必须始终可用。参考文件是增强资料，不是运行前提。
 
-### 报告元数据字段（必须逐字输出）
+### 报告面向作者（必须遵守）
 
-最终报告开头必须逐行输出以下英文 key，**不要翻译、不要改名、不要只输出中文同义词**。可以在英文 key 后追加中文说明，但 key 本身必须逐字出现，便于脚本和用户核对实际执行路径：
+报告写给作者：审了什么、哪里要改、为什么（用读者感受和故事后果说，附原文引用）、要作者拍板的事、下一步。reviewer 名、S1–S4、Gate、检测器类别名、脚本名、PASS/FAIL、文件字段名不进正文；位置写「第 N 章「引文」」或「第 N 章第 M 段」。优先级换成白话：S1 → **必须改**，S2 → **建议改**，S3/S4 → **可以不改**。执行路径只写在报告最后一行，格式固定：
 
-```md
-Requested Mode: full | lean | solo
-Effective Mode: full | lean | solo
-Fallback: none | project custom agents unavailable -> solo | missing agents -> solo | malformed agents -> solo | agent tool unavailable -> solo | spawn failed -> solo | subagent recursion guard -> solo
-Rubric: fanqie | qidian | zhihu | generic web-fiction
-Rubric Source: file | embedded fallback
+```text
+技术备注：Mode {请求}→{实际} · Fallback {none | project custom agents unavailable -> solo | missing agents -> solo | malformed agents -> solo | agent tool unavailable -> solo | spawn failed -> solo | subagent recursion guard -> solo} · Rubric {fanqie | qidian | zhihu | generic} ({file | embedded})
 ```
 
 ### 参考资料解析顺序
@@ -100,7 +96,7 @@ Rubric Source: file | embedded fallback
 
 ### 内置审查基准包（路径不可读时必用）
 
-如果上述参考文件在当前项目中不可读，**不要把审查降级为无 rubric，也不要在报告里说“无法加载具体 rubric”后停止使用标准**。必须使用本节内置基准包，并报告：`Rubric Source: embedded fallback`。
+如果上述参考文件在当前项目中不可读，**不要把审查降级为无 rubric，也不要在报告里说“无法加载具体 rubric”后停止使用标准**。必须使用本节内置基准包，技术备注行的 Rubric 来源写 `embedded`。
 
 通用网文内容 rubric：
 - 核心卖点：本章是否围绕明确卖点推进；看不出卖点至少 S2。
@@ -170,7 +166,7 @@ full/lean 模式下，主会话必须把“审查基准包摘要”直接写进�
    - 番茄小说 → 优先读取 `story-review/references/rubrics/fanqie.md`；不可读时使用内置番茄 fallback 摘要。
    - 起点 → 优先读取 `story-review/references/rubrics/qidian.md`；不可读时使用内置起点 fallback 摘要。
    - 知乎盐言 → 优先读取 `story-review/references/rubrics/zhihu.md`；不可读时使用内置知乎 fallback 摘要。
-   - 未识别平台 → 优先读取 `story-review/references/quality-rubric.md`；不可读时使用内置通用网文内容 rubric，并报告 `Rubric: generic web-fiction` 与 `Rubric Source: file | embedded fallback`。
+   - 未识别平台 → 优先读取 `story-review/references/quality-rubric.md`；不可读时使用内置通用网文内容 rubric；技术备注行写 `generic` 与 `file | embedded`。
 5. **形成审查基准包摘要**：把已加载的文件内容或内置 fallback 摘要压缩为 5-12 条审查标准，后续 solo 和子 Agent 都必须使用这份摘要。摘要必须保留一条句长标准：叙述默认是逗号长句，碎句和电报体与 AI 腔同级处理，不因「短」放行。
 6. **确定性预检（只报告，不修改）**：当审查范围包含本地正文文件路径时，运行本 skill 自带脚本：
    ```bash
@@ -197,7 +193,7 @@ full/lean 模式下，主会话必须把“审查基准包摘要”直接写进�
 
 ## 统一 Findings Schema（所有模式必须使用）
 
-所有 reviewer（包括 solo）输出问题时必须使用统一结构，方便综合排序。`location` 必须使用工具读取结果显示的原始文件行号；不要删除空行后重新编号。
+所有 reviewer（包括 solo）输出问题时必须使用统一结构，方便综合排序；它只在 reviewer 与综合裁决之间流转，给作者的报告按 Phase 4 模板转写。`location` 必须使用工具读取结果显示的原始文件行号；不要删除空行后重新编号。
 
 对 `consistency` / `factual` / `causal` / `rule_boundary` 类 finding，`fix` 字段只写事实统一方向（例如“统一为左臂旧伤，并同步正文/设定中冲突处”或“需在 A/B 时间线中裁定一个来源”），不要写文学创作建议。
 
@@ -365,56 +361,42 @@ full/lean 模式下，主会话必须把“审查基准包摘要”直接写进�
 2. 合并去重：按 `severity` 排序（S1 > S2 > S3 > S4），同级内按影响范围排序。
 3. **可选事实核查**：如果审查内容涉及需要验证的外部事实（历史年代、地理方位、职业细节等），只有在 `Effective Mode` 仍为 `full`/`lean`、当前不是子 Agent、当前运行时的 Agent 工具可用且对应 canonical agent 目录下的 `story-researcher` 已部署时，才可额外 spawn；Antigravity 检查 `.agents/agents/story-researcher/agent.md`，用 `invoke_subagent` + `TypeName: "story-researcher"`。`solo`、missing/malformed/stale/spawn failed 降级或子代理递归保护场景下不得 spawn，只能在报告中标记“需人工事实核查”。
 4. **分歧呈现**：如果 reviewer 间有冲突意见，明确呈现分歧让用户裁决；不要自动妥协。
-5. 输出综合审查报告。报告必须列出实际模式、fallback 原因、使用的 rubric、Rubric Source、审查范围和证据不足项。
+5. 按「报告面向作者」输出综合审查报告：开头说明审查方式与范围，证据不足项写成作者能补的材料，执行路径只进技术备注行。
 
 ---
 
 ## Phase 4：输出报告（full / lean 模式）
 
-只有 `Effective Mode` 确实为 `full` 或 `lean` 时才使用本模板；如果 Phase 0 或运行时失败导致降级 `solo`，必须改用 solo 模式模板。
+只有实际模式确实为 `full` 或 `lean` 时才使用本模板；如果 Phase 0 或运行时失败导致降级 `solo`，必须改用 solo 模式模板。lean 排除的视角写进「这次怎么审的」；full/lean 必需 reviewer 缺失或 spawn 失败时降级 solo，不在本模板里标「未看」后继续综合。
 
-注意：下列 `Requested Mode`、`Effective Mode`、`Fallback`、`Rubric`、`Rubric Source` 五个英文 key 必须逐字保留；不要改成“请求模式/实际模式/回退/评估标准”等中文 key。
+```author-report
+=== 《{书名}》{审查范围}审查 ===
+这次怎么审的：{结构、人物、文字、设定一致性四个视角分头看 | 精简审：结构和设定一致性两个视角}，按{番茄 | 起点 | 知乎盐言 | 通用网文}的标准。
 
-```md
-=== 故事审查报告 ===
-Requested Mode: full | lean
-Effective Mode: full | lean
-Fallback: none
-Rubric: fanqie | qidian | zhihu | generic web-fiction
-Rubric Source: file | embedded fallback
-审查范围: {章节/文件/批次}
+总体判断：{可以发 | 改完下面几处再发 | 这一章需要重写}——{一句话理由，用读者感受说}
 
-## Verdict Summary / 结论汇总
-- story-architect: APPROVE / CONCERNS(n) / REJECT / NOT_RUN
-- character-designer: APPROVE / CONCERNS(n) / REJECT / NOT_RUN
-- narrative-writer: APPROVE / CONCERNS(n) / REJECT / NOT_RUN
-- consistency-checker: APPROVE / CONCERNS(n) / REJECT / NOT_RUN
+## 必须改（{n} 处）
+1. 第{N}章「{原文引用}」
+   问题：{读者会怎么想、哪里读不通}
+   建议：{具体改法}
 
-> `NOT_RUN` 只用于 lean 模式排除的 reviewer 或可选 reviewer；如果 full/lean 必需 reviewer 缺失或 spawn 失败，应降级 solo，而不是在 full/lean 报告中标记 NOT_RUN 后继续综合。
+## 建议改（{n} 处）
+{同上格式}
 
-## Severity Counts
-- S1: n
-- S2: n
-- S3: n
-- S4: n
+## 可以不改（{n} 处）
+{一行一条：位置 + 问题 + 改法；风格微调也放这里}
 
-## 综合评定
-APPROVE(通过) / CONCERNS(有问题) / REJECT(需重写)
+## 需要你决定
+{审稿视角有分歧、或事实需要你裁定时，写成问题 + 选项 + 我的建议，例如「第12章写左臂受伤、第15章写右臂，统一成哪边？建议左臂（第12章交代了伤的来历）」；没有就写"无"}
 
-## 发现的问题
-{按统一 Findings Schema 或等价表格列出所有问题}
+## 没法判断的地方
+{缺哪份设定或大纲导致没法核对、需要人工查证的外部事实；没有就写"无"}
 
-## Agent 分歧（如有）
-{列出 reviewer 间不同意见和证据}
+## 下一批接着核对
+{仅分批审查：留到下一批回头看的问题 + 预计在哪几章兑现；否则删掉本节}
 
-## 证据不足 / 需补充
-{缺失设定、缺失大纲、无法核查事实等}
-
-## 修改建议
-{按 S1→S4 优先级排列}
-
-## 继承到下一批
-{仅分批审查填写：逐条列 location、issue、预计核查/兑现范围；无则写“无”}
+下一步：{例如「说"改第12章"，我按必须改的几处动手」「AI 味集中的段落可以说"去 AI 味"」}
+技术备注：Mode {full | lean}→{full | lean} · Fallback none · Rubric {…} ({file | embedded})
 ```
 
 ---
@@ -424,50 +406,46 @@ APPROVE(通过) / CONCERNS(有问题) / REJECT(需重写)
 不 spawn Agent。先按 Phase 1 第 4 步识别目标平台并加载对应 rubric；即使是 solo，也必须用平台 rubric、`story-review/references/quality-rubric.md` 或内置审查基准包校准判断。
 
 solo 必须执行基础检查：
-1. 格式合规性检查（戏剧单元/画面分段、无机械字数切分、无空行、对话格式、主语/角色名节奏）。
+1. 格式合规性检查：按戏剧单元/画面分段而非机械按字数切分（偶发稍长的完整推理、氛围或情绪链不算违规，通篇同阈值切段或碎成提纲才算）；段首建立主语、段中用代词或省略，连续无必要重复同一角色名才算主语过密；无段间空行；对话独立成行；具体数字须确认统计正确且有叙事必要。
 2. 简单的设定一致性 grep（角色名、属性、关键设定、伏笔关键词）+ 推理型一致性检查（规则边界、设定层级、跨章因果链、可滥用漏洞、代价一致性）。
 3. AI 味与禁用词检查（优先读取 `story-review/references/banned-words.md` 与 `story-review/references/anti-ai-writing.md`，不可读时使用内置 AI 味 / 禁用词 fallback 速查）。
 4. 通用网文内容评分（优先读取 `story-review/references/quality-rubric.md`，不可读时使用内置通用网文内容 rubric）。
-5. 按统一 Findings Schema 输出简化版报告。
+5. 按统一 Findings Schema 整理问题，再按下方模板写给作者。
 
 ### solo 模式输出格式
 
-```md
-=== 故事审查报告（solo）===
-Requested Mode: {full | lean | solo}
-Effective Mode: solo
-Fallback: none | missing agents -> solo | malformed agents -> solo | agent tool unavailable -> solo | spawn failed -> solo | subagent recursion guard -> solo
-Rubric: fanqie | qidian | zhihu | generic web-fiction
-Rubric Source: file | embedded fallback
-审查范围: {章节/文件}
+```author-report
+=== 《{书名}》{审查范围}审查（单人审）===
+这次怎么审的：我一个人审{；原因一句话，如"审稿助手还没装，运行 /story-setup 后可以四个视角审"}，按{番茄 | 起点 | 知乎盐言 | 通用网文}的标准。
 
-## 基础检查结果
+总体判断：{可以发 | 改完下面几处再发 | 这一章需要重写}——{一句话理由}
 
-### 格式合规性
-- [{x| }] 段落按戏剧单元/镜头/一件事结束自然断开，非机械按字数切分；偶发稍长的完整推理/氛围/情绪链不算违规，通篇同阈值切段或碎成提纲才算：通过/不通过；证据：...
-- [{x| }] 主语/角色名节奏自然：段首能建立主语，段中有代词/省略，关键转折再点名；连续句/段无必要重复同一主角名才算主语过密：通过/不通过；证据：...
-- [{x| }] 无段间空行：通过/不通过；证据：...
-- [{x| }] 对话独立成行：通过/不通过；证据：...
-- [{x| }] 具体字数表达已确认统计正确且有叙事必要；不能确认时已改成非具体数字表达：通过/不通过；证据：...
-- 违规位置：{列出}
+## 格式与设定
+- 分段与人名节奏：{没问题 | 第N章第M段起……}
+- 空行与对话换行：{没问题 | ……}
+- 具体数字：{没问题 | 第N章「……」对不上或没必要}
+- 前后矛盾：{没发现 | 第N章「……」与第M章「……」矛盾}
+- 因果和规则漏洞：{没发现 | ……}
 
-> checklist 约定：`[x]` 只表示通过，`[ ]` 表示未通过；不得出现“`[x] ... 不通过`”这种矛盾写法。
+## 必须改（{n} 处）
+1. 第{N}章「{原文引用}」
+   问题：{读者会怎么想、哪里读不通}
+   建议：{具体改法}
 
-### 设定一致性（grep + 推理扫描）
-- 字面事实冲突：{列出发现的矛盾或证据不足}
-- 推理型一致性：{规则边界/设定层级/跨章因果/可滥用漏洞/代价一致性的发现；无则写“未发现”}
+## 建议改（{n} 处）
+{同上格式}
 
-### AI 味 / 禁用词
-- {列出问题，必须附 evidence}
+## 可以不改（{n} 处）
+{一行一条}
 
-### Findings
-{按统一 Findings Schema 或等价表格列出，severity 必须是 S1/S2/S3/S4}
+## 需要你决定
+{问题 + 选项 + 我的建议；没有就写"无"}
 
-### 修改建议
-{按优先级排列}
+## 下一批接着核对
+{仅分批审查填写；否则删掉本节}
 
-### 继承到下一批
-{仅分批审查填写：逐条列 location、issue、预计核查/兑现范围；无则写“无”}
+下一步：{一句话}
+技术备注：Mode {full | lean | solo}→solo · Fallback {…} · Rubric {…} ({file | embedded})
 ```
 
 ---

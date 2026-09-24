@@ -76,6 +76,7 @@ PR 自动运行 `.github/workflows/cross-platform.yml`。static-check job 跑以
 - `scripts/static-check.sh` — 结构化解析 frontmatter、精确 Markdown 路径/锚点、Agent 引用与 references 可达性；除基础组件 `browser-cdp` 外禁止跨 Skill 文件引用
 - `python3 scripts/skill-numbering.py check` — 工作流编号连续性、引用可绑定性及小数标签守卫
 - `python3 scripts/check-agent-notes.py` — `.agents/notes/` 决策笔记的目录布局、`Status` 与所在目录一致、必需小节；`python3 scripts/test-agent-notes.py` 为其行为回归
+- `python3 scripts/check-author-reports.py` — ```` ```author-report ```` 标出的作者报告模板不含脚本名、字段名、flag、严重度代号等工程黑话（`--self-test` 为其正反例回归）
 - `scripts/check-current-skill-contracts.sh` — 按 `scripts/current-contract.json` 校验当前版本 / Phase / schema / 主产物 / 细纲契约，并拦截历史路径与静默兼容分支
 - `python3 scripts/test-current-skill-contracts.py` — current-contract manifest 与主产物 fail-fast 语义回归
 - `scripts/check-doc-budget.sh` — 热路径 SKILL/references/agent 模板的字数预算（按 `scripts/doc-budget.json`），防每次会话都要付的规则文本无声膨胀
@@ -108,6 +109,8 @@ PR 自动运行 `.github/workflows/cross-platform.yml`。static-check job 跑以
 bash scripts/static-check.sh
 python3 scripts/test-static-check.py
 python3 scripts/check-agent-notes.py
+python3 scripts/check-author-reports.py --self-test
+python3 scripts/check-author-reports.py
 python3 scripts/skill-numbering.py check
 bash scripts/test-skill-numbering.sh
 bash scripts/check-current-skill-contracts.sh
@@ -199,6 +202,7 @@ python3 scripts/skill-numbering.py check
 - **简洁**：用表格和模板，不要长篇叙述
 - **自包含**：运行时 Skill 禁止跨 Skill 路径引用。确需共享的 reference 以 canonical source + manifest 管理的本地部署副本发布，保证每个 Skill 可独立安装
 - **中文**：所有内容用中文
+- **报告写给作者**：给作者看的报告/消息模板用 ```` ```author-report ```` 围栏标出，只讲做了什么、发现了什么（附原文）、要作者决定什么、下一步；脚本名、字段名、flag、严重度代号和裸编号不进模板，确需保留的执行细节放块尾一行「技术备注：」。由 `check-author-reports.py` 守卫
 
 ## 提交流程
 
