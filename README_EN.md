@@ -41,7 +41,7 @@ Oh Story covers the whole web-fiction pipeline, long-form and short: **chart sca
 It installs as 13 skills into the coding agent you already use; the writing model is that agent's model. No GPU, no separate model setup.
 
 - **The file system is the memory** — settings, outlines, prose and continuity tracking are maintained as separate files. A several-hundred-chapter novel does not lean on conversation memory, and context compaction does not lose your foreshadowing.
-- **Deterministic checks and gates** — writing prose without a chapter blueprint is blocked; after each write, truncation, engineering vocabulary and word-count debt are scanned automatically. 7 specialist agents, 8 hooks and 100+ methodology files load on demand.
+- **Deterministic checks and gates** — writing prose without a chapter blueprint is blocked; after each write, truncation, engineering vocabulary and common AI phrasing are scanned automatically. 7 specialist agents, 8 hooks and 100+ methodology files load on demand.
 - **Runs in 8 coding agents** — Claude Code · Codex CLI · Google Antigravity · OpenCode · ZCode · OpenClaw · Reasonix, plus generic Web AI / agent environments that can read project files.
 - **Target platforms** — Qidian, Fanqie, Jinjiang, Qimao, Zhihu Yanyan and other long/short-form Chinese platforms.
 
@@ -67,7 +67,7 @@ Install this skill https://github.com/zenstory-ai/oh-story-claudecode
 Then run `/story-setup` from your writing-project root (`$story-setup` in Codex) to deploy hooks / agents / references, **and start a fresh session**. Re-run `/story-setup` after every upgrade.
 
 > Per-host deployment differences, known limits and install troubleshooting (Windows `ENOENT`, Antigravity `agy -p`, leftover directories) are in **[Host deployment and install troubleshooting](docs/hosts_EN.md)**.
-> Latest release **v0.7.10** (2026-09-09); see [CHANGELOG.md](CHANGELOG.md) and [Releases](https://github.com/zenstory-ai/oh-story-claudecode/releases).
+> Latest release **v0.7.11** (2026-09-24); see [CHANGELOG.md](CHANGELOG.md) and [Releases](https://github.com/zenstory-ai/oh-story-claudecode/releases).
 
 ## See what it produces
 

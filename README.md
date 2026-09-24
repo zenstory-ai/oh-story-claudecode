@@ -38,7 +38,7 @@ Oh Story 覆盖长篇与短篇网络小说的全流程：**扫榜选材 → 拆�
 它以 13 个 skill 的形式装进你已经在用的编程 Agent，写作用的模型就是该 Agent 的模型，不需要 GPU，也不需要另外配模型。
 
 - **用文件系统当记忆** — 设定、大纲、正文、追踪各自独立维护。几百章的长篇不靠对话记忆硬撑，压缩上下文也不会丢伏笔。
-- **确定性检查与门禁** — 写正文前没有细纲会被拦下；写完自动扫截断、工程词和字数欠账。7 个专业 Agent、8 个自动化 hook、100+ 份写作方法论按需加载。
+- **确定性检查与门禁** — 写正文前没有细纲会被拦下；写完自动扫截断、工程词和常见 AI 句式。7 个专业 Agent、8 个自动化 hook、100+ 份写作方法论按需加载。
 - **装进 8 款编程 Agent** — Claude Code · Codex CLI · Google Antigravity · OpenCode · ZCode · OpenClaw · Reasonix，以及能读取项目文件的通用 Web AI / Agent 环境。
 - **面向的平台** — 起点、番茄、晋江、七猫、知乎盐言等长短篇平台。
 
@@ -64,7 +64,7 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 装好后，在写作项目根运行 `/story-setup`（Codex 用 `$story-setup`）部署 hooks / agents / references，**然后新开会话**。升级后同样重跑一次 `/story-setup`。
 
 > 各 Agent 的部署差异、已知限制与安装排查（Windows `ENOENT`、Antigravity `agy -p`、目录残留等）见 **[各编程 Agent 的部署与安装排查](docs/hosts.md)**。
-> 最新版本 **v0.7.10**（2026-09-09）；变更见 [CHANGELOG.md](CHANGELOG.md) 与 [Releases](https://github.com/zenstory-ai/oh-story-claudecode/releases)。
+> 最新版本 **v0.7.11**（2026-09-24）；变更见 [CHANGELOG.md](CHANGELOG.md) 与 [Releases](https://github.com/zenstory-ai/oh-story-claudecode/releases)。
 
 ## 看看它的输出
 
@@ -345,7 +345,7 @@ oh-story-claudecode 内置适配 Claude Code、Google Antigravity、OpenCode、Z
 
 ### 每章字数不统一、字数对不上怎么办？
 
-从 v0.7.7 起，长篇正文只用一个机器统计的字数口径：每份细纲必须写明合法的「字数目标」，缺少时会停止而不是回退到 3000；欠字不会自动加戏，超字最多压缩一次。写入后 `check-prose-after-write.sh` 会提醒字数欠账。升级旧项目后重跑 `/story-setup` 并新开会话即可生效。
+从 v0.7.7 起，长篇正文只用一个机器统计的字数口径：每份细纲必须写明合法的「字数目标」，缺少时会停止而不是回退到 3000；欠字不会自动加戏，超字最多压缩一次。字数只由写作流程在交付前统一测量，写后 hook 不再提醒字数欠账。升级旧项目后重跑 `/story-setup` 并新开会话即可生效。
 
 ### 去AI味之后，朱雀等 AI 检测还是判定为 AI 怎么办？
 

@@ -2,7 +2,7 @@
 
 **一句话答案：** 不要让模型"记住"整本书，让文件系统记。Oh Story（`zenstory-ai/oh-story-claudecode`，开源 MIT，13 个 Claude Code / Codex / OpenCode 等编程 Agent 的写作 skill）把每部长篇拆成 `设定/`、`大纲/`、`正文/`、`追踪/` 四类文件；每写一章，只读取"不知道就会写错"的那一小部分状态，写完后由脚本把变化写回追踪文件。对话只负责创作，不负责记忆。
 
-这份文档回答一个具体问题：AI 写到几十章以后人设漂移、伏笔断线、角色提前知道答案，怎么办。它描述的是 v0.7.10 的实际机制，不是"几百章都不会出错"的承诺。
+这份文档回答一个具体问题：AI 写到几十章以后人设漂移、伏笔断线、角色提前知道答案，怎么办。它描述的是 v0.7.11 的实际机制，不是"几百章都不会出错"的承诺。
 
 English version: [Keep an AI-written novel consistent over 100+ chapters](keep-ai-novel-consistent-over-100-chapters.md)
 

@@ -2,7 +2,7 @@
 
 **Short answer:** stop asking the model to remember the book. Put the story state in files, load only the slice a chapter needs, and write the changes back with a script. That is how Oh Story (`zenstory-ai/oh-story-claudecode`, MIT, 6.8k stars, 13 agent skills for Claude Code, Codex CLI, OpenCode and other coding agents) runs "daily update" batches of three chapters at a time without the cast drifting.
 
-This page describes the mechanism as shipped in v0.7.10. It is not a claim that nothing ever goes wrong across 300 chapters.
+This page describes the mechanism as shipped in v0.7.11. It is not a claim that nothing ever goes wrong across 300 chapters.
 
 中文版：[AI 写长篇小说怎么不崩人设](ai-long-novel-character-consistency.md)
 

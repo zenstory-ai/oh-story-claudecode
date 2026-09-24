@@ -33,7 +33,7 @@ Agents load writing theory from `references/` on demand (character design, dialo
 | post-compact.sh | After context compaction | Prompt to read progress snapshot for context recovery |
 | validate-story-commit.sh | git commit | Check hardcoded attributes, setting required fields (warning only, non-blocking) |
 | guard-outline-before-prose.sh | Before writing prose (Write/Edit) | Blocks first creation of a chapter/story body when its 细纲/小节大纲 is missing (blocking) — enforces outline-first |
-| check-prose-after-write.sh | After writing prose (Write/Edit) | Lightly scan for truncation, leaked workflow terms, deterministic toxic phrasing, and word-count debt (advisory) |
+| check-prose-after-write.sh | After writing prose (Write/Edit) | Lightly scan for truncation, leaked workflow terms, deterministic toxic phrasing, (advisory; word count is measured by the writing workflow before delivery) |
 
 ## Project File Structure
 

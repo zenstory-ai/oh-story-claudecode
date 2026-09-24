@@ -34,7 +34,7 @@ Agent 按需加载 `references/` 中的写作理论（角色设计、对话技�
 | post-compact.sh | 上下文压缩后 | 提示读取进度快照恢复上下文 |
 | validate-story-commit.sh | git commit 时 | 检查硬编码属性、设定必填字段（仅警告，不阻断） |
 | guard-outline-before-prose.sh | 写正文前（Write/Edit） | 缺对应细纲/小节大纲时阻止首次创建正文（阻断），强制先搭大纲 |
-| check-prose-after-write.sh | 正文写入后（Write/Edit） | 轻量扫描截断、工程词、毒句式和字数欠账（提醒，不阻断） |
+| check-prose-after-write.sh | 正文写入后（Write/Edit） | 轻量扫描截断、工程词和毒句式（提醒，不阻断；字数由写作流程交付前统一测量） |
 
 ## 项目文件结构
 
