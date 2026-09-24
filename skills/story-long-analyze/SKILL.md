@@ -131,7 +131,7 @@ chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locato
 
 从 Stage 2 的 `涉及人物`、状态变化和批次关系观察归一实体，再结合 Stage 3 剧情单元生成角色档案与设定。关系记录动作方向、触发、双方得失、表面/真实状态、阶段变化和证据；“甲保护乙”与“乙依赖甲”分别记录。
 
-同一关系数据生成核心人物关系图与关键关系演变图：默认以 mermaid 代码块落盘 `人物关系图/核心人物关系.md` 与 `关键关系演变.md`；仅用户明确要图片时才渲染 PNG，渲染失败降级回 mermaid 并记录原因，不另建关系事实。
+同一关系数据生成核心人物关系图与关键关系演变图。环境无法可靠渲染时记录缺失原因，不另建关系事实。
 
 至少一份角色档案和一份设定文件落盘后运行 `manage_analysis_run.py mark-stage --stage stage4`；缺任一类文件时不得标完成。
 
