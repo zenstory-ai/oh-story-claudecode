@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Inspect reusable long-analysis assets without changing user files.
 
-The upstream directory contract is checked first. A complete upstream family
-is selected as a whole; otherwise a complete compact chapter-card family is
-selected as a whole. Chapter-level gap filling is used only when neither family
-is complete.
+Only the upstream directory contract is recognized: ``章节/第N章_摘要.md``,
+golden-three-chapter analyses, and the aggregate files. Missing chapters are
+reported exactly so a run only fills gaps.
 """
 
 from __future__ import annotations
@@ -20,7 +19,6 @@ from typing import Iterable
 
 SUMMARY_RE = re.compile(r"^第0*(\d+)章_摘要\.md$")
 GOLDEN_RE = re.compile(r"^第0*(\d+)章_深度拆解\.md$")
-CARD_ROW_RE = re.compile(r"^\|\s*(?:第\s*)?0*(\d+)(?:\s*章)?\s*\|")
 SCHEMA_RE = re.compile(r"schema_version\s*[：:]\s*v?(\d+)", re.IGNORECASE)
 TOTAL_RE = re.compile(r"总章数\s*(?:[：:]|\|)\s*(\d+)")
 TOTAL_FALLBACK_RE = re.compile(r"总章数\s+(\d+)\s*章?")
@@ -35,12 +33,6 @@ SOURCE_HASH_RE = re.compile(
 PROJECTION_RE = re.compile(
     r"<!--\s*story-long-analyze:projection\s+runtime=(?P<runtime>[^\s]+)\s+"
     r"source=(?P<source>[^\s]+)(?:\s+[^>]*?)?\s*-->"
-)
-BATCH_RANGE_RE = re.compile(
-    r"<!--\s*story-long-analyze:batch:[^:]+:start\s*-->.*?"
-    r"-\s*chapters:\s*(\d+)\s*-\s*(\d+).*?"
-    r"-\s*input_kind:\s*([^\s]+)",
-    re.DOTALL,
 )
 STATE_START = "<!-- story-long-analyze:runtime-state:start -->"
 STATE_END = "<!-- story-long-analyze:runtime-state:end -->"
@@ -183,46 +175,6 @@ def collect_numbered_files(
     return sorted(chapters), sources, duplicates
 
 
-def known_card_directories(root: Path) -> list[Path]:
-    candidates = (root / "章节卡", root / "v2" / "章节卡", root / "V2" / "章节卡")
-    result: list[Path] = []
-    seen: set[Path] = set()
-    for path in candidates:
-        if path.is_dir():
-            resolved = path.resolve()
-            if resolved not in seen:
-                result.append(path)
-                seen.add(resolved)
-    return result
-
-
-def collect_chapter_cards(root: Path) -> tuple[list[int], dict[int, Path], list[str], list[Path]]:
-    chapters: list[int] = []
-    sources: dict[int, Path] = {}
-    duplicates: list[str] = []
-    files: list[Path] = []
-    for directory in known_card_directories(root):
-        for path in sorted(directory.glob("*.md")):
-            text = read_text(path)
-            if text is None:
-                continue
-            found = False
-            for line in text.splitlines():
-                match = CARD_ROW_RE.match(line)
-                if not match:
-                    continue
-                found = True
-                chapter = int(match.group(1))
-                if chapter in sources:
-                    duplicates.append(f"第{chapter}章：{sources[chapter].as_posix()} / {path.as_posix()}")
-                    continue
-                chapters.append(chapter)
-                sources[chapter] = path
-            if found:
-                files.append(path)
-    return sorted(set(chapters)), sources, duplicates, files
-
-
 def compact_ranges(chapters: Iterable[int]) -> list[str]:
     values = sorted(set(chapters))
     if not values:
@@ -246,61 +198,31 @@ def relative(root: Path, path: Path) -> str:
         return path.as_posix()
 
 
-def old_projected_chapters(progress_text: str | None) -> dict[int, str]:
-    """Recover provenance hints from the former six-script progress blocks."""
-    result: dict[int, str] = {}
-    for start, end, input_kind in BATCH_RANGE_RE.findall(progress_text or ""):
-        kind = "six_script_projection" if input_kind == "raw-original" else "six_script_reuse"
-        for chapter in range(int(start), int(end) + 1):
-            result[chapter] = kind
-    return result
-
-
-def summary_kind(path: Path, old_projection: dict[int, str], chapter: int) -> str:
+def summary_kind(path: Path) -> str:
     text = read_text(path) or ""
-    marker = PROJECTION_RE.search(text[:1000])
-    if marker:
-        return "three_script_projection" if marker.group("runtime") == "single-state-v1" else "projected_summary"
-    return old_projection.get(chapter, "upstream_summary")
+    return "three_script_projection" if PROJECTION_RE.search(text[:1000]) else "upstream_summary"
 
 
 def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
     root = root.resolve()
     schema, progress_total, final_state = read_progress(root / "_progress.md")
     progress_text = read_text(root / "_progress.md")
-    old_projection = old_projected_chapters(progress_text)
     index_chapters, index_errors = read_index_chapters(root / "chapter_index.csv")
     index_identities = read_index_identities(root / "chapter_index.csv")
     managed_state_present, managed_stages = read_managed_stages(progress_text)
 
     summaries, summary_sources, duplicate_summaries = collect_numbered_files(root / "章节", SUMMARY_RE)
     golden, golden_sources, duplicate_golden = collect_numbered_files(root / "章节", GOLDEN_RE)
-    card_chapters, card_sources, duplicate_cards, card_files = collect_chapter_cards(root)
 
-    # Build the union first. After total coverage is known, prefer one complete
-    # source family; only partial families are combined chapter by chapter.
-    standard_paths: dict[int, str] = {}
-    standard_kinds: dict[int, str] = {}
     preferred_paths: dict[int, str] = {}
     preferred_kinds: dict[int, str] = {}
     for chapter, path in summary_sources.items():
-        standard_paths[chapter] = relative(root, path)
-        standard_kinds[chapter] = summary_kind(path, old_projection, chapter)
+        preferred_paths[chapter] = relative(root, path)
+        preferred_kinds[chapter] = summary_kind(path)
     for chapter, path in golden_sources.items():
-        if chapter not in standard_paths:
-            standard_paths[chapter] = relative(root, path)
-            standard_kinds[chapter] = "golden_analysis"
-    preferred_paths.update(standard_paths)
-    preferred_kinds.update(standard_kinds)
-    for chapter, path in card_sources.items():
         if chapter not in preferred_paths:
             preferred_paths[chapter] = relative(root, path)
-            preferred_kinds[chapter] = "compact_chapter_card"
-
-    v2_root = root / "v2"
-    if not v2_root.is_dir():
-        v2_root = root / "V2"
-    alt_schema, alt_progress_total, alt_final_state = read_progress(v2_root / "_progress.md")
+            preferred_kinds[chapter] = "golden_analysis"
 
     expected = expected_override
     expected_source = "argument" if expected is not None else None
@@ -310,23 +232,12 @@ def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
     if expected is None and progress_total is not None and final_state in {"completed", "completed_with_errors"}:
         expected = progress_total
         expected_source = "_progress.md"
-    if expected is None and alt_progress_total is not None and alt_final_state in {"completed", "completed_with_errors"}:
-        expected = alt_progress_total
-        expected_source = f"{v2_root.name}/_progress.md"
     if expected is None:
         expected, source = read_declared_total((root / "拆文报告.md", root / "概要.md", root / "快速预览.md"))
         expected_source = Path(source).name if source else None
     if expected is None and progress_total is not None:
         expected = progress_total
         expected_source = "_progress.md"
-    if expected is None and alt_progress_total is not None:
-        expected = alt_progress_total
-        expected_source = f"{v2_root.name}/_progress.md"
-    if expected is None:
-        expected, source = read_declared_total(
-            (v2_root / "输入报告.md", v2_root / "全局建模.md", v2_root / "快速预览.md")
-        )
-        expected_source = relative(root, Path(source)) if source else None
 
     expected_set = set(range(1, expected + 1)) if expected else set()
     union_semantic_set = set(preferred_paths)
@@ -353,39 +264,22 @@ def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
         else False,
         "characters": any_nonempty((root / "角色").glob("*.md")) if (root / "角色").is_dir() else False,
         "settings": any_nonempty((root / "设定").rglob("*.md")) if (root / "设定").is_dir() else False,
-        "batch_cache": (
-            any_nonempty((root / "_analysis_cache").glob("批次-*.md"))
-            or any_nonempty((root / "_analysis_cache").glob("复用提取-*.md"))
-            or any_nonempty((root / "_analysis_cache").glob("迁移-*.md"))
-        )
+        "batch_cache": any_nonempty((root / "_analysis_cache").glob("批次-*.md"))
         if (root / "_analysis_cache").is_dir()
         else False,
         "chapter_index": nonempty(root / "chapter_index.csv"),
-        "compact_chapter_cards": bool(card_files),
-        "compact_global_model": nonempty(v2_root / "全局建模.md"),
-        "compact_commercial_analysis": nonempty(v2_root / "商业分析.md"),
     }
 
     has_any = bool(union_semantic_set) or any(assets.values()) or any(primary.values()) or nonempty(root / "_progress.md")
     semantic_coverage_complete = bool(union_semantic_set) and (
         (expected is not None and not missing_semantic and not out_of_range_semantic)
         or (expected is None and final_state in {"completed", "completed_with_errors"})
-        or (expected is None and alt_final_state in {"completed", "completed_with_errors"})
     )
     summary_coverage_complete = (
         bool(summaries) and expected is not None and not missing_summaries and not out_of_range_summaries
     )
-    card_set = set(card_sources)
-    card_coverage_complete = bool(card_set) and expected is not None and card_set == expected_set
-    standard_set = set(standard_paths)
-    standard_coverage_complete = bool(standard_set) and expected is not None and standard_set == expected_set
+    standard_coverage_complete = bool(union_semantic_set) and expected is not None and union_semantic_set == expected_set
     legacy_core = assets["report"] and summary_coverage_complete and (assets["storyline"] or assets["plot_units"])
-    compact_core = (
-        assets["compact_chapter_cards"]
-        and assets["compact_global_model"]
-        and alt_final_state in {"completed", "completed_with_errors"}
-        and card_coverage_complete
-    )
     managed_pipeline_complete = all(
         managed_stages.get(stage, {}).get("status") == "completed"
         for stage in ("stage1", "stage2", "stage3", "stage4", "stage5", "stage6")
@@ -403,38 +297,20 @@ def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
         )
     )
 
-    if standard_coverage_complete:
-        source_selection = "complete_upstream_family"
-        preferred_paths = standard_paths
-        preferred_kinds = standard_kinds
-    elif compact_core:
-        source_selection = "complete_compact_family"
-        preferred_paths = {chapter: relative(root, path) for chapter, path in card_sources.items()}
-        preferred_kinds = {chapter: "compact_chapter_card" for chapter in card_sources}
-    else:
-        source_selection = "partial_families_upstream_first_gap_fill"
-
     if expected:
         preferred_paths = {chapter: path for chapter, path in preferred_paths.items() if chapter in expected_set}
         preferred_kinds = {chapter: kind for chapter, kind in preferred_kinds.items() if chapter in expected_set}
     semantic_set = set(preferred_paths)
 
-    full_result_available = usable_upstream_complete or compact_core or legacy_core
-    available_source_kinds: set[str] = set()
-    available_source_kinds.update(standard_kinds.values())
-    if golden:
-        available_source_kinds.add("golden_analysis")
-    if card_chapters:
-        available_source_kinds.add("compact_chapter_card")
-    mixed_sources = (
-        len(set(preferred_kinds.values())) > 1
-        or (bool(standard_paths) and bool(card_sources))
-    )
+    full_result_available = usable_upstream_complete or legacy_core
+    mixed_sources = len(set(preferred_kinds.values())) > 1
 
+    # Only summaries written before the chapter index exist can drift from its
+    # numbering; golden analyses and runtime projections are written against it.
     mapping_conflicts: list[str] = []
     mapping_blocked_chapters: list[int] = []
     upstream_summary_chapters = {
-        chapter for chapter, kind in standard_kinds.items() if kind in {"upstream_summary", "golden_analysis"}
+        chapter for chapter, kind in preferred_kinds.items() if kind == "upstream_summary"
     }
     if index_identities and upstream_summary_chapters:
         first_source = str(index_identities[0].get("source_chapter", "")).strip()
@@ -456,9 +332,9 @@ def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
             stage_repairs.append("stage3_emotion")
         if not primary["rhythm"]:
             stage_repairs.append("stage3_rhythm")
-        if not legacy_completed and not compact_core and (not assets["characters"] or not assets["settings"]):
+        if not legacy_completed and (not assets["characters"] or not assets["settings"]):
             stage_repairs.append("stage4")
-        if not compact_core and not assets["report"]:
+        if not assets["report"]:
             stage_repairs.append("stage5")
         if not assets["style"]:
             stage_repairs.append("stage6_style")
@@ -466,7 +342,7 @@ def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
             row = managed_stages.get(stage)
             if row and row.get("status") != "completed" and stage not in stage_repairs:
                 stage_repairs.append(stage)
-            elif managed_state_present and not legacy_completed and not compact_core and row is None:
+            elif managed_state_present and not legacy_completed and row is None:
                 # New three-script runs require a completed stage row even when
                 # a file was manually placed before the interruption.
                 if stage not in stage_repairs and not any(item.startswith(stage + "_") for item in stage_repairs):
@@ -478,7 +354,7 @@ def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
     elif usable_upstream_complete:
         classification = "current_complete"
         recommended_path = "repair_stages" if stage_repairs else "direct_use"
-    elif compact_core or legacy_core:
+    elif legacy_core:
         classification = "legacy_complete"
         recommended_path = "repair_stages" if stage_repairs else "direct_use"
     elif semantic_coverage_complete:
@@ -491,21 +367,15 @@ def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
     conflicts = list(index_errors)
     conflicts.extend(f"重复摘要：{item}" for item in duplicate_summaries)
     conflicts.extend(f"重复黄金三章：{item}" for item in duplicate_golden)
-    conflicts.extend(f"重复章节卡：{item}" for item in duplicate_cards)
     conflicts.extend(mapping_conflicts)
-    if final_state == "completed" and not usable_upstream_complete and not compact_core:
+    if final_state == "completed" and not usable_upstream_complete:
         conflicts.append("进度标记 completed，但当前主产物或上游逐章覆盖不完整")
     if final_state == "completed_with_errors" and not semantic_coverage_complete:
         conflicts.append("进度标记 completed_with_errors，需按失败与待核记录确认可用范围")
     if index_chapters and expected and max(index_chapters) != expected:
         conflicts.append("机械索引章数与期望章数不一致")
 
-    source_hash_paths = (
-        (v2_root / "_progress.md", v2_root / "输入报告.md", root / "_progress.md")
-        if compact_core and not usable_upstream_complete
-        else (root / "_progress.md", v2_root / "_progress.md", v2_root / "输入报告.md")
-    )
-    source_hash, source_hash_path = read_source_hash(source_hash_paths)
+    source_hash, source_hash_path = read_source_hash((root / "_progress.md",))
 
     return {
         "root": str(root),
@@ -526,20 +396,9 @@ def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
         "semantic_coverage_complete": semantic_coverage_complete,
         "full_result_available": full_result_available,
         "chapter_sources": {
-            "priority": [
-                "upstream_summary", "three_script_projection", "six_script_projection",
-                "six_script_reuse", "golden_analysis", "compact_chapter_card",
-            ],
-            "selection_strategy": source_selection,
+            "priority": ["upstream_summary", "three_script_projection", "golden_analysis"],
             "upstream_summary": {"chapters": summaries, "ranges": compact_ranges(summaries)},
             "golden_analysis": {"chapters": golden, "ranges": compact_ranges(golden)},
-            "compact_chapter_card": {
-                "chapters": card_chapters,
-                "ranges": compact_ranges(card_chapters),
-                "files": [relative(root, path) for path in card_files],
-                "schema_version": alt_schema,
-                "final_state": alt_final_state,
-            },
             "preferred_by_chapter": {str(chapter): preferred_kinds[chapter] for chapter in sorted(preferred_kinds)},
             "preferred_paths": {str(chapter): preferred_paths[chapter] for chapter in sorted(preferred_paths)},
         },
@@ -562,10 +421,10 @@ def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
         "managed_stage_status": managed_stages,
         "chapter_mapping_conflicts": mapping_conflicts,
         "chapter_mapping_blocked_chapters": mapping_blocked_chapters,
-        "provenance_requires_review": mixed_sources or (has_any and schema is None and not compact_core),
+        "provenance_requires_review": mixed_sources or (has_any and schema is None),
         "conflicts": conflicts,
         "notes": [
-            "本检查只扫描传入书目目录中的上游标准路径和已知章节卡路径，不扫描其他项目或磁盘。",
+            "本检查只扫描传入书目目录中的上游标准路径，不扫描其他项目或磁盘。",
             "运行路由必须使用 completed_semantic_chapters；缺少逐章摘要文件不等于缺少语义成果。",
             "direct_use 表示默认直接复用；只有用户明确要求增强时才二次提取已有成果。",
             "explicit reanalysis 必须忽略全部旧语义成果，并按新书流程重新执行。",
@@ -591,7 +450,7 @@ def compact_payload(payload: dict[str, object]) -> dict[str, object]:
     source_info = dict(result["chapter_sources"])
     source_info.pop("preferred_by_chapter", None)
     source_info.pop("preferred_paths", None)
-    for key in ("upstream_summary", "golden_analysis", "compact_chapter_card"):
+    for key in ("upstream_summary", "golden_analysis"):
         entry = dict(source_info[key])
         entry["count"] = len(entry.pop("chapters"))
         source_info[key] = entry

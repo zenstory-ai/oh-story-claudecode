@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Plan, commit, split, recover, and migrate long-analysis batches.
+"""Plan, commit, split, and recover long-analysis batches.
 
 Runtime state lives only in the managed block of ``_progress.md``. Plans are
 printed as JSON and are never persisted. Batch caches are complete recovery
-evidence, not a second state database.
+evidence, not a second state database. An existing chapter summary is never
+overwritten: to redo a chapter, delete its summary and plan again.
 """
 
 from __future__ import annotations
@@ -17,7 +18,6 @@ import os
 import re
 import sys
 import tempfile
-import uuid
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
@@ -35,19 +35,24 @@ CHAPTER_BLOCK_RE = re.compile(
     r"<!--\s*CHAPTER_START:(\d+)\s*-->\s*(.*?)\s*<!--\s*CHAPTER_END:\1\s*-->", re.DOTALL
 )
 BATCH_ID_RE = re.compile(r"^(RAW|REUSE)-(\d+)-(\d+)$")
-PROJECTION_RE = re.compile(
-    r"<!--\s*story-long-analyze:projection\s+runtime=single-state-v1\s+source=([^\s]+)\s+"
-    r"chapter_sha256=([0-9a-f]{64})\s+batch=([^\s]+)\s*-->"
-)
 COMPACT_FIELDS = (
     "概要", "因果", "关键行动", "局面结果", "涉及人物", "信息变化", "状态变化",
-    "三维节奏", "章尾钩子", "证据", "情节点类型", "情节点标题", "主题标签", "基调",
+    "三维节奏", "章尾钩子", "证据",
 )
+POINT_HEADER_RE = re.compile(r"^P(\d+)\s+\*\*(.+?)\*\*\s*[：:]\s*(.+)$")
+POINT_TAG_RE = re.compile(r"^主题标签\s*([^|｜]*?)\s*[|｜]\s*基调\s*[：:]\s*(.*?)\s*$")
 THEMES = ("爱情", "亲情", "友情", "权力", "金钱", "成长", "复仇", "悬念", "搞笑", "热血", "日常", "其他")
 TONES = ("紧张", "轻松", "悲伤", "热血", "爽", "甜", "温馨", "恐怖", "压抑", "其他")
 POINT_TYPES = ("转折点", "信息揭示", "冲突", "解决", "铺垫", "行动", "对话", "状态变化")
-MAX_CHAPTERS = 10
+THEME_ALIASES = {"恋爱": "爱情", "权谋": "权力", "政治": "权力", "幽默": "搞笑"}
+TONE_ALIASES = {"悲痛": "悲伤", "伤感": "悲伤", "痛快": "爽", "惊悚": "恐怖"}
+POINT_ALIASES = {"揭示": "信息揭示", "转折": "转折点", "变化": "状态变化", "动作": "行动",
+                 "交谈": "对话", "化解": "解决"}
+MIN_PLOT_POINTS = 10
+MAX_PLOT_POINTS = 30
+MAX_CHAPTERS = 5
 MAX_CHARS = 25_000
+FINAL_STAGES = ("stage1", "stage2", "stage3", "stage4", "stage5", "stage6")
 
 
 class RunError(ValueError):
@@ -144,7 +149,7 @@ def decode_progress(raw: bytes) -> Tuple[str, bool, str]:
 
 
 def empty_state() -> Dict[str, Any]:
-    return {"request": {}, "batches": {}, "stages": {}}
+    return {"batches": {}, "stages": {}}
 
 
 def table_cells(line: str) -> List[str]:
@@ -168,15 +173,8 @@ def load_state(progress: Path) -> Tuple[Dict[str, Any], bytes]:
         return state, raw
     section = None
     for line in match.group(1).splitlines():
-        if line.strip() == "## 本次请求":
-            section = "request"
-            continue
         if line.strip() == "### 批次状态":
             section = "batches"
-            continue
-        if section == "request" and line.startswith("- ") and "：" in line:
-            key, value = [item.strip() for item in line[2:].split("：", 1)]
-            state["request"][key] = value
             continue
         if line.strip() == "### 阶段状态":
             section = "stages"
@@ -194,30 +192,35 @@ def load_state(progress: Path) -> Tuple[Dict[str, Any], bytes]:
                 "range_sha256": cells[3], "status": cells[4],
                 "parent": "" if cells[5] == "-" else cells[5],
                 "cache": "" if cells[6] == "-" else cells[6],
-                "request_id": "" if len(cells) < 8 or cells[7] == "-" else cells[7],
             }
         elif section == "stages" and cells and cells[0] not in {"阶段", "---"} and len(cells) >= 3:
             state["stages"][cells[0]] = {"status": cells[1], "output": "" if cells[2] == "-" else cells[2]}
     return state, raw
 
 
+def final_status(stages: Dict[str, Dict[str, str]]) -> str:
+    """Value for the ``最终状态`` line that session hooks read."""
+    statuses = [stages.get(stage, {}).get("status") for stage in FINAL_STAGES]
+    if all(status in {"completed", "completed_with_errors"} for status in statuses):
+        return "completed_with_errors" if "completed_with_errors" in statuses else "completed"
+    return "pending"
+
+
 def render_state(state: Dict[str, Any], newline: str) -> str:
-    request = state.get("request", {})
-    lines = [STATE_START, "## 长篇拆文运行状态", "", "## 本次请求",
-             "- 意图：%s" % request.get("意图", "-") ,
-             "- 请求ID：%s" % request.get("请求ID", "-"),
-             "- 请求范围：%s" % request.get("请求范围", "-"),
-             "- 本次状态：%s" % request.get("本次状态", "-"),
-             "", "### 批次状态",
-             "| 批次ID | 章节范围 | 输入 | 原文范围hash | 状态 | 父批次 | 缓存 | 请求ID |",
-             "|---|---|---|---|---|---|---|---|"]
+    lines = [STATE_START, "## 长篇拆文运行状态", ""]
+    # Only projects the runtime tracks by stage get the line; an enhanced legacy
+    # project keeps its own 最终状态 as the single value hooks read.
+    if state["stages"]:
+        lines.extend(["- 最终状态：%s" % final_status(state["stages"]), ""])
+    lines.extend(["### 批次状态",
+                  "| 批次ID | 章节范围 | 输入 | 原文范围hash | 状态 | 父批次 | 缓存 |",
+                  "|---|---|---|---|---|---|---|"])
     batches = list(state["batches"].values())
     batches.sort(key=lambda row: (row["start"], row["end"], row["batch_id"]))
     for row in batches:
-        lines.append("| %s | %s-%s | %s | %s | %s | %s | %s | %s |" % (
+        lines.append("| %s | %s-%s | %s | %s | %s | %s | %s |" % (
             row["batch_id"], row["start"], row["end"], row["input_kind"],
-            row["range_sha256"], row["status"], row.get("parent") or "-", row.get("cache") or "-",
-            row.get("request_id") or "-"))
+            row["range_sha256"], row["status"], row.get("parent") or "-", row.get("cache") or "-"))
     lines.extend(["", "### 阶段状态", "| 阶段 | 状态 | 产物 |", "|---|---|---|"])
     for stage in sorted(state["stages"]):
         row = state["stages"][stage]
@@ -277,8 +280,6 @@ def completed_batch(root: Path, row: Dict[str, Any], rows: Optional[Sequence[Dic
         return False
     if metadata.get("range_sha256") != row.get("range_sha256"):
         return False
-    if row.get("request_id") and metadata.get("request_id", "") != row.get("request_id"):
-        return False
     if row["input_kind"] == "raw-original":
         return rows is not None and row.get("range_sha256") == range_sha256(rows, row["start"], row["end"])
     return True
@@ -320,91 +321,17 @@ def chunk_range(start: int, end: int, index_by_chapter: Optional[Dict[int, Dict[
     return result
 
 
-def stale_projection_chapters(root: Path, rows: Sequence[Dict[str, Any]], state: Dict[str, Any]) -> Set[int]:
-    hashes = {row["chapter"]: row["chapter_sha256"] for row in rows}
-    stale = set()
-    for chapter, current_hash in hashes.items():
-        path = summary_path(root, chapter)
-        if not path.is_file():
-            continue
-        try:
-            marker = PROJECTION_RE.search(path.read_text(encoding="utf-8-sig")[:1200])
-        except (OSError, UnicodeError):
-            continue
-        if marker and marker.group(2) != current_hash:
-            covered_by_current_commit = any(
-                row.get("input_kind") == "raw-original"
-                and row["start"] <= chapter <= row["end"]
-                and completed_batch(root, row, rows)
-                for row in state["batches"].values()
-            )
-            if not covered_by_current_commit:
-                stale.add(chapter)
-    return stale
-
-
-def source_change_chapters(root: Path, rows: Sequence[Dict[str, Any]], state: Dict[str, Any]) -> Set[int]:
-    """Return localized rebuild changes not yet covered by a current RAW batch."""
-    previous_path = root / "_analysis_cache" / "chapter_index.previous.csv"
-    if not previous_path.is_file():
-        return set()
-    try:
-        previous = read_index(root, previous_path)
-    except RunError:
-        return set()
-    previous_by_chapter = {row["chapter"]: row for row in previous}
-    changed = {
-        row["chapter"] for row in rows
-        if row["chapter"] not in previous_by_chapter
-        or previous_by_chapter[row["chapter"]].get("chapter_sha256") != row.get("chapter_sha256")
-    }
-    covered = set()
-    for batch in state["batches"].values():
-        if batch.get("input_kind") != "raw-original" or not completed_batch(root, batch, rows):
-            continue
-        covered.update(range(batch["start"], batch["end"] + 1))
-    return changed - covered
-
-
 def invalid_batch_targets(root: Path, rows: Optional[Sequence[Dict[str, Any]]],
                           state: Dict[str, Any]) -> Tuple[Set[int], Set[int]]:
+    """Chapters of recorded batches that no longer verify (cache lost or source changed)."""
     raw = set()
     reuse = set()
-    historical_indexes = None  # type: Optional[List[List[Dict[str, Any]]]]
     for batch in state["batches"].values():
         if batch.get("status") not in {"completed", "success"} or completed_batch(root, batch, rows):
             continue
         chapters = set(range(batch["start"], batch["end"] + 1))
         if batch.get("input_kind") == "raw-original":
-            targets = chapters
-            if rows is not None:
-                if historical_indexes is None:
-                    historical_indexes = []
-                    cache_dir = root / "_analysis_cache"
-                    paths = [cache_dir / "chapter_index.previous.csv"]
-                    paths.extend(sorted((cache_dir / "legacy").glob("chapter_index.*.csv")))
-                    for path in paths:
-                        try:
-                            historical_indexes.append(read_index(root, path))
-                        except RunError:
-                            continue
-                current_hashes = {row["chapter"]: row["chapter_sha256"] for row in rows}
-                for previous in historical_indexes:
-                    try:
-                        if not completed_batch(root, batch, previous):
-                            continue
-                    except RunError:
-                        continue
-                    # A complete old cache still proves its unchanged chapters.
-                    # Use the full change boundary, not only changes awaiting
-                    # repair: an empty remainder must never invalidate the parent.
-                    targets = {
-                        row["chapter"] for row in previous
-                        if row["chapter"] in chapters
-                        and row["chapter_sha256"] != current_hashes.get(row["chapter"])
-                    }
-                    break
-            raw.update(targets)
+            raw.update(chapters)
         elif batch.get("input_kind") == "existing-results":
             reuse.update(chapters)
     return raw, reuse
@@ -460,9 +387,6 @@ def plan_command(args: argparse.Namespace) -> Dict[str, Any]:
     index_path = args.index.resolve() if args.index else root / "chapter_index.csv"
     if index_path.is_file():
         index_rows = read_index(root, index_path)
-    request_id = args.request_id
-    if args.intent == "reanalyze" and not request_id:
-        request_id = "reanalyze-" + uuid.uuid4().hex[:16]
     recoverable_caches, cache_covered = add_recoverable_caches(root, state, index_rows)
     expected = report.get("expected_chapters") or (len(index_rows) if index_rows else None)
     if not expected:
@@ -470,26 +394,15 @@ def plan_command(args: argparse.Namespace) -> Dict[str, Any]:
     semantic = set(report["completed_semantic_chapters"])
     summaries = set(report["completed_summary_chapters"])
     all_chapters = set(range(1, int(expected) + 1))
-    source_changes = source_change_chapters(root, index_rows, state) if index_rows else set()
-    stale = stale_projection_chapters(root, index_rows, state) if index_rows else set()
-    stale |= source_changes
     invalid_raw, invalid_reuse = invalid_batch_targets(root, index_rows, state)
 
-    raw_targets = set()  # type: Set[int]
-    reuse_targets = set()  # type: Set[int]
-    if args.intent == "reanalyze":
-        raw_targets = all_chapters
-    elif args.intent == "enhance":
-        raw_targets = (all_chapters - semantic) | stale | invalid_raw
+    raw_targets = (all_chapters - semantic) | invalid_raw
+    if args.intent == "enhance":
         reuse_targets = (semantic - raw_targets) | invalid_reuse
     else:
-        raw_targets = (all_chapters - semantic) | stale | invalid_raw
         reuse_targets = ((semantic - summaries) | invalid_reuse) - raw_targets
-    if args.intent != "reanalyze":
-        raw_targets -= cache_covered
-        reuse_targets -= cache_covered
-    else:
-        recoverable_caches = []
+    raw_targets -= cache_covered
+    reuse_targets -= cache_covered
     if raw_targets and index_rows is None:
         raise RunError("chapter_index_required", "raw-original work remains")
     if index_rows is not None:
@@ -515,7 +428,6 @@ def plan_command(args: argparse.Namespace) -> Dict[str, Any]:
     split_children = [
         row for row in state["batches"].values()
         if row.get("parent") and row.get("status") != "superseded"
-        and (args.intent != "reanalyze" or row.get("request_id") == request_id)
     ]
     for child in split_children:
         for item in list(selected):
@@ -536,8 +448,7 @@ def plan_command(args: argparse.Namespace) -> Dict[str, Any]:
         batch_id = "%s-%s-%s" % (prefix, item["start"], item["end"])
         current_range_hash = range_sha256(index_rows, item["start"], item["end"]) if item["input_kind"] == "raw-original" else "existing-results"
         prior = state["batches"].get(batch_id)
-        same_request = args.intent != "reanalyze" or prior and prior.get("request_id") == request_id
-        if prior and same_request and completed_batch(root, prior, index_rows):
+        if prior and completed_batch(root, prior, index_rows):
             continue
         if item["input_kind"] == "raw-original":
             sources = [index_by_chapter[chapter]["source_locator"] for chapter in range(item["start"], item["end"] + 1)]
@@ -551,19 +462,14 @@ def plan_command(args: argparse.Namespace) -> Dict[str, Any]:
             "source_files": sources, "cache": "_analysis_cache/批次-%s.md" % batch_id,
         })
     required_stages = list(report.get("stage_repairs", []))
-    if args.intent == "reanalyze":
-        required_stages = ["stage1", "stage2", "stage3", "stage4", "stage5", "stage6"]
-    elif source_changes:
-        required_stages = sorted(set(required_stages + ["stage2", "stage3", "stage4", "stage5", "stage6"]))
-    elif batches or recoverable_caches:
+    if batches or recoverable_caches:
         required_stages = sorted(set(required_stages + ["stage2"]))
     return {
-        "ok": True, "root": str(root), "intent": args.intent, "request_id": request_id,
+        "ok": True, "root": str(root), "intent": args.intent,
         "classification": report["classification"], "recommended_path": report["recommended_path"],
         "mixed_sources": report["mixed_sources"], "batches": batches,
         "recoverable_caches": recoverable_caches,
-        "summary_gaps": sorted(all_chapters - summaries), "stale_projection_chapters": sorted(stale),
-        "source_changed_chapters": sorted(source_changes),
+        "summary_gaps": sorted(all_chapters - summaries),
         "read_counts": {"raw_chapters": raw_reads, "existing_result_files": result_reads},
         "required_stages": required_stages,
         "state_written": False,
@@ -590,7 +496,58 @@ def compact_field(body: str, name: str) -> str:
     return value
 
 
-def parse_model_output(text: str, start: int, end: int, input_kind: str) -> Dict[int, Dict[str, str]]:
+def map_enum(value: str, allowed: Sequence[str], aliases: Dict[str, str], default: str = "其他") -> str:
+    value = value.strip()
+    if value in allowed:
+        return value
+    if value in aliases:
+        return aliases[value]
+    for item in allowed:
+        if item != "其他" and value.startswith(item):
+            return item
+    return default
+
+
+def parse_plot_points(body: str, chapter: int, minimum: int) -> List[Dict[str, Any]]:
+    """Parse the repeated ``P{n}`` blocks that follow ``**情节点**：``."""
+    match = re.search(r"(?m)^\*\*情节点\*\*\s*[：:]\s*$", body)
+    if not match:
+        raise RunError("chapter_schema_incomplete", "chapter %s missing field: 情节点" % chapter)
+    points = []  # type: List[Dict[str, Any]]
+    for line in body[match.end():].split("\n"):
+        stripped = line.strip()
+        header = POINT_HEADER_RE.match(stripped)
+        if header:
+            segments = [item.strip() for item in re.split(r"[|｜]", header.group(3))]
+            if not segments[0].startswith("类型") or len(segments) < 2 or not segments[1]:
+                raise RunError("plot_point_invalid", "chapter %s P%s needs 类型 and 白描" % (chapter, header.group(1)))
+            points.append({"number": int(header.group(1)), "title": header.group(2).strip(),
+                           "type": segments[0][2:], "rest": segments[1:], "quote": [], "tag": None})
+            continue
+        if not stripped or stripped == "---":
+            continue
+        if not points or points[-1]["tag"] is not None:
+            raise RunError("plot_point_invalid", "chapter %s: unexpected line %r" % (chapter, stripped[:40]))
+        tag = POINT_TAG_RE.match(stripped)
+        if tag:
+            points[-1]["tag"] = (tag.group(1), tag.group(2))
+        else:
+            points[-1]["quote"].append(stripped)
+    if [point["number"] for point in points] != list(range(1, len(points) + 1)):
+        raise RunError("plot_point_invalid", "chapter %s: points must be numbered P1..Pn" % chapter)
+    if not minimum <= len(points) <= MAX_PLOT_POINTS:
+        raise RunError("plot_point_count", "chapter %s has %s points; expected %s-%s"
+                       % (chapter, len(points), minimum, MAX_PLOT_POINTS))
+    for point in points:
+        if point["tag"] is None:
+            raise RunError("plot_point_invalid", "chapter %s P%s missing 主题标签/基调 line" % (chapter, point["number"]))
+        text = "%s %s %s" % (point["title"], " ".join(point["rest"]), " ".join(point["quote"]))
+        if "{" in text or "}" in text:
+            raise RunError("template_placeholder", "chapter %s P%s" % (chapter, point["number"]))
+    return points
+
+
+def parse_model_output(text: str, start: int, end: int, input_kind: str) -> Dict[int, Dict[str, Any]]:
     text = normalized(text)
     if "BATCH_ERROR:" in text:
         raise RunError("extractor_reported_error", "model returned BATCH_ERROR")
@@ -602,13 +559,17 @@ def parse_model_output(text: str, start: int, end: int, input_kind: str) -> Dict
         raise RunError("chapter_marker_mismatch", "expected %s; received %s" % (expected_tokens, actual_tokens))
     if actual_tokens and actual_tokens != expected_tokens:
         raise RunError("chapter_marker_mismatch", "expected %s; received %s" % (expected_tokens, actual_tokens))
-    records = {}  # type: Dict[int, Dict[str, str]]
+    # Projections rebuilt from old results may hold fewer beats than a fresh reading.
+    minimum = MIN_PLOT_POINTS if input_kind == "raw-original" else 1
+    records = {}  # type: Dict[int, Dict[str, Any]]
     for match in CHAPTER_BLOCK_RE.finditer(text):
         chapter = int(match.group(1))
         body = match.group(2).strip()
         if not re.search(r"(?m)^##\s+第%s章(?:\s+.*)?$" % chapter, body):
             raise RunError("chapter_schema_incomplete", "chapter %s heading missing" % chapter)
-        records[chapter] = {name: compact_field(body, name) for name in COMPACT_FIELDS}
+        fields = {name: compact_field(body, name) for name in COMPACT_FIELDS}  # type: Dict[str, Any]
+        fields["情节点"] = parse_plot_points(body, chapter, minimum)
+        records[chapter] = fields
     if input_kind == "raw-original" and set(records) != set(range(start, end + 1)):
         raise RunError("chapter_block_missing", "%s-%s" % (start, end))
     if records and set(records) != set(range(start, end + 1)):
@@ -630,51 +591,41 @@ def parse_model_output(text: str, start: int, end: int, input_kind: str) -> Dict
     return records
 
 
-def map_enum(value: str, allowed: Sequence[str], aliases: Dict[str, str]) -> str:
-    for item in allowed:
-        if item != "其他" and item in value:
-            return item
-    for needle, target in aliases.items():
-        if needle in value:
-            return target
-    return "其他" if "其他" in allowed else allowed[-1]
+def render_plot_point(point: Dict[str, Any]) -> str:
+    point_type = map_enum(point["type"], POINT_TYPES, POINT_ALIASES, default="行动")
+    theme = map_enum(point["tag"][0], THEMES, THEME_ALIASES)
+    tone = map_enum(point["tag"][1], TONES, TONE_ALIASES)
+    lines = ["P%s **%s**：%s" % (point["number"], point["title"], " | ".join(["类型" + point_type] + point["rest"]))]
+    lines.extend(point["quote"])
+    lines.extend(["", "主题标签%s | 基调：%s" % (theme, tone)])
+    return "\n".join(lines)
 
 
-def render_summary(chapter: int, fields: Dict[str, str], source_kind: str,
+def render_summary(chapter: int, fields: Dict[str, Any], source_kind: str,
                    chapter_hash: str, batch_id: str) -> bytes:
-    theme = map_enum(fields["主题标签"], THEMES, {"恋": "爱情", "权谋": "权力", "政治": "权力", "幽默": "搞笑"})
-    tone = map_enum(fields["基调"], TONES, {"悲痛": "悲伤", "伤感": "悲伤", "痛快": "爽", "惊悚": "恐怖"})
-    point_type = map_enum(fields["情节点类型"], POINT_TYPES, {
-        "揭示": "信息揭示", "转折": "转折点", "变化": "状态变化",
-        "动作": "行动", "交谈": "对话", "化解": "解决", "": "行动",
-    })
     text = (
         "<!-- story-long-analyze:projection runtime=single-state-v1 source=%s chapter_sha256=%s batch=%s -->\n"
         "## 第%s章\n\n**概要**：%s\n\n**关键事件**：\n1. %s\n\n"
         "**因果**：%s\n\n**局面结果**：%s\n\n**涉及**：%s\n\n"
         "**信息变化**：%s\n\n**状态变化**：%s\n\n**三维节奏**：%s\n\n"
-        "**章尾钩子**：%s\n\n**证据**：%s\n\n**情节点**：\n\n"
-        "P1 **%s**：类型%s | %s | 涉及%s | 证据%s\n主题标签%s | 基调：%s\n"
+        "**章尾钩子**：%s\n\n**证据**：%s\n\n**情节点**：\n\n%s\n"
     ) % (
         source_kind, chapter_hash, batch_id, chapter, fields["概要"], fields["关键行动"],
         fields["因果"], fields["局面结果"], fields["涉及人物"], fields["信息变化"],
         fields["状态变化"], fields["三维节奏"], fields["章尾钩子"], fields["证据"],
-        fields["情节点标题"], point_type, fields["局面结果"], fields["涉及人物"], fields["证据"],
-        theme, tone,
+        "\n\n---\n\n".join(render_plot_point(point) for point in fields["情节点"]),
     )
     return text.encode("utf-8")
 
 
 def render_cache(batch_id: str, start: int, end: int, input_kind: str,
                  range_hash: str, source_files: Sequence[str], model_output: str,
-                 projection_schema: str = "compact-v2", request_id: str = "",
-                 request_intent: str = "continue") -> bytes:
+                 projection_schema: str = "compact-v3") -> bytes:
     text = (
         "%s\n# 批次 %s\n- batch_id: %s\n- chapters: %s-%s\n- input_kind: %s\n"
-        "- range_sha256: %s\n- projection_schema: %s\n- request_id: %s\n- request_intent: %s\n"
+        "- range_sha256: %s\n- projection_schema: %s\n"
         "- source_files: %s\n%s\n%s\n%s\n%s\n"
-    ) % (CACHE_START, batch_id, batch_id, start, end, input_kind, range_hash,
-           projection_schema, request_id or "-", request_intent,
+    ) % (CACHE_START, batch_id, batch_id, start, end, input_kind, range_hash, projection_schema,
            json.dumps(list(source_files), ensure_ascii=False), MODEL_START,
            normalized(model_output).strip(), MODEL_END, CACHE_END)
     return text.encode("utf-8")
@@ -684,16 +635,16 @@ def parse_cache(path: Path) -> Dict[str, Any]:
     text = normalized(path.read_text(encoding="utf-8-sig"))
     if not text.rstrip().endswith(CACHE_END):
         raise RunError("cache_incomplete", str(path))
-    metadata = {}
+    metadata = {}  # type: Dict[str, Any]
     for key in ("batch_id", "chapters", "input_kind", "range_sha256", "projection_schema"):
         match = re.search(r"(?m)^- %s:\s*(.+)$" % key, text)
         if not match:
             raise RunError("cache_invalid", "missing %s" % key)
         metadata[key] = match.group(1).strip()
-    for key in ("request_id", "request_intent"):
-        match = re.search(r"(?m)^- %s:\s*(.+)$" % key, text)
-        metadata[key] = "" if not match or match.group(1).strip() == "-" else match.group(1).strip()
-    start, end = [int(value) for value in metadata["chapters"].split("-", 1)]
+    try:
+        start, end = [int(value) for value in metadata["chapters"].split("-", 1)]
+    except ValueError:
+        raise RunError("cache_invalid", "chapters: %s" % metadata["chapters"])
     model_match = re.search(re.escape(MODEL_START) + r"\n(.*?)\n" + re.escape(MODEL_END), text, re.DOTALL)
     if not model_match:
         raise RunError("cache_invalid", "model output markers missing")
@@ -723,9 +674,11 @@ def commit_from_cache(root: Path, metadata: Dict[str, Any], cache: Path,
     records = parse_model_output(metadata["model_output"], start, end, input_kind)
     hashes = {row["chapter"]: row["chapter_sha256"] for row in index_rows or []}
     created = []
+    kept = []
     for chapter, fields in sorted(records.items()):
         path = summary_path(root, chapter)
         if path.exists():
+            kept.append(chapter)
             continue
         chapter_hash = hashes.get(chapter, "0" * 64)
         atomic_write(path, render_summary(chapter, fields, input_kind, chapter_hash, batch_id))
@@ -737,27 +690,14 @@ def commit_from_cache(root: Path, metadata: Dict[str, Any], cache: Path,
     if missing:
         raise RunError("summary_projection_missing", ",".join(map(str, missing)))
     state, _ = load_state(root / "_progress.md")
-    source_changes = source_change_chapters(root, index_rows, state) if input_kind == "raw-original" and index_rows else set()
     state["batches"][batch_id] = {
         "batch_id": batch_id, "start": start, "end": end, "input_kind": input_kind,
         "range_sha256": current_hash, "status": "completed", "parent": "",
         "cache": cache.relative_to(root).as_posix(),
-        "request_id": metadata.get("request_id", ""),
     }
-    request_id = metadata.get("request_id", "")
-    request_intent = metadata.get("request_intent", "continue") or "continue"
-    if request_id:
-        state["request"] = {
-            "意图": request_intent,
-            "请求ID": request_id,
-            "请求范围": "第%s-%s章" % (start, end),
-            "本次状态": "pending",
-        }
-    if input_kind == "raw-original" and source_changes & set(range(start, end + 1)):
-        for stage in ("stage3", "stage4", "stage5", "stage6"):
-            state["stages"][stage] = {"status": "pending", "output": "source_changed"}
     changed = write_state(root / "_progress.md", state)
-    return {"batch_id": batch_id, "created_summaries": created, "progress_updated": changed}
+    return {"batch_id": batch_id, "created_summaries": created,
+            "kept_existing_summary_chapters": kept, "progress_updated": changed}
 
 
 def commit_command(args: argparse.Namespace) -> Dict[str, Any]:
@@ -772,8 +712,6 @@ def commit_command(args: argparse.Namespace) -> Dict[str, Any]:
         total_chars = sum(row["char_count"] for row in index_rows if start <= row["chapter"] <= end)
         if total_chars > MAX_CHARS:
             raise RunError("batch_too_large", "%s exceeds %s characters" % (args.batch_id, MAX_CHARS))
-    if args.intent == "reanalyze" and not args.request_id:
-        raise RunError("request_id_required", "reanalyze commit must use the request_id printed by plan")
     current_hash = range_sha256(index_rows, start, end) if input_kind == "raw-original" else "existing-results"
     if input_kind == "raw-original" and not args.range_sha256:
         raise RunError("range_hash_required", "pass the value printed by plan")
@@ -782,8 +720,7 @@ def commit_command(args: argparse.Namespace) -> Dict[str, Any]:
     # Parsing above validates the whole result before the first write.
     path = cache_path(root, args.batch_id)
     data = render_cache(args.batch_id, start, end, input_kind, current_hash,
-                        source_files_from_args(args.source_file), text,
-                        request_id=args.request_id or "", request_intent=args.intent)
+                        source_files_from_args(args.source_file), text)
     if not path.is_file() or path.read_bytes() != data:
         if path.is_file():
             old_data = path.read_bytes()
@@ -844,7 +781,6 @@ def split_command(args: argparse.Namespace) -> Dict[str, Any]:
     state["batches"][args.batch_id] = {
         "batch_id": args.batch_id, "start": start, "end": end, "input_kind": input_kind,
         "range_sha256": parent_hash, "status": "superseded", "parent": "", "cache": "",
-        "request_id": args.request_id or "",
     }
     prefix = "RAW" if input_kind == "raw-original" else "REUSE"
     children = []
@@ -856,7 +792,7 @@ def split_command(args: argparse.Namespace) -> Dict[str, Any]:
             state["batches"][child_id] = {
                 "batch_id": child_id, "start": child_start, "end": child_end,
                 "input_kind": input_kind, "range_sha256": child_hash, "status": "planned",
-                "parent": args.batch_id, "cache": "", "request_id": args.request_id or "",
+                "parent": args.batch_id, "cache": "",
             }
         children.append(child_id)
     write_state(root / "_progress.md", state)
@@ -938,77 +874,6 @@ def mark_stage_command(args: argparse.Namespace) -> Dict[str, Any]:
     return {"ok": True, "stage": args.stage, "status": args.status, "progress_updated": changed}
 
 
-def migrate_command(args: argparse.Namespace) -> Dict[str, Any]:
-    root = require_root(args.root)
-    index_rows = None
-    index_warning = None
-    if (args.index or root / "chapter_index.csv").is_file():
-        try:
-            index_rows = read_index(root, args.index)
-        except RunError as exc:
-            # A six-script index predates chapter_sha256. Receipt/output hashes
-            # can still prove historical completeness; a later rebuild will
-            # establish current range hashes.
-            index_warning = {"error": exc.code, "detail": exc.detail}
-    receipts_dir = root / "_analysis_cache" / "receipts"
-    migrated = []
-    unverified = []
-    verified_old_paths = set()
-    state, _ = load_state(root / "_progress.md")
-    for receipt_path in sorted(receipts_dir.glob("*.json")) if receipts_dir.is_dir() else []:
-        try:
-            receipt = json.loads(receipt_path.read_text(encoding="utf-8-sig"))
-            start, end = [int(value) for value in receipt["chapter_range"]]
-            old_outputs = receipt.get("outputs", {})
-            candidates = [root / name for name in old_outputs if name.startswith("_analysis_cache/") and name.endswith(".md")]
-            old_cache = next((path for path in candidates if path.is_file() and sha256(path.read_bytes()) == old_outputs[path.relative_to(root).as_posix()]), None)
-            if receipt.get("status") != "success" or old_cache is None:
-                raise ValueError("receipt_or_cache_not_verified")
-            verified_old_paths.add(old_cache.resolve())
-            input_kind = receipt.get("input_kind", "raw-original")
-            prefix = "RAW" if input_kind == "raw-original" else "REUSE"
-            batch_id = "%s-%s-%s" % (prefix, start, end)
-            if input_kind == "raw-original" and index_rows:
-                source_hashes = {str(row.get("source_sha256", "")) for row in index_rows}
-                receipt_source = str(receipt.get("source_sha256", ""))
-                if len(source_hashes) == 1 and receipt_source not in source_hashes:
-                    raise ValueError("receipt_source_hash_mismatch")
-                current_hash = range_sha256(index_rows, start, end)
-            else:
-                current_hash = "historical-verified-by-receipt"
-            migrated_kind = "migrated-legacy"
-            compat = root / "_analysis_cache" / ("迁移-%s.md" % batch_id)
-            data = render_cache(batch_id, start, end, migrated_kind, current_hash,
-                                [old_cache.relative_to(root).as_posix(), receipt_path.relative_to(root).as_posix()],
-                                old_cache.read_text(encoding="utf-8-sig"), "legacy-compatible")
-            if not compat.exists():
-                atomic_write(compat, data)
-            if all(summary_path(root, chapter).is_file() for chapter in range(start, end + 1)):
-                state["batches"][batch_id] = {
-                    "batch_id": batch_id, "start": start, "end": end, "input_kind": migrated_kind,
-                    "range_sha256": current_hash, "status": "completed", "parent": "",
-                    "cache": compat.relative_to(root).as_posix(),
-                }
-            migrated.append({"batch_id": batch_id, "cache": compat.relative_to(root).as_posix()})
-        except (OSError, UnicodeError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
-            unverified.append({"receipt": receipt_path.relative_to(root).as_posix(), "reason": str(exc)})
-    cache_dir = root / "_analysis_cache"
-    historical_candidates = []
-    if cache_dir.is_dir():
-        historical_candidates.extend(cache_dir.glob("批次-*.md"))
-        historical_candidates.extend(cache_dir.glob("复用提取-*.md"))
-    for old_cache in sorted(set(historical_candidates)):
-        if old_cache.resolve() in verified_old_paths or re.fullmatch(r"批次-(?:RAW|REUSE)-\d+-\d+", old_cache.stem):
-            continue
-        unverified.append({"cache": old_cache.relative_to(root).as_posix(),
-                           "reason": "no_verified_receipt; kept as historical evidence"})
-    if migrated:
-        write_state(root / "_progress.md", state)
-    return {"ok": True, "migrated": migrated, "historical_unverified": unverified,
-            "index_warning": index_warning,
-            "legacy_files_deleted": False}
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1016,8 +881,7 @@ def build_parser() -> argparse.ArgumentParser:
     plan.add_argument("--root", required=True, type=Path)
     plan.add_argument("--index", type=Path)
     plan.add_argument("--expected-chapters", type=int)
-    plan.add_argument("--intent", choices=("continue", "enhance", "reanalyze"), default="continue")
-    plan.add_argument("--request-id", help="stable ID for resuming one explicit reanalysis request")
+    plan.add_argument("--intent", choices=("continue", "enhance"), default="continue")
     plan.set_defaults(handler=plan_command)
     commit = sub.add_parser("commit", help="validate and atomically commit one batch")
     commit.add_argument("--root", required=True, type=Path)
@@ -1026,15 +890,12 @@ def build_parser() -> argparse.ArgumentParser:
     commit.add_argument("--range-sha256")
     commit.add_argument("--index", type=Path)
     commit.add_argument("--source-file", action="append")
-    commit.add_argument("--intent", choices=("continue", "enhance", "reanalyze"), default="continue")
-    commit.add_argument("--request-id", help="request_id printed by plan; required for reanalyze")
     commit.set_defaults(handler=commit_command)
     split = sub.add_parser("split", help="persist a failed batch split")
     split.add_argument("--root", required=True, type=Path)
     split.add_argument("--batch-id", required=True)
     split.add_argument("--at", type=int)
     split.add_argument("--index", type=Path)
-    split.add_argument("--request-id")
     split.set_defaults(handler=split_command)
     repair = sub.add_parser("repair-progress", help="recover missing projections/state from complete caches")
     repair.add_argument("--root", required=True, type=Path)
@@ -1048,10 +909,6 @@ def build_parser() -> argparse.ArgumentParser:
     stage.add_argument("--output", type=Path)
     stage.add_argument("--prepare", action="store_true", help="before Stage 5, preserve the existing report")
     stage.set_defaults(handler=mark_stage_command)
-    migrate = sub.add_parser("migrate-legacy", help="migrate verified six-script recovery evidence")
-    migrate.add_argument("--root", required=True, type=Path)
-    migrate.add_argument("--index", type=Path)
-    migrate.set_defaults(handler=migrate_command)
     return parser
 
 

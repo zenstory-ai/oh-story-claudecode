@@ -3,6 +3,7 @@
 Status: implemented
 Date: 2026-09-22
 Issue: PR #386
+Related: [2026-09-23-long-analyze-runtime-takeover](../simplification/2026-09-23-long-analyze-runtime-takeover.md)（接手收口：情节点密度、`reanalyze`、`migrate-legacy`、章节卡家族与局部失效追踪的决定已在该篇翻转）
 
 ## Problem
 
@@ -16,9 +17,9 @@ Issue: PR #386
 1. **生产运行收敛为三个脚本**：`build_chapter_index.py`（章界、物理行、全文与逐章
    hash、显式 rebuild）；`inspect_existing_assets.py`（只读判断旧成果、精确缺章、
    来源混存和阶段修复）；`manage_analysis_run.py`（只读计划、范围批次、原子提交、
-   相邻拆分、缓存恢复、阶段状态和旧证据迁移）。
+   相邻拆分、缓存恢复和阶段状态）。
 2. **唯一运行状态在 `_progress.md` 受管区**；`chapter_index.csv` 是当前机械索引，
-   批次缓存和上一版索引只作恢复/局部失效证据。新运行不再创建计划 JSON、checkpoint、
+   批次缓存只作恢复证据。新运行不再创建计划 JSON、checkpoint、
    逐批 receipt 或 Stage receipt。批次 ID 固定为 `RAW-{起章}-{止章}` /
    `REUSE-{起章}-{止章}`。
 3. **逐章摘要换 14 字段事实 schema**（概要、因果、关键行动、局面结果、涉及人物、

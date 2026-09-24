@@ -36,7 +36,7 @@ SPECIAL_RE = re.compile(
     rf"^\s*(?P<label>楔子|序章|引子|前言|后记|尾声|番外(?:[{NUMBER}]+)?)"
     r"(?:[\s:：\-—]+(?P<title>.*))?\s*$"
 )
-LEGACY_CHAPTER_FILE_RE = re.compile(r"^第0*(\d+)章_(?:摘要|深度拆解)\.md$")
+LEGACY_CHAPTER_FILE_RE = re.compile(r"^第0*(\d+)章_摘要\.md$")
 TITLE_PREFIX_RE = re.compile(r"^[\s\-—:：、.．]+")
 DIGITS = {"〇": 0, "零": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4,
           "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
@@ -368,21 +368,6 @@ def legacy_mapping_conflict(output: Path, rows: Sequence[Dict[str, Any]]) -> Opt
     )
 
 
-def preserve_previous_index(output: Path, data: bytes) -> Path:
-    """Keep the immediately previous CSV as cache evidence for localized invalidation."""
-    previous = output.parent / "_analysis_cache" / "chapter_index.previous.csv"
-    if previous.is_file() and previous.read_bytes() != data:
-        old = previous.read_bytes()
-        history = output.parent / "_analysis_cache" / "legacy" / (
-            "chapter_index.%s.csv" % sha256(old)[:12]
-        )
-        if not history.exists():
-            atomic_write(history, old)
-    if not previous.is_file() or previous.read_bytes() != data:
-        atomic_write(previous, data)
-    return previous
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", required=True, type=Path)
@@ -417,7 +402,7 @@ def main() -> int:
         pending = list(range(1, len(rows) + 1))
         old_count = 0
         if args.output.is_file():
-            old_data, old_rows = read_existing(args.output)
+            _, old_rows = read_existing(args.output)
             old_count = len(old_rows)
             pending = compare_rebuild(old_rows, rows)
         else:
@@ -426,8 +411,6 @@ def main() -> int:
                 raise ValueError(mapping_error)
         data = csv_payload(rows)
         if not args.output.is_file() or args.output.read_bytes() != data:
-            if args.output.is_file():
-                preserve_previous_index(args.output, old_data)
             atomic_write(args.output, data)
         print(json.dumps({
             "ok": True, "reused": False, "parsed_source": True, "rebuilt": bool(old_count),

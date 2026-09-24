@@ -31,17 +31,17 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 "{PYTHON}" "{story-long-analyze skill 根}/scripts/inspect_existing_assets.py" --root "拆文库/{书名}" --compact
 ```
 
-路径错误必须停止。完整旧项目返回 `direct_use` 后直接使用，不建索引、不读原文。只有用户明确要求增强才读取旧成果；明确要求重拆才忽略旧语义成果。`schema_version` 只报告，不作为新旧门禁，也不得在复用时改写。
+路径错误必须停止。完整旧项目返回 `direct_use` 后直接使用，不建索引、不读原文。只有用户明确要求增强才读取旧成果。已有摘要一律不覆盖：要重拆某章就先删掉它的 `章节/第N章_摘要.md`，整本重拆就换一个新目录。`schema_version` 只报告，不作为新旧门禁，也不得在复用时改写。
 
 ## Phase 2：唯一管道与三种情况
 
 | 情况 | 行为 |
 |---|---|
-| 部分完成 | 已完成章只读旧拆文；黄金三章可补缺失摘要；仅缺失或原文 hash 失效章进入原文块 |
-| 已完整拆完 | 默认直接使用；增强只写 `_analysis_cache/` 和 `_progress.md` 状态；重拆才读原文 |
+| 部分完成 | 已完成章只读旧拆文；黄金三章可补缺失摘要；仅缺摘要的章进入原文块 |
+| 已完整拆完 | 默认直接使用；增强只写 `_analysis_cache/` 和 `_progress.md` 状态 |
 | 全新小说 | 建索引、完成黄金三章，再把其余正文放入不重叠连续章块 |
 
-检查器先扫描上游 `章节/*_摘要.md` 与黄金三章，再扫描同目录已知紧凑章节卡。一个完整来源家族整套使用；都不完整时才逐章补缺。新旧投影混存要报告来源，但不要求重拆。
+检查器只扫描上游 `章节/*_摘要.md` 与黄金三章，逐章报告缺口。新旧投影混存要报告来源，但不要求重拆。
 
 ### 固定交付接口
 
@@ -65,11 +65,11 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | 5 主报告 | 权威底层结果 | 拆文报告、完整概要 | 文件存在、阶段状态完成 |
 | 6 文风 | 既有资料、样本或索引定点原文 | `文风.md` | 文件存在、阶段状态完成 |
 
-用户未要求一次跑完时，Stage 1 后写 `paused_after_stage1` 并询问是否继续；续跑不重复 Stage 0/1。Stage 3–5 不重读原文。Stage 6 可按索引定点读取 4–6 段原文锚点，但不重扫全书。
+用户未要求一次跑完时，Stage 1 后停下询问是否继续；续跑不重复 Stage 0/1。Stage 3–5 不重读原文。Stage 6 可按索引定点读取 4–6 段原文锚点，但不重扫全书。
 
 ## Stage 0：机械章节索引
 
-全新、部分完成和明确重拆运行：
+全新和部分完成运行：
 
 ```text
 "{PYTHON}" "{story-long-analyze skill 根}/scripts/build_chapter_index.py" --source "{拆文目录}/原文/原文.txt" --output "{拆文目录}/chapter_index.csv" --locator-path "原文/原文.txt"
@@ -81,7 +81,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locator,status,chapter_sha256,source_sha256,parser_version
 ```
 
-只按 LF 计物理行。支持楔子、序章、第0章、任意正文起始章、番外、后记、中文大数、英文章号、多卷重置和卷章组合。目录与正文标题重复时先剔掉目录块；落表前校验章号连续、无重复和边界有效，其中特殊章独立编号，正文允许从任意首章开始。原文变化先拒绝；确认后用 `--rebuild`。重建时上一版 CSV 只作为 `_analysis_cache/chapter_index.previous.csv` 来源证据保留，用于局部失效判断；当前边界仍只认 `chapter_index.csv`。追加章节不使前面逐章 hash 失效；旧章映射会整体漂移或旧成果从序章、第0章、非第一章开头而无法确认身份时，停止并明确报告。
+只按 LF 计物理行。支持楔子、序章、第0章、任意正文起始章、番外、后记、中文大数、英文章号、多卷重置和卷章组合。目录与正文标题重复时先剔掉目录块；落表前校验章号连续、无重复和边界有效，其中特殊章独立编号，正文允许从任意首章开始。原文变化先拒绝；确认后用 `--rebuild`。追加章节不使前面逐章 hash 失效，只有新章进入待处理；改动已拆章节的原文只会让该批缓存重读，已有摘要不刷新（要刷新就删掉对应摘要再续跑）。旧章映射会整体漂移或旧成果从序章、第0章、非第一章开头而无法确认身份时，停止并明确报告。
 
 ## Stage 2：计划、提取、提交
 
@@ -91,29 +91,27 @@ chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locato
 "{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" plan --root "{拆文目录}" --intent continue
 ```
 
-用户明确增强改为 `--intent enhance`，明确重拆改为 `--intent reanalyze`。明确重拆的计划会返回 `request_id`；提交、拆分和同一次中断恢复都必须传回该 ID。同一 ID 已完成的块可复用，不传 ID 再次规划表示发起新的重拆请求。计划不落盘，批次 ID 固定为 `RAW-{起章}-{止章}` 或 `REUSE-{起章}-{止章}`。计划与提交都拒绝超过 10 章或 25,000 字符的非单章原文块；同一章不能出现在两个原文块。计划原文读取数为 0 时不得派发原文任务。
+用户明确增强改为 `--intent enhance`。计划不落盘，批次 ID 固定为 `RAW-{起章}-{止章}` 或 `REUSE-{起章}-{止章}`。计划与提交都拒绝超过 5 章或 25,000 字符的非单章原文块；同一章不能出现在两个原文块。计划原文读取数为 0 时不得派发原文任务。
 
 ### 两种互斥输入
 
 - `raw-original`：只按索引读取计划范围，一次产生紧凑逐章事实和跨章观察；
-- `existing-results`：只读 `source_files` 列出的摘要、黄金三章或章节卡，不得打开原文。完整旧项目增强只产批次观察；缺摘要时可以从已有事实生成紧凑章块。
+- `existing-results`：只读 `source_files` 列出的摘要或黄金三章，不得打开原文。完整旧项目增强只产批次观察；缺摘要时可以从已有事实生成紧凑章块。
 
-`chapter-extractor` 输出字段为：概要、因果、关键行动、局面结果、涉及人物、信息变化、状态变化、三维节奏、章尾钩子、证据、情节点类型、情节点标题、主题标签、基调。不得另做章节卡表或多套情节点。
+`chapter-extractor` 输出字段为：概要、因果、关键行动、局面结果、涉及人物、信息变化、状态变化、三维节奏、章尾钩子、证据，以及情节点列表（原文块每章 10–20 个、长章最多 30 个，格式见 output-templates）。不得另做章节卡表。
 
 提交：
 
 ```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" commit --root "{拆文目录}" --input "{临时结果.md}" --batch-id "RAW-4-10" --range-sha256 "{plan 输出值}" --source-file "{plan 来源}"
+"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" commit --root "{拆文目录}" --input "{临时结果.md}" --batch-id "RAW-4-8" --range-sha256 "{plan 输出值}" --source-file "{plan 来源}"
 ```
 
-明确重拆时同一命令另加 `--intent reanalyze --request-id "{plan request_id}"`；拆分和重规划也沿用这个 ID。
-
-提交脚本先完整校验，再按“缓存 → 缺失摘要 → `_progress.md`”写入。摘要投影固定主题、基调和情节点类型枚举，映射不上时主题/基调写“其他”；保留“关键事件”“情节点”“涉及”“基调”等旧消费者字段。任何已有摘要均不覆盖。
+提交脚本先完整校验（原文块每章情节点不足 10 或超过 30 即整批拒收），再按“缓存 → 缺失摘要 → `_progress.md`”写入。摘要投影逐个情节点固定主题、基调和类型枚举，映射不上时主题/基调写“其他”；保留“关键事件”“情节点”“涉及”“基调”等旧消费者字段。任何已有摘要均不覆盖，结果里的 `kept_existing_summary_chapters` 列出被保留的章。
 
 ### 拆分与恢复
 
 ```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" split --root "{拆文目录}" --batch-id "RAW-4-10"
+"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" split --root "{拆文目录}" --batch-id "RAW-4-8"
 "{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" repair-progress --root "{拆文目录}"
 ```
 
@@ -147,13 +145,7 @@ chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locato
 
 ## 状态、旧项目与最终回归
 
-运行状态只有 `_progress.md` 受管区；既有 `schema_version: 2` 原值保留；`chapter_index.csv` 是机械索引；缓存是恢复证据。不得创建运行计划、checkpoint、逐批 JSON receipt 或 Stage receipt。旧六脚本项目先运行：
-
-```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" migrate-legacy --root "{拆文目录}"
-```
-
-迁移不删除旧文件；只有可验证旧 receipt 和缓存才转为兼容证据，其他列为 `historical_unverified`。
+运行状态只有 `_progress.md` 受管区；既有 `schema_version: 2` 原值保留；`chapter_index.csv` 是机械索引；缓存是恢复证据。有阶段记录后，受管区的 `最终状态` 由脚本按六个阶段状态写出（全部完成为 `completed`，否则 `pending`；只做增强的旧项目沿用原值），会话 hooks 靠它判断拆文是否完成，不要手改。不得创建运行计划、checkpoint、逐批 JSON receipt 或 Stage receipt。
 
 最终必须回归：黄金三章、逐章摘要、情绪模块、节奏、角色、设定、文风、导入、对标和写作仍可用；旧完整项目直接使用；部分项目只补精确缺章；混存项目报告来源但不重拆；增强/恢复不改旧产物与原 schema。
 
