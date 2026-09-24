@@ -6,7 +6,7 @@
 
 1. `build_chapter_index.py`：建立机械章界和逐章原文 hash；
 2. `inspect_existing_assets.py`：只读识别旧成果、当前成果、缺章和修复阶段；
-3. `manage_analysis_run.py`：只读计划，并负责批次提交、拆分、恢复、阶段标记和旧状态迁移。
+3. `manage_analysis_run.py`：只读计划，并负责批次提交、拆分、恢复和阶段标记。
 
 `chapter_index.csv` 是机械章节边界唯一真源。批次和阶段状态只写在 `_progress.md` 的
 `story-long-analyze:runtime-state` 受管区。`_analysis_cache/` 保存完整结果和恢复证据，不承担状态库功能。
@@ -37,7 +37,7 @@
 
 ## 2. 需要原文时建立或校验索引
 
-完整旧成果默认直接使用和纯旧成果增强无需索引。全新、部分完成或明确重拆才运行：
+完整旧成果默认直接使用和纯旧成果增强无需索引。全新或部分完成才运行：
 
 ```text
 "{PYTHON}" "{story-long-analyze skill 根}/scripts/build_chapter_index.py" \
@@ -48,7 +48,7 @@
 
 脚本只按 LF 计算物理行号，支持楔子、序章、第0章、任意正文起始章、番外、后记、多卷和中文大数。CSV 保存内部连续号、来源章号、卷、标题、行界、字符数、`chapter_sha256`、全源 hash 和解析器版本。
 
-同源索引直接复用且不重写。原文变化时先非零退出；人工确认后加 `--rebuild`。重建会把上一版 CSV 原子保存为 `_analysis_cache/chapter_index.previous.csv`，供计划器判断实际变化章；它不是第二个状态表。追加新章时旧章 hash 保持稳定，输出仅列出新增或内容变化的 `pending_chapters`。会导致旧内部章号整体漂移，或旧摘要/深拆从序章、第0章、非第一章开始而身份无法确认时，返回 `chapter_mapping_ambiguous`，不得静默覆盖。
+同源索引直接复用且不重写。原文变化时先非零退出；人工确认后加 `--rebuild`。追加新章时旧章 hash 保持稳定，输出仅列出新增或内容变化的 `pending_chapters`。改动已拆章节的原文只会让覆盖它的批次缓存失效、下次计划重读该批；已有摘要不刷新——要刷新哪章就删掉哪章的 `章节/第N章_摘要.md` 再续跑。会导致旧内部章号整体漂移，或旧摘要/深拆从序章、第0章、非第一章开始而身份无法确认时，返回 `chapter_mapping_ambiguous`，不得静默覆盖。
 
 ## 3. 生成只读计划
 
@@ -60,13 +60,12 @@
 
 意图：
 
-- `continue`：补缺失/失效语义章；已有语义但缺摘要时用旧成果投影；
-- `enhance`：只读既有拆文成果形成 `REUSE-{起章}-{止章}` 批次，原文读取数必须为 0；
-- `reanalyze`：忽略旧语义成果，按索引规划全部 `RAW-{起章}-{止章}`，并返回本次 `request_id`。
+- `continue`：补缺失语义章，以及缓存失效的已记录批次；已有语义但缺摘要时用旧成果投影；
+- `enhance`：只读既有拆文成果形成 `REUSE-{起章}-{止章}` 批次，原文读取数必须为 0。
 
-计划只存在内存和标准输出，`state_written` 必须为 `false`。每块最多 10 章、25,000 字符；批次 ID 直接使用章节范围。`RAW` 只覆盖缺失或逐章原文 hash 已失效的章，`REUSE` 只读取计划列出的旧成果。黄金三章深拆属于已有语义成果，可以生成缺失摘要，无需再次读取前三章原文。
+没有“整本重拆”意图：已有摘要永不覆盖。整本重拆就换一个新目录重新拆。
 
-明确重拆时，后续 `commit`、`split` 和恢复用的 `plan` 都传 `--request-id "{首次 plan 输出值}"`。同一请求 ID 的 completed 批次可复用；省略 ID 再执行 reanalyze 会生成新 ID，表示一次新的重拆请求。
+计划只存在内存和标准输出，`state_written` 必须为 `false`。每块最多 5 章、25,000 字符；批次 ID 直接使用章节范围。`RAW` 只覆盖缺失章和缓存失效批次，`REUSE` 只读取计划列出的旧成果。黄金三章深拆属于已有语义成果，可以生成缺失摘要，无需再次读取前三章原文。
 
 ## 4. 执行与提交一个批次
 
@@ -76,21 +75,21 @@
 "{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" commit \
   --root "{拆文目录}" \
   --input "{临时结果.md}" \
-  --batch-id "RAW-4-10" \
+  --batch-id "RAW-4-8" \
   --range-sha256 "{plan 输出值}" \
   --source-file "{plan 列出的来源}"
 ```
 
 `REUSE` 批次不传 `--range-sha256`。完整增强可以只输出 `REUSED_CHAPTERS` 与跨章观察；需要补摘要时输出同一套紧凑章节块。
-明确重拆的提交另加 `--intent reanalyze --request-id "{plan request_id}"`。提交入口会再次检查 10 章与 25,000 字符上限；单个超长章仍允许独占。
+提交入口会再次检查 5 章与 25,000 字符上限；单个超长章仍允许独占。
 
 提交顺序固定：
 
-1. 在写文件前校验整批范围、标记和所有紧凑字段；
+1. 在写文件前校验整批范围、标记、所有紧凑字段和情节点（原文块每章 10–30 个，编号连续、每点带主题标签与基调行）；
 2. 对 `RAW` 再算当前范围 hash，与计划值不一致就拒绝；
 3. 原子写入含完整模型输出和最终结束标记的批次缓存；
-4. 只创建缺失的 `章节/第N章_摘要.md`，任何已有摘要都保留；
-5. 最后更新 `_progress.md` 受管批次表为 `completed`。
+4. 只创建缺失的 `章节/第N章_摘要.md`，任何已有摘要都保留，并在结果的 `kept_existing_summary_chapters` 里列出；
+5. 最后更新 `_progress.md` 受管批次表为 `completed`，并按阶段状态重写受管区的 `最终状态`。
 
 每条成功行记录章节范围、输入类型、原文范围 hash、状态和缓存路径。受管区外的 BOM、换行、作者备注及既有 `schema_version` 必须逐字节保留。
 
@@ -100,10 +99,10 @@
 
 ```text
 "{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" split \
-  --root "{拆文目录}" --batch-id "RAW-4-10"
+  --root "{拆文目录}" --batch-id "RAW-4-8"
 ```
 
-也可用 `--at 7` 指定左右边界。脚本在同一个 `_progress.md` 受管区把父块记为 `superseded`，写入两个相邻子块。重新运行 `plan` 后继续使用子块，不会按位置编号覆盖旧记录，也不会把子块重新合成父块。
+也可用 `--at 5` 指定左右边界。脚本在同一个 `_progress.md` 受管区把父块记为 `superseded`，写入两个相邻子块。重新运行 `plan` 后继续使用子块，不会按位置编号覆盖旧记录，也不会把子块重新合成父块。
 
 ## 6. 中断恢复
 
@@ -140,19 +139,11 @@ Stage 3–6 各运行一次。文件成功原子落盘后再标记：
 
 若旧报告存在，命令会完整复制到 `_analysis_cache/legacy/拆文报告.md`；已存在的首份备份不覆盖。当前旧报告与首份备份不同时，另存一份带内容 hash 的历史备份。其他旧产物与已有摘要不得覆盖。新报告落盘后再用不带 `--prepare` 的 `mark-stage` 标记完成。
 
-## 8. 旧六脚本项目迁移
-
-```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" migrate-legacy --root "{拆文目录}"
-```
-
-迁移只读取旧 checkpoint、receipt 和缓存；不会删除它们。只有旧 receipt 的输出 hash 能验证对应缓存完整时，才生成兼容缓存并在摘要齐全时写成功状态。旧缓存没有结束标记时不得直接补标记冒充完整；无法验证的项目列入 `historical_unverified`，按实际缺口继续计划。
-
-## 9. 最终检查
+## 8. 最终检查
 
 - 再运行检查器和计划器；完整项目应 `direct_use`，继续意图应无待处理批次；
 - 对比受保护路径 hash：旧 `章节/`、`剧情/`、`角色/`、`设定/`、`文风.md`、`拆文报告.md` 不得被增强或恢复流程改写；
 - 允许变化的旧项目文件只有 `_progress.md` 受管状态区和 `_analysis_cache/` 新证据；
 - 检查旧 `schema_version` 原值；
-- 检查新投影的主题、基调、情节点类型和“涉及”字段能被导入与写作流程读取；
+- 检查新投影的情节点序列、主题、基调、类型和“涉及”字段能被导入与写作流程读取；
 - 报告未执行的真实模型或跨平台检查，不得用静态 fixture 冒充。

@@ -104,7 +104,7 @@ def test_invalid_root_and_manage_entry() -> None:
         require(MANAGE.is_file(), "统一运行脚本 manage_analysis_run.py 必须存在")
         help_result = run(MANAGE, "--help")
         require(help_result.returncode == 0, help_result.stdout or help_result.stderr)
-        for command in ("plan", "commit", "split", "repair-progress", "mark-stage", "migrate-legacy"):
+        for command in ("plan", "commit", "split", "repair-progress", "mark-stage"):
             require(command in help_result.stdout, "统一运行脚本缺少命令：" + command)
 
 
@@ -157,7 +157,17 @@ def write_source_and_index(root: Path, count: int) -> Path:
     return source
 
 
-def compact_output(start: int, end: int, *, tone: str = "期待", theme: str = "陌生主题") -> str:
+def plot_points(chapter: int, count: int, *, tone: str, theme: str) -> str:
+    points = []
+    for number in range(1, count + 1):
+        points.append(
+            f"P{number} **节拍{number}**：类型动作 | 人物甲在第{chapter}章完成第{number}步。 | 涉及人物甲,人物乙 | 地点旧城\n\n"
+            f"主题标签{theme} | 基调：{tone}"
+        )
+    return "\n\n---\n\n".join(points)
+
+
+def compact_output(start: int, end: int, *, tone: str = "期待", theme: str = "陌生主题", points: int = 10) -> str:
     blocks = []
     for chapter in range(start, end + 1):
         blocks.append(
@@ -174,10 +184,9 @@ def compact_output(start: int, end: int, *, tone: str = "期待", theme: str = "
 **三维节奏**：事件3/5｜情绪3/5｜篇幅2/3。
 **章尾钩子**：代价将在下一章出现。
 **证据**：原文定位词“正文{chapter}”。
-**情节点类型**：动作
-**情节点标题**：取得入口
-**主题标签**：{theme}
-**基调**：{tone}
+**情节点**：
+
+{plot_points(chapter, points, tone=tone, theme=theme)}
 <!-- CHAPTER_END:{chapter} -->"""
         )
     return "\n\n".join(blocks) + """
@@ -289,7 +298,9 @@ def test_plan_commit_repair_and_state_preservation() -> None:
         require(progress.read_bytes().startswith(prefix), "受管状态外的 BOM、换行和 schema 必须逐字节保留")
         summary = (root / "章节" / "第1章_摘要.md").read_text(encoding="utf-8")
         require("主题标签其他 | 基调：其他" in summary, "未知主题和情绪必须投影到其他")
-        require("类型行动" in summary and "涉及人物甲、人物乙" in summary, "情节点类型与涉及人物必须兼容旧消费者")
+        require("P1 **节拍1**：类型行动 | " in summary and "P10 **节拍10**" in summary and "地点旧城" in summary,
+                "多情节点必须逐条投影，类型映射到枚举并保留地点等字段")
+        require("**涉及**：人物甲、人物乙" in summary, "章级涉及人物必须兼容旧消费者")
         after_commit = progress.read_bytes()
         require(json.loads(run(MANAGE, "plan", "--root", root).stdout)["batches"] == [], "成功批次不得重复规划")
         require(progress.read_bytes() == after_commit, "重跑计划仍必须只读")
@@ -306,7 +317,20 @@ def test_plan_commit_repair_and_state_preservation() -> None:
         stale_repair = run(MANAGE, "repair-progress", "--root", root, "--batch-id", "RAW-1-2")
         require(stale_repair.returncode != 0 and json.loads(stale_repair.stdout)["errors"][0]["error"] == "range_hash_mismatch", "旧输入缓存不能修复新原文进度")
         changed_plan = json.loads(run(MANAGE, "plan", "--root", root).stdout)
-        require([batch["batch_id"] for batch in changed_plan["batches"]] == ["RAW-2-2"], "局部原文变化只重做对应章")
+        require([batch["batch_id"] for batch in changed_plan["batches"]] == ["RAW-1-2"], "原文变化使整批缓存失效并重读该批")
+        summary_before = (root / "章节" / "第2章_摘要.md").read_bytes()
+        recommitted = json.loads(run(MANAGE, "commit", "--root", root, "--input", model, "--batch-id", "RAW-1-2",
+                                     "--range-sha256", changed_plan["batches"][0]["range_sha256"]).stdout)
+        require(recommitted["kept_existing_summary_chapters"] == [1, 2]
+                and (root / "章节" / "第2章_摘要.md").read_bytes() == summary_before,
+                "已有摘要一律不覆盖，并在提交结果中列出")
+        (root / "章节" / "第2章_摘要.md").unlink()
+        refresh_plan = json.loads(run(MANAGE, "plan", "--root", root).stdout)
+        require(refresh_plan["batches"] == [] and refresh_plan["recoverable_caches"][0]["missing_summary_chapters"] == [2],
+                "删掉摘要后应从本批新缓存补回，不再重读原文")
+        require(run(MANAGE, "repair-progress", "--root", root).returncode == 0
+                and (root / "章节" / "第2章_摘要.md").read_bytes() != summary_before,
+                "补回的摘要必须来自变化后的原文")
 
         interrupted = Path(temporary) / "中断"
         write_source_and_index(interrupted, 2)
@@ -370,14 +394,14 @@ def test_plan_commit_repair_and_state_preservation() -> None:
 def test_split_survives_replanning() -> None:
     with tempfile.TemporaryDirectory(prefix="long-split-refactor-") as temporary:
         root = Path(temporary)
-        write_source_and_index(root, 12)
+        write_source_and_index(root, 7)
         first = json.loads(run(MANAGE, "plan", "--root", root).stdout)
-        require(first["batches"][0]["batch_id"] == "RAW-1-10", "恰好10章必须合法成块")
-        split = run(MANAGE, "split", "--root", root, "--batch-id", "RAW-1-10", "--at", 5)
-        require(split.returncode == 0 and json.loads(split.stdout)["children"] == ["RAW-1-5", "RAW-6-10"], split.stdout)
+        require(first["batches"][0]["batch_id"] == "RAW-1-5", "恰好5章必须合法成块")
+        split = run(MANAGE, "split", "--root", root, "--batch-id", "RAW-1-5", "--at", 2)
+        require(split.returncode == 0 and json.loads(split.stdout)["children"] == ["RAW-1-2", "RAW-3-5"], split.stdout)
         second = json.loads(run(MANAGE, "plan", "--root", root).stdout)
         ids = [batch["batch_id"] for batch in second["batches"]]
-        require("RAW-1-5" in ids and "RAW-6-10" in ids and "RAW-1-10" not in ids, "拆分必须相邻且重规划不能合回父块")
+        require("RAW-1-2" in ids and "RAW-3-5" in ids and "RAW-1-5" not in ids, "拆分必须相邻且重规划不能合回父块")
 
 
 def test_panlong_acceptance_samples() -> None:
@@ -417,6 +441,8 @@ def test_panlong_acceptance_samples() -> None:
         require(protected_snapshot(complete) == before, "旧项目增强只能新增缓存并修改进度状态区")
         progress_after = (complete / "_progress.md").read_text(encoding="utf-8-sig")
         require("schema_version: 2" in progress_before and "schema_version: 2" in progress_after, "旧 schema 值不能改变")
+        require(progress_after.count("最终状态") == progress_before.count("最终状态"),
+                "只做增强的旧项目不能多出第二个最终状态")
         require(json.loads(run(INSPECT, "--root", complete).stdout)["recommended_path"] == "direct_use", "增强后仍须 direct_use")
         require(json.loads(run(MANAGE, "plan", "--root", complete, "--intent", "enhance").stdout)["batches"] == [], "已提交增强批次不能重复执行")
 
@@ -490,56 +516,8 @@ def test_panlong_acceptance_samples() -> None:
         append_plan = json.loads(run(MANAGE, "plan", "--root", mixed).stdout)
         require([batch["batch_id"] for batch in append_plan["batches"]] == ["RAW-24-24"], "追加后只处理新章")
 
-        reanalyze = area / "明确重拆"
-        shutil.copytree(source_demo, reanalyze)
-        require(run(INDEX, "--source", reanalyze / "原文" / "原文.txt", "--output", reanalyze / "chapter_index.csv", "--locator-path", "原文/原文.txt").returncode == 0, "重拆索引失败")
-        reanalyze_plan = json.loads(run(MANAGE, "plan", "--root", reanalyze, "--intent", "reanalyze").stdout)
-        require(sum(batch["chapter_range"][1] - batch["chapter_range"][0] + 1 for batch in reanalyze_plan["batches"]) == 23, "明确重拆必须覆盖全部章")
-        require(all(batch["input_kind"] == "raw-original" for batch in reanalyze_plan["batches"]), "明确重拆不能复用旧语义")
 
-
-def test_six_script_migration_is_read_only() -> None:
-    with tempfile.TemporaryDirectory(prefix="long-migrate-refactor-") as temporary:
-        root = Path(temporary)
-        for chapter in (1, 2):
-            path = root / "章节" / f"第{chapter}章_摘要.md"
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(f"旧摘要{chapter}", encoding="utf-8")
-        progress = root / "_progress.md"
-        progress.write_text(
-            "# 旧六脚本进度\n- schema_version: 2\n"
-            "<!-- story-long-analyze:batch:B001:start -->\n"
-            "- chapters: 1-2\n- input_kind: raw-original\n- status: success\n"
-            "<!-- story-long-analyze:batch:B001:end -->\n",
-            encoding="utf-8",
-        )
-        old_cache = root / "_analysis_cache" / "批次-1-2.md"
-        old_cache.parent.mkdir(parents=True, exist_ok=True)
-        old_cache.write_text("# 旧缓存\n<!-- BATCH_OBSERVATIONS_END -->\n", encoding="utf-8")
-        receipt = {
-            "status": "success", "chapter_range": [1, 2], "input_kind": "raw-original",
-            "source_sha256": "a" * 64,
-            "outputs": {"_analysis_cache/批次-1-2.md": hashlib.sha256(old_cache.read_bytes()).hexdigest()},
-        }
-        receipt_path = root / "_analysis_cache" / "receipts" / "B001.json"
-        receipt_path.parent.mkdir(parents=True, exist_ok=True)
-        receipt_path.write_text(json.dumps(receipt, ensure_ascii=False), encoding="utf-8")
-        legacy_before = {path.relative_to(root).as_posix(): path.read_bytes() for path in root.rglob("*") if path.is_file()}
-        migrated = run(MANAGE, "migrate-legacy", "--root", root)
-        payload = json.loads(migrated.stdout)
-        require(migrated.returncode == 0 and [item["batch_id"] for item in payload["migrated"]] == ["RAW-1-2"], migrated.stdout)
-        compat = root / "_analysis_cache" / "迁移-RAW-1-2.md"
-        require(compat.read_text(encoding="utf-8").rstrip().endswith("<!-- story-long-analyze:cache:end -->"), "迁移缓存必须有新的完整结束标记")
-        for relative, data in legacy_before.items():
-            if relative == "_progress.md":
-                continue
-            require((root / relative).read_bytes() == data, "迁移不能修改或删除旧文件：" + relative)
-        require("schema_version: 2" in progress.read_text(encoding="utf-8-sig"), "迁移不能改旧 schema")
-        second = run(MANAGE, "migrate-legacy", "--root", root)
-        require(second.returncode == 0 and compat.is_file(), "迁移必须幂等")
-
-
-def test_audit_recovery_and_request_regressions() -> None:
+def test_audit_recovery_regressions() -> None:
     with tempfile.TemporaryDirectory(prefix="long-audit-recovery-") as temporary:
         area = Path(temporary)
         root = area / "截断缓存"
@@ -580,35 +558,31 @@ def test_audit_recovery_and_request_regressions() -> None:
                 and "| RAW-1-2 | 1-2 | raw-original |" in (state_only / "_progress.md").read_text(encoding="utf-8-sig"),
                 "repair-progress 必须能从完整缓存恢复单一状态表")
 
-        reanalyze = json.loads(run(MANAGE, "plan", "--root", root, "--intent", "reanalyze").stdout)
-        request_id = reanalyze["request_id"]
-        require(request_id and [batch["batch_id"] for batch in reanalyze["batches"]] == ["RAW-1-2"],
-                "首次明确重拆不能被旧 completed 跳过")
-        rerun = run(MANAGE, "commit", "--root", root, "--input", model,
-                    "--batch-id", "RAW-1-2", "--range-sha256", reanalyze["batches"][0]["range_sha256"],
-                    "--intent", "reanalyze", "--request-id", request_id)
-        require(rerun.returncode == 0, rerun.stdout or rerun.stderr)
-        resumed = json.loads(run(MANAGE, "plan", "--root", root, "--intent", "reanalyze",
-                                 "--request-id", request_id).stdout)
-        require(resumed["batches"] == [], "同一重拆请求恢复时不得重复已完成批次")
-        next_request = json.loads(run(MANAGE, "plan", "--root", root, "--intent", "reanalyze").stdout)
-        require(next_request["request_id"] != request_id and next_request["batches"],
-                "新的明确重拆请求必须有新请求 ID 并重新执行")
-
         oversized = area / "超限提交"
-        write_source_and_index(oversized, 11)
+        write_source_and_index(oversized, 6)
         oversized_model = area / "oversized.md"
-        oversized_model.write_text(compact_output(1, 11), encoding="utf-8")
+        oversized_model.write_text(compact_output(1, 6), encoding="utf-8")
         index_rows = rows(oversized / "chapter_index.csv")
         payload = "range-v1\n" + "".join(f"{row['chapter']}:{row['chapter_sha256']}\n" for row in index_rows)
         range_hash = hashlib.sha256(payload.encode("ascii")).hexdigest()
         refused = run(MANAGE, "commit", "--root", oversized, "--input", oversized_model,
-                      "--batch-id", "RAW-1-11", "--range-sha256", range_hash)
+                      "--batch-id", "RAW-1-6", "--range-sha256", range_hash)
         require(refused.returncode != 0 and json.loads(refused.stdout)["error"] == "batch_too_large",
-                "提交入口必须拒绝超过10章的手工批次")
+                "提交入口必须拒绝超过5章的手工批次")
+
+        sparse = area / "情节点不足"
+        write_source_and_index(sparse, 1)
+        sparse_plan = json.loads(run(MANAGE, "plan", "--root", sparse).stdout)
+        sparse_model = area / "sparse.md"
+        sparse_model.write_text(compact_output(1, 1, points=1), encoding="utf-8")
+        sparse_commit = run(MANAGE, "commit", "--root", sparse, "--input", sparse_model, "--batch-id", "RAW-1-1",
+                            "--range-sha256", sparse_plan["batches"][0]["range_sha256"])
+        require(sparse_commit.returncode != 0 and json.loads(sparse_commit.stdout)["error"] == "plot_point_count"
+                and not (sparse / "章节" / "第1章_摘要.md").exists(),
+                "原文批次每章少于10个情节点必须整批拒收且不落盘")
 
 
-def test_audit_stage_compact_and_mapping_regressions() -> None:
+def test_audit_stage_and_mapping_regressions() -> None:
     with tempfile.TemporaryDirectory(prefix="long-audit-stage-") as temporary:
         area = Path(temporary)
         root = area / "阶段缺口"
@@ -646,29 +620,14 @@ def test_audit_stage_compact_and_mapping_regressions() -> None:
         require(complete["classification"] == "current_complete"
                 and complete["recommended_path"] == "direct_use",
                 "受管 Stage 1-6 全部完成时必须识别为 current_complete/direct_use")
-
-        compact = area / "精简成果"
-        (compact / "v2" / "章节卡").mkdir(parents=True)
-        (compact / "v2" / "章节卡" / "批次1.md").write_text(
-            "| 1 | 第一章 | 事实一 |\n| 2 | 第二章 | 事实二 |\n", encoding="utf-8")
-        (compact / "v2" / "_progress.md").write_text(
-            "# 进度\n- 总章数：2\n- 最终状态：completed\n", encoding="utf-8")
-        (compact / "v2" / "全局建模.md").write_text("有效全局建模", encoding="utf-8")
-        inspected = run(INSPECT, "--root", compact)
-        payload = json.loads(inspected.stdout)
-        require(inspected.returncode == 0 and payload["classification"] == "legacy_complete",
-                "完整精简成果必须可检查，不能触发 NameError")
-
-        compact_mixed = area / "精简与标准成果混存"
-        shutil.copytree(compact, compact_mixed)
-        standard = compact_mixed / "章节" / "第1章_摘要.md"
-        standard.parent.mkdir(parents=True)
-        standard.write_text("标准摘要事实", encoding="utf-8")
-        mixed_inspected = run(INSPECT, "--root", compact_mixed)
-        mixed_payload = json.loads(mixed_inspected.stdout)
-        require(mixed_inspected.returncode == 0 and mixed_payload["classification"] == "legacy_complete"
-                and mixed_payload["mixed_sources"],
-                "精简成果与标准摘要混存时必须可检查并报告来源混存")
+        require("- 最终状态：completed" in (root / "_progress.md").read_text(encoding="utf-8-sig"),
+                "六个阶段完成后必须写出 hooks 识别的最终状态")
+        hook_lib = ROOT / "skills" / "story-setup" / "references" / "templates" / "hooks" / "lib" / "common.sh"
+        if shutil.which("bash"):
+            probe = subprocess.run(["bash", "-c", 'source "$1" && analysis_incomplete "$2"', "_",
+                                    hook_lib.as_posix(), (root / "_progress.md").as_posix()],
+                                   capture_output=True, text=True, check=False)
+            require(probe.returncode == 1, "hooks 必须把拆完的书判为已完成：" + probe.stderr)
 
         prologue = area / "序章旧项目"
         (prologue / "原文").mkdir(parents=True)
@@ -684,104 +643,20 @@ def test_audit_stage_compact_and_mapping_regressions() -> None:
                 and not (prologue / "chapter_index.csv").exists(),
                 "序章导致旧摘要身份漂移时必须在写索引前明确停止")
 
-
-def test_audit_legacy_source_change_regression() -> None:
-    source_demo = ROOT / "demo" / "拆文库" / "盘龙"
-    if not (source_demo / "原文" / "原文.txt").is_file():
-        print("SKIP: test_audit_legacy_source_change_regression (panlong raw text absent by copyright policy)")
-        return
-    with tempfile.TemporaryDirectory(prefix="long-audit-source-change-") as temporary:
-        root = Path(temporary) / "盘龙"
-        shutil.copytree(source_demo, root)
-        require(run(INDEX, "--source", root / "原文" / "原文.txt", "--output", root / "chapter_index.csv",
-                    "--locator-path", "原文/原文.txt").returncode == 0, "旧项目首次索引失败")
-        indexed = rows(root / "chapter_index.csv")
-        source = root / "原文" / "原文.txt"
-        source_lines = source.read_text(encoding="utf-8-sig").split("\n")
-        source_lines[int(indexed[6]["start_line"])] += "第七章输入已经变化。"
-        source.write_text("\n".join(source_lines), encoding="utf-8")
-        rebuilt = run(INDEX, "--source", source, "--output", root / "chapter_index.csv",
-                      "--locator-path", "原文/原文.txt", "--rebuild")
-        require(rebuilt.returncode == 0 and json.loads(rebuilt.stdout)["pending_chapters"] == [7],
-                "旧项目局部变化必须由索引精确定位")
-        changed_plan = json.loads(run(MANAGE, "plan", "--root", root).stdout)
-        require([batch["batch_id"] for batch in changed_plan["batches"]] == ["RAW-7-7"],
-                "旧摘要不能掩盖已知的第7章原文变化")
-        old_summary = (root / "章节" / "第7章_摘要.md").read_bytes()
-        model = Path(temporary) / "chapter7.md"
-        model.write_text(compact_output(7, 7), encoding="utf-8")
-        committed = run(MANAGE, "commit", "--root", root, "--input", model,
-                        "--batch-id", "RAW-7-7", "--range-sha256", changed_plan["batches"][0]["range_sha256"])
-        require(committed.returncode == 0 and (root / "章节" / "第7章_摘要.md").read_bytes() == old_summary,
-                "原文变化分析必须保留用户已有摘要")
-        after = json.loads(run(MANAGE, "plan", "--root", root).stdout)
-        require(after["batches"] == [] and {"stage3", "stage4", "stage5", "stage6"}.issubset(after["required_stages"]),
-                "当前 RAW 完成后应停止重复提取，并保留下游阶段 pending")
-
-
-def test_local_rebuild_preserves_unchanged_batch_chapters() -> None:
-    with tempfile.TemporaryDirectory(prefix="long-local-rebuild-") as temporary:
-        root = Path(temporary) / "原批次"
-        source = write_source_and_index(root, 3)
-        model = Path(temporary) / "model.md"
-
-        def plan() -> dict:
-            result = run(MANAGE, "plan", "--root", root)
-            require(result.returncode == 0, result.stdout or result.stderr)
-            return json.loads(result.stdout)
-
-        def commit(batch: dict) -> None:
-            start, end = batch["chapter_range"]
-            model.write_text(compact_output(start, end), encoding="utf-8")
-            result = run(MANAGE, "commit", "--root", root, "--input", model,
-                         "--batch-id", batch["batch_id"], "--range-sha256", batch["range_sha256"])
-            require(result.returncode == 0, result.stdout or result.stderr)
-
-        def change_chapter(chapter: int) -> None:
-            source.write_text(source.read_text(encoding="utf-8").replace(
-                f"正文{chapter}。", f"正文{chapter}已改变。"), encoding="utf-8")
-            rebuilt = run(INDEX, "--source", source, "--output", root / "chapter_index.csv",
-                          "--locator-path", "原文/原文.txt", "--rebuild")
-            require(rebuilt.returncode == 0, rebuilt.stdout or rebuilt.stderr)
-
-        commit(plan()["batches"][0])
-        original_summaries = protected_snapshot(root)
-        parent_cache = root / "_analysis_cache" / "批次-RAW-1-3.md"
-        parent_bytes = parent_cache.read_bytes()
-
-        change_chapter(2)
-        changed = plan()
-        require([batch["batch_id"] for batch in changed["batches"]] == ["RAW-2-2"],
-                "局部变化只应分析第2章")
-        commit(changed["batches"][0])
-        progress_before = (root / "_progress.md").read_bytes()
-        for _ in range(2):
-            after = plan()
-            require(after["batches"] == [] and after["read_counts"]["raw_chapters"] == 0,
-                    "变化章补完后不能把旧父批次的未变化章重新规划：" + json.dumps(after, ensure_ascii=False))
-        require((root / "_progress.md").read_bytes() == progress_before, "重规划必须仍然只读")
-
-        # A second rebuild moves the parent's matching index into legacy evidence.
-        change_chapter(3)
-        next_plan = plan()
-        require([batch["batch_id"] for batch in next_plan["batches"]] == ["RAW-3-3"],
-                "连续重建仍须保留第1章完成资格，且不能重做刚补完的第2章")
-        commit(next_plan["batches"][0])
-        require(plan()["batches"] == [], "第二次局部补完后也不应留下原文任务")
-        require(protected_snapshot(root) == original_summaries and parent_cache.read_bytes() == parent_bytes,
-                "局部恢复不得改写已有摘要或旧父批次缓存")
-
-        # Historical index evidence cannot excuse a missing or truncated cache.
-        for broken in (None, parent_bytes[:len(parent_bytes) // 2]):
-            if broken is None:
-                parent_cache.unlink()
-            else:
-                parent_cache.write_bytes(broken)
-            retry = plan()
-            require([batch["batch_id"] for batch in retry["batches"]] == ["RAW-1-1"],
-                    "旧缓存缺失或截断时，未被新有效缓存覆盖的第1章仍须恢复")
-        parent_cache.write_bytes(parent_bytes)
-        require(plan()["batches"] == [], "完整旧缓存恢复后应再次复用未变化章")
+        fresh_prologue = area / "序章新书"
+        (fresh_prologue / "原文").mkdir(parents=True)
+        (fresh_prologue / "原文" / "原文.txt").write_text(
+            "序章 引子\n序章事实。\n第1章 起\n正文1。\n第2章 承\n正文2。\n第3章 合\n正文3。\n", encoding="utf-8")
+        require(run(INDEX, "--source", fresh_prologue / "原文" / "原文.txt", "--output", fresh_prologue / "chapter_index.csv",
+                    "--locator-path", "原文/原文.txt").returncode == 0, "序章新书索引失败")
+        for chapter in (1, 2, 3):
+            path = fresh_prologue / "章节" / f"第{chapter}章_深度拆解.md"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("本次 Stage 1 按索引写的黄金章", encoding="utf-8")
+        fresh_plan = run(MANAGE, "plan", "--root", fresh_prologue)
+        require(fresh_plan.returncode == 0 and [b["batch_id"] for b in json.loads(fresh_plan.stdout)["batches"]]
+                == ["REUSE-1-3", "RAW-4-4"],
+                "序章开头的新书写完黄金三章后不能被身份守卫卡死：" + fresh_plan.stdout)
 
 
 def main() -> int:
@@ -792,11 +667,8 @@ def main() -> int:
     test_plan_commit_repair_and_state_preservation()
     test_split_survives_replanning()
     test_panlong_acceptance_samples()
-    test_six_script_migration_is_read_only()
-    test_audit_recovery_and_request_regressions()
-    test_audit_stage_compact_and_mapping_regressions()
-    test_audit_legacy_source_change_regression()
-    test_local_rebuild_preserves_unchanged_batch_chapters()
+    test_audit_recovery_regressions()
+    test_audit_stage_and_mapping_regressions()
     print("OK: single-state long-analyze runtime regressions passed")
     return 0
 
