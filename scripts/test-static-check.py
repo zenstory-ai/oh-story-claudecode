@@ -481,7 +481,7 @@ def test_author_report_templates_reject_engineering_jargon() -> None:
             root / "skills/demo/SKILL.md",
             "---\nname: demo\ndescription: Demo skill\n---\n# Demo\n\n"
             "内部动作：作者选 1 → `accept-current-length`，S3 另记；块外术语不受限。\n\n"
-            "```author-report\n"
+            "<!-- author-report -->\n```md\n"
             "第{N}章写好了，伏笔 F057（那封信的去处）已经收回。\n"
             "1. 就按现在的长度收下（推荐）\n"
             "下一步：运行 `/story-setup` 后再说「接着写」。\n"
@@ -492,7 +492,7 @@ def test_author_report_templates_reject_engineering_jargon() -> None:
         assert clean.returncode == 0, clean.stdout + clean.stderr
 
         leaked = (
-            "```author-report\n"
+            "<!-- author-report -->\n```md\n"
             "选项：accept-current-length / discard\n"
             "口径 visible_chars_v1，内带 ±12%，一致性 S3×3，伏笔 F057 待定\n"
             "运行 storyctl.py --chapter 3，state_revision 已更新\n"

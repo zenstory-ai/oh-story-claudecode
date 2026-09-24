@@ -35,6 +35,12 @@ Related: [2026-09-23-long-analyze-runtime-takeover](../simplification/2026-09-23
 5. **Stage 6 可单独重建**：优先 `_style-sample.txt`，缺样本按索引定点读 4–6 段原文，
    不重扫全书；生成新报告前逐字节备份旧报告到 `_analysis_cache/legacy/`。
 
+6. **批次提交格式写在 skill 自己的 reference 里**：`output-templates.md`「批次提交格式」给出
+   `CHAPTER_START/END`、`REUSED_CHAPTERS`、`BATCH_OBSERVATIONS_START/END` 的包裹规则；原先只写在
+   chapter-extractor 模板里，子代理不可用时主线程看不到，v0.7.11 发版前 solo 实测续拆旧库时
+   提交被拒 3 次、靠读脚本源码才补齐标记。批次输入文件固定为 `{拆文目录}/_analysis_cache/输入-{批次ID}.md`，
+   不写系统 `/tmp`。
+
 ## Review
 
 署名审核意见（PR #386 评审轮）：

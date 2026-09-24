@@ -72,9 +72,8 @@ EXTERNAL_URL_RE = re.compile(
 )
 # 花括号枚举（含逗号）是「逐个点名」，可以展开成具体路径；`{题材}` 这种单占位符不是枚举。
 BRACE_LIST_RE = re.compile(r"\{([^{}/]*,[^{}/]*)\}")
-# 面向作者的汇报模板：信息串为 author-report 的围栏块是直接说给作者听的话，
+# 面向作者的汇报模板：紧跟 <!-- author-report --> 标记行的围栏块是直接说给作者听的话，
 # 不得出现脚本/字段/参数名、状态码或内部清单名（SKILL.md「面向作者的汇报」）。
-AUTHOR_REPORT_INFO = "author-report"
 
 
 def _load_author_report_rules():
@@ -300,23 +299,12 @@ def parse_document(path: Path) -> Document:
 
 
 def author_report_blocks(path: Path) -> list[tuple[int, list[tuple[int, str]]]]:
-    """Return (opening line, [(line, text), ...]) for each author-report fence."""
-    blocks: list[tuple[int, list[tuple[int, str]]]] = []
-    current: list[tuple[int, str]] | None = None
-    fence = ""
-    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-        if current is None:
-            opening = OPEN_FENCE_RE.match(line)
-            if opening and opening.group(2).strip().split(" ")[0] == AUTHOR_REPORT_INFO:
-                fence = opening.group(1)
-                current = []
-                blocks.append((line_number, current))
-            continue
-        if re.fullmatch(r"[ ]{0,3}" + re.escape(fence[0]) + "{" + str(len(fence)) + r",}[ \t]*", line):
-            current = None
-            continue
-        current.append((line_number, line))
-    return blocks
+    """Return (opening line, [(line, text), ...]) for each fence marked by <!-- author-report -->."""
+    text = path.read_text(encoding="utf-8")
+    return [
+        (first - 1, [(first + k, line) for k, line in enumerate(body)])
+        for first, body in AUTHOR_REPORT_RULES.author_blocks(text)
+    ]
 
 
 def author_report_issues(path: Path) -> list[Issue]:

@@ -407,7 +407,7 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
    > 项目 `追踪/` 里已有不属于当前协议的早期文件时不必手工清理：`init` 会先把它们按原样整体移入 `追踪/_旧追踪存档/`，再在原地建当前协议。旧内容保留供作者查阅，不参与解析，当前状态完全由本次导入输入决定；校验失败的 `init` 不移动任何文件。
 
    ```text
-   {PYTHON} {story-import skill 根}/scripts/tracking_commit.py init --project {项目根} --input {初始化事务.json}
+   {PYTHON} {story-import skill 根}/scripts/tracking_commit.py init --project {项目根} --input {项目根}/.story/work/init.json
    {PYTHON} {story-import skill 根}/scripts/tracking_commit.py check --project {项目根}
    ```
 
@@ -514,7 +514,8 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 
 **长篇**：
 
-```author-report
+<!-- author-report -->
+```md
 === 《{导入书名}》导入完成 ===
 导进来了：第 1–{N} 章，约 {Y} 万字{；第 {N+1} 章只写了一半，按你的决定{接着残章写 | 先补完}}。项目在 `{项目目录}`。
 
@@ -537,7 +538,8 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 
 **短篇**：
 
-```author-report
+<!-- author-report -->
+```md
 === 《{短篇标题}》导入完成 ===
 导进来了：全文约 {Y} 字，分成 {N} 个小节。项目在 `{项目目录}`。
 

@@ -28,6 +28,9 @@ workflow-chapter 要求 writer「先写前组临时 segment」、`build_writer_p
    `.story/work/第NNN章/`，再在为空时顺带删掉 `.story/work`、`.story`（`.story/作者记忆/` 存在时
    不动），返回 `work_dir_removed`。提交被拒（带外、blocking、事务无效）时目录原样保留供重跑。
    清理失败只在返回里附 `work_dir_cleanup_error`，不把已落盘的提交报成失败。
+3a. 事务命令示例不留抽象占位：tracking-transaction（三份副本）与 story-import 的 `--input` 直接写成
+   `{书项目根}/.story/work/init.json`、`{书项目根}/.story/work/第{NNN}章/tracking.json`。发版前实测开书
+   首次初始化时，模型照 `{初始化事务.json}` 占位把事务写到了 `/tmp/claude-story-init/init.json`。
 4. 文档把「提交成功后清理」从步骤 13 挪到步骤 12；作者选「这章不要了」时删正文与工作目录。
 5. 回归：`test-chapter-completion-lifecycle.py` 覆盖「被拒保留 → 成功删除 → 作者记忆不受影响 →
    正文目录只剩一章」；`test-writer-pipeline.py` 覆盖 `--out` 无值留档与执行安排里的路径。

@@ -83,7 +83,8 @@ word_count = 全文字数
 
 问作者时不提文件名、字段名和 Stage 编号：
 
-```author-report
+<!-- author-report -->
+```md
 《{书名}》之前拆过，{拆到一半，停在"{当前阶段的白话名，如反转与写作手法}" | 已经拆完}。怎么处理？
 1. 接着上次往下拆（推荐，已拆的部分保留）
 2. 旧结果存档，从头重拆
@@ -211,7 +212,8 @@ Stage 6 内容写完后，**不**立刻 append `6` 到 `stages_completed[]`。�
 「拆文报告 AI 腔自检」「structure_counts 数值校验」和「BLOCK 项扫描」全通过 → 清空 `_meta.json.last_stage_in_progress`，append `6` 到
 `stages_completed[]`，按下方格式告诉作者：
 
-```author-report
+<!-- author-report -->
+```md
 《{书名}》拆完了，结果在 `拆文库/{书名}/`。
 - 这篇靠什么抓人：{一句话故事核}
 - 最值得学的 3 点：{白话，各附一句原文或情节例子}

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """守卫：给作者看的报告模板里不许出现工程黑话。
 
-只检查用 ```author-report 围栏标出的模板块（其余 skill 指令不管，避免误报）：
+只检查紧跟在 <!-- author-report --> 标记行后面的围栏块（其余 skill 指令不管，避免误报）。
+围栏本身用普通的 ```md：信息串写成 author-report 时模型会把围栏原样回给作者，所以旧写法直接报错。
+检查内容：
 - 已知内部字段/状态名、reviewer 名、严重度代号、Gate 字母、PASS/FAIL；
 - 脚本/配置文件名（.py/.js/.sh/.json/...）、命令行 flag、snake_case 与 kebab-case 标识符
   （/story-xxx、$story-xxx 这类作者要敲的命令除外）；
@@ -23,8 +25,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# 作者记忆回执不在此列：整条回复就是模板两行，写成围栏块时模型会把围栏原样回给作者（实测 2/2），
+# 所以 author-memory.md 用行内示例描述回执。
 REQUIRED = (
-    "skills/story/references/author-memory.md",
     "skills/story-import/SKILL.md",
     "skills/story-review/SKILL.md",
     "skills/story-deslop/SKILL.md",
@@ -67,18 +70,24 @@ LABELED_ID = re.compile(
 )
 
 FENCE_OPEN = re.compile(r"^(\s*)(`{3,}|~{3,})\s*([^\s`]*)")
+MARKER = "<!-- author-report -->"
+LEGACY_INFO = "author-report"
 
 
 def author_blocks(text: str):
     """产出 (起始行号, 块内行列表)。"""
     lines = text.splitlines()
     i = 0
+    previous = ""
     while i < len(lines):
         m = FENCE_OPEN.match(lines[i])
         if not m:
+            if lines[i].strip():
+                previous = lines[i].strip()
             i += 1
             continue
-        fence, info = m.group(2), m.group(3)
+        fence = m.group(2)
+        marked = previous == MARKER
         start = i
         i += 1
         body = []
@@ -86,8 +95,17 @@ def author_blocks(text: str):
             body.append(lines[i])
             i += 1
         i += 1
-        if info == "author-report":
+        previous = ""
+        if marked:
             yield start + 2, body
+
+
+def legacy_fences(text: str) -> list[int]:
+    """信息串写成 author-report 的旧围栏（行号从 1 起）。"""
+    return [
+        k + 1 for k, line in enumerate(text.splitlines())
+        if (m := FENCE_OPEN.match(line)) and m.group(3) == LEGACY_INFO
+    ]
 
 
 def check_block(body: list[str]) -> list[tuple[int, str]]:
@@ -130,9 +148,11 @@ def run() -> int:
             marked.add(rel)
         for lineno, msg in check_text(text):
             failures.append(f"{rel}:{lineno}: {msg}")
+        for lineno in legacy_fences(text):
+            failures.append(f"{rel}:{lineno}: 围栏信息串不能写 author-report（模型会原样回给作者），改成上一行 {MARKER}、围栏用 ```md")
     for rel in REQUIRED:
         if rel not in marked:
-            failures.append(f"{rel}: 缺少 ```author-report 报告模板块")
+            failures.append(f"{rel}: 缺少 {MARKER} 标记的报告模板块")
     if failures:
         print("作者报告模板含工程黑话：")
         for f in failures:
@@ -168,26 +188,33 @@ def self_test() -> int:
     ]
     ok = True
     for line in bad:
-        text = f"```author-report\n{line}\n结尾\n```\n"
+        text = f"{MARKER}\n```md\n{line}\n结尾\n```\n"
         if not check_text(text):
             print(f"self-test: 未拦截 {line!r}")
             ok = False
     for line in good:
-        text = f"```author-report\n{line}\n```\n"
+        text = f"{MARKER}\n```md\n{line}\n```\n"
         if check_text(text):
             print(f"self-test: 误报 {line!r}: {check_text(text)}")
             ok = False
-    tail_ok = "```author-report\n正文\n技术备注：Mode full→solo · Fallback missing agents -> solo\n```\n"
+    tail_ok = MARKER + "\n```md\n正文\n技术备注：Mode full→solo · Fallback missing agents -> solo\n```\n"
     if check_text(tail_ok):
         print(f"self-test: 块尾技术备注被误报 {check_text(tail_ok)}")
         ok = False
-    tail_bad = "```author-report\n技术备注：S1\n正文\n```\n"
+    tail_bad = MARKER + "\n```md\n技术备注：S1\n正文\n```\n"
     if not check_text(tail_bad):
         print("self-test: 未拦截非块尾技术备注")
         ok = False
     plain = "```text\ntracking_commit.py check\n```\n"
     if check_text(plain):
         print("self-test: 误检了非 author-report 块")
+        ok = False
+    unmarked_after_marked = MARKER + "\n```md\n正文\n```\n\n```text\ntracking_commit.py\n```\n"
+    if check_text(unmarked_after_marked):
+        print("self-test: 标记只该管紧随其后的一个围栏")
+        ok = False
+    if legacy_fences("```author-report\n正文\n```\n") != [1]:
+        print("self-test: 未拦截旧的 author-report 信息串")
         ok = False
     print("self-test OK" if ok else "self-test FAILED")
     return 0 if ok else 1

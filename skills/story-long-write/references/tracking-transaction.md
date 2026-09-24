@@ -18,11 +18,11 @@ Markdown 只负责给作者和 Agent 阅读，工具不再反向解析 Markdown�
 先按运行环境探测 Python 3 解释器（依次尝试 `python3`、`python`、`py -3`）。追踪事务脚本使用当前 skill 根目录；字数与章节闭环统一使用 `story-long-write` skill 根目录：
 
 ```text
-{PYTHON} {当前 skill 根}/scripts/tracking_commit.py init   --project {书项目根} --input {初始化事务.json}
+{PYTHON} {当前 skill 根}/scripts/tracking_commit.py init   --project {书项目根} --input {书项目根}/.story/work/init.json
 {PYTHON} {当前 skill 根}/scripts/tracking_commit.py check  --project {书项目根}
 {PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter check   --project {书项目根} --chapter {N}
-{PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter commit  --project {书项目根} --chapter {N} --input {逐章事务.json}
-{PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter accept-current-length --project {书项目根} --chapter {N} --input {逐章事务.json}
+{PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter commit  --project {书项目根} --chapter {N} --input {书项目根}/.story/work/第{NNN}章/tracking.json
+{PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter accept-current-length --project {书项目根} --chapter {N} --input {书项目根}/.story/work/第{NNN}章/tracking.json
 ```
 
 - `init`：只在 `_tracking-state.json` 不存在时执行，绝不覆盖已初始化项目。

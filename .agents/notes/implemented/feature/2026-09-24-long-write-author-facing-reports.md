@@ -34,7 +34,7 @@ Date: 2026-09-24
    脚本/字段/参数名、状态码、内部清单名；编号必带故事标签（「伏笔 F057（那封信的去处）」）；
    检查结果一句白话带过；回执、Notice、Fallback 等机器行放末尾一行；子 agent 返回的术语由主
    会话翻译。放在入口是因为它约束每个流程，只有 SKILL.md 每次都加载。
-2. 每个流程的汇报写成信息串为 `author-report` 的围栏模板，放在该流程本来就要完整读取的
+2. 每个流程的汇报写成 `<!-- author-report -->` 标记的 ```` ```md ```` 围栏模板，放在该流程本来就要完整读取的
    workflow 文件里：
    - workflow-setup：规划交付后（开书、大纲、卷纲、细纲、补纲、改细纲），C 级缺口与设定互相
      冲突作为「要你定的事」问；对标书缺情绪/节奏分析时的白话停下说明。
@@ -45,7 +45,7 @@ Date: 2026-09-24
    - workflow-daily：批末汇报模板替代「章数、字数、漂移、供给反馈」；分流、漂移、盘点标明是
      内部核对。
    - workflow-revision：改完汇报模板；字数对比说「约 X 字，比原来多/少 Y 字」，不报状态码。
-3. 守卫：`scripts/static-check.py` 对所有 skill 的 `author-report` 围栏逐行扫工程词，规则调用
+3. 守卫：`scripts/static-check.py` 对所有 skill 里 `author-report` 标记的围栏逐行扫工程词，规则调用
    `scripts/check-author-reports.py` 的 `check_block`（snake_case、kebab-case、脚本/数据文件名、
    命令行参数、S1-S4、不带故事标签的编号、commit/state/revision/Fallback 等英文术语、安全七检/
    供给自查/内带/用户带/收编/二档/三档等内部清单名），命中即 FAIL。`scripts/test-static-check.py` 用夹具证明块内命中报错、块外同词不报，
@@ -87,5 +87,5 @@ agent 模板（narrative-writer、consistency-checker）的返回对象是主会
   workflow-daily 11890→12250、workflow-setup 14700→14850、workflow-revision 2990→3100、
   project-files 4700→4800，相关路径预算同步上调（见 `scripts/doc-budget.json` 各条 why）。
   每个用户每次会话都为这几百字付费，换来的是汇报可读；模板只写骨架，不写示例长文。
-- 代价：守卫只覆盖 `author-report` 围栏，模板外的临场汇报仍靠通则约束；词表是黑名单，新
+- 代价：守卫只覆盖 `author-report` 标记的围栏，模板外的临场汇报仍靠通则约束；词表是黑名单，新
   出现的工程词要补进 `AUTHOR_REPORT_JARGON`。

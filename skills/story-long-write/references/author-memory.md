@@ -66,12 +66,7 @@
 
 ## 回执怎么告诉作者
 
-先用一句人话说记住了什么、管哪本书或哪类场合，机器回执只放最后一行作凭证：
-
-```author-report
-记住了：《{书名}》的对话一律用「」，以后写这本书都照这个来；想改随时说。
-技术备注：Author Memory Receipt: r1 · BP001
-```
+回复就两行纯文本，不加代码块或引用格式：第一行用一句人话说记住了什么、管哪本书或哪类场合，如「记住了：《{书名}》的对话一律用「」，以后写这本书都照这个来；想改随时说。」；第二行是机器回执作凭证，如「技术备注：Author Memory Receipt: r1 · BP001」。
 
 - 确认、替换、忘掉同理：「好，这条生效了：……」「换成了：……，原来的「……」不再用」「忘掉了：……」。只进待确认时说「这条先记在待确认里，你说"确认"才生效」；有冲突时用原话说明跟哪条旧习惯冲突。
 - `warnings` / `omitted_ids` 不原样贴：说「你的习惯攒得有点多，写正文时这几条可能顾不上：「……」」，并建议说「整理作者记忆」。不提字节、prompt、kind、scope；编号只能跟着原话出现。
@@ -123,14 +118,14 @@
 
 ```text
 {PYTHON} {当前 skill 根}/scripts/author_memory_commit.py init    --workspace {工作区} [--book-root {书目录}]
-{PYTHON} {当前 skill 根}/scripts/author_memory_commit.py record  --workspace {工作区} [--book-root {书目录}] --input {单事件.json}
+{PYTHON} {当前 skill 根}/scripts/author_memory_commit.py record  --workspace {工作区} [--book-root {书目录}] --input {工作区}/.story/work/作者记忆-事件.json
 {PYTHON} {当前 skill 根}/scripts/author_memory_commit.py query   --workspace {工作区} --book-root {书目录} --kind {类型}（必传，可重复） [--genre {题材}] [--workflow {流程}]
-{PYTHON} {当前 skill 根}/scripts/author_memory_commit.py commit  --workspace {工作区} [--book-root {书目录}] --input {事务.json}
+{PYTHON} {当前 skill 根}/scripts/author_memory_commit.py commit  --workspace {工作区} [--book-root {书目录}] --input {工作区}/.story/work/作者记忆-事务.json
 {PYTHON} {当前 skill 根}/scripts/author_memory_commit.py migrate --workspace {工作区} --book-root {书目录}
 {PYTHON} {当前 skill 根}/scripts/author_memory_commit.py check   --workspace {工作区} [--book-root {书目录}]
 ```
 
-所有子命令都可加 `--book {书名}` 覆盖书名；正在写某本书时一律带上 `--book-root`，书级操作没有它会直接报错。
+所有子命令都可加 `--book {书名}` 覆盖书名；正在写某本书时一律带上 `--book-root`，书级操作没有它会直接报错。事件与事务 JSON 写在 `{工作区}/.story/work/` 下（不写系统 `/tmp`），成功后删掉；`book` 条目的 `scope.value` 填书名（书级 store 已记着书名就用它，首次取书目录名）。
 
 - `record`：常用单事件入口，按路由规则落到项目级或书级 store，自动读取该 store 的当前修订、首次自动初始化；`event_id` 相同且内容相同会幂等返回原回执，内容不同会失败。原样重申已有条目的 `assertion` 会强化该条（不受 120 字节新建上限约束）。返回里的 `store` / `book` 说明写到了哪一级，`warnings` 是预算提醒，按「回执怎么告诉作者」用白话转告。
 - `query`：只读相关 active 条目，项目级与书级合并返回；`--kind` 必传、可重复，两级 state 都不存在时返回空结果且零写入。输出按 重要度 → 本书例外 → 最近更新 排序装填；装不下的条目跳过而不中断（一条长的不挡后面的短条），漏下的 ID 按同一优先级报进 `omitted_ids`（最多列 20 条，`omitted` 是真实总数）。**`omitted_ids` 非空＝记忆超编**——转告作者并建议「整理作者记忆」，它不是「没有更多了」，也不得改读完整画像规避预算。

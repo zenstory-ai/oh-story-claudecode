@@ -236,7 +236,8 @@ node scripts/jjwxc-rank-scraper.js --type 12 --list-only                 # 只�
 
 报告写给作者：讲市场结论和能写的方向。脚本名、命令和采集状态码不进报告；某个榜没采到，就说一句「XX 榜这次没拿到（原因），结论不含它」。
 
-```author-report
+<!-- author-report -->
+```md
 # 长篇网文扫榜报告：{平台名称}
 
 ## 市场概况

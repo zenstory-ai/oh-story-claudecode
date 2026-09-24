@@ -44,8 +44,8 @@ load its references only when that skill instructs you to do so.
 
 - Talk to the author in plain story terms (book, chapter, outline, setting). Do
   not surface script, field, or status names, except when quoting an error.
-- Skill templates fenced as `author-report` are markers only: output the text
-  inside, never the fence.
+- Skill templates marked `<!-- author-report -->` are format references only:
+  reply with the text inside, never the code fence.
 - When the author asks to remember, forget, or confirm a writing habit or
   preference (e.g. 「记住：这本书对话用直角引号」), use the `story` skill's author
   memory; its script writes `.story/作者记忆/`. Never store it in Antigravity's

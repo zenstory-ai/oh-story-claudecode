@@ -11,7 +11,7 @@ Status: implemented
 ## Decision
 
 - **报告写给作者**：每份作者可见的报告/消息模板只讲四件事——做了什么（故事语言）、发现了什么（白话 + 作者原文举例）、要作者决定什么（问题 + 自然语言选项 + 推荐默认）、下一步怎么说。脚本名、字段名、flag、状态码、内部清单名不进正文；编号只能以「故事描述（ID）」出现。确需保留的执行细节（如审稿降级原因、作者记忆回执）只放块尾一行「技术备注：」。
-- **模板显式标注**：作者可见模板一律用 ```` ```author-report ```` 围栏，`scripts/check-author-reports.py` 只扫这些块，拦截已知内部名、脚本/配置文件名、flag、snake_case / kebab-case 标识符（`/story-*`、`$story-*` 命令除外）、英文工程词、S1–S4、Gate 与裸编号；块尾技术备注豁免且只能一行。编号必须挂故事标签，「描述（ID）」与「ID（描述）」两种写法都放行。`REQUIRED` 列出必须带模板块的文件，防止标记被悄悄删掉。守卫注册在 `cross-platform.yml` 的 static-check job，`--self-test` 自带正反例。规则只有这一份：`static-check.py` 的 author-report 检查加载本脚本的 `check_block`，不另维护词表（两份词表曾对编号写法要求相反，且各有漏词）。
+- **模板显式标注**：作者可见模板写在普通 ```` ```md ```` 围栏里，上一行加 `<!-- author-report -->` 标记，`scripts/check-author-reports.py` 只扫紧跟标记的围栏，拦截已知内部名、脚本/配置文件名、flag、snake_case / kebab-case 标识符（`/story-*`、`$story-*` 命令除外）、英文工程词、S1–S4、Gate 与裸编号；块尾技术备注豁免且只能一行。编号必须挂故事标签，「描述（ID）」与「ID（描述）」两种写法都放行。`REQUIRED` 列出必须带模板块的文件，防止标记被悄悄删掉。作者记忆回执例外：整条回复就是模板两行，写成围栏块时模型把围栏原样回给了作者（发版前实测 2/2），改用行内示例后 2/2 为纯文本两行，所以 `author-memory.md` 不用围栏、不在 `REQUIRED` 里。围栏信息串原先直接写成 `author-report`，发版前实测审稿报告整份连围栏回给了作者；同一本书用 v0.7.10 的 ```` ```md ```` 模板审则没有，改成「标记行 + ```` ```md ````」后复测为纯文本（各 1 次）。守卫现在拒收信息串为 `author-report` 的旧写法。守卫注册在 `cross-platform.yml` 的 static-check job，`--self-test` 自带正反例。规则只有这一份：`static-check.py` 的 author-report 检查加载本脚本的 `check_block`，不另维护词表（两份词表曾对编号写法要求相反，且各有漏词）。
 - **本次覆盖的 skill**：
   - story-review：新增「报告面向作者」小节；S1 → 必须改、S2 → 建议改、S3/S4 → 可以不改；reviewer 名与 APPROVE/CONCERNS 换成「这次怎么审的」「总体判断」；新增「需要你决定」「没法判断的地方」；Mode / Fallback / Rubric 收进块尾技术备注。统一 Findings Schema 保留为 reviewer 与综合裁决之间的内部格式。
   - story-import：导入完成报告改成「导进来了 / 我整理出了 / 请你核对 / 需要你决定 / 下一步：说『日更』就从第 N+1 章接着写」；质量检查清单明确是自检、不念给作者；未部署环境的二选一和对标缺资料的提示改成白话。

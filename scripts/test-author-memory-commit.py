@@ -351,6 +351,14 @@ def assert_single_root_layout(temporary: Path, input_path: Path) -> None:
     assert "无法自动归位" in query(broken, "--kind", "prose_style", *broken_args, expect=2)["stderr"]
 
 
+def error_text(stderr: str) -> str:
+    """报错走 JSON（ensure_ascii），Windows 路径的反斜杠会被转义；按字段取出原文再比。"""
+    try:
+        return str(json.loads(stderr)["error"])
+    except (ValueError, KeyError, TypeError):
+        return stderr
+
+
 def assert_book_dir_is_not_single_root(temporary: Path, input_path: Path) -> None:
     """多书工作区里的书目录被误传成 --workspace（书目录自己也含 .story/作者记忆/）：
     不得当单书布局挪动书级 state，报错、零写入；正确调用照常可用。"""
@@ -366,7 +374,7 @@ def assert_book_dir_is_not_single_root(temporary: Path, input_path: Path) -> Non
     mistaken = ("--workspace", str(book_root), *book_args)
     for command in (("query", "--kind", "prose_style"), ("init",), ("check",), ("migrate",)):
         failed = run(command[0], *mistaken, *command[1:], expect=2)
-        assert f"--workspace 应传 {workspace.resolve()}" in failed.stderr, failed.stderr
+        assert f"--workspace 应传 {workspace.resolve()}" in error_text(failed.stderr), failed.stderr
     record(book_root, input_path, remember("mb-book-2", preference(
         "甲书：少用比喻", "这本书少用比喻。", scope_level="book", scope_value="甲书",
     )), *book_args, expect=2)
@@ -384,12 +392,12 @@ def assert_book_dir_is_not_single_root(temporary: Path, input_path: Path) -> Non
     (marked / "书稿" / "乙书").mkdir(parents=True)
     (marked / ".active-book").write_text("书稿/乙书\n", encoding="utf-8")
     nested = marked / "书稿" / "乙书"
-    assert f"--workspace 应传 {marked.resolve()}" in run("init", "--workspace", str(nested), "--book-root", str(nested), expect=2).stderr
+    assert f"--workspace 应传 {marked.resolve()}" in error_text(run("init", "--workspace", str(nested), "--book-root", str(nested), expect=2).stderr)
     stored = temporary / "有项目级工作区"
     (stored / "丙书").mkdir(parents=True)
     run("init", "--workspace", str(stored))
     nested = stored / "丙书"
-    assert f"--workspace 应传 {stored.resolve()}" in run("init", "--workspace", str(nested), "--book-root", str(nested), expect=2).stderr
+    assert f"--workspace 应传 {stored.resolve()}" in error_text(run("init", "--workspace", str(nested), "--book-root", str(nested), expect=2).stderr)
     assert not memory_dir(nested).exists()
 
 

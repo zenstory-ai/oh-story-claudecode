@@ -107,7 +107,7 @@ chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locato
 提交：
 
 ```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" commit --root "{拆文目录}" --input "{临时结果.md}" --batch-id "RAW-4-6" --range-sha256 "{plan 输出值}" --source-file "{plan 来源}"
+"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" commit --root "{拆文目录}" --input "{拆文目录}/_analysis_cache/输入-RAW-4-6.md" --batch-id "RAW-4-6" --range-sha256 "{plan 输出值}" --source-file "{plan 来源}"
 ```
 
 提交脚本先完整校验（原文块每章情节点不足 10 或超过 30 即整批拒收），再按“缓存 → 缺失摘要 → `_progress.md`”写入。摘要投影逐个情节点固定主题、基调和类型枚举，映射不上时主题/基调写“其他”；保留“关键事件”“情节点”“涉及”“基调”等旧消费者字段。任何已有摘要均不覆盖，结果里的 `kept_existing_summary_chapters` 列出被保留的章。

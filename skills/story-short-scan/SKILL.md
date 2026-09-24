@@ -116,7 +116,8 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 报告写给作者：讲市场结论和能写的方向。脚本名、命令和 SKIP 这类采集状态不进报告；某个平台没采到，就说一句「XX 这次没拿到（原因），结论不含它」。
 
-```author-report
+<!-- author-report -->
+```md
 # 短篇网文扫榜报告：{平台名称}
 
 ## 市场概况

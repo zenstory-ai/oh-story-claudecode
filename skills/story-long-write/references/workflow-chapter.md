@@ -4,7 +4,7 @@
 
 项目文件结构、产物映射、缺失处理和对标权威顺序见 [project-files.md](project-files.md)；首次定位、初始化或缺失时先读取并执行。
 
-**工作目录**：本章所有临时文件——分组 segment、writer prompt 留档、逐章事务 JSON——只放书目录下 `.story/work/第NNN章/`（依次叫 前组.md、后组.md、writer_prompt.md、tracking.json）。不写系统 `/tmp`（多书/多会话同章号互相覆盖，Windows 无此目录），不写 `正文/`、`大纲/` 或书根（会被当成章节或产物）。`chapter commit` / `accept-current-length` 成功后脚本自动删除该章目录，失败时原样保留供重跑。
+**工作目录**：本章所有临时文件——分组 segment、writer prompt 留档、逐章事务 JSON——只放书目录下 `.story/work/第NNN章/`（依次叫 前组.md、后组.md、writer_prompt.md、tracking.json）。不写系统 `/tmp`、`正文/`、`大纲/` 或书根。`chapter commit` / `accept-current-length` 成功后脚本自动删除该章目录，失败时原样保留供重跑。
 
 本文件提到的 agent 都只检查当前端 canonical 目录；Antigravity 使用 `.agents/agents/agent-name/agent.md`（`agent-name` 为目标 agent 名）和 `invoke_subagent` + 同名 `TypeName`，其余端使用各自 Agent 工具。
 
@@ -86,7 +86,8 @@
 
 按 SKILL.md「面向作者的汇报」，下列时机照模板说；`{}` 换成故事里的话，其余内部结论不说给作者。提交成功、本章完成后（日更批量改用 workflow-daily 批末汇报）：
 
-```author-report
+<!-- author-report -->
+```md
 第{N}章《{章名}》写好了，约 {字数} 字。
 这章：{两三句讲发生了什么，停在哪个钩子上}。
 {有需作者留意的新人物/新设定就一句话，如「加了个跑腿的小厮阿福，后面可能还会用」；没有就删掉此行}
@@ -96,7 +97,8 @@
 
 字数一次处理后仍不在范围内时，请作者选，不自行补写：
 
-```author-report
+<!-- author-report -->
+```md
 第{N}章《{章名}》写完了，比目标{少/多}了约 {差额} 字（目标约 {目标} 字，现在 {实际} 字）。{一句原因，如「细纲的事写完就到这儿了，硬凑会注水」}
 你想怎么处理？
 1. 就按现在的长度收下（推荐）
@@ -106,7 +108,8 @@
 
 作者选 1 → `chapter accept-current-length`；选 2 → 等作者改完细纲/目标后回步骤 8；选 3 → 删本章正文与工作目录，不提交。新增内容需要作者拍板（下方三档第③档）时：
 
-```author-report
+<!-- author-report -->
+```md
 第{N}章写的时候多出了一样东西，需要你定：{用故事话说新增了什么}。
 它会牵动{后面哪段剧情或哪个已定安排，如「原定第三卷才揭开的那封信」}。
 1. 留下，我把后面的大纲一起改过来
@@ -117,7 +120,8 @@
 
 写不下去、要停下时：
 
-```author-report
+<!-- author-report -->
+```md
 第{N}章还没法写：{白话说缺什么，如「这一章还没有细纲」}。
 建议{一个动作，如「我先按卷纲把这章细纲补出来给你看」}，可以吗？
 ```
@@ -183,4 +187,4 @@ advisory 只提示可疑处，先看脚本给出的例外；故事内系统/界�
 - 伏笔变化用 `foreshadow_changes` 更新同一 ID 的当前行，不追加重复历史；
 - 时间线变化写入 `timeline_events`，由 `_tracking-state.json` 统一派生 `作者真相.md` 与 `读者已知.md`，不得把作者秘密泄露到读者视图；
 - 核心角色状态变化同时提交该角色截至当前章的完整快照；
-- 事务失败后保留原事务 JSON，修正写入环境并重跑同一 `commit`；成功后执行 `check`，确认 state 与全部派生视图一致后再继续写作（事务 JSON 已随工作目录自动删除）。
+- 事务失败后保留原事务 JSON，修正写入环境并重跑同一 `commit`；成功后执行 `check`，确认 state 与全部派生视图一致后再继续写作。

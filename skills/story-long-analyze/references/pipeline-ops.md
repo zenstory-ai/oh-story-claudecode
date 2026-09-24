@@ -79,12 +79,12 @@ Stage 4 另用 `render_relation_chart.py` 从 `角色/角色关系.md` 生成人
 
 ## 4. 执行与提交一个批次
 
-`chapter-extractor` 只读取计划中一个批次；派发时带上计划里的 `chapter_chars`（每章字数，决定情节点密度）。把完整输出保存为临时 Markdown 后提交：
+`chapter-extractor` 只读取计划中一个批次；派发时带上计划里的 `chapter_chars`（每章字数，决定情节点密度）。把完整输出保存为 `{拆文目录}/_analysis_cache/输入-{批次ID}.md` 后提交（不写系统 `/tmp`：Windows 没有，多本书同批号会互相覆盖；提交成功后删掉这份输入）。子代理不可用时主线程自己写批次，包裹标记照 output-templates「批次提交格式」：
 
 ```text
 "{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" commit \
   --root "{拆文目录}" \
-  --input "{临时结果.md}" \
+  --input "{拆文目录}/_analysis_cache/输入-RAW-4-6.md" \
   --batch-id "RAW-4-6" \
   --range-sha256 "{plan 输出值}" \
   --source-file "{plan 列出的来源}"
