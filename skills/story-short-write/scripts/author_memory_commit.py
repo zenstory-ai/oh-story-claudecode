@@ -262,9 +262,56 @@ def peek_book_name(state_path: Path) -> str | None:
     return name if isinstance(name, str) and name.strip() else None
 
 
+def enclosing_workspace(workspace: Path) -> Path | None:
+    """--workspace 指到的其实是多书工作区里的一本书时，返回真正的创作工作区。
+
+    认三种迹象，任一成立即是：①工作区的上一层目录叫 长篇 / 短篇（story-setup 的书
+    目录约定，返回再上一层）；②某个祖先目录有 .active-book；③某个祖先目录有项目级
+    store（不带 book 字段的 state）——但工作区自己已有项目级 store 时不认这一条，最
+    近的项目级 store 就是它自己，免得主目录里一份误建的 store 挡住正常的单书工作区。
+    读不出来的祖先 state 不算迹象。"""
+    resolved = workspace.resolve()
+    if resolved.parent.name in {"长篇", "短篇"}:
+        return resolved.parent.parent
+    own = project_store(resolved).state_path
+    owns_project_store = own.exists() and peek_book_name(own) is None
+    for ancestor in resolved.parents:
+        if (ancestor / ".active-book").exists():
+            return ancestor
+        if owns_project_store:
+            continue
+        state_path = project_store(ancestor).state_path
+        try:
+            document = read_json(state_path) if state_path.is_file() else None
+        except AuthorMemoryError:
+            document = None
+        if isinstance(document, dict) and "book" not in document:
+            return ancestor
+    return None
+
+
+def same_directory(first: Path, second: Path) -> bool:
+    # samefile 认得大小写不敏感文件系统（macOS APFS 默认）上只差大小写的同一目录。
+    if first.exists() and second.exists():
+        return os.path.samefile(first, second)
+    return first.resolve() == second.resolve()
+
+
 def is_single_root(workspace: Path, book_root: Path | None) -> bool:
-    """单书布局：书根就是工作区（正文/、大纲/、追踪/ 直接在工作区根）。"""
-    return book_root is not None and book_root.resolve() == workspace.resolve()
+    """单书布局：书根就是工作区（正文/、大纲/、追踪/ 直接在工作区根）。
+
+    同一目录还可能是多书工作区里的一本书被误传成了 --workspace（书目录自己也含
+    .story/作者记忆/）。那时按单书布局处理会把书级 state 挪进 书级/、在原处补一份
+    空的项目级 state，此后正确的调用全部失败，所以一律报错、零写入。"""
+    if book_root is None or not same_directory(book_root, workspace):
+        return False
+    outer = enclosing_workspace(workspace)
+    require(
+        outer is None,
+        f"{workspace} 是创作工作区 {outer} 里的一本书，不是单书工作区：--workspace 应传 {outer}，"
+        f"这个目录放 --book-root",
+    )
+    return True
 
 
 def book_memory_root(workspace: Path, book_root: Path) -> Path:
@@ -441,8 +488,9 @@ def validate_state(value: object, *, store: Store) -> dict[str, Any]:
     else:
         require(
             "book" not in state,
-            "project-level state must not carry state.book：这份其实是书级 state。书根就是工作区时，"
-            "带 --book-root {工作区} 重跑任一命令即自动移进 .story/作者记忆/书级/",
+            "project-level state must not carry state.book：这份其实是书级 state。--workspace 指到了"
+            "长篇/、短篇/ 下的书目录时，改传创作工作区根、书目录放 --book-root；只有书根就是工作区"
+            "（单书布局）时，带 --book-root {工作区} 重跑任一命令即自动移进 .story/作者记忆/书级/",
         )
         book = None
     revision = as_int(state.get("state_revision"), "state.state_revision")

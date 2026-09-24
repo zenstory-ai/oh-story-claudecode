@@ -12,7 +12,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > Agent 兼容性：只检查当前运行时 canonical 目录。运行时不支持项目 agent 或找不到文件时降级 solo/direct，并报告 `Fallback: project custom agents unavailable -> solo`。ZCode 3.3.4 不提供项目 custom agents，直接按此规则降级，不扫描其他 CLI 的 agent 目录。
 >
-> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 31` 不一致时（标记缺失、字段缺失/非整数、小于或大于 31）照常按文件存在性检查并 spawn，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 31）` 并提示重新运行 `/story-setup` 后新开会话；大于 31 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct。本次不修改 `agents_version`、插件版本或发布版本。
+> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 31` 不一致时（标记缺失、字段缺失/非整数、小于或大于 31）照常按文件存在性检查并 spawn，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 31）` 并提示重新运行 `/story-setup` 后新开会话；大于 31 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct。
 
 ## 分析边界
 
@@ -85,7 +85,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locator,status,chapter_sha256,source_sha256,parser_version
 ```
 
-只按 LF 计物理行。支持楔子、序章、第0章、任意正文起始章、番外、后记、中文大数、英文章号、多卷重置和卷章组合。目录与正文标题重复时先剔掉目录块；落表前校验章号连续、无重复和边界有效，其中特殊章独立编号，正文允许从任意首章开始。原文变化先拒绝；确认后用 `--rebuild`。追加章节不使前面逐章 hash 失效，只有新章进入待处理；改动已拆章节的原文只会让该批缓存重读，已有摘要不刷新（要刷新就删掉对应摘要和批次缓存再续跑）。旧成果（旧摘要，或旧版 `_progress.md` 下的黄金三章）的章号与新索引对不上时，脚本在写索引前停下并返回 `author_message`：有旧版「章节边界」表就逐章核对标题与起始行，没有表而原文不从第一章开始也停。把说明和选项转告作者（默认推荐①）：① 按旧章号继续——加 `--fold-prologue` 重建，楔子/序章/第0章并进第一章，旧成果原样复用、楔子不单独拆；② 楔子单独成章——把旧的 `章节/` 深拆与摘要、`快速预览.md`、`概要.md`、`_progress.md` 挪进 `_analysis_cache/legacy/旧章号/`（不删除），再从 Stage 0 重拆；③ 换新目录整本重拆。索引已建过时先删 `chapter_index.csv`（只是机械章节表）再按所选方式重建。
+只按 LF 计物理行。支持楔子、序章、第0章、任意正文起始章、番外、后记、中文大数、英文章号、多卷重置和卷章组合。目录与正文标题重复时先剔掉目录块；落表前校验章号连续、无重复和边界有效，其中特殊章独立编号，正文允许从任意首章开始。原文变化先拒绝；确认后用 `--rebuild`，章号口径沿用已有索引（上次并入过楔子就照样并入）；重建后前面的章号对不上时不写索引并返回 `author_message`。追加章节不使前面逐章 hash 失效，只有新章进入待处理；改动已拆章节的原文只会让该批缓存重读，已有摘要不刷新（要刷新就删掉对应摘要和批次缓存再续跑）。旧成果（旧摘要，或旧版 `_progress.md` 下的黄金三章）的章号与新索引对不上时，脚本在写索引前停下并返回 `author_message`：有旧版「章节边界」表就逐章核对标题与起始行，没有表而原文不从第一章开始也停。把说明和选项转告作者（默认推荐①）：① 按旧章号继续——加 `--fold-prologue` 重建，楔子/序章/第0章并进第一章，旧成果原样复用、楔子不单独拆；② 楔子单独成章——把除 `原文/` 外所有按旧章号写的产物（`章节/`、`剧情/`、`角色/`、`设定/`、`人物关系图/`、`快速预览.md`、`概要.md`、`拆文报告.md`、`文风.md`、`_analysis_cache/批次-*.md` 和 `_progress.md`）挪进 `_analysis_cache/legacy/旧章号/`（不删除），再从 Stage 0 重拆；③ 换新目录整本重拆。索引已建过时先删 `chapter_index.csv`（只是机械章节表）再按所选方式重建。
 
 ## Stage 2：计划、提取、提交
 
@@ -133,7 +133,7 @@ chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locato
 
 从 Stage 2 的 `涉及人物`、状态变化和批次关系观察归一实体，再结合 Stage 3 剧情单元生成角色档案与设定。关系记录动作方向、触发、双方得失、表面/真实状态、阶段变化和证据；“甲保护乙”与“乙依赖甲”分别记录。
 
-关系图只从 `角色/角色关系.md` 生成：`"{PYTHON}" "{story-long-analyze skill 根}/scripts/render_relation_chart.py" --root "{拆文目录}" --png`。主产物是 `人物关系图/人物关系图.md`（Mermaid + 文字清单，任何 Markdown 查看器都显示中文）；PNG 只在找到含中文字形的字体时生成。没有中文字体就不出图，不得自行改画拼音或首字母版，把脚本的 `author_message` 转告作者。
+关系图只从 `角色/角色关系.md` 生成：`"{PYTHON}" "{story-long-analyze skill 根}/scripts/render_relation_chart.py" --root "{拆文目录}" --png`。主产物是 `人物关系图/人物关系图.md`（Mermaid + 文字清单，任何 Markdown 查看器都显示中文）；PNG 只在找到能显示图中全部文字的字体时生成（表情等符号不画进图片）。字体不够就不出图，不得自行改画拼音或首字母版，把脚本的 `author_message` 转告作者。
 
 至少一份角色档案和一份设定文件落盘后运行 `manage_analysis_run.py mark-stage --stage stage4`；缺任一类文件时不得标完成。
 

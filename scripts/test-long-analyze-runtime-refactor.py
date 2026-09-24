@@ -834,6 +834,61 @@ def test_legacy_summaries_prologue_way_out() -> None:
                     f"{name}：对齐后旧摘要全部复用、无需重读：" + plan.stdout)
 
 
+def test_legacy_table_title_variants() -> None:
+    """Old tables whose titles differ only in notes, brackets or width still line up."""
+    variants = {
+        "尾注": ("第一章 起程（求收藏）\n一\n第二章 遇敌(二合一)\n二\n第三章 破局\n三\n", "第一章 起程"),
+        "方括号": ("第一章 【起程】\n一\n第二章 遇敌\n二\n第三章 破局\n三\n", "起程"),
+        "全角": ("第一章 Ｈｅｌｌｏ起程\n一\n第二章 遇敌\n二\n第三章 破局\n三\n", "第一章 Hello起程"),
+        "数字标题": ("1. 起程\n一\n2. 遇敌\n二\n3. 破局\n三\n", "1. 起程"),
+    }
+    with tempfile.TemporaryDirectory(prefix="long-legacy-titles-") as temporary:
+        for name, (text, first_title) in variants.items():
+            # Exact start lines, then the same table shifted by one line (titles decide).
+            for shift in (0, 1):
+                root = Path(temporary) / f"{name}-{shift}"
+                make_legacy_stage1_library(root, [(1, first_title, 1 + shift), (2, "第二章 遇敌", 3 + shift),
+                                                  (3, "第三章 破局", 5 + shift)])
+                (root / "原文" / "原文.txt").write_text(text, encoding="utf-8")
+                result = build_index(root)
+                require(result.returncode == 0, f"{name}（行差 {shift}）：标题只差尾注/括号/全半角时不能拦：" + result.stdout)
+        title_less = Path(temporary) / "只有章号"
+        make_legacy_stage1_library(title_less, [(1, "第一章", 1), (2, "第二章", 3), (3, "第三章", 6)])
+        (title_less / "原文" / "原文.txt").write_text("第一章\n一\n\n第二章\n二\n\n第三章\n三\n", encoding="utf-8")
+        require(build_index(title_less).returncode == 0, "只有章号的旧表按章号对齐，不能按行误判错位")
+
+
+def test_fold_prologue_survives_rebuild() -> None:
+    with tempfile.TemporaryDirectory(prefix="long-fold-rebuild-") as temporary:
+        root = Path(temporary) / "并入楔子后追加章节"
+        make_legacy_stage1_library(root, OLD_BOUNDARIES)
+        require(build_index(root, "--fold-prologue").returncode == 0, "并入楔子建索引失败")
+        source = root / "原文" / "原文.txt"
+        source.write_text(PROLOGUE_BOOK + "\n第七章 归来\n正文七。\n", encoding="utf-8")
+        rebuilt = build_index(root, "--rebuild")
+        payload = json.loads(rebuilt.stdout)
+        indexed = rows(root / "chapter_index.csv")
+        require(rebuilt.returncode == 0 and payload["pending_chapters"] == [7]
+                and payload["folded_into_first_chapter"] == ["楔子"]
+                and indexed[0]["source_chapter"] == "1" and indexed[6]["title"] == "归来",
+                "重建必须沿用上次并入楔子的章号口径：" + rebuilt.stdout)
+        # The source now lost chapters: the rebuild stops with a plain explanation.
+        source.write_text(PROLOGUE_BOOK.split("第五章")[0], encoding="utf-8")
+        shrunk = build_index(root, "--rebuild")
+        message = json.loads(shrunk.stdout).get("author_message", "")
+        require(shrunk.returncode == 2 and "换一个新目录" in message and author_text_is_plain(message),
+                "重建对不上时必须给作者能看懂的出路：" + shrunk.stdout)
+        unfolded = Path(temporary) / "楔子单独成章后重建"
+        (unfolded / "原文").mkdir(parents=True)
+        (unfolded / "原文" / "原文.txt").write_text(PROLOGUE_BOOK, encoding="utf-8")
+        require(build_index(unfolded).returncode == 0, "无旧成果的楔子新书必须能建索引")
+        mismatch = build_index(unfolded, "--rebuild", "--fold-prologue")
+        mismatch_payload = json.loads(mismatch.stdout)
+        require(mismatch.returncode == 2 and mismatch_payload["error"] == "chapter_mapping_ambiguous:position=1"
+                and author_text_is_plain(mismatch_payload.get("author_message", "")),
+                "重建改变章号口径时必须停下并说明：" + mismatch.stdout)
+
+
 def test_cli_output_is_utf8_on_legacy_consoles() -> None:
     with tempfile.TemporaryDirectory(prefix="long-cp1252-") as temporary:
         root = Path(temporary)
@@ -846,6 +901,9 @@ def test_cli_output_is_utf8_on_legacy_consoles() -> None:
             inspected = run(INSPECT, "--root", root / "不存在", extra_env=env)
             require(inspected.returncode == 2 and "不存在" in json.loads(inspected.stdout)["error"],
                     f"{encoding} 控制台下检查器必须输出 UTF-8")
+            helped = run(INSPECT, "--help", extra_env=env)
+            require(helped.returncode == 0 and "拆文库" in helped.stdout,
+                    f"{encoding} 控制台下检查器的帮助必须能输出：" + helped.stderr[-300:])
             planned = run(MANAGE, "plan", "--root", root / "不存在", extra_env=env)
             require(planned.returncode == 2 and "不存在" in json.loads(planned.stdout)["detail"],
                     f"{encoding} 控制台下运行脚本必须输出 UTF-8")
@@ -882,6 +940,91 @@ def test_relation_chart_never_falls_back_to_pinyin() -> None:
                 "缺关系表时必须给作者能看懂的原因")
 
 
+def load_chart_module():  # noqa: ANN201 - module object
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("render_relation_chart_under_test", CHART)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_relation_chart_font_choice() -> None:
+    chart = load_chart_module()
+
+    class Face:
+        def __init__(self, covered, family: str = "Test") -> None:
+            self.covered = covered
+            self.family_name = family
+
+        def get_char_index(self, codepoint: int) -> int:
+            return 1 if self.covered(chr(codepoint)) else 0
+
+    def cjk_only(char: str) -> bool:
+        return char != "\U00020000" and ord(char) < 0x1F000 and char != "⚔"
+
+    faces = {
+        "/System/Library/Fonts/LastResort.otf": Face(lambda char: True, "LastResort"),
+        "/fonts/AdobeBlank.otf": Face(lambda char: True, "Adobe Blank"),
+        "/fonts/NotoSansCJK.ttc": Face(cjk_only),
+    }
+    chart.font_candidates = lambda: list(faces)
+    chart.font_face = lambda path: faces[path]
+    os.environ.pop("STORY_ANALYZE_CHART_FONT", None)
+    path, missing = chart.find_cjk_font(chart.png_text("🐉龙君⚔ → 林远"))
+    require(path == "/fonts/NotoSansCJK.ttc" and not missing,
+            "表情和符号应从图片文字里去掉，不能因此放弃中文字体：%s %s" % (path, missing))
+    path, missing = chart.find_cjk_font(chart.png_text("\U00020000祖 林远"))
+    require(path is None and missing == ["\U00020000"],
+            "中文字体缺字时不能退到 LastResort 这类只画方框的兜底字体：%s %s" % (path, missing))
+    cjk_face = faces.pop("/fonts/NotoSansCJK.ttc")
+    require(chart.find_cjk_font("林远") == (None, []), "只剩兜底字体时等同于没有中文字体")
+    faces["/fonts/NotoSansCJK.ttc"] = cjk_face
+
+    with tempfile.TemporaryDirectory(prefix="long-chart-font-") as temporary:
+        root = Path(temporary) / "测试书"
+        (root / "角色").mkdir(parents=True)
+        (root / "角色" / "角色关系.md").write_text(
+            "| 主体 → 客体 | 变化后状态 |\n|---|---|\n| \U00020000祖 → 林远 | 师徒 |\n", encoding="utf-8")
+        chart.matplotlib_available = lambda: True
+        payload = chart.render(root, True)
+        require(payload["png"] == [] and "显示不了" in payload["author_message"]
+                and "没有找到能显示中文的字体" not in payload["author_message"],
+                "有中文字体只是缺字时，要照实说缺哪几个字：" + json.dumps(payload, ensure_ascii=False))
+        faces["/fonts/NotoSansCJK.ttc"] = Face(lambda char: True)
+
+        def broken_draw(*_args: object) -> list[str]:
+            raise RuntimeError("draw failed")
+
+        chart.draw_png = broken_draw
+        payload = chart.render(root, True)
+        require(payload["ok"] and (root / "人物关系图" / "人物关系图.md").is_file() and payload["author_message"],
+                "画图片出错时 Markdown 关系图必须已经写好：" + json.dumps(payload, ensure_ascii=False))
+
+
+def test_relation_chart_mermaid_edge_cases() -> None:
+    with tempfile.TemporaryDirectory(prefix="long-chart-mermaid-") as temporary:
+        root = Path(temporary) / "测试书"
+        (root / "角色").mkdir(parents=True)
+        (root / "角色" / "角色关系.md").write_text(
+            "| 关系ID | 主体 → 客体 | 关系动作/类型 | 变化后状态 |\n|---|---|---|---|\n"
+            "| R1 | ** → 林远 | ** | %%{init: {}}%% |\n"
+            "| R2 | 林远 ↔ 苏晴 | 同盟 | 同盟 |\n"
+            "| R3 | 林远 -> 苏晴 -> 赵三 | 利用 | 利用 |\n"
+            "| R4 | 只有一个人 | 敌对 | 敌对 |\n",
+            encoding="utf-8")
+        result = run(CHART, "--root", root)
+        payload = json.loads(result.stdout)
+        chart = (root / "人物关系图" / "人物关系图.md").read_text(encoding="utf-8")
+        block = chart.split("```mermaid", 1)[1].split("```", 1)[0]
+        require(result.returncode == 0 and '[""]' not in block and '|""|' not in block and "%%" not in block,
+                "Mermaid 标签清洗后为空或含 %% 时必须换成占位词：" + block)
+        require(re.search(r'p\d+ -->\|"同盟"\| p\d+', block) and block.count('-->|"同盟"|') == 1
+                and "苏晴 → 林远：同盟" in chart and "苏晴 → 赵三：利用" in chart,
+                "↔ 要画成双向、链式关系要逐段画出：" + chart)
+        require(payload["skipped_rows"] == 1 and "1 行" in (payload["author_message"] or ""),
+                "认不出的关系行要报出数量：" + result.stdout)
+
+
 def main() -> int:
     test_index_contract()
     test_invalid_root_and_manage_entry()
@@ -894,8 +1037,12 @@ def main() -> int:
     test_audit_stage_and_mapping_regressions()
     test_legacy_prologue_alignment()
     test_legacy_summaries_prologue_way_out()
+    test_legacy_table_title_variants()
+    test_fold_prologue_survives_rebuild()
     test_cli_output_is_utf8_on_legacy_consoles()
     test_relation_chart_never_falls_back_to_pinyin()
+    test_relation_chart_font_choice()
+    test_relation_chart_mermaid_edge_cases()
     print("OK: single-state long-analyze runtime regressions passed")
     return 0
 

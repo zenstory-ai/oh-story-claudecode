@@ -349,12 +349,40 @@ def mapping_signature(row: Dict[str, Any]) -> Tuple[str, str]:
     return str(row.get("volume", "")), str(row.get("source_chapter", ""))
 
 
+class RebuildMismatch(ValueError):
+    def __init__(self, code: str, author_message: str) -> None:
+        super().__init__(code)
+        self.author_message = author_message
+
+
+REBUILD_MISMATCH_MESSAGE = (
+    "重建章节表时发现，%s。照这样继续，已拆好的章节会和原文错开，所以章节表没有改。请选一种："
+    "① 换回上次拆文时用的那份原文再继续（推荐）；② 换一个新目录，整本重新拆。"
+)
+
+
+def index_was_folded(old_rows: Sequence[Dict[str, Any]], new_rows: Sequence[Dict[str, Any]]) -> bool:
+    """True when the existing index merged a prologue into chapter one.
+
+    A folded index starts with a numbered chapter although the text opens with
+    楔子/序章/第0章; a rebuild keeps that numbering instead of shifting it.
+    """
+    old_first = str(old_rows[0].get("source_chapter", "")) if old_rows else ""
+    new_first = str(new_rows[0].get("source_chapter", "")) if new_rows else ""
+    return (old_first.isdigit() and int(old_first) >= 1
+            and not (new_first.isdigit() and int(new_first) >= 1))
+
+
 def compare_rebuild(old_rows: Sequence[Dict[str, Any]], new_rows: Sequence[Dict[str, Any]]) -> List[int]:
-    if len(new_rows) < len(old_rows):
-        raise ValueError("chapter_mapping_ambiguous:index_would_shrink")
-    for position, old_row in enumerate(old_rows):
+    for position, old_row in enumerate(old_rows[:len(new_rows)]):
         if mapping_signature(old_row) != mapping_signature(new_rows[position]):
-            raise ValueError("chapter_mapping_ambiguous:position=%s" % (position + 1))
+            raise RebuildMismatch(
+                "chapter_mapping_ambiguous:position=%s" % (position + 1),
+                REBUILD_MISMATCH_MESSAGE % ("第%s章和上次的章节表对不上（上次是「%s」，这次是「%s」）" % (
+                    position + 1, old_row.get("title", ""), new_rows[position]["title"])))
+    if len(new_rows) < len(old_rows):
+        raise RebuildMismatch("chapter_mapping_ambiguous:index_would_shrink",
+                              REBUILD_MISMATCH_MESSAGE % "这次认出的章节比上次少")
     return [position for position, row in enumerate(new_rows, start=1)
             if position > len(old_rows) or old_rows[position - 1].get("chapter_sha256") != row["chapter_sha256"]]
 
@@ -402,12 +430,15 @@ def main() -> int:
             print(json.dumps({"ok": True, "reused": True, "parsed_source": False,
                               "chapters": len(existing_rows), "pending_chapters": []}, ensure_ascii=False))
             return 0
-        rows, folded = build_boundaries(decode_source(raw), locator_path, source_hash, args.fold_prologue)
+        text = decode_source(raw)
+        rows, folded = build_boundaries(text, locator_path, source_hash, args.fold_prologue)
         pending = list(range(1, len(rows) + 1))
         old_count = 0
         if args.output.is_file():
             _, old_rows = read_existing(args.output)
             old_count = len(old_rows)
+            if not args.fold_prologue and index_was_folded(old_rows, rows):
+                rows, folded = build_boundaries(text, locator_path, source_hash, True)
             pending = compare_rebuild(old_rows, rows)
         else:
             mapping = legacy_mapping_check(args.output.parent, rows)
@@ -425,6 +456,8 @@ def main() -> int:
             "folded_into_first_chapter": folded,
         }, ensure_ascii=False))
         return 0
+    except RebuildMismatch as exc:
+        return fail(str(exc), exc.author_message)
     except (OSError, UnicodeError, ValueError, csv.Error) as exc:
         return fail(str(exc))
 

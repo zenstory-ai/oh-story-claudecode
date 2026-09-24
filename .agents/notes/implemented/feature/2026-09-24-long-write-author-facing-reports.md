@@ -45,10 +45,10 @@ Date: 2026-09-24
    - workflow-daily：批末汇报模板替代「章数、字数、漂移、供给反馈」；分流、漂移、盘点标明是
      内部核对。
    - workflow-revision：改完汇报模板；字数对比说「约 X 字，比原来多/少 Y 字」，不报状态码。
-3. 守卫：`scripts/static-check.py` 对所有 skill 的 `author-report` 围栏逐行扫工程词（snake_case、
-   kebab-case、脚本/数据文件扩展名、命令行参数、S1-S4、不带故事标签的 E/F/L 编号、
-   commit/state/revision/Fallback 等英文术语、安全七检/供给自查/内带/用户带/收编/二档/三档等内部
-   清单名），命中即 FAIL。`scripts/test-static-check.py` 用夹具证明块内命中报错、块外同词不报，
+3. 守卫：`scripts/static-check.py` 对所有 skill 的 `author-report` 围栏逐行扫工程词，规则调用
+   `scripts/check-author-reports.py` 的 `check_block`（snake_case、kebab-case、脚本/数据文件名、
+   命令行参数、S1-S4、不带故事标签的编号、commit/state/revision/Fallback 等英文术语、安全七检/
+   供给自查/内带/用户带/收编/二档/三档等内部清单名），命中即 FAIL。`scripts/test-static-check.py` 用夹具证明块内命中报错、块外同词不报，
    并对真实仓库断言四个 workflow 文件各自至少有应有数量的模板且全部干净，防守卫空转。
 4. 「继续写」一条规则：「继续」「按这个来」「确认方案」只续当前范围；「继续写」「接着写」指
    正文——下一章已有细纲时按写正文处理，但上一轮在规划就只问一句「要接着写第N章正文吗？」

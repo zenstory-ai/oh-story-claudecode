@@ -1208,8 +1208,8 @@ def target_paths_from_hook(obj: dict[str, Any]) -> list[Path]:
     return [resolve_target(root, t, base) for t in raw_targets if t]
 
 
-# 未展开的 shell 变量：$VAR / ${VAR}。与 JS core UNEXPANDED_SHELL_VAR 同式。
-UNEXPANDED_SHELL_VAR = re.compile(r"\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)")
+# 未展开的 shell 变量：$VAR / ${VAR} / $(cmd)。与 JS core UNEXPANDED_SHELL_VAR 同式。
+UNEXPANDED_SHELL_VAR = re.compile(r"\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*|\()")
 
 
 def prose_block_reason(root: Path, abs_path: Path) -> str | None:

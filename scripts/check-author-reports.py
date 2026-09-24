@@ -5,7 +5,8 @@
 - 已知内部字段/状态名、reviewer 名、严重度代号、Gate 字母、PASS/FAIL；
 - 脚本/配置文件名（.py/.js/.sh/.json/...）、命令行 flag、snake_case 与 kebab-case 标识符
   （/story-xxx、$story-xxx 这类作者要敲的命令除外）；
-- 裸编号（F003、BP001、REL-001）——编号只能以「标签（ID）」形式跟在故事描述后面。
+- 裸编号（F003、BP001、REL-001、L1-3）——编号必须挂故事标签：「描述（ID）」或「ID（描述）」。
+static-check.py 的 author-report 检查调用本文件的 check_block，两处只有这一份规则。
 块内最后一个非空行若以「技术备注：」开头，可承载执行路径等工程细节，不受上述检查；
 技术备注只能有一行且必须在块尾。
 
@@ -47,13 +48,23 @@ CHECKS = (
     ("命令行 flag", re.compile(r"(?<![\w-])--[A-Za-z][\w-]*")),
     ("snake_case 字段名", re.compile(r"(?<![\w])[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+\b")),
     ("kebab-case 标识符", re.compile(r"(?<![\w/$-])[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b")),
-    ("英文工程词", re.compile(r"(?i)(?<![A-Za-z])(?:state|schema|agents?|reviewers?|rubric|prompt|hooks?|fallback|pipeline|stage|tier|token|commit|verdict|severity)(?![A-Za-z])")),
+    ("英文工程词", re.compile(
+        r"(?i)(?<![A-Za-z])(?:state|schema|agents?|reviewers?|rubric|prompt|hooks?|fallback|pipeline|stage|tier|token"
+        r"|commit|verdict|severity|discard|borderline|invalid|internal|pass|fail|under|over|tracking|revision"
+        r"|checkpoint|segment|delta|Constraint Lock|Notice)(?![A-Za-z])"
+    )),
+    ("内部清单名", re.compile(r"安全七检|七检|供给自查|供给单|内带|用户带|二档|三档|收编|契约检查器|状态码|追踪事务")),
     ("严重度代号", re.compile(r"(?<![A-Za-z0-9])S[1-4](?![0-9])")),
     ("Gate 名", re.compile(r"\bGate\b|\d\s*Gate")),
 )
 
-RAW_ID = re.compile(r"(?<![A-Za-z0-9])(?:[A-Z]{1,3}\d?-?\d{2,})(?![A-Za-z0-9])")
-LABELED_ID = re.compile(r"\S（(?:[A-Z]{1,3}\d?-?\d{2,})(?:[、，,]\s*[A-Z]{1,3}\d?-?\d{2,})*）")
+_ID = r"(?:[A-Z]{1,3}\d?-?\d{2,}|[EFL]\d+(?:-\d+)?)"
+RAW_ID = re.compile(r"(?<![A-Za-z0-9])" + _ID + r"(?![A-Za-z0-9])")
+# 编号必须挂故事标签，两种写法都算：「描述（ID）」与「ID（描述）」。
+LABELED_ID = re.compile(
+    r"\S（" + _ID + r"(?:[、，,]\s*" + _ID + r")*）"
+    r"|(?<![A-Za-z0-9])" + _ID + r"(?:[、，,]\s*" + _ID + r")*\s*[（(][^）)]*[^\sA-Za-z0-9（(）)][^）)]*[）)]"
+)
 
 FENCE_OPEN = re.compile(r"^(\s*)(`{3,}|~{3,})\s*([^\s`]*)")
 
@@ -96,7 +107,7 @@ def check_block(body: list[str]) -> list[tuple[int, str]]:
         masked = LABELED_ID.sub("", line)
         hit = RAW_ID.search(masked)
         if hit:
-            errors.append((k, f"裸编号「{hit.group(0)}」（写成「故事描述（ID）」）"))
+            errors.append((k, f"裸编号「{hit.group(0)}」（写成「故事描述（ID）」或「ID（故事描述）」）"))
     return errors
 
 
@@ -142,10 +153,16 @@ def self_test() -> int:
         "Fallback: none",
         "加 --book-root",
         "追踪：唯一结构化 state + 派生快照",
+        "伏笔 L1-3 待定",
+        "按安全七检过了一遍",
+        "字数 borderline，要不要 discard",
+        "Constraint Lock 已生效",
     ]
     good = [
         "下一步：说「日更」就从第 7 章接着写；也可运行 `/story-long-write`。",
         "还没收的线：玉佩的来历（F003）",
+        "伏笔 F057（那封信的去处）已经收回",
+        "第一卷第三个单元（L1-3）写完了",
         "## 必须改（2 处）",
         "",
     ]

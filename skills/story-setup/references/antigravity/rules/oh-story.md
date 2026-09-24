@@ -51,7 +51,7 @@ load its references only when that skill instructs you to do so.
   memory; its script writes `.story/作者记忆/`. Never store it in Antigravity's
   built-in memory. One-off requests are simply carried out, not recorded.
 - Never modify installed skill files (`SKILL.md`, `references/`, `scripts/`) in
-  this workspace. If a skill script errors, stop and report the error and the
+  this workspace (redeploying via `story-setup` is the exception). If a skill script errors, stop and report the error and the
   command to the author instead of patching around it.
 
 ## Context recovery

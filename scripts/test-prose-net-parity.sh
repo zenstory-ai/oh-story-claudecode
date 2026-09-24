@@ -590,7 +590,7 @@ import importlib.util, sys
 from pathlib import Path
 spec = importlib.util.spec_from_file_location("ch", sys.argv[1]); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 root = Path(sys.argv[2])
-for rel in ["long/正文/第1章_起.md", "long/正文/第2章_承.md", "short/正文.md", "short2/正文.md", "long2/正文/第2章_新.md", "long3/正文/第2章_新.md", "long4/正文/第2章_新.md", "long5/正文/第2章_新.md", "long6/正文/第2章_新.md", "bare/正文/第1章_起.md", "$PROJ/正文/第001章_x.md"]:
+for rel in ["long/正文/第1章_起.md", "long/正文/第2章_承.md", "short/正文.md", "short2/正文.md", "long2/正文/第2章_新.md", "long3/正文/第2章_新.md", "long4/正文/第2章_新.md", "long5/正文/第2章_新.md", "long6/正文/第2章_新.md", "bare/正文/第1章_起.md", "$PROJ/正文/第001章_x.md", "$(pwd)/book/正文/第001章_y.md"]:
     reason = m.prose_block_reason(root, root / rel)
     sys.stdout.buffer.write((f"{rel} :: {reason if reason else '-'}\n").encode("utf-8"))
 PY
@@ -598,7 +598,7 @@ PY
 const path = require("node:path")
 const core = require(process.argv[2])
 const root = process.argv[3]
-for (const rel of ["long/正文/第1章_起.md", "long/正文/第2章_承.md", "short/正文.md", "short2/正文.md", "long2/正文/第2章_新.md", "long3/正文/第2章_新.md", "long4/正文/第2章_新.md", "long5/正文/第2章_新.md", "long6/正文/第2章_新.md", "bare/正文/第1章_起.md", "$PROJ/正文/第001章_x.md"]) {
+for (const rel of ["long/正文/第1章_起.md", "long/正文/第2章_承.md", "short/正文.md", "short2/正文.md", "long2/正文/第2章_新.md", "long3/正文/第2章_新.md", "long4/正文/第2章_新.md", "long5/正文/第2章_新.md", "long6/正文/第2章_新.md", "bare/正文/第1章_起.md", "$PROJ/正文/第001章_x.md", "$(pwd)/book/正文/第001章_y.md"]) {
   const reason = core.proseBlockReason(root, path.join(root, rel))
   console.log(`${rel} :: ${reason || "-"}`)
 }
@@ -623,6 +623,7 @@ JS
   # 目标含未展开的 shell 变量（cat > "$PROJ/正文/..."）：仍拦，但说路径没解析出来，不谎报缺细纲。
   grep -q '\$PROJ/正文/第001章_x.md :: ⛔.*未展开的 shell 变量' "$tmp/bpy.txt" || { echo "FAIL: shell 变量目标未按「路径未解析」拦截" >&2; return 3; }
   grep -q '\$PROJ/正文/第001章_x.md :: .*缺少细纲' "$tmp/bpy.txt" && { echo "FAIL: shell 变量目标被误报为缺少细纲" >&2; return 3; }
+  grep -q '\$(pwd)/book/正文/第001章_y.md :: ⛔.*未展开的 shell 变量' "$tmp/bpy.txt" || { echo "FAIL: \$(...) 命令替换目标未按「路径未解析」拦截" >&2; return 3; }
 
   # E3: 追踪状态判定 parity。覆盖缺失、坏 JSON、旧 schema、派生 revision 不一致、
   #     缺修订号、缺章号、提交落后和有效 state 放行，避免 Codex Python 与三端 JS core 漂移。

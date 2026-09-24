@@ -34,11 +34,15 @@ Related: [2026-09-24-long-analyze-legacy-prologue-alignment](../bug-fix/2026-09-
   分级字母、不带名称的 EM/REL/EV/RV/AX 编号、内部文件与 hash/JSON；并要求 SKILL.md 路由到该文件。回归测试
   用真实运行里出现过的原句逐条验证会被拦下。
 - **关系图脚本 `scripts/render_relation_chart.py`**：只从 `角色/角色关系.md` 生成。主产物是
-  `人物关系图/人物关系图.md`（Mermaid 图 + 文字清单 + 关键关系演变），任何 Markdown 查看器都显示中文；`--png`
-  时先按常见中文字体名（PingFang SC、Hiragino Sans GB、Microsoft YaHei、SimHei、Noto Sans CJK、WenQuanYi、
-  Source Han Sans 等）和 `fc-list :lang=zh` 找字体，并用 FT2Font 逐字检查要画的每个字都有字形（macOS 的
-  PingFang.ttc 首个字面是繁体 HK 版，缺简体字，只看字体名会画出方块），找到才画两张 PNG。找不到字体或没有
-  matplotlib 就不出图，返回一句大白话 `author_message`，绝不退回拼音或首字母。
+  `人物关系图/人物关系图.md`（Mermaid 图 + 文字清单 + 关键关系演变），任何 Markdown 查看器都显示中文，且在尝试
+  画 PNG 之前就写好，画图出错也不丢。关系列认 `→`/`->` 等单向箭头、`↔`/`<->`（拆成两条）和「甲 → 乙 → 丙」链式
+  （逐段拆），单元格里转义的 `\|` 不拆列；认不出的行计数返回并告诉作者。Mermaid 标签去掉 `%%`，清洗后为空时换成
+  「未命名」「关系」，避免 mermaid 解析失败。`--png` 时先按常见中文字体名（PingFang SC、Hiragino Sans GB、Microsoft
+  YaHei、SimHei、Noto Sans CJK、WenQuanYi、Source Han Sans 等）和 `fc-list :lang=zh` 找字体，排除 LastResort、
+  Adobe Blank 这类对任何字都返回方框字形的兜底字体，并用 FT2Font 逐字检查要画的每个字都有字形（macOS 的
+  PingFang.ttc 首个字面是繁体 HK 版，缺简体字，只看字体名会画出方块）；表情和其他符号不画进图片，其余文字全部有
+  字形才画两张 PNG。没有中文字体、中文字体缺某几个字（说出是哪几个字）或没有 matplotlib 时不出图，返回一句
+  大白话 `author_message`，绝不退回拼音或首字母。
 - 检查器和建索引脚本的停下说明、原文变化说明也改成作者语言（见 Related 的 bug-fix 篇）。
 
 ## Alternatives considered
@@ -56,5 +60,5 @@ Related: [2026-09-24-long-analyze-legacy-prologue-alignment](../bug-fix/2026-09-
 有中文字体时还有图片。
 
 代价：拆文报告小节结构变了，旧报告不会自动改写（Stage 5 重跑才生效）；demo 盘龙的旧报告仍是旧格式；守卫只
-覆盖 author-facing.md 的代码块，对话里模型是否照做仍靠模板约束；PNG 需要 matplotlib，默认 CI 只测无字体回退
-路径；story-import 的长篇导入管道仍按旧写法描述关系图，未同步。
+覆盖 author-facing.md 的代码块，对话里模型是否照做仍靠模板约束；PNG 需要 matplotlib，默认 CI 不真画图，只测无字体回退
+路径，选字体逻辑用假字体对象测；图片版不画表情等符号（Markdown 版保留原样）；story-import 的长篇导入管道仍按旧写法描述关系图，未同步。

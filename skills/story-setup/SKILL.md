@@ -28,6 +28,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
    - `agents_version: 31` → 使用 AskUserQuestion 确认是否重新部署；提示里写明重新部署只用**当前本地 skill 包**刷新项目文件，要拿 skill 本身的新版本得先更新 oh-story-claudecode（`npx skills add` 或 marketplace），再回来重跑
    - `agents_version` 大于 `31` → 当前 story-setup 比项目部署旧；停止以避免降级覆盖，提示先更新 oh-story-claudecode，不写任何部署文件
    - 同时读 `target_cli` 字段。**已部署项目以 sentinel 里的值为准**：非空时（逗号分隔的多端组合原样保留）跳过下面第 5-12 步的环境探测与选择，直接按这些端重新部署。只有字段缺失或为空，才回落到探测。用户明确要求增删目标端时，用 AskUserQuestion 在现有值基础上改，改完的值写回 sentinel。
+   - `target_cli` 不含 opencode、但项目里有 `.opencode/plugins/story-hooks.ts` 或 `.opencode/agents/`（多端部署时 OpenCode 曾被版本门拦下）→ 用 AskUserQuestion 问是否把 OpenCode 加回来；选加回则先过「OpenCode 部署前置」，通过后写回 `target_cli`
 2. 检查是否有书名目录（包含 `追踪/` 子目录的目录，或用户自定义结构）
    - 有 → 识别为长篇项目，显示当前项目信息
    - 无 → 识别为新项目或短篇项目
@@ -135,7 +136,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
    - 主版本 ≥ 2 → 继续
    - 主版本 < 2 → 停止 OpenCode 部署（其它 target 照常），告诉用户先升级到 2.x（先 `npm rm -g opencode-ai`，再 `npm i -g @opencode/cli` 或 `curl -fsSL https://opencode.ai/v2/install | bash`），装好后重跑 story-setup
    - 命令不可用或解析不出版本 → 同样停止 OpenCode 部署，请用户在自己的终端运行 `opencode --version`：用户在对话里确认显示 2.x 后才继续；是 1.x 按上一条处理
-   - 停止 OpenCode 部署时：target 只有 opencode 则不写、不更新 `.story-deployed`（已有的原样保留，不抬 `agents_version`），也不写任何 OpenCode 文件；多 target 时其它端照常部署，写入的 `target_cli` 不含 opencode，报告首行写明 OpenCode 未部署及原因
+   - 停止 OpenCode 部署时：target 只有 opencode 则不写、不更新 `.story-deployed`（已有的原样保留，不抬 `agents_version`），也不写任何 OpenCode 文件；多 target 时其它端照常部署，写入的 `target_cli` 不含 opencode，报告首行写明 OpenCode 未部署及原因，并告诉作者升级后重跑 story-setup、选择把 OpenCode 加回来
 2. 插件由 OpenCode 自动发现 `.opencode/plugins/*.ts` 加载，不写 `opencode.json`。项目根已有 `opencode.json` / `opencode.jsonc` 时，从其 `plugin`、`plugins` 数组删掉指向 `.opencode/plugins/story-hooks.ts` 的项（旧版部署留下；2.x 丢弃单文件路径并告警），数组删空就删掉该键，其余内容原样保留。
 
 ### Step 2：部署 CLAUDE.md
@@ -413,7 +414,7 @@ Reasonix（DeepSeek-Reasonix CLI）当前只部署 skills 与 `AGENTS.md`，不�
    - **先写「现在可以做什么」**：用写书的话列本次部署后真正可用的事（如「可以开新书、续写：说 /story-long-write」「可以拆一本对标书」），端的限制如实翻译（如「这个工具里审稿由我一个人完成，没有分工助手」）。
    - **再写「你还需要做的事」**：逐条可照做，如「新开一个会话」「在 Codex 里打开 /hooks，把 oh-story 的几条信任一下」「先安装 Node」；没有就写「无需其他操作」。这两段不出现脚本名、字段名、状态名或文件路径；各端「安装报告必须提示」的内容先翻译进这两段。
    - **最后是简短的「部署明细」**：已部署文件、已合并的配置、删掉的残留路径、下面的模型配置摘要和技术原因，放在报告末尾。
-    - **⚠️ 重启提示（必须醒目，放进「你还需要做的事」）**：本次部署写入了 `.claude/agents/`，但这些 custom agent 只在「会话启动」时才会被 Claude Code 注册成 `subagent_type`。**请新开一个 Claude Code 会话再开始写作**，否则当前会话里 story-review / story-long-write 等想 spawn `story-architect`、`narrative-writer` 等时会拿到「subagent_type 不可用」并降级 solo（单视角，失去多 agent 协作）。判断是否生效：新会话里跑 `/story-review`，报告开头「这次怎么审的」写着几个视角分头看即注册成功；若写着「我一个人审」说明还在旧会话或未注册。
+    - **⚠️ 重启提示（必须醒目，放进「你还需要做的事」）**：本次部署写入了 `.claude/agents/`，但这些 custom agent 只在「会话启动」时才会被 Claude Code 注册成 `subagent_type`。**请新开一个 Claude Code 会话再开始写作**，否则当前会话里 story-review / story-long-write 等想 spawn `story-architect`、`narrative-writer` 等时会拿到「subagent_type 不可用」并降级 solo（单视角，失去多 agent 协作）。判断是否生效：新会话里跑 `/story-review`，报告开头「这次怎么审的」写着几个视角（完整审或精简审）即注册成功；若写着「我一个人审」说明还在旧会话或未注册。
     - 重启后即可使用 `/story-long-write` 或 `/story-short-write`
     - 如果执行了「配置 OpenCode Agent 模型」，输出 Agent 模型配置摘要：
       ```
@@ -507,7 +508,7 @@ Reasonix（DeepSeek-Reasonix CLI）当前只部署 skills 与 `AGENTS.md`，不�
 1. 优先识别 story-setup 管理块标记（如果旧项目已有标记，只替换标记内内容）
 2. 无标记时，读取用户现有 CLAUDE.md，按 `##` 标题切分为 section map
 3. 读取模板 CLAUDE.md.tmpl，同样切分
-4. 模板中的标准 section（Skill 路由表、文件结构、协作规则、Compact 后恢复上下文）**覆盖**用户同名 section
+4. 模板中的标准 section（Skill 路由表、文件结构、协作规则、与作者协作、Compact 后恢复上下文；模板有而用户文件没有的 section 直接补入）**覆盖**用户同名 section
 5. 用户独有的 section（自定义内容）**保留**不动
 6. 未知冲突用 AskUserQuestion 让用户选择保留哪个版本
 
@@ -517,7 +518,7 @@ Reasonix（DeepSeek-Reasonix CLI）当前只部署 skills 与 `AGENTS.md`，不�
 1. 优先识别 story-setup 管理块标记（如果旧项目已有标记，只替换标记内内容）
 2. 无标记时，读取用户现有 AGENTS.md，按 `##` 标题切分为 section map
 3. OpenCode 使用 `skills/story-setup/references/opencode/AGENTS.md.tmpl`；Codex 使用 `skills/story-setup/references/codex/AGENTS.md.tmpl`；ZCode 使用 `skills/story-setup/references/zcode/AGENTS.md.tmpl`；OpenClaw 使用 `skills/story-setup/references/openclaw/AGENTS.md.tmpl`；Reasonix 使用 `skills/story-setup/references/reasonix/AGENTS.md.tmpl`；通用 Web AI / 其他 Agent 使用 `skills/story-setup/references/generic/AGENTS.md.tmpl`
-4. 模板中的标准 section（Skill 路由表、文件结构、协作规则、Compact 后恢复上下文）覆盖同名 section；用户独有 section 保留
+4. 模板中的标准 section（Skill 路由表、文件结构、协作规则、与作者协作、Compact 后恢复上下文；模板有而用户文件没有的 section 直接补入）覆盖同名 section；用户独有 section 保留
 5. 多端同时部署时，Codex/OpenCode/ZCode/OpenClaw/Reasonix/generic 共同可用的通用段落只保留一份；工具特有说明以小节区分，避免互相覆盖
 
 ## 重新部署

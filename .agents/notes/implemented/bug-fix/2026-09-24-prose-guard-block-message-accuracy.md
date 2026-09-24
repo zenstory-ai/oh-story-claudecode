@@ -14,8 +14,8 @@ Related: [2026-07-15-hook-guard-failure-semantics](../architecture/2026-07-15-ho
 ## Decision
 
 - JS 共享核 `story_hook_core.js` 的 `proseBlockReason`、Codex `story_codex_hook.py` 的 `prose_block_reason`、Claude `guard-outline-before-prose.sh` 的缺细纲文案都给三位补零的文件名（章号 ≥ 1000 时原样）；JS 核的三个部署副本由 `sync-shared-assets.py` 同步。
-- 长篇正文目标在项目根之下的相对部分含未展开的 shell 变量（`$VAR` / `${VAR}`），且按字面拼出的书目录不存在时，仍然拦截（fail closed），文案改为「写入路径含未展开的 shell 变量……守卫无法确认对应细纲。改用字面项目路径重新写入」。JS 与 Python 逐字一致。Claude 的 bash 守卫对 Bash 命令本来就调用共享核，文件路径直写（Write/Edit）不会出现 shell 变量，不需另改。
-- 测试：`test-prose-net-parity.sh` Part E 加 `$PROJ/正文/第001章_x.md` 与补零文件名断言（Python 与 JS 对比）；`test-codex-hooks.sh`、`test-opencode-plugin.mjs`、`check-story-setup-deployment.sh` 各加一条命令级用例。
+- 长篇正文目标在项目根之下的相对部分含未展开的 shell 变量或命令替换（`$VAR` / `${VAR}` / `$(cmd)`），且按字面拼出的书目录不存在时，仍然拦截（fail closed），文案改为「写入路径含未展开的 shell 变量……守卫无法确认对应细纲。改用字面项目路径重新写入」。JS 与 Python 逐字一致。Claude 的 bash 守卫对 Bash 命令本来就调用共享核，文件路径直写（Write/Edit）不会出现 shell 变量，不需另改。
+- 测试：`test-prose-net-parity.sh` Part E 加 `$PROJ/正文/第001章_x.md`、`$(pwd)/book/正文/第001章_y.md` 与补零文件名断言（Python 与 JS 对比）；`test-codex-hooks.sh`、`test-opencode-plugin.mjs`、`check-story-setup-deployment.sh` 各加一条命令级用例。
 
 ## Alternatives considered
 

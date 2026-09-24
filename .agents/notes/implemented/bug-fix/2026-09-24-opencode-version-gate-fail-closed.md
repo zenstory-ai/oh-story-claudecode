@@ -16,7 +16,8 @@ Related: [2026-09-23-opencode-v2-only](../architecture/2026-09-23-opencode-v2-on
 ## Decision
 
 - `skills/story-setup/SKILL.md`「OpenCode 部署前置」：主版本 < 2 或版本无法确定，都停止 OpenCode 部署。版本无法确定时请用户在自己的终端运行 `opencode --version`，用户在对话里确认是 2.x 才继续。
-- 停止 OpenCode 部署时：target 只有 opencode，就不写、不更新 `.story-deployed`（已有的原样保留，不抬 `agents_version`），也不写任何 OpenCode 文件；多 target 时其它端照常部署，写入的 `target_cli` 不含 opencode，报告首行说明 OpenCode 未部署及原因。
+- 停止 OpenCode 部署时：target 只有 opencode，就不写、不更新 `.story-deployed`（已有的原样保留，不抬 `agents_version`），也不写任何 OpenCode 文件；多 target 时其它端照常部署，写入的 `target_cli` 不含 opencode，报告首行说明 OpenCode 未部署及原因，并告诉作者升级后重跑、选择把 OpenCode 加回来。
+- 已部署项目重跑时，`target_cli` 不含 opencode 但项目里有 `.opencode/plugins/story-hooks.ts` 或 `.opencode/agents/`，用 AskUserQuestion 问是否加回 OpenCode；选加回先过版本门，通过后写回 `target_cli`。否则 sentinel 已是当前 `agents_version`、又以 `target_cli` 为准跳过探测，升级后的 OpenCode 永远不会重新部署，旧插件在 2.x 上静默失效。
 - 升级命令先 `npm rm -g opencode-ai` 再装 `@opencode/cli`：两个包都提供 `opencode` 命令，不卸旧包时 PATH 上可能仍是 1.x。
 - story-review 改为检查 `mode: subagent` 与 `permissions:` 规则列表；旧版单数 `permission:` 视为待重新部署。
 - story-short-write、story-deslop、story-import、story-review 的委派说明改为「OpenCode 用 `subagent` 的 `agent` 参数」。
@@ -30,6 +31,6 @@ Related: [2026-09-23-opencode-v2-only](../architecture/2026-09-23-opencode-v2-on
 
 ## Consequences
 
-- **收益**：1.x 或版本不明时不会再部署出权限失效的只读 agent；OpenCode-only 项目被拦后，下次会话仍会提示需要重跑 story-setup；story-review 不再把 2.x 合法 agent 误判为 malformed。
-- **代价**：无法在部署环境里运行 `opencode --version` 的用户多一步确认；多 target 部署时 OpenCode 被拦会让 `target_cli` 少一项，升级后需要重跑并把 opencode 加回来。
+- **收益**：1.x 或版本不明时不会再部署出权限失效的只读 agent；OpenCode-only 项目被拦后，下次会话仍会提示需要重跑 story-setup；多端项目被拦后，升级再重跑会被问到是否加回 OpenCode；story-review 不再把 2.x 合法 agent 误判为 malformed。
+- **代价**：无法在部署环境里运行 `opencode --version` 的用户多一步确认；多 target 部署时 OpenCode 被拦会让 `target_cli` 少一项，要靠重跑时的加回询问补回；作者手动删了 `.opencode/` 的项目不会被问到。
 - **已知上限**：版本门仍靠 skill 文本约束模型执行，没有脚本强制；`check-opencode-adapter.sh` 只守文案存在，不在真实 1.x 上跑部署。

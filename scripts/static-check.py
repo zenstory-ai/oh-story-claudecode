@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import re
 import sys
 import unicodedata
@@ -74,28 +75,19 @@ BRACE_LIST_RE = re.compile(r"\{([^{}/]*,[^{}/]*)\}")
 # 面向作者的汇报模板：信息串为 author-report 的围栏块是直接说给作者听的话，
 # 不得出现脚本/字段/参数名、状态码或内部清单名（SKILL.md「面向作者的汇报」）。
 AUTHOR_REPORT_INFO = "author-report"
-_NO_ASCII_BEFORE = r"(?<![A-Za-z0-9_])"
-_NO_ASCII_AFTER = r"(?![A-Za-z0-9_])"
-AUTHOR_REPORT_JARGON = (
-    (re.compile(r"[A-Za-z0-9]+(?:_[A-Za-z0-9]+)+"), "snake_case 字段名"),
-    # 作者要亲手输入的 `/story-*` 命令不算黑话，斜杠后的 kebab-case 放行。
-    (re.compile(r"(?<![A-Za-z0-9_/-])[a-z]+(?:-[a-z]+)+" + _NO_ASCII_AFTER), "kebab-case 动作/参数名"),
-    (re.compile(r"\.(?:py|js|mjs|json|sh)" + _NO_ASCII_AFTER), "脚本或数据文件名"),
-    (re.compile(r"(?<![\w-])--[A-Za-z]"), "命令行参数"),
-    (re.compile(_NO_ASCII_BEFORE + r"S[1-4]" + _NO_ASCII_AFTER), "一致性分级代号"),
-    (re.compile(_NO_ASCII_BEFORE + r"[EFL]\d+(?:-\d+)?" + _NO_ASCII_AFTER + r"(?!\s*[（(])"), "不带故事标签的编号"),
-    (
-        re.compile(
-            _NO_ASCII_BEFORE
-            + r"(?:commit|discard|borderline|invalid|internal|pass|fail|under|over|tracking|state|revision"
-            + r"|checkpoint|segment|schema|delta|Constraint Lock|Notice|Fallback)"
-            + _NO_ASCII_AFTER,
-            re.IGNORECASE,
-        ),
-        "工程术语",
-    ),
-    (re.compile(r"安全七检|七检|供给自查|供给单|内带|用户带|二档|三档|收编|契约检查器|状态码|追踪事务"), "内部清单名"),
-)
+
+
+def _load_author_report_rules():
+    """规则只有一份，放在 check-author-reports.py；这里只负责按全仓扫描调用它。"""
+    path = Path(__file__).resolve().with_name("check-author-reports.py")
+    spec = importlib.util.spec_from_file_location("check_author_reports", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+AUTHOR_REPORT_RULES = _load_author_report_rules()
 # 跨 skill 扫描覆盖全部文本资产。模板（*.md.tmpl / *.json.patch）与前端资产同样会被
 # story-setup 部署进作者项目，漏扫等于把「skill 自包含」这条红线在部署面上放空。
 SKILL_TEXT_SUFFIXES = {
@@ -330,22 +322,16 @@ def author_report_blocks(path: Path) -> list[tuple[int, list[tuple[int, str]]]]:
 def author_report_issues(path: Path) -> list[Issue]:
     issues: list[Issue] = []
     for _opening, lines in author_report_blocks(path):
-        for line_number, text in lines:
-            # 与 check-author-reports.py 同一约定：块尾「技术备注：」一行留给排障，不按白话要求检查。
-            if text.lstrip().startswith("技术备注："):
-                continue
-            for pattern, label in AUTHOR_REPORT_JARGON:
-                match = pattern.search(text)
-                if match:
-                    issues.append(
-                        Issue(
-                            "error",
-                            "author-report-jargon",
-                            path,
-                            line_number,
-                            f"作者汇报模板含{label}「{match.group(0)}」；改成作者能懂的白话",
-                        )
-                    )
+        for index, message in AUTHOR_REPORT_RULES.check_block([text for _line, text in lines]):
+            issues.append(
+                Issue(
+                    "error",
+                    "author-report-jargon",
+                    path,
+                    lines[index][0],
+                    f"作者汇报模板含{message}；改成作者能懂的白话",
+                )
+            )
     return issues
 
 

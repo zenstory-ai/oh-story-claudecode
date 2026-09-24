@@ -630,8 +630,8 @@ function extractPatchTargets(patchText) {
   return targets
 }
 
-// 未展开的 shell 变量：$VAR / ${VAR}。与 codex UNEXPANDED_SHELL_VAR 同式。
-const UNEXPANDED_SHELL_VAR = /\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)/
+// 未展开的 shell 变量：$VAR / ${VAR} / $(cmd)。与 codex UNEXPANDED_SHELL_VAR 同式。
+const UNEXPANDED_SHELL_VAR = /\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*|\()/
 
 function proseBlockReason(root, absolute) {
   const base = path.basename(absolute)

@@ -13,6 +13,7 @@ import csv
 import json
 import re
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Iterable
 
@@ -39,11 +40,14 @@ STATE_END = "<!-- story-long-analyze:runtime-state:end -->"
 # v0.7.x wrote a 「章节边界」 table (章号 | 标题 | 起始行 | 字数) into _progress.md.
 BOUNDARY_HEADING_RE = re.compile(r"^#{1,6}\s*章节边界")
 TITLE_LABEL_RE = re.compile(
-    r"^\s*(?:第[〇零一二三四五六七八九十百千万两0-9]+[卷章回节]|卷[〇零一二三四五六七八九十百千万两0-9]+"
-    r"|Chapter\s*[0-9]+|楔子|序章|引子|前言|后记|尾声|番外[〇零一二三四五六七八九十百千万两0-9]*)",
+    r"^\s*(?:第(?P<number>[〇零一二三四五六七八九十百千万两0-9]+)章|第[〇零一二三四五六七八九十百千万两0-9]+[卷回节]"
+    r"|卷[〇零一二三四五六七八九十百千万两0-9]+|Chapter\s*(?P<english>[0-9]+)|(?P<numeric>[0-9]+)[.、](?![0-9])"
+    r"|(?P<special>楔子|序章|引子|前言|后记|尾声|番外[〇零一二三四五六七八九十百千万两0-9]*))",
     re.IGNORECASE,
 )
-TITLE_NOISE_RE = re.compile(r"[\s\-—:：、.．,，;；!！?？\"“”'‘’《》「」『』]+")
+# Author notes appended to a heading, e.g. 「（求收藏）」「【二合一】」.
+TITLE_NOTE_RE = re.compile(r"[(\[【〔〖][^()\[\]【】〔〕〖〗]*[)\]】〕〗]\s*$")
+TITLE_NOISE_RE = re.compile(r"[\s\-—:：、.,;!?\"“”'‘’《》「」『』()\[\]【】〔〕〖〗]+")
 
 
 def nonempty(path: Path) -> bool:
@@ -248,33 +252,80 @@ def read_legacy_boundaries(text: str | None) -> list[dict[str, object]]:
     return rows
 
 
-def title_key(title: str) -> str:
-    text = str(title or "")
+def title_parts(title: str) -> tuple[str, str, str]:
+    """(label, strict key, loose key) of a heading; loose drops trailing author notes."""
+    text = unicodedata.normalize("NFKC", str(title or "")).strip()
+    label = ""
     for _ in range(3):
-        stripped = TITLE_LABEL_RE.sub("", text, count=1)
-        if stripped == text:
+        match = TITLE_LABEL_RE.match(text)
+        if not match or not match.group(0).strip():
             break
-        text = stripped
-    return TITLE_NOISE_RE.sub("", text)
+        for group in ("number", "english", "numeric", "special"):
+            if match.group(group):
+                label = match.group(group)
+        text = text[match.end():]
+    strict = TITLE_NOISE_RE.sub("", text)
+    loose = text
+    while TITLE_NOTE_RE.search(loose):
+        loose = TITLE_NOTE_RE.sub("", loose)
+    return label, strict, TITLE_NOISE_RE.sub("", loose) or strict
+
+
+def label_matches(label: str, row: dict[str, object]) -> bool:
+    source = str(row.get("source_chapter", "")).strip()
+    if not label or not source:
+        return False
+    if label == source:
+        return True
+    try:
+        from build_chapter_index import parse_number
+        return source.isdigit() and parse_number(label) == int(source)
+    except ValueError:
+        return False
+
+
+def title_candidates(title: str, index_rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Index rows whose title agrees with an old table title, best tier first."""
+    label, strict, loose = title_parts(title)
+    if strict:
+        keys = [(row, title_parts(str(row.get("title", "")))) for row in index_rows]
+        for tier in (
+            [row for row, (_, row_strict, _) in keys if row_strict == strict],
+            [row for row, (_, _, row_loose) in keys
+             if row_loose and (row_loose == loose or row_loose in loose or loose in row_loose)],
+        ):
+            if tier:
+                return tier
+    # Retitled or title-less headings still carry their chapter number.
+    return [row for row in index_rows if label_matches(label, row)]
 
 
 def map_legacy_row(old: dict[str, object], index_rows: list[dict[str, object]]) -> int | None:
-    """Index chapter an old boundary row points at: its start line, checked by title."""
-    by_line = None
+    """Index chapter an old boundary row points at.
+
+    A start line that is exactly a chapter's heading line decides on its own.
+    Otherwise the title picks the chapter (nearest to the old start line when
+    several match); a title-less row falls back to the chapter holding the line.
+    """
     start = old.get("start_line")
     if isinstance(start, int):
         for row in index_rows:
-            if int(row["start_line"]) <= start <= int(row["end_line"]):
-                by_line = row
-                break
-    key = title_key(str(old.get("title", "")))
-    if by_line is not None and (not key or title_key(str(by_line.get("title", ""))) == key):
-        return int(by_line["chapter"])
-    if key:
-        matches = [row for row in index_rows if title_key(str(row.get("title", ""))) == key]
-        if len(matches) == 1:
-            return int(matches[0]["chapter"])
-    return None
+            if int(row["start_line"]) == start:
+                return int(row["chapter"])
+    matches = title_candidates(str(old.get("title", "")), index_rows)
+    if not isinstance(start, int):
+        return int(matches[0]["chapter"]) if len(matches) == 1 else None
+    if not matches and not any(title_parts(str(old.get("title", "")))[:2]):
+        matches = [row for row in index_rows if int(row["start_line"]) <= start <= int(row["end_line"])]
+
+    def distance(row: dict[str, object]) -> int:
+        first, last = int(row["start_line"]), int(row["end_line"])
+        return 0 if first <= start <= last else min(abs(start - first), abs(start - last))
+
+    ranked = sorted(matches, key=distance)
+    if not ranked or (len(ranked) > 1 and distance(ranked[0]) == distance(ranked[1])):
+        return None
+    return int(ranked[0]["chapter"])
 
 
 def leading_special_labels(index_rows: list[dict[str, object]]) -> list[str]:
@@ -297,9 +348,9 @@ def mapping_author_message(detail: str, labels: list[str], done: str) -> str:
             "照这样续拆，旧文件会整体错开一章——%s没人拆、有的章被拆两遍。请选一种："
             "① 按旧章号继续（推荐，旧拆文当时没把%s算作一章时选这个）：%s并进第一章，"
             "已拆好的%s原样复用，%s不单独拆；"
-            "② %s单独算一章：已拆好的%s挪进备份目录（不删除），按新章号重拆；"
+            "② %s单独算一章：这本书已有的拆文结果全部挪进备份目录（不删除），按新章号重拆；"
             "③ 换一个新目录，整本重新拆。"
-            % (detail, prologue, prologue, prologue, prologue, done, prologue, prologue, done)
+            % (detail, prologue, prologue, prologue, prologue, done, prologue, prologue)
         )
     return (
         "先停一下：%s，没法确认已拆好的%s各对应哪一章。请选一种："
@@ -619,6 +670,9 @@ def compact_payload(payload: dict[str, object]) -> dict[str, object]:
 
 
 def main() -> int:
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True, help="拆文库/{书名} 目录")
     parser.add_argument("--expected-chapters", type=int, help="已知总章数；省略时按标准路径优先推断")
@@ -626,9 +680,6 @@ def main() -> int:
     args = parser.parse_args()
     if args.expected_chapters is not None and args.expected_chapters < 1:
         parser.error("--expected-chapters 必须大于 0")
-    for stream in (sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
-            stream.reconfigure(encoding="utf-8")
     try:
         if not args.root.exists():
             raise ValueError("root_not_found:%s" % args.root)

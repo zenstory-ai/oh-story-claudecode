@@ -504,7 +504,7 @@ def test_author_report_templates_reject_engineering_jargon() -> None:
         assert result.returncode == 1, result.stdout + result.stderr
         for token in (
             "accept-current-length", "discard", "visible_chars_v1", "内带", "S3", "F057",
-            ".py", "--c", "state_revision",
+            "storyctl.py", "--chapter", "state_revision",
         ):
             assert f"「{token}」" in result.stdout, (token, result.stdout)
 

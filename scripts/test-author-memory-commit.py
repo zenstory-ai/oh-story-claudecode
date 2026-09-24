@@ -351,6 +351,66 @@ def assert_single_root_layout(temporary: Path, input_path: Path) -> None:
     assert "无法自动归位" in query(broken, "--kind", "prose_style", *broken_args, expect=2)["stderr"]
 
 
+def assert_book_dir_is_not_single_root(temporary: Path, input_path: Path) -> None:
+    """多书工作区里的书目录被误传成 --workspace（书目录自己也含 .story/作者记忆/）：
+    不得当单书布局挪动书级 state，报错、零写入；正确调用照常可用。"""
+    workspace = temporary / "多书工作区"
+    book_root = workspace / "长篇" / "甲书"
+    book_root.mkdir(parents=True)
+    book_args = ("--book-root", str(book_root))
+    record(workspace, input_path, remember("mb-global", preference("全局：动词承重", "记住：动词承重。")))
+    record(workspace, input_path, remember("mb-book", preference(
+        "甲书：对话短句", "这本书对话短一点。", scope_level="book", scope_value="甲书",
+    )), *book_args)
+    before = snapshot(workspace)
+    mistaken = ("--workspace", str(book_root), *book_args)
+    for command in (("query", "--kind", "prose_style"), ("init",), ("check",), ("migrate",)):
+        failed = run(command[0], *mistaken, *command[1:], expect=2)
+        assert f"--workspace 应传 {workspace.resolve()}" in failed.stderr, failed.stderr
+    record(book_root, input_path, remember("mb-book-2", preference(
+        "甲书：少用比喻", "这本书少用比喻。", scope_level="book", scope_value="甲书",
+    )), *book_args, expect=2)
+    assert snapshot(workspace) == before, "误传书目录为工作区时不得改动任何文件"
+    assert not (memory_dir(book_root) / "书级").exists()
+    # 误传不带 --book-root 时，报错提示不得只引导「带 --book-root {工作区} 重跑」
+    hint = query(book_root, "--kind", "prose_style", expect=2)["stderr"]
+    assert "改传创作工作区根" in hint and "单书布局" in hint, hint
+    # 正确调用照常可用
+    assert [item["id"] for item in query(workspace, "--kind", "prose_style", *book_args)["items"]] == ["BP001", "AP001"]
+    run("check", "--workspace", str(workspace), *book_args)
+
+    # 其余两种迹象：祖先有 .active-book，或祖先有项目级 store（书目录不在 长篇/ 短篇/ 下）
+    marked = temporary / "标记工作区"
+    (marked / "书稿" / "乙书").mkdir(parents=True)
+    (marked / ".active-book").write_text("书稿/乙书\n", encoding="utf-8")
+    nested = marked / "书稿" / "乙书"
+    assert f"--workspace 应传 {marked.resolve()}" in run("init", "--workspace", str(nested), "--book-root", str(nested), expect=2).stderr
+    stored = temporary / "有项目级工作区"
+    (stored / "丙书").mkdir(parents=True)
+    run("init", "--workspace", str(stored))
+    nested = stored / "丙书"
+    assert f"--workspace 应传 {stored.resolve()}" in run("init", "--workspace", str(nested), "--book-root", str(nested), expect=2).stderr
+    assert not memory_dir(nested).exists()
+
+
+def assert_single_root_case_insensitive_path(temporary: Path, input_path: Path) -> None:
+    """大小写不敏感的文件系统（macOS APFS 默认）上，只差大小写的书根仍是同一目录。"""
+    probe = temporary / "CaseProbe"
+    probe.mkdir()
+    if not (temporary / "caseprobe").exists():
+        return  # 大小写敏感的文件系统上没有这种别名
+    workspace = temporary / "Book"
+    workspace.mkdir()
+    alias = ("--book-root", str(temporary / "book"))
+    record(workspace, input_path, remember("ci-global", preference("全局：动词承重", "记住：动词承重。")), *alias)
+    booked = json.loads(record(workspace, input_path, remember("ci-book", preference(
+        "本书对话短句", "这本书对话短一点。", scope_level="book", scope_value="Book",
+    )), *alias).stdout)
+    assert booked["item_ids"] == ["BP001"] and Path(booked["root"]).name == "书级", "只差大小写的书根也按单书布局住子目录"
+    assert "book" not in state(workspace), "项目级 state 不得被书级条目占用"
+    assert [item["id"] for item in query(workspace, "--kind", "prose_style", *alias)["items"]] == ["BP001", "AP001"]
+
+
 def assert_other_store_failure_is_nonfatal(temporary: Path, input_path: Path) -> None:
     """写入已落盘后，读另一级 store 失败只降级为提醒：报错会让 agent 告诉作者「没记住」，
     换个 event_id 重试就派生重复条目。"""
@@ -1042,6 +1102,8 @@ def main() -> None:
         assert "超出 120 字节上限" in new_long.stderr, "新建条目仍受一句话上限约束"
 
         assert_single_root_layout(Path(temporary), input_path)
+        assert_book_dir_is_not_single_root(Path(temporary), input_path)
+        assert_single_root_case_insensitive_path(Path(temporary), input_path)
         assert_other_store_failure_is_nonfatal(Path(temporary), input_path)
         assert_no_false_negatives()
         assert_omitted_ids_follow_priority()
