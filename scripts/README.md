@@ -76,6 +76,7 @@
 | `test-charcount-portable.sh` | 跨平台字符统计命令在三平台 + Windows 的正确性 | CI（调 check-python-invocation） |
 | `test-hook-encoding-portable.sh` | 部署 hook 在 Windows 中文系统的编码健壮性 | CI |
 | `test-long-analyze-runtime.py` | 长篇拆文索引、旧成果直接使用/增强/续跑路由、无重叠原文块、批次提交与恢复 | CI；改 story-long-analyze 运行时后 |
+| `test-inspiration-index.py` | 三层灵感库索引：EM 卡登记幂等、专名泄漏拦截、NM/CBA 闭包与计数、卡内路径引用拒绝、标签检索 | CI；改 inspiration_index.py 或灵感库契约后 |
 | `test-opencode-cli-e2e.sh` | 真实 OpenCode CLI 加载 smoke（repo skills 发现 / 13 commands / 7 agents / plugin） | CLI compatibility CI；需已安装 `opencode` |
 | `test-skill-numbering.sh` | Step 重排级联安全、锚点 fail-closed、代码块引用、验证零写入/提交回滚、dry-run/write/幂等性 | Linux / Windows Git Bash / macOS CI |
 

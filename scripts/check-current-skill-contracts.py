@@ -1312,6 +1312,57 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
         )
     )
 
+    # 三层灵感库管道：复用 EM 卡、裸 ID 引用、可选轴不阻塞——三条红线各有一个可机检锚点。
+    inspiration_library = repo_root / "skills/story-long-analyze/references/inspiration-library.md"
+    for pattern, code, message in (
+        (r"原子灵感", "inspiration-atom-layer", "inspiration library must define the atom layer"),
+        (r"单小说灵感合并", "inspiration-novel-merge-layer", "inspiration library must define the single-novel merge layer"),
+        (r"跨书灵感聚合", "inspiration-cross-book-layer", "inspiration library must define the cross-book aggregation layer"),
+        (r"只是索引行，没有文件", "inspiration-atom-is-index-row", "inspiration atoms must stay index rows without card files"),
+        (r"禁止在卡里堆路径链接|卡内无路径引用", "inspiration-no-path-in-card", "NM/CBA cards must reference sources by bare id, not paths"),
+        (r"单书拆文不自动入库", "inspiration-no-auto-ingest", "single-book analysis must not auto-ingest into the library"),
+    ):
+        findings.extend(require_pattern(inspiration_library, pattern, code, message))
+    findings.extend(
+        require_pattern(
+            repo_root / "skills/story-long-analyze/SKILL.md",
+            r"references/inspiration-library\.md",
+            "inspiration-pipeline-routed",
+            "story-long-analyze must route the optional inspiration pipeline",
+        )
+    )
+    findings.extend(
+        require_pattern(
+            repo_root / "skills/story-long-write/references/cross-book-recall.md",
+            r"layer=跨书灵感聚合[^\n]*status=active",
+            "cross-book-active-cba-only",
+            "inspiration recall must retrieve only active cross-book aggregation cards",
+        )
+    )
+    findings.extend(
+        require_pattern(
+            repo_root / "skills/story-long-write/references/project-files.md",
+            r"Top 3[–-]8[^\n]*CBA[^\n]*不传 IA/NM",
+            "long-write-cba-budget",
+            "long writing must bound public inspiration retrieval to Top 3-8 CBA cards without IA/NM",
+        )
+    )
+    setup_workflow = repo_root / "skills/story-long-write/references/workflow-setup.md"
+    for pattern, code, message in (
+        (r"适用阶段=设定", "inspiration-hook-setup", "book setup must offer optional inspiration recall"),
+        (r"适用阶段=卷纲", "inspiration-hook-volume", "volume outlining must offer optional inspiration recall"),
+        (r"适用阶段=细纲", "inspiration-hook-outline", "chapter outlining must offer optional inspiration recall"),
+    ):
+        findings.extend(require_pattern(setup_workflow, pattern, code, message))
+    findings.extend(
+        require_pattern(
+            repo_root / "skills/story-long-write/references/cross-book-recall.md",
+            r"独立于[^\n]*多对标触发条件",
+            "inspiration-decoupled-from-multi-benchmark",
+            "inspiration channel must not depend on the >=2 benchmark trigger",
+        )
+    )
+
     # 三处消费方都必须明确取消逐点字数，避免旧 Σ 契约从任一部署面回流。
     for relative in OUTLINE_SEMANTIC_CAPACITY_CONSUMERS:
         findings.extend(
