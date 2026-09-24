@@ -854,6 +854,42 @@ def test_outline_total_and_profile_gap_parity() -> None:
     )
 
 
+def test_author_facing_templates_stay_plain() -> None:
+    """拆文给作者看的模板里，一个真实报告出现过的工程词都不能漏过。"""
+
+    real_path = REPO_ROOT / "skills/story-long-analyze/references/author-facing.md"
+    require(not VALIDATOR.author_facing_findings(real_path), "author-facing templates must stay plain")
+    leaked_lines = [
+        "classification: current_complete",
+        "final_state: completed，推荐 direct_use",
+        "stage_repairs: []",
+        "plan --intent continue 返回 batches: []",
+        "已复用 REUSE-1-3，原文块 RAW-4-6",
+        "披露引用与三维解释完整 100%",
+        "B 级推断两条",
+        "关系 REL-001/004 反转",
+        "覆盖率 96%，置信度高",
+        "见 manage_analysis_run.py 输出",
+        "Stage 5 已完成",
+    ]
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "author-facing.md"
+        path.write_text(
+            "说明文字里可以提 `author_message` 与 RAW-4-6。\n\n```text\n"
+            + "\n".join(leaked_lines)
+            + "\n「退婚当众打脸」（EM-003）：由信任到反目\n```\n",
+            encoding="utf-8",
+        )
+        findings = VALIDATOR.author_facing_findings(path)
+    flagged = {finding.excerpt for finding in findings}
+    missed = [line for line in leaked_lines if line not in flagged]
+    require(not missed, "author-facing guard missed engineering tokens: {}".format(missed))
+    require(
+        "「退婚当众打脸」（EM-003）：由信任到反目" not in flagged,
+        "an id that follows its human label must stay allowed",
+    )
+
+
 def main() -> int:
     test_manifest_contract()
     test_bad_fallbacks_fail()
@@ -875,6 +911,7 @@ def main() -> int:
     test_upgrading_version_contract()
     test_style_profile_is_not_a_book_existence_probe()
     test_outline_total_and_profile_gap_parity()
+    test_author_facing_templates_stay_plain()
     print("OK: current-contract manifest, structure, and fallback regressions passed")
     return 0
 

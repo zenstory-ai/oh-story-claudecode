@@ -23,6 +23,10 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 5. 只迁移抽象机制，不复刻专有设定、角色组合、关键事件链、标志性场面或原句。
 6. 不为填字段虚构事实，不把结果倒推成人物早有计划。
 
+## 对作者说话
+
+作者读到的一切——停下来提问、进度、拆完汇报、出错说明，以及 `快速预览.md`、`拆文报告.md`、人物关系图——按 [references/author-facing.md](references/author-facing.md) 写：大白话讲书、讲章、讲读者和作者能怎么用；不出现脚本名、命令、字段名、状态值、批次编号、内部文件名、质量指标名和证据分级字母；编号只和名称一起出现；需要作者拿主意时给一个问题、推荐选项和默认值；工程细节默认不写，确需时只在末尾留一行技术备注。脚本输出带 `author_message` 时转述它，不贴 JSON 或错误码。
+
 ## Phase 1：确认对象并检查目录
 
 没有书名或原文时询问书名、平台和原文路径；已有完整成果直接使用时不强制索要原文。已有目录先运行只读检查器：
@@ -65,7 +69,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | 5 主报告 | 权威底层结果 | 拆文报告、完整概要 | 文件存在、阶段状态完成 |
 | 6 文风 | 既有资料、样本或索引定点原文 | `文风.md` | 文件存在、阶段状态完成 |
 
-用户未要求一次跑完时，Stage 1 后停下询问是否继续；续跑不重复 Stage 0/1。Stage 3–5 不重读原文。Stage 6 可按索引定点读取 4–6 段原文锚点，但不重扫全书。
+用户未要求一次跑完时，Stage 1 后按 author-facing.md「开头三章拆完、停下来问」询问是否继续；续跑不重复 Stage 0/1。Stage 3–5 不重读原文。Stage 6 可按索引定点读取 4–6 段原文锚点，但不重扫全书。
 
 ## Stage 0：机械章节索引
 
@@ -81,7 +85,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locator,status,chapter_sha256,source_sha256,parser_version
 ```
 
-只按 LF 计物理行。支持楔子、序章、第0章、任意正文起始章、番外、后记、中文大数、英文章号、多卷重置和卷章组合。目录与正文标题重复时先剔掉目录块；落表前校验章号连续、无重复和边界有效，其中特殊章独立编号，正文允许从任意首章开始。原文变化先拒绝；确认后用 `--rebuild`。追加章节不使前面逐章 hash 失效，只有新章进入待处理；改动已拆章节的原文只会让该批缓存重读，已有摘要不刷新（要刷新就删掉对应摘要和批次缓存再续跑）。旧章映射会整体漂移或旧成果从序章、第0章、非第一章开头而无法确认身份时，停止并明确报告。
+只按 LF 计物理行。支持楔子、序章、第0章、任意正文起始章、番外、后记、中文大数、英文章号、多卷重置和卷章组合。目录与正文标题重复时先剔掉目录块；落表前校验章号连续、无重复和边界有效，其中特殊章独立编号，正文允许从任意首章开始。原文变化先拒绝；确认后用 `--rebuild`。追加章节不使前面逐章 hash 失效，只有新章进入待处理；改动已拆章节的原文只会让该批缓存重读，已有摘要不刷新（要刷新就删掉对应摘要和批次缓存再续跑）。旧成果（旧摘要，或旧版 `_progress.md` 下的黄金三章）的章号与新索引对不上时，脚本在写索引前停下并返回 `author_message`：有旧版「章节边界」表就逐章核对标题与起始行，没有表而原文不从第一章开始也停。把说明和选项转告作者（默认推荐①）：① 按旧章号继续——加 `--fold-prologue` 重建，楔子/序章/第0章并进第一章，旧成果原样复用、楔子不单独拆；② 楔子单独成章——把旧的 `章节/` 深拆与摘要、`快速预览.md`、`概要.md`、`_progress.md` 挪进 `_analysis_cache/legacy/旧章号/`（不删除），再从 Stage 0 重拆；③ 换新目录整本重拆。索引已建过时先删 `chapter_index.csv`（只是机械章节表）再按所选方式重建。
 
 ## Stage 2：计划、提取、提交
 
@@ -129,13 +133,13 @@ chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locato
 
 从 Stage 2 的 `涉及人物`、状态变化和批次关系观察归一实体，再结合 Stage 3 剧情单元生成角色档案与设定。关系记录动作方向、触发、双方得失、表面/真实状态、阶段变化和证据；“甲保护乙”与“乙依赖甲”分别记录。
 
-同一关系数据生成核心人物关系图与关键关系演变图。环境无法可靠渲染时记录缺失原因，不另建关系事实。
+关系图只从 `角色/角色关系.md` 生成：`"{PYTHON}" "{story-long-analyze skill 根}/scripts/render_relation_chart.py" --root "{拆文目录}" --png`。主产物是 `人物关系图/人物关系图.md`（Mermaid + 文字清单，任何 Markdown 查看器都显示中文）；PNG 只在找到含中文字形的字体时生成。没有中文字体就不出图，不得自行改画拼音或首字母版，把脚本的 `author_message` 转告作者。
 
 至少一份角色档案和一份设定文件落盘后运行 `manage_analysis_run.py mark-stage --stage stage4`；缺任一类文件时不得标完成。
 
 ## Stage 5：主报告
 
-报告包括范围与覆盖、人物动力、剧情因果、双时间线与知识边界、三维节奏、核心机制、文风摘要、证据边界和待核项。生成新报告前运行 `manage_analysis_run.py mark-stage --stage stage5 --prepare`，把旧报告完整保存到 `_analysis_cache/legacy/拆文报告.md`；新报告落盘后再运行 `manage_analysis_run.py mark-stage --stage stage5`，命令在 `拆文报告.md` 不存在或为空时拒绝完成。报告只综合底层结果，不再次阅读全文。
+报告按 author-facing.md「拆文报告.md」写：拆到哪、核心发现、读者在追什么、故事怎么推进、人物与关系、读者与角色的信息差、节奏、核心机制、可借鉴套路、不建议模仿、文风一句话、还不确定的地方。生成新报告前运行 `manage_analysis_run.py mark-stage --stage stage5 --prepare`，把旧报告完整保存到 `_analysis_cache/legacy/拆文报告.md`；新报告落盘后再运行 `manage_analysis_run.py mark-stage --stage stage5`，命令在 `拆文报告.md` 不存在或为空时拒绝完成。报告只综合底层结果，不再次阅读全文。
 
 如项目存在 `选题决策.md`，只回填仍标记“待拆文验证”且题材匹配的项。文件存在但缺少当前契约必需的“能爆的原因”等字段时返回 `invalid_topic_decision_contract`，提示重跑 `story-long-scan` Phase 5；文件不存在不影响拆文。
 
@@ -151,6 +155,6 @@ chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locato
 
 运行状态只有 `_progress.md` 受管区；既有 `schema_version: 2` 原值保留；`chapter_index.csv` 是机械索引；缓存是恢复证据。有阶段记录后，受管区的 `最终状态` 由脚本按 Stage 3–6 的阶段状态写出（都完成为 `completed`，否则 `pending`）；旧项目沿用自己原有的 `最终状态` 行，全部完成时由脚本改为 `completed`，不写第二行，会话 hooks 靠它判断拆文是否完成，不要手改。不得创建运行计划、checkpoint、逐批 JSON receipt 或 Stage receipt。
 
-最终必须回归：黄金三章、逐章摘要、情绪模块、节奏、角色、设定、文风、导入、对标和写作仍可用；旧完整项目直接使用；部分项目只补精确缺章；混存项目报告来源但不重拆；增强/恢复不改旧产物与原 schema。
+全部完成后按 author-facing.md「全部拆完」向作者汇报。最终必须回归：黄金三章、逐章摘要、情绪模块、节奏、角色、设定、文风、导入、对标和写作仍可用；旧完整项目直接使用；部分项目只补精确缺章；混存项目报告来源但不重拆；增强/恢复不改旧产物与原 schema。
 
 详细命令和恢复顺序见 [references/pipeline-ops.md](references/pipeline-ops.md)。输出模板见 [references/output-templates.md](references/output-templates.md)，素材聚合方法见 [references/material-decomposition.md](references/material-decomposition.md)。联合验收用 [references/semantic-acceptance-fixtures.md](references/semantic-acceptance-fixtures.md) 的六项 0–2 分表，真实模型结果至少 10/12 且无硬失败才算语义通过。

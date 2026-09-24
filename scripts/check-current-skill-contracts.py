@@ -694,6 +694,46 @@ def require_pattern(path: Path, pattern: str, code: str, message: str) -> List[F
     return [Finding(code, message, path)]
 
 
+# 拆文写给作者的模板（对话回复、快速预览、拆文报告）里不得出现工程痕迹：作者看不懂
+# 字段名、批次号、脚本名和内部指标，真实运行里它们会被模型照抄进汇报。
+AUTHOR_FACING_FORBIDDEN = (
+    (r"\b(?:classification|recommended_path|stage_repairs|final_state|direct_use|current_complete|legacy_complete|batches)\b",
+     "runtime field or status name"),
+    (r"[A-Za-z]+_[A-Za-z0-9_]+", "snake_case identifier"),
+    (r"(?:RAW|REUSE)-(?:\d|\{)", "batch id"),
+    (r"\.py\b|(?<![\w-])--[a-z]", "script name or command flag"),
+    (r"\b(?:Stage|Phase)\s*\d", "internal stage number"),
+    (r"置信度|覆盖率|重叠率|三维", "internal metric wording"),
+    (r"(?<![A-Za-z])[ABC]\s*级", "evidence grade letter"),
+    (r"(?<![（(A-Za-z0-9])(?:EM|REL|EV|RV|AX)-(?:\d|\*|x|\{)", "internal id without a human label"),
+    (r"_progress|_analysis_cache|sha256|\bhash\b|(?i:json)", "internal file or data format"),
+)
+FENCE_RE = re.compile(r"^(`{3,})[^\n]*\n(.*?)^\1\s*$", re.MULTILINE | re.DOTALL)
+
+
+def author_facing_findings(path: Path) -> List[Finding]:
+    """Every fenced block in the author-facing reference is text the author reads verbatim."""
+    text = read_text(path)
+    if text is None:
+        return [Finding("author-facing-template-missing", "cannot read author-facing templates", path)]
+    findings: List[Finding] = []
+    blocks = list(FENCE_RE.finditer(text))
+    if not blocks:
+        return [Finding("author-facing-template-missing", "author-facing reference has no template blocks", path)]
+    for block in blocks:
+        start_line = text.count("\n", 0, block.start(2)) + 1
+        for offset, line in enumerate(block.group(2).splitlines()):
+            for pattern, label in AUTHOR_FACING_FORBIDDEN:
+                match = re.search(pattern, line)
+                if match:
+                    findings.append(Finding(
+                        "author-facing-engineering-token",
+                        "author-facing template contains {}: {!r}".format(label, match.group(0)),
+                        path, start_line + offset, line.strip(),
+                    ))
+    return findings
+
+
 def spawn_preflight_findings(
     text: str, manifest: ContractManifest, path: Path
 ) -> List[Finding]:
@@ -1214,7 +1254,10 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
 
     findings.extend(rubric_parity_findings(repo_root))
 
+    findings.extend(author_facing_findings(repo_root / "skills/story-long-analyze/references/author-facing.md"))
     long_analyze = repo_root / "skills/story-long-analyze/SKILL.md"
+    findings.extend(require_pattern(long_analyze, r"references/author-facing\.md", "author-facing-routed",
+                                    "story-long-analyze must route every author-visible message through author-facing.md"))
     findings.extend(require_pattern(long_analyze, r"invalid_topic_decision_contract", "invalid-topic-contract", "invalid topic-decision artifacts must fail explicitly"))
     # 章节边界表是 Stage 1/2/6 的唯一切片真值：原文开头的目录块会让每个章号命中两次，
     # 不剔就一路错到底。剔除步骤和落表前的连续性校验都必须留在 Stage 0。

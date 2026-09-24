@@ -59,10 +59,11 @@ LEGACY_FINAL_RE = re.compile(r"(?m)^([ \t]*(?:[-*][ \t]*)?最终状态[ \t]*[：
 
 
 class RunError(ValueError):
-    def __init__(self, code: str, detail: str) -> None:
+    def __init__(self, code: str, detail: str, author_message: Optional[str] = None) -> None:
         super().__init__(detail)
         self.code = code
         self.detail = detail
+        self.author_message = author_message
 
 
 def sha256(data: bytes) -> str:
@@ -235,8 +236,8 @@ def write_state(progress: Path, state: Dict[str, Any]) -> bool:
     text, bom, newline = decode_progress(raw)
     pattern = re.compile(re.escape(STATE_START) + r".*?" + re.escape(STATE_END), re.DOTALL)
     # Hooks read the first 最终状态 in the file. A legacy project keeps its own
-    # line as that single value; the runtime only promotes it once all six
-    # stages are complete and never demotes it.
+    # line as that single value; the runtime only promotes it once Stage 3-6
+    # are all complete and never demotes it.
     existing = pattern.search(text)
     head = text[:existing.start()] if existing else text
     legacy = LEGACY_FINAL_RE.search(head)
@@ -429,6 +430,7 @@ def plan_command(args: argparse.Namespace) -> Dict[str, Any]:
         raise RunError(
             "chapter_mapping_ambiguous",
             "; ".join(report.get("chapter_mapping_conflicts", [])) or "legacy chapter identity is unresolved",
+            report.get("chapter_mapping_author_message"),
         )
 
     selected = []  # type: List[Dict[str, Any]]
@@ -947,8 +949,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     parser = build_parser()
     args = parser.parse_args()
     try:
@@ -956,8 +959,10 @@ def main() -> int:
         print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
         return 0 if payload.get("ok", True) else 2
     except (OSError, UnicodeError, RunError) as exc:
-        print(json.dumps({"ok": False, "error": getattr(exc, "code", "io_error"),
-                          "detail": str(exc)}, ensure_ascii=False, indent=2))
+        payload = {"ok": False, "error": getattr(exc, "code", "io_error"), "detail": str(exc)}
+        if getattr(exc, "author_message", None):
+            payload["author_message"] = exc.author_message
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 2
 
 

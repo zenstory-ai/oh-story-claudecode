@@ -3,7 +3,7 @@
 Status: implemented
 Date: 2026-09-23
 Issue: PR #386 / #438（维护者接手）
-Related: [2026-09-22-long-analyze-single-state-runtime](../architecture/2026-09-22-long-analyze-single-state-runtime.md)
+Related: [2026-09-22-long-analyze-single-state-runtime](../architecture/2026-09-22-long-analyze-single-state-runtime.md)、[2026-09-24-long-analyze-legacy-prologue-alignment](../bug-fix/2026-09-24-long-analyze-legacy-prologue-alignment.md)（旧版拆文库的身份守卫与逐章比对在该篇翻转）
 
 ## Problem
 

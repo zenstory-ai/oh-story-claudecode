@@ -36,6 +36,14 @@ PROJECTION_RE = re.compile(
 )
 STATE_START = "<!-- story-long-analyze:runtime-state:start -->"
 STATE_END = "<!-- story-long-analyze:runtime-state:end -->"
+# v0.7.x wrote a 「章节边界」 table (章号 | 标题 | 起始行 | 字数) into _progress.md.
+BOUNDARY_HEADING_RE = re.compile(r"^#{1,6}\s*章节边界")
+TITLE_LABEL_RE = re.compile(
+    r"^\s*(?:第[〇零一二三四五六七八九十百千万两0-9]+[卷章回节]|卷[〇零一二三四五六七八九十百千万两0-9]+"
+    r"|Chapter\s*[0-9]+|楔子|序章|引子|前言|后记|尾声|番外[〇零一二三四五六七八九十百千万两0-9]*)",
+    re.IGNORECASE,
+)
+TITLE_NOISE_RE = re.compile(r"[\s\-—:：、.．,，;；!！?？\"“”'‘’《》「」『』]+")
 
 
 def nonempty(path: Path) -> bool:
@@ -203,6 +211,168 @@ def summary_kind(path: Path) -> str:
     return "three_script_projection" if PROJECTION_RE.search(text[:1000]) else "upstream_summary"
 
 
+def read_legacy_boundaries(text: str | None) -> list[dict[str, object]]:
+    """Rows of the v0.7.x 「章节边界」 table: old chapter number, title, start line."""
+    if not text:
+        return []
+    rows: list[dict[str, object]] = []
+    in_section = False
+    header: list[str] | None = None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            if in_section and rows:
+                break
+            in_section = bool(BOUNDARY_HEADING_RE.match(stripped))
+            header = None
+            continue
+        if not in_section or not stripped.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+        if header is None:
+            if "章号" in cells:
+                header = cells
+            continue
+        if not "".join(cells).strip("-: "):
+            continue
+        record = dict(zip(header, cells))
+        number = re.search(r"\d+", record.get("章号", ""))
+        start = re.search(r"\d+", record.get("起始行", ""))
+        if not number:
+            continue
+        rows.append({
+            "chapter": int(number.group(0)),
+            "title": record.get("标题", ""),
+            "start_line": int(start.group(0)) if start else None,
+        })
+    return rows
+
+
+def title_key(title: str) -> str:
+    text = str(title or "")
+    for _ in range(3):
+        stripped = TITLE_LABEL_RE.sub("", text, count=1)
+        if stripped == text:
+            break
+        text = stripped
+    return TITLE_NOISE_RE.sub("", text)
+
+
+def map_legacy_row(old: dict[str, object], index_rows: list[dict[str, object]]) -> int | None:
+    """Index chapter an old boundary row points at: its start line, checked by title."""
+    by_line = None
+    start = old.get("start_line")
+    if isinstance(start, int):
+        for row in index_rows:
+            if int(row["start_line"]) <= start <= int(row["end_line"]):
+                by_line = row
+                break
+    key = title_key(str(old.get("title", "")))
+    if by_line is not None and (not key or title_key(str(by_line.get("title", ""))) == key):
+        return int(by_line["chapter"])
+    if key:
+        matches = [row for row in index_rows if title_key(str(row.get("title", ""))) == key]
+        if len(matches) == 1:
+            return int(matches[0]["chapter"])
+    return None
+
+
+def leading_special_labels(index_rows: list[dict[str, object]]) -> list[str]:
+    """Prologue-like chapters (楔子、序章、第0章…) before the first numbered chapter."""
+    labels: list[str] = []
+    for row in index_rows:
+        source = str(row.get("source_chapter", "")).strip()
+        if source.isdigit() and int(source) >= 1:
+            break
+        labels.append("第0章" if source == "0" else source)
+    return labels
+
+
+def mapping_author_message(detail: str, labels: list[str], done: str) -> str:
+    """One plain-language stop message with the author's choices (no field names)."""
+    if labels:
+        prologue = "、".join("「%s」" % label for label in labels)
+        return (
+            "先停一下：%s。这次重新识别章节时，开头的%s被算成了单独一章，"
+            "照这样续拆，旧文件会整体错开一章——%s没人拆、有的章被拆两遍。请选一种："
+            "① 按旧章号继续（推荐，旧拆文当时没把%s算作一章时选这个）：%s并进第一章，"
+            "已拆好的%s原样复用，%s不单独拆；"
+            "② %s单独算一章：已拆好的%s挪进备份目录（不删除），按新章号重拆；"
+            "③ 换一个新目录，整本重新拆。"
+            % (detail, prologue, prologue, prologue, prologue, done, prologue, prologue, done)
+        )
+    return (
+        "先停一下：%s，没法确认已拆好的%s各对应哪一章。请选一种："
+        "① 换一个新目录，整本重新拆（推荐）；② 如果原文换过版本或被改过，换回拆文时用的那份原文再续拆。"
+        % (detail, done)
+    )
+
+
+def legacy_mapping_check(root: Path, index_rows: list[dict[str, object]]) -> dict[str, object] | None:
+    """Stop when files numbered by an older run no longer match the chapter index.
+
+    Old summaries always predate the index. Golden-chapter analyses count as old
+    when ``_progress.md`` comes from v0.7.x (a 「章节边界」 table or no runtime
+    block); this run's Stage 1 writes them against the index. The old boundary
+    table, when present, decides; otherwise a source that does not start at
+    chapter one is ambiguous.
+    """
+    if not index_rows:
+        return None
+    progress_text = read_text(root / "_progress.md")
+    boundaries = read_legacy_boundaries(progress_text)
+    legacy_progress = progress_text is not None and (bool(boundaries) or STATE_START not in progress_text)
+    _, summary_sources, _ = collect_numbered_files(root / "章节", SUMMARY_RE)
+    old_chapters = {chapter for chapter, path in summary_sources.items() if summary_kind(path) == "upstream_summary"}
+    old_kinds = ["逐章摘要"] if old_chapters else []
+    if legacy_progress:
+        golden, _, _ = collect_numbered_files(root / "章节", GOLDEN_RE)
+        if golden:
+            old_chapters.update(golden)
+            old_kinds.insert(0, "开头三章拆解")
+    if not old_chapters:
+        return None
+    rows = sorted(index_rows, key=lambda row: int(row["chapter"]))
+    labels = leading_special_labels(rows)
+    done = "、".join(old_kinds)
+    if boundaries:
+        by_old = {int(row["chapter"]): row for row in boundaries}
+        # Chapters the old run appended after its table stay on the same numbering
+        # as long as every chapter the table does cover lines up.
+        checked = sorted(chapter for chapter in old_chapters if chapter <= max(by_old)) or sorted(old_chapters)
+        shifted = []
+        unknown = []
+        for chapter in checked:
+            old = by_old.get(chapter)
+            mapped = map_legacy_row(old, rows) if old else None
+            if mapped is None:
+                unknown.append(chapter)
+            elif mapped != chapter:
+                shifted.append((chapter, mapped))
+        if not shifted and not unknown:
+            return None
+        if shifted:
+            old_number, new_number = shifted[0]
+            title = next((str(row.get("title", "")) for row in rows if int(row["chapter"]) == new_number), "")
+            detail = "旧拆文的第%s章「%s」，在这次的章节表里是第%s章" % (old_number, title, new_number)
+        else:
+            detail = "旧进度里的章节表和原文对不上（第%s章找不到）" % compact_ranges(unknown)[0]
+        code = "legacy_boundary_shift" if shifted else "legacy_boundary_unmatched"
+    else:
+        first_source = str(rows[0].get("source_chapter", "")).strip()
+        if first_source.isdigit() and int(first_source) == 1:
+            return None
+        detail = "原文开头是「%s」，而旧拆文没有留下能核对章号的章节表" % (first_source or "未知")
+        code = "legacy_identity_unverifiable"
+    return {
+        "code": code,
+        "conflict": "旧拆文章号与当前索引不一致：" + detail,
+        "author_message": mapping_author_message(detail, labels, done),
+        "fold_prologue_available": bool(labels),
+        "legacy_chapters": sorted(old_chapters),
+    }
+
+
 def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
     root = root.resolve()
     schema, progress_total, final_state = read_progress(root / "_progress.md")
@@ -305,25 +475,14 @@ def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
     full_result_available = usable_upstream_complete or legacy_core
     mixed_sources = len(set(preferred_kinds.values())) > 1
 
-    # Only summaries written before the chapter index exist can drift from its
-    # numbering; golden analyses and runtime projections are written against it.
+    # Files numbered by an older run can drift from the index; this run's golden
+    # analyses and projections are written against it.
     mapping_conflicts: list[str] = []
     mapping_blocked_chapters: list[int] = []
-    upstream_summary_chapters = {
-        chapter for chapter, kind in preferred_kinds.items() if kind == "upstream_summary"
-    }
-    if index_identities and upstream_summary_chapters:
-        first_source = str(index_identities[0].get("source_chapter", "")).strip()
-        try:
-            starts_at_one = int(first_source) == 1
-        except ValueError:
-            starts_at_one = False
-        if not starts_at_one:
-            mapping_blocked_chapters = sorted(expected_set or set(index_chapters))
-            mapping_conflicts.append(
-                "旧摘要文件号无法安全对应当前索引：首个原文章号为 %s；需先建立章节身份映射"
-                % (first_source or "未知")
-            )
+    mapping = legacy_mapping_check(root, index_identities) if index_identities else None
+    if mapping:
+        mapping_blocked_chapters = sorted(expected_set or set(index_chapters))
+        mapping_conflicts.append(str(mapping["conflict"]))
 
     stage_repairs: list[str] = []
     if semantic_coverage_complete:
@@ -421,13 +580,14 @@ def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
         "managed_stage_status": managed_stages,
         "chapter_mapping_conflicts": mapping_conflicts,
         "chapter_mapping_blocked_chapters": mapping_blocked_chapters,
+        "chapter_mapping_author_message": mapping["author_message"] if mapping else None,
         "provenance_requires_review": mixed_sources or (has_any and schema is None),
         "conflicts": conflicts,
         "notes": [
             "本检查只扫描传入书目目录中的上游标准路径，不扫描其他项目或磁盘。",
             "运行路由必须使用 completed_semantic_chapters；缺少逐章摘要文件不等于缺少语义成果。",
             "direct_use 表示默认直接复用；只有用户明确要求增强时才二次提取已有成果。",
-            "explicit reanalysis 必须忽略全部旧语义成果，并按新书流程重新执行。",
+            "整本重拆换一个新目录；本检查不提供就地重拆入口。",
         ],
     }
 
@@ -466,8 +626,9 @@ def main() -> int:
     args = parser.parse_args()
     if args.expected_chapters is not None and args.expected_chapters < 1:
         parser.error("--expected-chapters 必须大于 0")
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     try:
         if not args.root.exists():
             raise ValueError("root_not_found:%s" % args.root)

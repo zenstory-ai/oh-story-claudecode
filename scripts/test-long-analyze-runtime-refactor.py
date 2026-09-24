@@ -699,6 +699,189 @@ def test_audit_stage_and_mapping_regressions() -> None:
                 "序章开头的新书写完黄金三章后不能被身份守卫卡死：" + fresh_plan.stdout)
 
 
+PROLOGUE_BOOK = (
+    "测试书\n\n楔子 雨夜\n楔子正文。\n\n第一章 起程\n正文一。\n\n第二章 遇敌\n正文二。\n\n"
+    "第三章 破局\n正文三。\n\n第四章 回城\n正文四。\n\n第五章 夜谈\n正文五。\n\n第六章 远行\n正文六。\n"
+)
+# v0.7.10 did not recognize 楔子: its 第1章 is the body's 第一章 (line 6).
+OLD_BOUNDARIES = [(1, "第一章 起程", 6), (2, "第二章 遇敌", 9), (3, "第三章 破局", 12),
+                  (4, "第四章 回城", 15), (5, "第五章 夜谈", 18), (6, "第六章 远行", 21)]
+
+
+def legacy_progress(boundary_rows: list[tuple[int, str, int]]) -> str:
+    """A v0.7.10-shaped _progress.md: schema 2, paused after Stage 1, 「章节边界」 table."""
+    table = "".join(f"| {number} | {title} | {line} | 3 |\n" for number, title, line in boundary_rows)
+    return (
+        "# 深度拆解进度：测试书\n- 小说：测试书 | 总章数：6 | 输出目录：拆文库/测试书 | 开始：2026-09-01\n"
+        "- 最终状态：paused_after_stage1\n- schema_version: 2\n## 管道进度\n| 阶段 | 状态 | 进度 | 备注 |\n"
+        "|------|------|------|------|\n| Stage 1 黄金三章 | 完成 | 3/3 章 | — |\n"
+        "## 章节边界（Stage 0 章节边界子步骤产物，唯一权威）\n| 章号 | 标题 | 起始行 | 字数 |\n"
+        "|------|------|--------|------|\n" + table + "## 分块进度\n| 块 | 章节 | 状态 |\n## 断点\n- 下一操作：Stage 2\n"
+    )
+
+
+def make_legacy_stage1_library(root: Path, boundary_rows: list[tuple[int, str, int]]) -> None:
+    source = root / "原文" / "原文.txt"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text(PROLOGUE_BOOK, encoding="utf-8")
+    (root / "_progress.md").write_text(legacy_progress(boundary_rows), encoding="utf-8")
+    for chapter in (1, 2, 3):
+        path = root / "章节" / f"第{chapter}章_深度拆解.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"字数约3字 | 核心事件：旧版第{chapter}章事件", encoding="utf-8")
+    (root / "快速预览.md").write_text("# 快速预览：测试书\n", encoding="utf-8")
+
+
+def build_index(root: Path, *extra: str) -> subprocess.CompletedProcess[str]:
+    return run(INDEX, "--source", root / "原文" / "原文.txt", "--output", root / "chapter_index.csv",
+               "--locator-path", "原文/原文.txt", *extra)
+
+
+def author_text_is_plain(message: str) -> bool:
+    return bool(message) and not re.search(r"[A-Za-z]+_[A-Za-z_]+|RAW-|REUSE-|\.py|\.csv|--", message)
+
+
+def test_legacy_prologue_alignment() -> None:
+    with tempfile.TemporaryDirectory(prefix="long-legacy-prologue-") as temporary:
+        area = Path(temporary)
+        root = area / "旧版只拆了黄金三章"
+        make_legacy_stage1_library(root, OLD_BOUNDARIES)
+        protected = protected_snapshot(root)
+
+        blocked = build_index(root)
+        payload = json.loads(blocked.stdout)
+        require(blocked.returncode == 2 and payload["error"].startswith("chapter_mapping_ambiguous")
+                and not (root / "chapter_index.csv").exists(),
+                "旧版黄金三章与带楔子的新章号错位时必须在写索引前停下：" + blocked.stdout)
+        message = payload.get("author_message", "")
+        require("楔子" in message and "按旧章号继续" in message and "新目录" in message,
+                "停下时必须给作者可选的出路：" + message)
+        require(author_text_is_plain(message), "给作者的话不能夹带字段名、批次号或脚本名：" + message)
+
+        # An index built before this guard existed must not let plan misalign either.
+        prebuilt = area / "prebuilt"
+        (prebuilt / "原文").mkdir(parents=True)
+        (prebuilt / "原文" / "原文.txt").write_text(PROLOGUE_BOOK, encoding="utf-8")
+        require(build_index(prebuilt).returncode == 0, "无旧成果的楔子新书必须能建索引")
+        shutil.copy2(prebuilt / "chapter_index.csv", root / "chapter_index.csv")
+        inspected = json.loads(run(INSPECT, "--root", root, "--compact").stdout)
+        require(inspected["chapter_mapping_conflicts"] and inspected["chapter_mapping_author_message"],
+                "检查器必须报告旧黄金三章的章号错位")
+        plan = run(MANAGE, "plan", "--root", root)
+        plan_payload = json.loads(plan.stdout)
+        require(plan.returncode == 2 and plan_payload["error"] == "chapter_mapping_ambiguous"
+                and "楔子" in plan_payload.get("author_message", ""),
+                "计划不能排出 REUSE-1-3 + RAW-4-6 这类静默错位批次：" + plan.stdout)
+        (root / "chapter_index.csv").unlink()
+
+        folded = build_index(root, "--fold-prologue")
+        folded_payload = json.loads(folded.stdout)
+        require(folded.returncode == 0 and folded_payload["folded_into_first_chapter"] == ["楔子"],
+                "作者选「按旧章号继续」时楔子必须并入第一章：" + folded.stdout)
+        indexed = rows(root / "chapter_index.csv")
+        require(indexed[0]["source_chapter"] == "1" and indexed[0]["start_line"] == "3"
+                and indexed[0]["title"] == "起程" and indexed[3]["title"] == "回城",
+                "并入后新章号必须与旧章节表逐章对齐：" + json.dumps(indexed[:4], ensure_ascii=False))
+        aligned_plan = json.loads(run(MANAGE, "plan", "--root", root).stdout)
+        require([batch["batch_id"] for batch in aligned_plan["batches"]] == ["REUSE-1-3", "RAW-4-6"],
+                "对齐后应复用旧黄金三章、只读第四章起的原文：" + json.dumps(aligned_plan, ensure_ascii=False))
+        raw_batch = aligned_plan["batches"][1]
+        require(raw_batch["source_files"][0] == indexed[3]["source_locator"] and indexed[3]["title"] == "回城",
+                "RAW-4-6 读到的必须是「第四章 回城」")
+        require(protected_snapshot(root) == protected, "对齐过程不得改动旧拆文文件")
+
+        # Old runs whose table already counted 楔子 as 第1章 stay aligned without folding.
+        counted = area / "旧版已把楔子算作第1章"
+        make_legacy_stage1_library(counted, [(1, "楔子 雨夜", 3)] + [
+            (number + 1, title, line) for number, title, line in OLD_BOUNDARIES[:5]])
+        require(build_index(counted).returncode == 0, "旧章节表与新索引一致时不能误拦")
+
+        # Option ②: the author moves the old files aside and restarts from Stage 1.
+        restart = area / "楔子单独成章重拆"
+        make_legacy_stage1_library(restart, OLD_BOUNDARIES)
+        backup = restart / "_analysis_cache" / "legacy" / "旧章号"
+        backup.mkdir(parents=True)
+        for name in ("_progress.md", "快速预览.md", "章节"):
+            shutil.move(str(restart / name), str(backup / name))
+        require(build_index(restart).returncode == 0
+                and rows(restart / "chapter_index.csv")[0]["source_chapter"] == "楔子",
+                "旧文件挪进备份后必须能按新章号（楔子为第1章）重拆")
+
+
+def test_legacy_summaries_prologue_way_out() -> None:
+    with tempfile.TemporaryDirectory(prefix="long-legacy-summaries-") as temporary:
+        area = Path(temporary)
+        for name, progress in (("有章节表", legacy_progress(OLD_BOUNDARIES)), ("无章节表", None)):
+            root = area / name
+            source = root / "原文" / "原文.txt"
+            source.parent.mkdir(parents=True)
+            source.write_text(PROLOGUE_BOOK, encoding="utf-8")
+            if progress:
+                (root / "_progress.md").write_text(progress, encoding="utf-8")
+            for chapter in range(1, 7):
+                path = root / "章节" / f"第{chapter}章_摘要.md"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f"**概要**：旧版第{chapter}章", encoding="utf-8")
+            blocked = build_index(root)
+            payload = json.loads(blocked.stdout)
+            require(blocked.returncode == 2 and "按旧章号继续" in payload.get("author_message", "")
+                    and author_text_is_plain(payload["author_message"]),
+                    f"{name}：楔子开头的旧摘要库必须给出可执行出路：" + blocked.stdout)
+            folded = build_index(root, "--fold-prologue")
+            require(folded.returncode == 0, f"{name}：并入楔子后必须能建索引：" + folded.stdout)
+            plan = run(MANAGE, "plan", "--root", root)
+            require(plan.returncode == 0 and json.loads(plan.stdout)["batches"] == [],
+                    f"{name}：对齐后旧摘要全部复用、无需重读：" + plan.stdout)
+
+
+def test_cli_output_is_utf8_on_legacy_consoles() -> None:
+    with tempfile.TemporaryDirectory(prefix="long-cp1252-") as temporary:
+        root = Path(temporary)
+        for encoding in ("cp1252", "gbk"):
+            env = {"PYTHONIOENCODING": encoding}
+            missing = run(INDEX, "--source", root / "不存在的原文.txt", "--output", root / "索引.csv",
+                          extra_env=env)
+            require(missing.returncode == 2 and "不存在的原文" in json.loads(missing.stdout)["error"],
+                    f"{encoding} 控制台下错误路径必须输出 UTF-8 JSON 而不是崩溃：" + missing.stdout + missing.stderr)
+            inspected = run(INSPECT, "--root", root / "不存在", extra_env=env)
+            require(inspected.returncode == 2 and "不存在" in json.loads(inspected.stdout)["error"],
+                    f"{encoding} 控制台下检查器必须输出 UTF-8")
+            planned = run(MANAGE, "plan", "--root", root / "不存在", extra_env=env)
+            require(planned.returncode == 2 and "不存在" in json.loads(planned.stdout)["detail"],
+                    f"{encoding} 控制台下运行脚本必须输出 UTF-8")
+
+
+CHART = RUNTIME / "render_relation_chart.py"
+
+
+def test_relation_chart_never_falls_back_to_pinyin() -> None:
+    with tempfile.TemporaryDirectory(prefix="long-chart-") as temporary:
+        root = Path(temporary) / "测试书"
+        (root / "角色").mkdir(parents=True)
+        (root / "角色" / "角色关系.md").write_text(
+            "# 角色关系\n\n| 关系ID | 主体 → 客体 | 关系动作/类型 | 表面关系 | 真实关系 | 触发事件 | 双方得失 | 变化后状态 | 证据强度 | 证据 |\n"
+            "|---|---|---|---|---|---|---|---|---|---|\n"
+            "| REL-001 | 林远 → 苏晴 | 保护 | 同门 | 暗中倾慕 | 山门遇险 | 林远受伤 | 信任 | A | 第3章 |\n"
+            "| REL-002 | 苏晴 → 林远 | 依赖 | 同门 | 依赖 | 山门遇险 | 苏晴脱险 | 依赖 | A | 第3章 |\n"
+            "| REL-003 | 林远 → 苏晴 | 背离 | 同门 | 对立 | 宗门大比 | 两败俱伤 | 反目 | B | 第9章 |\n",
+            encoding="utf-8")
+        for flags, env in (((), {}), (("--png",), {"STORY_ANALYZE_CHART_FONT": "none"})):
+            result = run(CHART, "--root", root, *flags, extra_env=env)
+            payload = json.loads(result.stdout)
+            require(result.returncode == 0 and payload["ok"] and payload["png"] == [],
+                    "关系图脚本失败：" + result.stdout + result.stderr)
+            chart = (root / "人物关系图" / "人物关系图.md").read_text(encoding="utf-8")
+            require("```mermaid" in chart and '["林远"]' in chart and '["苏晴"]' in chart
+                    and "信任（山门遇险） → 反目（宗门大比）" in chart,
+                    "Markdown 关系图必须保留中文人名和关系演变：" + chart)
+            require(not list((root / "人物关系图").glob("*.png")), "没有中文字体时不能生成 PNG")
+        require("人物关系图/人物关系图.md" in (payload.get("author_message") or ""),
+                "画不了中文图片时必须用大白话告诉作者去看 Markdown 版：" + json.dumps(payload, ensure_ascii=False))
+        missing = run(CHART, "--root", Path(temporary))
+        require(missing.returncode == 2 and json.loads(missing.stdout)["author_message"],
+                "缺关系表时必须给作者能看懂的原因")
+
+
 def main() -> int:
     test_index_contract()
     test_invalid_root_and_manage_entry()
@@ -709,6 +892,10 @@ def main() -> int:
     test_panlong_acceptance_samples()
     test_audit_recovery_regressions()
     test_audit_stage_and_mapping_regressions()
+    test_legacy_prologue_alignment()
+    test_legacy_summaries_prologue_way_out()
+    test_cli_output_is_utf8_on_legacy_consoles()
+    test_relation_chart_never_falls_back_to_pinyin()
     print("OK: single-state long-analyze runtime regressions passed")
     return 0
 
