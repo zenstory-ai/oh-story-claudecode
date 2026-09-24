@@ -14,6 +14,7 @@ compare 链接；小节名使用 Keep a Changelog 的六个英文类别（`Added
 
 ### Changed
 
+- OpenCode 适配改为只支持 2.x（#443，修复 #440、#441）：2.x 发布在 `@opencode/cli`，旧插件在 2.x 上加载失败只记日志，写正文守卫静默缺席。插件改用 2.x API 并按会话所在项目定位书目；agents 改用原生 `permissions:` 规则列表；不再写 `opencode.json`；story-setup 部署前检查 `opencode --version`，1.x 停止部署并提示升级。已部署项目升级 OpenCode 后重跑 story-setup。
 - 作者记忆拆成项目级与书级两个 store，记忆随书走（#435）：全局、题材、流程条目留在工作区 `.story/作者记忆/`（`AP`），本书条目改存书目录 `.story/作者记忆/`（`BP`），`query` 合并两级返回。书级读写须传 `--book-root`，没传直接报错，不再写进工作区；一份 `commit` 只写一个 store，`replace` / `conflicts_with` 不跨 store。升级前写在工作区的本书条目不再参与查询（不做双读），用新增的 `migrate --book-root` 一次性整批搬进书目录，证据与确认次数原样保留。
 - 作者记忆只记作者明确表达的偏好（#436）：捕获表移除 `repeated_correction` / `inferred_pattern` 两条推断写入管道，`record` / `commit` 拒绝这两个来源；待确认只剩「作者原话范围含糊」一种来源。存量 state 里的旧来源条目照常可读、可确认、可退役。
 

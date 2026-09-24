@@ -25,7 +25,7 @@ CI 一直绿，是因为 `cli-compat` 装的是 `opencode-ai@latest`，永远是
 - `scripts/test-agent-permissions.py --opencode` 预热后台服务后对每个 agent 跑 `opencode run --agent`，以 mock 收到的工具清单为运行时判定（2.x 把整条 deny 的工具从清单里摘掉），并验证允许的 write/shell 真实执行、被拒的 write 得到 `No tool named "write"`。`check-opencode-adapter.sh` 的静态裁决矩阵改为独立复刻 2.x `whollyDisabled()`。
 - `scripts/test-opencode-plugin.mjs` 以 `setup(ctx)` 注册钩子，且在项目外的 cwd 里调用 `setup` 与钩子，锁住 `ctx.location` 定位。
 
-来源：本 PR（#440/#441）
+来源：#443（修复 #440、#441）
 
 ## Alternatives considered
 
