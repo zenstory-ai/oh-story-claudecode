@@ -1,7 +1,7 @@
 ---
 name: story-long-analyze
 version: 1.0.0
-description: "长篇网文拆文。保留黄金三章、逐章摘要、剧情、情绪、节奏、角色、设定和文风接口，以连续章节块完成因果、双时间线、关系与三维节奏分析；兼容旧成果直接使用、按需增强和断点续跑。"
+description: "长篇网文拆文。保留黄金三章、逐章摘要、剧情、情绪、节奏、角色、设定和文风接口，以连续章节块完成因果、双时间线、关系与三维节奏分析；兼容旧成果直接使用、按需增强和断点续跑。含可选三层灵感库管道（灵感库、跨书灵感聚合、更新灵感库）。"
 metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudecode"}}
 ---
 # story-long-analyze：长篇网文拆文
@@ -121,7 +121,7 @@ chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locato
 
 剧情点按“起始目标与阻碍 → 改变局面的选择/行动/外部事件 → 局面变化与得失 → 后续影响”合并。事件发生与信息披露分开；同一事实的异常、线索、解释、确认属于一条披露路径。全局只保留约 8–15 个主线或关键转折节点。
 
-三维节奏分别说明：事件推进 1–5 及状态变化，读者情绪类型/强度 1–5 及触发，篇幅展开度 1–3 及展开/压缩/省略/反复的作用。最强三个情绪机制完整写读者期待、铺垫、条件、触发、兑现、可变项和失效情形；其余保留索引。
+三维节奏分别说明：事件推进 1–5 及状态变化，读者情绪类型/强度 1–5 及触发，篇幅展开度 1–3 及展开/压缩/省略/反复的作用。情绪机制写完整卡，至少覆盖最强三个，值得复现的不设数量上限；其余保留索引。完整卡以 `读者想看什么`、`情绪链`、`戏剧单元`、`可替换项`、`不可照搬` 五个字段齐全为准，字段名按 `references/output-templates.md` 的 EM 卡表原样使用；缺任一项即无法登记灵感库。铺垫、成立条件、关键触发物、复现步骤、失效情形等按需增列。索引节标题用字面量 `## 其他机制索引`。
 
 `剧情/情绪模块.md` 与 `剧情/节奏.md` 都落盘后，用 `manage_analysis_run.py mark-stage --stage stage3 --output "剧情/节奏.md"` 标记。命令会同时检查两份必需产物；阶段没有 receipt 或依赖 hash。
 
@@ -142,6 +142,10 @@ chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locato
 ## Stage 6：文风与单独重建
 
 加载 [references/style-profile-generator.md](references/style-profile-generator.md)。优先使用已有 `文风.md` 和有效 `_style-sample.txt`；样本不足时允许依据索引选择 4–6 章、定点读取原文行段。只缺文风时直接运行 Stage 6，不重跑 Stage 1–5。没有有效样本、索引或原文时明确失败，不生成锚点全空的可用档案。
+
+## 三层灵感库管道（可选后置）
+
+用户提出「灵感库 / 提炼灵感 / 跨书灵感聚合 / 更新灵感库」时加载 [references/inspiration-library.md](references/inspiration-library.md)。复用 Stage 3 的 EM 机制卡：`inspiration_index.py register-atoms` 机械登记原子灵感索引（无 IA 文件），再按该文档做单书合并与带受控标签的跨书聚合；卡内只用 `书名/EM-xxx` 裸 ID，禁路径引用。缺情绪模块的书先走上方按需增强，不在灵感层代拆。单书拆文不自动入库。
 
 ## 状态、旧项目与最终回归
 
