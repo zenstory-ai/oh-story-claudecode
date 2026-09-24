@@ -3,7 +3,7 @@
 Status: implemented
 Date: 2026-09-18
 Issue: #435（出自 #429 评审讨论的扩展 A）
-Related: [2026-09-18-author-memory-query-budget](../bug-fix/2026-09-18-author-memory-query-budget.md)、[2026-09-18-author-memory-explicit-only](../simplification/2026-09-18-author-memory-explicit-only.md)
+Related: [2026-09-18-author-memory-query-budget](../bug-fix/2026-09-18-author-memory-query-budget.md)、[2026-09-18-author-memory-explicit-only](../simplification/2026-09-18-author-memory-explicit-only.md)、[2026-09-24-author-memory-single-root](../bug-fix/2026-09-24-author-memory-single-root.md)（书根就是工作区时书级 store 改住 `书级/` 子目录）
 
 ## Problem
 

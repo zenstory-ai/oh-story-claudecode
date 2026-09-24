@@ -7,7 +7,8 @@ last as the commit point. Author memory lives in two kinds of store: the
 project-level store under the workspace holds global / genre / workflow items
 (`AP` ids); each book keeps its own book-level store under the book directory
 (`BP` ids) so memory travels with the book. Both stay separate from each book's
-story-continuity tracking.
+story-continuity tracking. When the book root is the workspace itself, the
+book-level store moves into a `书级/` subdirectory so the two never share a file.
 """
 
 from __future__ import annotations
@@ -90,6 +91,9 @@ RANK = {"low": 0, "medium": 1, "high": 2}
 # 用 migrate 搬进书目录后才回来——不做双读，双读会让迁移永远没人做。
 STORE_PREFIX = {"project": "AP", "book": "BP"}
 ID_PREFIXES = tuple(STORE_PREFIX.values())
+# 单书布局（书根就是工作区）下书级 store 的子目录：两级 store 的默认落点在这种
+# 布局里是同一个 state 文件，书级改住 {工作区}/.story/作者记忆/书级/。
+SINGLE_ROOT_BOOK_DIR = "书级"
 
 
 class AuthorMemoryError(ValueError):
@@ -258,20 +262,79 @@ def peek_book_name(state_path: Path) -> str | None:
     return name if isinstance(name, str) and name.strip() else None
 
 
-def book_store(book_root: Path, book: str | None) -> Store:
+def is_single_root(workspace: Path, book_root: Path | None) -> bool:
+    """单书布局：书根就是工作区（正文/、大纲/、追踪/ 直接在工作区根）。"""
+    return book_root is not None and book_root.resolve() == workspace.resolve()
+
+
+def book_memory_root(workspace: Path, book_root: Path) -> Path:
+    root = book_root.resolve() / ".story" / "作者记忆"
+    # 单书布局下两级 store 的默认落点是同一个 state 文件；书级改住子目录，
+    # 两份 state、两套派生视图、两条修订线仍各自独立。
+    return root / SINGLE_ROOT_BOOK_DIR if is_single_root(workspace, book_root) else root
+
+
+def sole_legacy_book_name(project: Store) -> str | None:
+    """项目级 store 里存量 book 条目只指向一本书时返回该书名（单书布局的升级默认）。"""
+    if not project.state_path.exists():
+        return None
+    document = read_json(project.state_path)
+    items = document.get("items") if isinstance(document, dict) else None
+    names: dict[str, str] = {}
+    for item in (items.values() if isinstance(items, dict) else ()):
+        scope = item.get("scope") if isinstance(item, dict) else None
+        if (
+            isinstance(scope, dict) and scope.get("level") == "book"
+            and isinstance(scope.get("value"), str) and scope["value"].strip()
+            and item.get("status") in {"active", "pending", "conflict"}
+        ):
+            names.setdefault(scope["value"].casefold(), scope["value"])
+    return next(iter(names.values())) if len(names) == 1 else None
+
+
+def book_store(workspace: Path, book_root: Path, book: str | None) -> Store:
     require(book_root.exists() and book_root.is_dir(), f"book root does not exist: {book_root}")
     resolved = book_root.resolve()
-    root = resolved / ".story" / "作者记忆"
+    root = book_memory_root(workspace, book_root)
     name = optional_text(book, "book", max_bytes=180)
     stored = peek_book_name(root / "_author-memory-state.json")
     if name is None:
-        name = stored if stored is not None else clean_text(resolved.name, "book root name", max_bytes=180)
+        name = stored
     elif stored is not None:
         require(
             name.casefold() == stored.casefold(),
             f"--book「{name}」与 {root} 里记录的书「{stored}」不一致",
         )
+    if name is None and is_single_root(workspace, book_root):
+        # 单书工作区的目录名常常不是书名；升级前的本书条目只指向一本书时，以它为准，
+        # 否则 migrate 会按目录名找不到存量、静默迁移零条。
+        name = sole_legacy_book_name(project_store(workspace))
+    if name is None:
+        name = clean_text(resolved.name, "book root name", max_bytes=180)
     return Store("book", root, name)
+
+
+def relocate_misplaced_book_state(workspace: Path, book_root: Path | None) -> None:
+    """单书布局的自愈：旧版把书级 state（带 state.book）写在了项目级位置，此后项目级
+    读写一律失败。带 --book-root {工作区} 运行任一命令时，把它原子移进书级子目录，
+    再在项目级位置补一份空 state 重建视图。state 内容不变，不推进任何修订。"""
+    if not is_single_root(workspace, book_root):
+        return
+    project = project_store(workspace)
+    misplaced = peek_book_name(project.state_path)
+    if misplaced is None:
+        return
+    target = Store("book", book_memory_root(workspace, book_root), misplaced)
+    require(
+        not target.state_path.exists(),
+        f"{project.state_path} 与 {target.state_path} 都是书级 state，无法自动归位；"
+        f"保留修订较新的一份移到 {target.state_path}，另一份备份后移走再重跑",
+    )
+    state = validate_state(read_json(project.state_path), store=target)
+    target.root.mkdir(parents=True, exist_ok=True)
+    os.replace(project.state_path, target.state_path)
+    write_snapshot(target, state)
+    write_snapshot(project, empty_state())
 
 
 def resolve_target_store(kind: str, workspace: Path, book_root: Path | None, book: str | None) -> Store:
@@ -281,7 +344,7 @@ def resolve_target_store(kind: str, workspace: Path, book_root: Path | None, boo
         book_root is not None,
         "book 级条目须传 --book-root {书目录}——记忆随书存放在 {书}/.story/作者记忆/，不再写进工作区的项目级 store",
     )
-    return book_store(book_root, book)
+    return book_store(workspace, book_root, book)
 
 
 def empty_state(book: str | None = None) -> dict[str, Any]:
@@ -376,7 +439,11 @@ def validate_state(value: object, *, store: Store) -> dict[str, Any]:
         book = clean_text(state.get("book"), "state.book", max_bytes=180)
         require(store.book is not None and book.casefold() == store.book.casefold(), f"state.book「{book}」与目标书「{store.book}」不一致")
     else:
-        require("book" not in state, "project-level state must not carry state.book")
+        require(
+            "book" not in state,
+            "project-level state must not carry state.book：这份其实是书级 state。书根就是工作区时，"
+            "带 --book-root {工作区} 重跑任一命令即自动移进 .story/作者记忆/书级/",
+        )
         book = None
     revision = as_int(state.get("state_revision"), "state.state_revision")
     next_number = as_int(state.get("next_item_number"), "state.next_item_number", minimum=1)
@@ -1178,12 +1245,21 @@ def visible_states(
     workspace: Path,
     book_root: Path | None,
     book: str | None,
-) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-    """写入后可见的两级状态：刚写的那份用内存里的，另一份只读加载（没有就 None）。"""
-    if store.kind == "project":
-        book_state = load_state(book_store(book_root, book)) if book_root is not None else None
-        return updated, book_state
-    return load_state(project_store(workspace)), updated
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, list[str]]:
+    """写入后可见的两级状态：刚写的那份用内存里的，另一份只读加载（没有就 None）。
+
+    此时写入已经落盘，另一份读不出来（书目录不存在、--book 与书级记录不符、state
+    损坏）只能降级为提醒：若在这里报错，调用方会告诉作者「没记住」，换个 event_id
+    重试就派生重复条目。"""
+    try:
+        if store.kind == "project":
+            other = load_state(book_store(workspace, book_root, book)) if book_root is not None else None
+            return updated, other, []
+        return load_state(project_store(workspace)), updated, []
+    except AuthorMemoryError as exc:
+        other_label = "书级" if store.kind == "project" else "项目级"
+        notice = f"已写入{store.label} store；但{other_label} store 读取失败，本次预算提醒没算上它：{exc}"
+        return (updated, None, [notice]) if store.kind == "project" else (None, updated, [notice])
 
 
 # ---------------------------------------------------------------------------
@@ -1191,8 +1267,11 @@ def visible_states(
 # ---------------------------------------------------------------------------
 
 
-def require_workspace(workspace: Path) -> None:
+def prepare_workspace(workspace: Path, book_root: Path | None = None) -> None:
+    """每个命令的入口：校验工作区，并在单书布局下先把误放的书级 state 归位——
+    归位之前项目级 store 读不出来，放在任何读取之前才能让只读查询也自愈。"""
     require(workspace.exists() and workspace.is_dir(), f"workspace does not exist: {workspace}")
+    relocate_misplaced_book_state(workspace, book_root)
 
 
 def store_fields(store: Store) -> dict[str, Any]:
@@ -1203,8 +1282,8 @@ def store_fields(store: Store) -> dict[str, Any]:
 
 
 def command_init(workspace: Path, book_root: Path | None, book: str | None) -> dict[str, Any]:
-    require_workspace(workspace)
-    store = book_store(book_root, book) if book_root is not None else project_store(workspace)
+    prepare_workspace(workspace, book_root)
+    store = book_store(workspace, book_root, book) if book_root is not None else project_store(workspace)
     state = load_state(store)
     if state is None:
         state = empty_state(store.book)
@@ -1213,7 +1292,7 @@ def command_init(workspace: Path, book_root: Path | None, book: str | None) -> d
 
 
 def command_commit(workspace: Path, book_root: Path | None, book: str | None, input_path: Path) -> dict[str, Any]:
-    require_workspace(workspace)
+    prepare_workspace(workspace, book_root)
     transaction = normalize_transaction(read_json(input_path))
     store = resolve_target_store(transaction_store_kind(transaction), workspace, book_root, book)
     require(store.state_path.exists(), f"{store.label} author memory is not initialized; run init first")
@@ -1223,7 +1302,7 @@ def command_commit(workspace: Path, book_root: Path | None, book: str | None, in
     replayed = updated is state
     # 幂等重放时也重写快照，修复缺失或过期的派生视图。
     write_snapshot(store, updated)
-    project_state, book_state = visible_states(store, updated, workspace, book_root, book)
+    project_state, book_state, load_warnings = visible_states(store, updated, workspace, book_root, book)
     return {
         "ok": True,
         "command": "commit",
@@ -1232,13 +1311,13 @@ def command_commit(workspace: Path, book_root: Path | None, book: str | None, in
         "replayed": replayed,
         "item_ids": updated["applied_transactions"][transaction["transaction_id"]]["item_ids"],
         "summaries": summaries,
-        "warnings": query_budget_warnings(project_state, book_state),
+        "warnings": load_warnings + query_budget_warnings(project_state, book_state),
         **store_fields(store),
     }
 
 
 def command_record(workspace: Path, book_root: Path | None, book: str | None, input_path: Path) -> dict[str, Any]:
-    require_workspace(workspace)
+    prepare_workspace(workspace, book_root)
     event = normalize_record_event(read_json(input_path))
     store = resolve_target_store(operation_store_kind(event["operation"], "event.operation"), workspace, book_root, book)
     state = load_state(store)
@@ -1260,7 +1339,7 @@ def command_record(workspace: Path, book_root: Path | None, book: str | None, in
     record = updated["applied_transactions"][transaction_id]
     item_ids = record["item_ids"]
     receipt = f"Author Memory Receipt: r{record['revision']} · {', '.join(item_ids)}"
-    project_state, book_state = visible_states(store, updated, workspace, book_root, book)
+    project_state, book_state, load_warnings = visible_states(store, updated, workspace, book_root, book)
     return {
         "ok": True,
         "command": "record",
@@ -1271,7 +1350,7 @@ def command_record(workspace: Path, book_root: Path | None, book: str | None, in
         "item_ids": item_ids,
         "receipt": receipt,
         "summaries": summaries,
-        "warnings": query_budget_warnings(project_state, book_state),
+        "warnings": load_warnings + query_budget_warnings(project_state, book_state),
         **store_fields(store),
     }
 
@@ -1284,13 +1363,13 @@ def command_query(
     genre: str | None,
     workflow: str | None,
 ) -> dict[str, Any]:
-    require_workspace(workspace)
+    prepare_workspace(workspace, book_root)
     require(
         bool(kinds),
         "query 必须显式传 --kind（按 references/author-memory.md 的任务映射表选类型），不再默认返回全部类型",
     )
     project_state = load_state(project_store(workspace))
-    book_state = load_state(book_store(book_root, book)) if book_root is not None else None
+    book_state = load_state(book_store(workspace, book_root, book)) if book_root is not None else None
     if project_state is None and book_state is None:
         return {"ok": True, "command": "query", "initialized": False, "revision": 0, "items": [], "omitted": 0, "omitted_ids": []}
     requested_scopes = {
@@ -1318,11 +1397,11 @@ def check_store(store: Store) -> dict[str, Any]:
 
 
 def command_check(workspace: Path, book_root: Path | None, book: str | None) -> dict[str, Any]:
-    require_workspace(workspace)
+    prepare_workspace(workspace, book_root)
     project = project_store(workspace)
     result: dict[str, Any] = {"ok": True, "command": "check"}
     if book_root is not None:
-        store = book_store(book_root, book)
+        store = book_store(workspace, book_root, book)
         result["book"] = {"name": store.book, "root": str(store.root), **check_store(store)}
         if project.state_path.exists():
             result["project"] = {"root": str(project.root), **check_store(project)}
@@ -1384,10 +1463,10 @@ def command_migrate(workspace: Path, book_root: Path | None, book: str | None) -
     随后一笔事务把这批源条目标 superseded 并注明去向。先写书级再写项目级，中途
     失败直接重跑：书级已有记录的直接复用编号，只补项目级。
     """
-    require_workspace(workspace)
+    prepare_workspace(workspace, book_root)
     require(book_root is not None, "migrate 须传 --book-root {书目录}：书名到书目录的映射由调用方给出")
     project = project_store(workspace)
-    store = book_store(book_root, book)
+    store = book_store(workspace, book_root, book)
     assert store.book is not None
     project_state = load_state(project)
     book_state = load_state(store)
