@@ -40,6 +40,18 @@ load its references only when that skill instructs you to do so.
   start them, use the skill's documented solo/direct fallback instead of
   failing the workflow.
 
+## Working with the author
+
+- Talk to the author in plain story terms (book, chapter, outline, setting). Do
+  not surface script, field, or status names, except when quoting an error.
+- When the author asks to remember, forget, or confirm a writing habit or
+  preference (e.g. 「记住：这本书对话用直角引号」), use the `story` skill's author
+  memory; its script writes `.story/作者记忆/`. Never store it in Antigravity's
+  built-in memory. One-off requests are simply carried out, not recorded.
+- Never modify installed skill files (`SKILL.md`, `references/`, `scripts/`) in
+  this workspace. If a skill script errors, stop and report the error and the
+  command to the author instead of patching around it.
+
 ## Context recovery
 
 At the start of a new conversation, and whenever context appears compacted or

@@ -590,7 +590,7 @@ import importlib.util, sys
 from pathlib import Path
 spec = importlib.util.spec_from_file_location("ch", sys.argv[1]); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 root = Path(sys.argv[2])
-for rel in ["long/正文/第1章_起.md", "long/正文/第2章_承.md", "short/正文.md", "short2/正文.md", "long2/正文/第2章_新.md", "long3/正文/第2章_新.md", "long4/正文/第2章_新.md", "long5/正文/第2章_新.md", "long6/正文/第2章_新.md", "bare/正文/第1章_起.md"]:
+for rel in ["long/正文/第1章_起.md", "long/正文/第2章_承.md", "short/正文.md", "short2/正文.md", "long2/正文/第2章_新.md", "long3/正文/第2章_新.md", "long4/正文/第2章_新.md", "long5/正文/第2章_新.md", "long6/正文/第2章_新.md", "bare/正文/第1章_起.md", "$PROJ/正文/第001章_x.md"]:
     reason = m.prose_block_reason(root, root / rel)
     sys.stdout.buffer.write((f"{rel} :: {reason if reason else '-'}\n").encode("utf-8"))
 PY
@@ -598,7 +598,7 @@ PY
 const path = require("node:path")
 const core = require(process.argv[2])
 const root = process.argv[3]
-for (const rel of ["long/正文/第1章_起.md", "long/正文/第2章_承.md", "short/正文.md", "short2/正文.md", "long2/正文/第2章_新.md", "long3/正文/第2章_新.md", "long4/正文/第2章_新.md", "long5/正文/第2章_新.md", "long6/正文/第2章_新.md", "bare/正文/第1章_起.md"]) {
+for (const rel of ["long/正文/第1章_起.md", "long/正文/第2章_承.md", "short/正文.md", "short2/正文.md", "long2/正文/第2章_新.md", "long3/正文/第2章_新.md", "long4/正文/第2章_新.md", "long5/正文/第2章_新.md", "long6/正文/第2章_新.md", "bare/正文/第1章_起.md", "$PROJ/正文/第001章_x.md"]) {
   const reason = core.proseBlockReason(root, path.join(root, rel))
   console.log(`${rel} :: ${reason || "-"}`)
 }
@@ -618,6 +618,11 @@ JS
   grep -q 'long5/正文/第2章_新.md :: ⛔' "$tmp/bpy.txt" || { echo "FAIL: 上一章含坏字节时两端应替换解码继续扫（不得整体放行）" >&2; return 3; }
   grep -q 'long6/正文/第2章_新.md :: ⛔.*必须先提交第1章追踪事务' "$tmp/bpy.txt" || { echo "FAIL: state 的 last_committed_chapter 落后正文时未拦住下一章" >&2; return 3; }
   grep -q 'bare/正文/第1章_起.md :: ⛔' "$tmp/bpy.txt" || { echo "FAIL: 新书无 大纲/追踪/设定 脚手架时首章守卫 fail open" >&2; return 3; }
+  # 缺细纲文案给补零的规范文件名（细纲_第001章.md），不给 细纲_第1章.md 误导模型建错名。
+  grep -q 'long/正文/第1章_起.md :: ⛔.*细纲_第001章\.md' "$tmp/bpy.txt" || { echo "FAIL: 缺细纲文案未给补零的规范细纲文件名" >&2; return 3; }
+  # 目标含未展开的 shell 变量（cat > "$PROJ/正文/..."）：仍拦，但说路径没解析出来，不谎报缺细纲。
+  grep -q '\$PROJ/正文/第001章_x.md :: ⛔.*未展开的 shell 变量' "$tmp/bpy.txt" || { echo "FAIL: shell 变量目标未按「路径未解析」拦截" >&2; return 3; }
+  grep -q '\$PROJ/正文/第001章_x.md :: .*缺少细纲' "$tmp/bpy.txt" && { echo "FAIL: shell 变量目标被误报为缺少细纲" >&2; return 3; }
 
   # E3: 追踪状态判定 parity。覆盖缺失、坏 JSON、旧 schema、派生 revision 不一致、
   #     缺修订号、缺章号、提交落后和有效 state 放行，避免 Codex Python 与三端 JS core 漂移。

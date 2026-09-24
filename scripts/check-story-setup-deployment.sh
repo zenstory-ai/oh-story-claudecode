@@ -842,6 +842,20 @@ if command -v node >/dev/null 2>&1; then
     || fail "Claude Bash write bypassed prose pre-guard"
   [ "$(run_bash_guard 'grep -n book/正文/第8章_x.md notes.md')" = "0" ] \
     || fail "Claude Bash read-only mention was wrongly blocked"
+  # 缺细纲文案给补零的规范名；目标含未展开 shell 变量时仍拦，但说路径没解析出来、不谎报缺细纲。
+  pad_err="$(printf '{"tool_name":"Write","tool_input":{"file_path":"book/正文/第8章_x.md","content":"x"}}' \
+    | CLAUDE_PROJECT_DIR="$guard_root" bash "$guard_root/.claude/hooks/guard-outline-before-prose.sh" 2>&1 >/dev/null || true)"
+  printf '%s' "$pad_err" | grep -q '细纲_第008章\.md' || fail "missing-outline block must name the zero-padded outline file: $pad_err"
+  var_payload="$(python3 - <<'PY'
+import json
+print(json.dumps({"tool_name": "Bash", "tool_input": {"command": 'PROJ=$PWD/book; cat draft.md > "$PROJ/正文/第8章_x.md"'}}, ensure_ascii=False))
+PY
+)"
+  var_ec=0
+  var_err="$(printf '%s' "$var_payload" \
+    | CLAUDE_PROJECT_DIR="$guard_root" bash "$guard_root/.claude/hooks/guard-outline-before-prose.sh" 2>&1 >/dev/null)" || var_ec=$?
+  [ "$var_ec" = "2" ] || fail "Claude Bash write behind an unexpanded shell variable must stay blocked"
+  printf '%s' "$var_err" | grep -q '未展开的 shell 变量' || fail "shell-variable target block must say the path was not resolved: $var_err"
 
   # 相对 Bash 目标必须按 hook cwd 解，不得总按项目根；根 book 有第8章细纲，nested/book 没有。
   : > "$guard_root/book/大纲/细纲_第8章.md"

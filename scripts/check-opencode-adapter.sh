@@ -602,6 +602,14 @@ assert_grep 'from "\./lib/story_hook_core\.js"' "$ROOT/plugin.ts" "OpenCode plug
 # structural proxy: the deploy manifest must place the core under .opencode/plugins/lib/, never flat
 # in .opencode/plugins/ (a flat *.js there is auto-loaded by OpenCode as a broken second plugin).
 assert_grep '\.opencode/plugins/lib/story_hook_core\.js' "$REPO_ROOT/skills/story-setup/SKILL.md" "SKILL.md deploy manifest must target .opencode/plugins/lib/story_hook_core.js, not a flat .opencode/plugins/story_hook_core.js"
+# Version gate is fail-closed: on 1.x the plugin never loads and agents' `permissions:` rules are
+# ignored (read-only agents would get write/shell), so an unknown version must stop, not continue,
+# and a blocked OpenCode-only deploy must leave `.story-deployed` untouched.
+SETUP_MD="$REPO_ROOT/skills/story-setup/SKILL.md"
+assert_grep '命令不可用或解析不出版本 → 同样停止 OpenCode 部署' "$SETUP_MD" "OpenCode version gate must stop when the version cannot be determined"
+assert_grep 'target 只有 opencode 则不写、不更新 `\.story-deployed`' "$SETUP_MD" "blocked OpenCode-only deploy must not write or bump .story-deployed"
+if grep -q '解析不出版本 → 继续部署' "$SETUP_MD"; then fail "OpenCode version gate must not continue on an unknown version"; fi
+assert_grep 'permissions:` 规则列表' "$REPO_ROOT/skills/story-review/SKILL.md" "story-review must validate OpenCode 2.x agents by their permissions: list"
 assert_grep '正文' "$ROOT/plugin.ts" "OpenCode plugin must inspect prose targets"
 assert_grep '@opencode/plugin' "$ROOT/plugin.ts" "OpenCode plugin must import OpenCode 2.x plugin types"
 # The shared prose-guard core (light net / outline guard / wordcount·landing·dup-title) deploys

@@ -12,7 +12,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > Agent 兼容性：只检查当前运行时 canonical 目录。运行时不支持项目 agent 或找不到文件时降级 solo/direct，并报告 `Fallback: project custom agents unavailable -> solo`。ZCode 3.3.4 不提供项目 custom agents，直接按此规则降级，不扫描其他 CLI 的 agent 目录。
 >
-> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 30` 不一致时（标记缺失、字段缺失/非整数、小于或大于 30）照常按文件存在性检查并 spawn，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 30）` 并提示重新运行 `/story-setup` 后新开会话；大于 30 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct。本次不修改 `agents_version`、插件版本或发布版本。
+> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 31` 不一致时（标记缺失、字段缺失/非整数、小于或大于 31）照常按文件存在性检查并 spawn，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 31）` 并提示重新运行 `/story-setup` 后新开会话；大于 31 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct。本次不修改 `agents_version`、插件版本或发布版本。
 
 ## 分析边界
 

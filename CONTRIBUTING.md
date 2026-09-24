@@ -356,7 +356,7 @@ python3 scripts/test-antigravity-hook-merge.py
 node scripts/test-antigravity-hooks.mjs
 ```
 
-若本机装有当前 Antigravity 2.0 / `agy`，再在临时写作项目运行一次 `story-setup`，新开 conversation，用 `/skills`、`/agents`、`/hooks` 验发现，并分别验证 IDE 与交互式 CLI。`agy 1.1.22 -p` 的 headless 进程会在静默鉴权前先扫描 workspace，鉴权后不重载 custom agents/hooks；实测会出现 `subagent not found` 或把普通模型输出写进 `~/.gemini/antigravity-cli/scratch/`，因此当前不作为支持入口或 smoke 手段。测试后检查并清理意外 scratch 产物。自动化不读写用户 global customization，也不替代这个实机步骤。
+若本机装有当前 Antigravity 2.0 / `agy`，再在临时写作项目运行一次 `story-setup`，新开 conversation，用 `/skills`、`/agents`、`/hooks` 验发现，并分别验证 IDE 与交互式 CLI。print 模式 `agy -p` 必须带 `--add-dir "$PWD"`：实测 agy 1.2.10 带上它会加载工作区 `.agents/`（13 个 skills、7 个 agents 与 hooks），不带则都不加载，可能把普通模型输出写进 `~/.gemini/antigravity-cli/scratch/`。测试后检查并清理意外 scratch 产物。自动化不读写用户 global customization，也不替代这个实机步骤。
 
 ## ZCode 适配维护
 
@@ -413,7 +413,7 @@ bash scripts/test-codex-hooks.sh
 
 ### Codex 关键兼容性问题
 
-- **hooks 信任门槛**：Codex project `.codex/` 配置层需要被 trust，非 managed command hooks 还需要用户在 `/hooks` review/trust 后才会运行。
+- **hooks 信任门槛**：Codex project `.codex/` 配置层需要被 trust，非 managed command hooks 还需要用户在 `/hooks` review/trust 后才会运行。未信任前 Codex 静默跳过这些 hooks（包括写正文前的大纲守卫），不报错；自动化里的 `codex exec` 可加 `--dangerously-bypass-hook-trust`。
 - **hook JSON 契约**：`PreToolUse`、`PreCompact`、`PostCompact` 的普通 stdout 会被忽略；需要输出 JSON，如 `hookSpecificOutput.permissionDecision = "deny"` 或 `hookSpecificOutput.additionalContext`。
 - **PreToolUse 不完整拦截**：Codex 官方说明当前 shell/edit 拦截不是完备安全边界；story hooks 只作为写作流程 guardrail，不能替代版本控制和人工审查。
 - **agent 文件格式**：Codex custom agents 是 `.codex/agents/{name}.toml`，必需 `name`、`description`、`developer_instructions`；只读 agent 使用 `sandbox_mode = "read-only"`。

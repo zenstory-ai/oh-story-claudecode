@@ -2,6 +2,8 @@
 
 Status: implemented
 
+Related: [2026-09-24-opencode-version-gate-fail-closed](../bug-fix/2026-09-24-opencode-version-gate-fail-closed.md)（「版本无法确定时继续部署」一条已翻转为停止部署）
+
 ## Problem
 
 OpenCode 2.0（2026-09-11 起，npm 包 `@opencode/cli`，与停在 1.18.x 的 `opencode-ai` 分开发布）重写了服务端。我们的 OpenCode 适配按 1.x 写，在 2.0.15 上实测：

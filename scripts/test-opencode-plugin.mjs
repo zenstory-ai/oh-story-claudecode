@@ -102,12 +102,19 @@ try {
     await before("write", { path: "book/正文/第001章_开局.md" });
     await assert.rejects(
       () => before("write", { path: "book/正文/第005章_外部.md" }),
-      /第 5 章缺少细纲（book\/大纲\/细纲_第5章\.md）/,
+      /第 5 章缺少细纲（book\/大纲\/细纲_第005章\.md）/,
       "project root must come from ctx.location, not process.cwd()"
     );
   } finally {
     process.chdir(tmp);
   }
+
+  // shell 变量展不开：仍拦，但如实说路径没解析出来，不谎报缺细纲。
+  await assert.rejects(
+    () => before("shell", { command: 'PROJ=$PWD/book; cat draft.md > "$PROJ/正文/第001章_开局.md"' }),
+    (error) => /未展开的 shell 变量/.test(error.message) && !/缺少细纲/.test(error.message),
+    "shell-variable prose target must be blocked as unresolved, not as a missing outline"
+  );
 
   fs.mkdirSync("bare/正文", { recursive: true });
   await expectBlocked(

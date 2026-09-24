@@ -1,6 +1,6 @@
 ---
 name: story-setup
-version: 1.2.10
+version: 1.2.11
 description: "网文写作工具集基础设施部署与检查。为 Claude Code / OpenCode / Codex / Google Antigravity / ZCode / OpenClaw / Reasonix 提供内置适配；Web AI / 通用 Agent 可走 skills + AGENTS.md 文件模式。触发方式：/story-setup、$story-setup、「准备写书」「帮我搭一下环境」「配置写作项目」「检查写作环境」。"
 metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudecode"}}
 ---
@@ -24,9 +24,9 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 > 判据是「有没有 `SKILL.md`」：只看正在执行的 `SKILL.md` 同级的 `references/`。项目内 `.claude/skills/story-setup/`、`.codex/skills/story-setup/` 和 OpenCode 的 `skills/story-setup/` 只有 `references/agent-references/`、不含 `SKILL.md`，不会是执行目录，也不要拿它们核对。Antigravity / ZCode / OpenClaw / Reasonix / generic 的项目副本是整份 skill 拷贝、自带 `SKILL.md`，9 个子目录本就齐全，照常核对即可。
 
 1. 检查当前目录是否已部署过（存在 `.story-deployed`）
-   - `agents_version` 缺失、非整数或小于 `30` → 标记为待更新，继续执行当前部署
-   - `agents_version: 30` → 使用 AskUserQuestion 确认是否重新部署；提示里写明重新部署只用**当前本地 skill 包**刷新项目文件，要拿 skill 本身的新版本得先更新 oh-story-claudecode（`npx skills add` 或 marketplace），再回来重跑
-   - `agents_version` 大于 `30` → 当前 story-setup 比项目部署旧；停止以避免降级覆盖，提示先更新 oh-story-claudecode，不写任何部署文件
+   - `agents_version` 缺失、非整数或小于 `31` → 标记为待更新，继续执行当前部署
+   - `agents_version: 31` → 使用 AskUserQuestion 确认是否重新部署；提示里写明重新部署只用**当前本地 skill 包**刷新项目文件，要拿 skill 本身的新版本得先更新 oh-story-claudecode（`npx skills add` 或 marketplace），再回来重跑
+   - `agents_version` 大于 `31` → 当前 story-setup 比项目部署旧；停止以避免降级覆盖，提示先更新 oh-story-claudecode，不写任何部署文件
    - 同时读 `target_cli` 字段。**已部署项目以 sentinel 里的值为准**：非空时（逗号分隔的多端组合原样保留）跳过下面第 5-12 步的环境探测与选择，直接按这些端重新部署。只有字段缺失或为空，才回落到探测。用户明确要求增删目标端时，用 AskUserQuestion 在现有值基础上改，改完的值写回 sentinel。
 2. 检查是否有书名目录（包含 `追踪/` 子目录的目录，或用户自定义结构）
    - 有 → 识别为长篇项目，显示当前项目信息
@@ -129,12 +129,13 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ### OpenCode 部署前置（先于上表任何 OpenCode 行执行）
 
-只适配 OpenCode 2.x：1.x 的插件 loader 读不了 `story-hooks.ts`，只记一行日志后照常运行，写正文守卫整场缺席。
+只适配 OpenCode 2.x：1.x 的插件 loader 读不了 `story-hooks.ts`，只记一行日志后照常运行，写正文守卫整场缺席；1.x 也不认 agents 的 `permissions:` 规则，三个只读 agent 会拿到写文件与 shell 权限。版本门 fail-closed。
 
 1. 运行 `opencode --version`，取第一个 `主.次.修` 版本号：
    - 主版本 ≥ 2 → 继续
-   - 主版本 < 2 → 停止 OpenCode 部署（其它 target 照常），告诉用户先升级到 2.x（`curl -fsSL https://opencode.ai/v2/install | bash` 或 `npm i -g @opencode/cli`），装好后重跑 story-setup
-   - 命令不可用或解析不出版本 → 继续部署，安装报告首行写明「未能确认 OpenCode 版本；本适配需要 2.x，1.x 下写正文守卫不会加载」
+   - 主版本 < 2 → 停止 OpenCode 部署（其它 target 照常），告诉用户先升级到 2.x（先 `npm rm -g opencode-ai`，再 `npm i -g @opencode/cli` 或 `curl -fsSL https://opencode.ai/v2/install | bash`），装好后重跑 story-setup
+   - 命令不可用或解析不出版本 → 同样停止 OpenCode 部署，请用户在自己的终端运行 `opencode --version`：用户在对话里确认显示 2.x 后才继续；是 1.x 按上一条处理
+   - 停止 OpenCode 部署时：target 只有 opencode 则不写、不更新 `.story-deployed`（已有的原样保留，不抬 `agents_version`），也不写任何 OpenCode 文件；多 target 时其它端照常部署，写入的 `target_cli` 不含 opencode，报告首行写明 OpenCode 未部署及原因
 2. 插件由 OpenCode 自动发现 `.opencode/plugins/*.ts` 加载，不写 `opencode.json`。项目根已有 `opencode.json` / `opencode.jsonc` 时，从其 `plugin`、`plugins` 数组删掉指向 `.opencode/plugins/story-hooks.ts` 的项（旧版部署留下；2.x 丢弃单文件路径并告警），数组删空就删掉该键，其余内容原样保留。
 
 ### Step 2：部署 CLAUDE.md
@@ -182,7 +183,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 - Agent 文件属于 story-setup 管理文件，可安全覆盖；`references/codex/agents/` 里的 TOML 由仓库根的 `scripts/generate-codex-agents.py` 从 Claude agent 模板确定性生成后提交入库，部署只做复制
 - 校验每个 TOML 都能解析，且包含 Codex 必需字段：`name`、`description`、`developer_instructions`
 - 只读职责 agent（`chapter-extractor`、`consistency-checker`、`story-explorer`）必须保留 `sandbox_mode = "read-only"`
-- **部署后必须 trust + 新开 Codex 会话**（报告文案与 fallback 规则见「验证 Codex 部署」）；若运行时返回 `unknown agent_type`，调用方必须降级 solo/direct 并报告 fallback。
+- **部署后必须 trust + 新开 Codex 会话**（报告文案与 fallback 规则见「验证 Codex 部署」）；hooks 未在 `/hooks` 信任前会被 Codex 静默跳过，包括写正文前的大纲守卫；若运行时返回 `unknown agent_type`，调用方必须降级 solo/direct 并报告 fallback。
 - 将 `skills/story-setup/references/agent-references/` 同步复制到 `.codex/skills/story-setup/references/agent-references/`，作为 Codex agent 的项目内参考资料主路径
 
 #### 部署 Antigravity Agents（target_cli 含 antigravity 时）
@@ -381,15 +382,15 @@ Reasonix（DeepSeek-Reasonix CLI）当前只部署 skills 与 `AGENTS.md`，不�
 - 写入以下字段（YAML `key: value` 格式，hook 用 `references/templates/hooks/lib/sentinel.sh` 读取）：
   ```
   deployed_at: <date -u +"%Y-%m-%dT%H:%M:%SZ">
-  agents_version: 30
-  setup_skill_version: 1.2.10
+  agents_version: 31
+  setup_skill_version: 1.2.11
   target_cli: claude-code（或 opencode、codex、antigravity、zcode、openclaw、reasonix、generic，或其任意组合）
   resolver_strategy: project-local-skill-reference
   references_dir: .claude/skills/story-setup/references/agent-references（Codex 写 .codex/skills/...；Antigravity 写 .agents/skills/...；ZCode 写 .zcode/skills/...；OpenClaw / Reasonix / generic 写 skills/...；多端用逗号分隔）
   ```
 - 此文件供 session-start.sh 和写作 skill 检测部署状态，避免重复提示
 - target_cli 含 claude-code 时，同时创建一次性标记文件 `.claude/.agents-pending-restart`（空文件即可）。session-start.sh 在下一个会话启动时据此确认 agents 已随新会话注册，并自动删除该标记——用来向用户确认「重启已生效」。ZCode 不创建该标记，因为它不部署项目 agents。
-- 如果 `.story-deployed` 已存在但 `agents_version` 缺失、非整数或小于 `30`，按本次流程更新 hooks/agents/rules/reference bundle（具体变更见 `UPGRADING.md`）；大于 `30` 时已在 Phase 1 停止，不得降级覆盖
+- 如果 `.story-deployed` 已存在但 `agents_version` 缺失、非整数或小于 `31`，按本次流程更新 hooks/agents/rules/reference bundle（具体变更见 `UPGRADING.md`）；大于 `31` 时已在 Phase 1 停止，不得降级覆盖
 
 ## Phase 3：验证安装
 
@@ -407,11 +408,12 @@ Reasonix（DeepSeek-Reasonix CLI）当前只部署 skills 与 `AGENTS.md`，不�
    - 检查 `.claude/skills/story-setup/references/agent-references/` 下 reference 文件完整
    - 检查所有 `story-setup/references/agent-references/<file>.md` 都能解析到 deployed bundle
 5. 验证部署标记：
-   - 检查 `.story-deployed` 是否存在且包含时间戳、`agents_version: 30`、`setup_skill_version: 1.2.10`、`target_cli`、`resolver_strategy`、`references_dir`
-6. 输出安装报告：
-   - 列出所有已部署的文件
-   - 列出需要注意的事项（如已有配置已合并）
-    - **⚠️ 重启提示（必须醒目输出）**：本次部署写入了 `.claude/agents/`，但这些 custom agent 只在「会话启动」时才会被 Claude Code 注册成 `subagent_type`。**请新开一个 Claude Code 会话再开始写作**，否则当前会话里 story-review / story-long-write 等想 spawn `story-architect`、`narrative-writer` 等时会拿到「subagent_type 不可用」并降级 solo（单视角，失去多 agent 协作）。判断是否生效：新会话里跑 `/story-review`，报告头若是 `Effective Mode: full/lean` 即注册成功；若是 `Fallback: ... -> solo` 说明还在旧会话或未注册。
+   - 检查 `.story-deployed` 是否存在且包含时间戳、`agents_version: 31`、`setup_skill_version: 1.2.11`、`target_cli`、`resolver_strategy`、`references_dir`
+6. 输出安装报告。读者是不懂编程的作者，按这个顺序写：
+   - **先写「现在可以做什么」**：用写书的话列本次部署后真正可用的事（如「可以开新书、续写：说 /story-long-write」「可以拆一本对标书」），端的限制如实翻译（如「这个工具里审稿由我一个人完成，没有分工助手」）。
+   - **再写「你还需要做的事」**：逐条可照做，如「新开一个会话」「在 Codex 里打开 /hooks，把 oh-story 的几条信任一下」「先安装 Node」；没有就写「无需其他操作」。这两段不出现脚本名、字段名、状态名或文件路径；各端「安装报告必须提示」的内容先翻译进这两段。
+   - **最后是简短的「部署明细」**：已部署文件、已合并的配置、删掉的残留路径、下面的模型配置摘要和技术原因，放在报告末尾。
+    - **⚠️ 重启提示（必须醒目，放进「你还需要做的事」）**：本次部署写入了 `.claude/agents/`，但这些 custom agent 只在「会话启动」时才会被 Claude Code 注册成 `subagent_type`。**请新开一个 Claude Code 会话再开始写作**，否则当前会话里 story-review / story-long-write 等想 spawn `story-architect`、`narrative-writer` 等时会拿到「subagent_type 不可用」并降级 solo（单视角，失去多 agent 协作）。判断是否生效：新会话里跑 `/story-review`，报告头若是 `Effective Mode: full/lean` 即注册成功；若是 `Fallback: ... -> solo` 说明还在旧会话或未注册。
     - 重启后即可使用 `/story-long-write` 或 `/story-short-write`
     - 如果执行了「配置 OpenCode Agent 模型」，输出 Agent 模型配置摘要：
       ```
@@ -453,14 +455,14 @@ Reasonix（DeepSeek-Reasonix CLI）当前只部署 skills 与 `AGENTS.md`，不�
     - 检查 `.codex/hooks.json` 存在且 JSON 有效，Unix `command` 仅通过 `run-story-hook.sh` 启动，Windows `commandWindows` 仅通过 `run-story-hook.cmd` 启动；不存在直调 `story_codex_hook.py` 的注册
    - 检查 `.codex/hooks/story_codex_hook.py`、`run-story-hook.sh`、`run-story-hook.cmd` 存在，Python 语法有效，POSIX/Windows launcher 能从嵌套 cwd 定位项目根
     - 检查 `.codex/skills/story-setup/references/agent-references/` 下 reference 文件完整且数量与源目录一致
-    - 安装报告必须提示：Codex 需要 trust 项目 `.codex/` 配置层，并在 `/hooks` review/trust 非 managed hooks；部署后新开 Codex 会话让 custom agents 生效；若当前运行时仍返回 `unknown agent_type`，按各 skill 的 fallback 规则降级 solo/direct
+    - 安装报告必须提示：Codex 需要 trust 项目 `.codex/` 配置层，并在 `/hooks` review/trust 非 managed hooks——**未信任前 Codex 静默跳过这些 hooks，写正文前的大纲守卫也不生效，且不报错**；自动化里的 `codex exec` 可加 `--dangerously-bypass-hook-trust`；部署后新开 Codex 会话让 custom agents 生效；若当前运行时仍返回 `unknown agent_type`，按各 skill 的 fallback 规则降级 solo/direct
 9. 验证 Antigravity 部署（仅当 target_cli 含 antigravity 时）：
     - 检查 `.agents/skills/` 下 13 个 story skills 为真实目录且 `SKILL.md` 可读；`.agents/skills/story-setup/references/agent-references/` 完整
     - 检查 `.agents/agents/` 下 7 个 Markdown agent 可解析，名称、模型档、官方工具白名单、只读边界与 `.agents/skills/` reference 前缀正确
     - 检查 `.agents/rules/oh-story.md` 为 `trigger: always_on` 且未超过 12,000 字符
     - 检查 `.agents/hooks.json` 有效、顶层 `oh-story` group 恰有 PreToolUse/PostToolUse/PreInvocation/Stop，用户 hook groups 保留；检查 `.agents/hooks/story_antigravity_hook.js` 与 `story_hook_core.js` 语法有效
     - 用 fixture 验证：PreToolUse 缺纲/追踪时 deny、普通写入 allow、commit advisory；PostToolUse stdout 恒为 `{}` 且把正文 findings 写进 session artifact；下一次 PreInvocation 注入 findings；Stop 对未处理 findings 最多 continue 一次；干净正文清除 pending state
-    - 安装报告必须提示：新开 Antigravity conversation 刷新 customization；Hooks 依赖 PATH 中的 `node`；外部 hook API 没有 PreCompact/PostCompact，compact 恢复由 Always-On Rule 读取 `追踪/上下文.md`；IDE 与交互式 `agy` 仍建议分别实机 smoke test；`agy 1.1.22 -p` 每次 headless 启动都可能在静默鉴权前扫描 workspace，鉴权后不重载 custom agents/hooks，因此当前不在支持面内，可能报 `subagent not found` 或回退写入 `~/.gemini/antigravity-cli/scratch/`；命令行写作从项目目录进入交互式 `agy`，确认 `/skills`、`/agents`、`/hooks` 已发现 oh-story 后再发任务，测试后检查 scratch 无意外小说产物
+    - 安装报告必须提示：新开 Antigravity conversation 刷新 customization；Hooks 依赖 PATH 中的 `node`；外部 hook API 没有 PreCompact/PostCompact，compact 恢复由 Always-On Rule 读取 `追踪/上下文.md`；IDE 与交互式 `agy` 仍建议分别实机 smoke test；命令行写作从项目目录进入交互式 `agy`，确认 `/skills`、`/agents`、`/hooks` 已发现 oh-story 后再发任务；print 模式 `agy -p` 必须带 `--add-dir "$PWD"`（实测 agy 1.2.10 带上才加载工作区 `.agents/` 的 13 个 skills、7 个 agents 与 hooks，不带则都不加载，可能回退写入 `~/.gemini/antigravity-cli/scratch/`），测试后检查 scratch 无意外小说产物
 10. 验证 ZCode 部署（仅当 target_cli 含 zcode 时）：
     - 检查根 `AGENTS.md` 含 ZCode `$story-*` 路由、大纲守卫和 solo/direct fallback
     - 检查 `.zcode/skills/` 下 13 个 Skills 与 `.zcode/commands/` 下 13 个 Commands，验证 frontmatter 和命名
@@ -521,9 +523,9 @@ Reasonix（DeepSeek-Reasonix CLI）当前只部署 skills 与 `AGENTS.md`，不�
 ## 重新部署
 
 - `.story-deployed` 不存在 → 全新安装，Phase 2 全部执行
-- `.story-deployed` 存在且 `agents_version: 30` → 提示已部署，AskUserQuestion 确认是否重新部署；提示里写明重新部署只用当前本地 skill 包刷新项目文件，skill 本身的更新走 `npx skills add` 或 marketplace
-- `.story-deployed` 存在但 `agents_version` 缺失、非整数或小于 `30` → 提示需要更新，重新执行 Phase 2 覆盖 agents/hooks/rules/reference bundle，CLAUDE.md / AGENTS.md / settings.local.json / .codex/hooks.json / `.agents/hooks.json` / .zcode/config.json 走合并策略
-- `.story-deployed` 存在且 `agents_version` 大于 `30` → 当前 skill 版本过旧，停止并提示先更新 oh-story-claudecode；不覆盖项目中的更新部署
+- `.story-deployed` 存在且 `agents_version: 31` → 提示已部署，AskUserQuestion 确认是否重新部署；提示里写明重新部署只用当前本地 skill 包刷新项目文件，skill 本身的更新走 `npx skills add` 或 marketplace
+- `.story-deployed` 存在但 `agents_version` 缺失、非整数或小于 `31` → 提示需要更新，重新执行 Phase 2 覆盖 agents/hooks/rules/reference bundle，CLAUDE.md / AGENTS.md / settings.local.json / .codex/hooks.json / `.agents/hooks.json` / .zcode/config.json 走合并策略
+- `.story-deployed` 存在且 `agents_version` 大于 `31` → 当前 skill 版本过旧，停止并提示先更新 oh-story-claudecode；不覆盖项目中的更新部署
 
 ---
 

@@ -630,6 +630,9 @@ function extractPatchTargets(patchText) {
   return targets
 }
 
+// 未展开的 shell 变量：$VAR / ${VAR}。与 codex UNEXPANDED_SHELL_VAR 同式。
+const UNEXPANDED_SHELL_VAR = /\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)/
+
 function proseBlockReason(root, absolute) {
   const base = path.basename(absolute)
   const parent = path.basename(path.dirname(absolute))
@@ -666,7 +669,12 @@ function proseBlockReason(root, absolute) {
       })
     } catch {}
     if (!found) {
-      return `⛔ 写正文被拦截：第 ${chapter} 章缺少细纲（${safeRelative(root, outlineDir)}/细纲_第${chapter}章.md）。先按 story-long-write 单章流程补建细纲再写正文。`
+      // `cat > "$PROJ/正文/第001章.md"` 这类目标里的 shell 变量守卫展开不了，书目录按字面拼出来
+      // 必然找不到细纲。仍然拦（fail closed），但如实说路径没解析出来，不谎报「缺少细纲」。
+      if (UNEXPANDED_SHELL_VAR.test(safeRelative(root, absolute)) && !fs.existsSync(book)) {
+        return `⛔ 写正文被拦截：写入路径含未展开的 shell 变量（${safeRelative(root, absolute)}），守卫无法确认对应细纲。改用字面项目路径（如 书名/正文/第${chapter.padStart(3, "0")}章_标题.md）重新写入。`
+      }
+      return `⛔ 写正文被拦截：第 ${chapter} 章缺少细纲（${safeRelative(root, outlineDir)}/细纲_第${chapter.padStart(3, "0")}章.md）。先按 story-long-write 单章流程补建细纲再写正文。`
     }
   }
   const checkpointIssue = trackingCheckpointIssue(book, true, exists ? null : Number(chapter) - 1)

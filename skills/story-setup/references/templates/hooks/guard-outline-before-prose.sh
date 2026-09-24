@@ -154,7 +154,7 @@ case "$BASE" in
         done
       fi
       if [ -z "$FOUND" ]; then
-        printf '%s\n' "⛔ 写正文被拦截：第 ${NUM} 章缺少细纲（${OUTLINE_DIR#$ROOT/}/细纲_第${NUM}章.md）。" >&2
+        printf '%s\n' "⛔ 写正文被拦截：第 ${NUM} 章缺少细纲（${OUTLINE_DIR#$ROOT/}/细纲_第$(printf '%03d' "$NUM")章.md）。" >&2
         printf '%s\n' "   按 story-long-write 单章流程先补建细纲，再写正文（不允许跳过细纲直接写作）。" >&2
         printf '%s\n' "   如确需先起草，请先补建对应细纲文件。" >&2
         exit 2

@@ -64,6 +64,12 @@ echo "Fixture: $ROOT"
 mkdir -p "$ROOT/book/正文" "$ROOT/book/大纲" "$ROOT/book/设定"
 out="$(run_hook pre-tool-prose-guard '{"tool_name":"Bash","tool_input":{"command":"cat > book/正文/第001章_开端.md <<EOF\n正文\nEOF"}}')"
 assert_denied "$out" "long prose without outline"
+printf '%s' "$out" | grep -q '细纲_第001章\.md' || fail "missing-outline denial must name the zero-padded outline file: $out"
+# 目标路径里的 shell 变量守卫展不开：仍拦，但说路径没解析出来，而不是谎报缺细纲。
+out="$(run_hook pre-tool-prose-guard '{"tool_name":"Bash","tool_input":{"command":"PROJ=$PWD/book; cat > \"$PROJ/正文/第001章_开端.md\" <<EOF\n正文\nEOF"}}')"
+assert_denied "$out" "prose target behind an unexpanded shell variable"
+printf '%s' "$out" | grep -q '未展开的 shell 变量' || fail "shell-variable target denial must say the path was not resolved: $out"
+if printf '%s' "$out" | grep -q '缺少细纲'; then fail "shell-variable target must not be reported as a missing outline: $out"; fi
 : > "$ROOT/book/大纲/细纲_第1章.md"
 out="$(run_hook pre-tool-prose-guard '{"tool_name":"Bash","tool_input":{"command":"cat > book/正文/第001章_开端.md <<EOF\n正文\nEOF"}}')"
 assert_denied "$out" "long prose without tracking metadata"

@@ -1208,6 +1208,10 @@ def target_paths_from_hook(obj: dict[str, Any]) -> list[Path]:
     return [resolve_target(root, t, base) for t in raw_targets if t]
 
 
+# 未展开的 shell 变量：$VAR / ${VAR}。与 JS core UNEXPANDED_SHELL_VAR 同式。
+UNEXPANDED_SHELL_VAR = re.compile(r"\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)")
+
+
 def prose_block_reason(root: Path, abs_path: Path) -> str | None:
     base = abs_path.name
     parent = abs_path.parent.name
@@ -1250,7 +1254,10 @@ def prose_block_reason(root: Path, abs_path: Path) -> str | None:
                     found = True
                     break
         if not found:
-            return f"⛔ 写正文被拦截：第 {num} 章缺少细纲（{safe_rel(root, outline_dir)}/细纲_第{num}章.md）。先按 story-long-write 单章流程补建细纲再写正文。"
+            # 文案与 JS core 逐字一致：shell 变量展不开时仍拦，但如实说路径没解析出来。
+            if UNEXPANDED_SHELL_VAR.search(safe_rel(root, abs_path)) and not book_dir.exists():
+                return f"⛔ 写正文被拦截：写入路径含未展开的 shell 变量（{safe_rel(root, abs_path)}），守卫无法确认对应细纲。改用字面项目路径（如 书名/正文/第{int(num):03d}章_标题.md）重新写入。"
+            return f"⛔ 写正文被拦截：第 {num} 章缺少细纲（{safe_rel(root, outline_dir)}/细纲_第{int(num):03d}章.md）。先按 story-long-write 单章流程补建细纲再写正文。"
     checkpoint_issue = tracking_checkpoint_issue(
         book_dir,
         require_state=True,

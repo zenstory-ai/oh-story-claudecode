@@ -2,20 +2,27 @@
 
 ## 当前版本
 
-发布版本 `v0.7.10`。`agents_version` 从上一发布 tag v0.7.9 的 29 增加到 30；开发期间已使用 main v30 的项目也需更新技能包、重新运行 `/story-setup` 并新开会话，以加载本次完整部署内容。
+发布版本 `v0.7.11`。`agents_version` 从上一发布 tag v0.7.10 的 30 增加到 31；已部署项目需更新技能包、重新运行 `/story-setup` 并新开会话，以加载本次完整部署内容。
 
-- `setup_skill_version: 1.2.10`
-- `agents_version: 30`
+- `setup_skill_version: 1.2.11`
+- `agents_version: 31`
 
-`.story-deployed` 缺失任一字段，或 `agents_version` 缺失 / 非整数 / 小于 `30`，都视为待更新部署。直接重新运行 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或自然语言点名）；不在运行时逐级兼容历史模板。如项目 `agents_version` 大于 `30`，说明本地 story-setup 比项目旧：先更新 oh-story-claudecode，不得用 v30 降级覆盖。历史版本改动见仓库根目录 `CHANGELOG.md`。
+`.story-deployed` 缺失任一字段，或 `agents_version` 缺失 / 非整数 / 小于 `31`，都视为待更新部署。直接重新运行 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或自然语言点名）；不在运行时逐级兼容历史模板。如项目 `agents_version` 大于 `31`，说明本地 story-setup 比项目旧：先更新 oh-story-claudecode，不得用 v31 降级覆盖。历史版本改动见仓库根目录 `CHANGELOG.md`。
 
-## OpenCode 只支持 2.x（下一版本）
+### v0.7.11 必须重跑 story-setup
 
-OpenCode 2.0 起发布在 npm 包 `@opencode/cli`（`opencode-ai` 停在 1.x）。本适配只支持 2.x：1.x 的插件 loader 读不了新版 `story-hooks.ts`，在 1.x 上会没有写正文守卫与写后兜底。
+Claude Code、Codex、Antigravity、OpenCode、ZCode、OpenClaw、Reasonix 用户更新技能包后都要在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`），再新开会话：
 
-1. 升级 OpenCode：`curl -fsSL https://opencode.ai/v2/install | bash` 或 `npm i -g @opencode/cli`，确认 `opencode --version` 为 2.x。
+- `chapter-extractor` 与 `story-explorer` 模板已改。`story-long-analyze` Stage 2 按新格式校验情节点，旧 extractor 的输出会被整批拒收。
+- 长篇拆文（`story-long-analyze`）的运行时改由 Python 脚本管理，本机需要 Python 3（`python3` / `python` / `py` 任一可用）。
+- 部署到项目的指令模板新增「与作者协作」三条规则：回复用写书的话说，不抛脚本名和字段名；作者要求记住 / 忘掉 / 确认写作习惯时走 story 的作者记忆（`.story/作者记忆/`），不写宿主自带记忆；skill 脚本报错时停下报告，不改写项目里已安装的 skill 文件。安装报告与检查报告改为先说「现在可以做什么」「你还需要做的事」。
+
+## OpenCode 只支持 2.x（v0.7.11）
+
+OpenCode 2.0 起发布在 npm 包 `@opencode/cli`（`opencode-ai` 停在 1.x）。本适配只支持 2.x：1.x 的插件 loader 读不了新版 `story-hooks.ts`，在 1.x 上会没有写正文守卫与写后兜底；1.x 也不认 agents 的 `permissions:` 规则，三个只读 agent 会拿到完整读写与 shell 权限。story-setup 在版本是 1.x 或无法确定时停止部署。
+
+1. 升级 OpenCode：先卸载旧包 `npm rm -g opencode-ai`，再 `npm i -g @opencode/cli`（或 `curl -fsSL https://opencode.ai/v2/install | bash`），确认 `opencode --version` 为 2.x。两个包都提供 `opencode` 命令，不先卸载旧包时 PATH 上可能仍是 1.x。
 2. 更新技能包后，在写作项目根重跑 story-setup：替换 `.opencode/plugins/story-hooks.ts` 与 `.opencode/agents/`（改为 2.x 原生 `permissions:` 规则列表，已配的 `model:` 会保留），并从 `opencode.json` / `opencode.jsonc` 删除旧的 story-hooks 插件注册。
-3. 这次变更随下一次发版抬 `agents_version`；发版前 session-start 不会提示重新部署，OpenCode 用户需要手动重跑。
 
 ## 插件打包身份迁移（v0.7.9 同版本修复）
 
@@ -120,12 +127,21 @@ OpenClaw / Reasonix / generic 三条路径的 skill 副本在项目 `skills/` �
 - `{书名}/设定/`、`大纲/`、`追踪/`
 - `.active-book`
 
-## 三层灵感库契约（版本号与发布安排待维护者定）
+## 三层灵感库契约（v0.7.11）
 
 - story-long-analyze 新增可选「三层灵感库管道」：复用 Stage 3 的 EM 机制卡——IA 只是索引登记行（无文件），NM 只记合并增量，CBA 是唯一自包含写作消费卡；卡内禁路径引用，来源用 `书名/EM-xxx` 裸 ID，溯源经 `灵感索引.csv` 或 `resolve` 子命令。
 - story-long-write 在开书（适用阶段=设定）、卷纲、细纲三处可选召回 active CBA；逐章写前召回与写手 prompt 不接灵感库。无库或零命中只记 gap，不阻塞。
 
-## v30 当前契约
+## v31 当前契约
+
+- `chapter-extractor` 按原文块逐章输出紧凑字段与 10–20 个情节点（长章最多 30），由 `manage_analysis_run.py commit` 校验后生成章节摘要；不合格的整批拒收重跑。
+- `story-explorer` 读新版轻量章节摘要的「信息变化」「状态变化」「章尾钩子」「三维节奏」字段，旧摘要回退读「关键信息与扩写技法」表；对标主产物只以两份文件是否存在判定，不看 `schema_version`。
+- OpenCode 只部署 2.x：agents 使用原生 `permissions:` 规则列表，`story-hooks.ts` 按 2.x 插件接口加载；版本为 1.x 或无法确定时停止部署。
+- 项目指令模板新增「与作者协作」一节：说写书的话、作者记忆路由、不改已安装 skill 文件。写正文拦截文案给补零的细纲名（`细纲_第001章.md`），shell 变量路径如实报「路径未解析」。
+
+重新部署后新开会话，使新 agent 定义生效。
+
+## v30 历史契约
 
 - 默认保留一次 checkpoint；全章细纲供整体编排，用户可明确选择一次成文。
 - 写手 prompt 使用脚本组装；卷纲按作用域取段，旧卷纲未声明的段保守保留并告警。
@@ -220,7 +236,7 @@ OpenClaw / Reasonix / generic 三条路径的 skill 副本在项目 `skills/` �
 ## 升级步骤
 
 1. 在项目根目录重新运行 story-setup。
-2. 确认 `.story-deployed` 写入 `agents_version: 30` 与 `setup_skill_version: 1.2.10`。
+2. 确认 `.story-deployed` 写入 `agents_version: 31` 与 `setup_skill_version: 1.2.11`。
 3. 确认目标 CLI 的 agents、hooks/rules 和 reference bundle 都通过安装验证。
 4. 新开会话，使 custom agents 与 hooks 按当前文件重新注册。
 5. **长篇在写项目必做**：检查每本书的 `追踪/_tracking-state.json` 是否存在。不存在就是旧追踪结构，按下方「追踪模型迁移」重建，否则写下一章会被拦。
