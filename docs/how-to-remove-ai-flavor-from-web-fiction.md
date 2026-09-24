@@ -66,5 +66,5 @@
 
 - 触发：`/story-deslop`、`/去AI味`，或直接说"这篇太 AI 了"。
 - 预防优于治疗：`story-long-write` 和 `story-short-write` 在写作阶段就加载同一套 anti-ai-writing 规则。
-- 站点上的改稿示例（前后对照）：https://zenstory.ai/oh-story/revise-ai-prose
+- 站点上的改稿示例（前后对照）：https://zenstory.ai/zh/oh-story/revise-ai-prose
 - 仓库地址：https://github.com/zenstory-ai/oh-story-claudecode（原 `worldwonderer/oh-story-claudecode`，旧链接自动跳转）

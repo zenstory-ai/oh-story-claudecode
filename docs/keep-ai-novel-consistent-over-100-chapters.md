@@ -62,5 +62,6 @@ Run `/story-setup`, then `/story-import` to reverse-parse the existing manuscrip
 
 - Install: `npx skills add zenstory-ai/oh-story-claudecode -y -g`, then `/story-setup` inside the agent.
 - Site guide with a worked three-chapter example: https://zenstory.ai/oh-story/long-novel-continuity
+- Chapter outline template (what each chapter must change, and what stays hidden): https://zenstory.ai/oh-story/chapter-outline-template
 - Implementation notes: `skills/story-long-write/references/state-tracking.md`, `tracking-transaction.md`
 - Repository: https://github.com/zenstory-ai/oh-story-claudecode (formerly `worldwonderer/oh-story-claudecode`; old links redirect)
