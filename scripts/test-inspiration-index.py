@@ -144,7 +144,7 @@ def base_row(**overrides: str) -> dict[str, str]:
     return row
 
 
-CBA_TAGS = "题材=玄幻；读者需求=认知反转；情绪=期待；剧情功能=信息揭示；适用阶段=正文；风险=泄底过早"
+CBA_TAGS = "题材=玄幻；读者需求=认知反转；情绪=期待；剧情功能=信息揭示；适用阶段=细纲；风险=泄底过早"
 
 
 def test_register_and_idempotence() -> None:
@@ -359,7 +359,7 @@ VOCABULARY_TEXT = """# 标签词表
 ## 剧情功能
 - 信息揭示
 ## 适用阶段
-- 正文
+- 细纲
 ## 风险
 - 泄底过早
 """
@@ -500,6 +500,45 @@ def test_parser_and_gate_hardening() -> None:
         require(MODULE["coverage"] is not None, "coverage 可用")
 
 
+def test_parser_does_not_block_legit_modules() -> None:
+    fields = "| 读者想看什么 | 甲 |\n| 情绪链 | 乙 |\n| 戏剧单元 | 丙 |\n| 可替换项 | 丁 |\n| 不可照搬 | 戊 |\n"
+    legit = (
+        "# 情绪模块：EM-001 等机制\n\n## 其他机制索引（EM-004 起）\n\nEM-004｜索引条目｜用途\n\n## 可复现模块卡\n\n"
+        "### EM-001 第一卡\n\n| 字段 | 内容 |\n|:---|:---|\n" + fields
+        + "| 关键触发物 | 一 |\n| 关键触发物 | 二 |\n\n| 项目 | 内容 |\n|:---|:---|\n| 注意 | 附表 |\n"
+        "- **注意**：一\n- **注意**：二\n\n#### 与 EM-002 的区别\n\n说明文字。\n\n"
+        "### **EM-002 第二卡**\n\n- ***读者想看什么***：翻盘\n- **情绪链**：\n  - **缺口：**被否定\n  - **爆发：**反证\n"
+        "- **戏剧单元：** 公开反证\n- **可替换项**：场景\n- **不可照搬**：原台词\n\n### 重组指南：EM-001 与 EM-002 组合\n\n说明。\n"
+    )
+    with tempfile.TemporaryDirectory(prefix="ilib-legit-") as temporary:
+        base = Path(temporary)
+        root = make_workspace(base, module_text=legit)
+        module_path = base / "拆文库" / "测试书" / "剧情" / "情绪模块.md"
+        report = MODULE["check_atoms"](root, module_path, "测试书")
+        require(report["ok"] and report["cards_full"] == 2, f"分隔行、非门禁字段重复、提到 EM 的普通标题与缩进多行值都不能挡住登记：{report}")
+        cards, _, _ = MODULE["parse_em_module"](legit)
+        require(cards[1]["title"] == "第二卡" and "被否定" in cards[1]["情绪链"] and "反证" in cards[1]["情绪链"],
+                f"粗体卡头标题去星号、缩进小标题并入多行值：{cards[1]}")
+
+        make_workspace(base, module_text="## 可复现模块卡\n\n### EM-001 第一卡\n\n" + fields + "\n## EM-002 被吞的卡\n\n" + fields)
+        report = MODULE["check_atoms"](root, module_path, "测试书")
+        require(any("em_header_unrecognized" in error for error in report["errors"]), f"`## EM-xxx` 卡头必须报错：{report}")
+
+        make_workspace(base, book="乙书", module_text=LEAKY_CARD)
+        report = MODULE["check_atoms"](root, base / "拆文库" / "乙书" / "剧情" / "情绪模块.md", ".")
+        require(any("book_name_invalid" in error for error in report["errors"]), f"`--book .` 必须拒绝：{report}")
+
+        make_workspace(base)
+        MODULE["register_atoms"](root, module_path, "测试书")
+        rows = index_rows(root)
+        text = (root / "灵感索引.csv").read_text(encoding="utf-8-sig").rstrip("\n").split("\n")
+        text.insert(2, "IA-099,原子灵感,短行")
+        (root / "灵感索引.csv").write_bytes(("\ufeff" + "\n".join(text) + "\n").encode("utf-8"))
+        errors = MODULE["validate"](root)
+        require("line_3:column_count_mismatch" in errors, f"坏行按文件实际行号报告：{errors}")
+        require(MODULE["coverage"] is not None and rows, "fixture 可用")
+
+
 def main() -> int:
     test_register_and_idempotence()
     test_parse_genre_variants()
@@ -512,6 +551,7 @@ def main() -> int:
     test_validate_rejects_path_reference_in_card()
     test_validate_set_mismatch_and_nm_rules()
     test_parser_and_gate_hardening()
+    test_parser_does_not_block_legit_modules()
     print("OK: inspiration index regressions passed")
     return 0
 

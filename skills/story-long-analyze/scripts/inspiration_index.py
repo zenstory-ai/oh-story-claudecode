@@ -40,11 +40,13 @@ CORE_QUERY_AXES = {"题材", "读者需求", "情绪", "剧情功能", "适用�
 EM_REQUIRED_FIELDS = ("读者想看什么", "情绪链", "戏剧单元", "可替换项", "不可照搬")
 # 专名泄漏扫描范围：排除「不可照搬」——该字段的职责就是点名原书专名
 EM_LEAK_SCAN_FIELDS = ("读者想看什么", "情绪链", "戏剧单元", "可替换项")
-EM_HEADER_RE = re.compile(r"^###\s+\**(EM-[0-9]{2,})(?![0-9])\**\s*(?:[·\-—：:｜|]\s*)?(.*?)\s*$")
-EM_ANY_HEADING_RE = re.compile(r"^#{1,6}\s")
+EM_HEADER_RE = re.compile(r"^###\s+[*_]*(EM-[0-9]{2,})(?![0-9])[*_]*\s*(?:[·\-—：:｜|]\s*)?(.*?)[\s*_]*$")
+# 以 EM 编号开头、却不是 `### EM-xxx` 的标题行：下一张卡会被静默并进上一张
+EM_MISPLACED_HEADER_RE = re.compile(r"^#{1,6}\s+[*_【\[]*EM-[0-9]")
+EM_TABLE_SEPARATOR_RE = re.compile(r"^:?-+:?$")
 EM_INDEX_ID_RE = re.compile(r"(EM-[0-9]{2,})")
 # 字段行的两种体裁：表格 `| 字段 | 值 |` 与粗体列表 `- **字段**：值`（前导 `- ` 可省）
-EM_BOLD_FIELD_RE = re.compile(r"^[-*]?\s*\*\*([^*]+?)(?:[:：]\*\*|\*\*\s*[:：])\s*(.*)$")
+EM_BOLD_FIELD_RE = re.compile(r"^[-*]?\s*\*{2,3}([^*]+?)(?:[:：]\*{2,3}|\*{2,3}\s*[:：])\s*(.*)$")
 # 同义字段名归一；表头行的首列词不作为字段
 EM_FIELD_ALIASES = {"不可照搬项": "不可照搬", "可替换项目": "可替换项"}
 EM_TABLE_HEADER_KEYS = {"字段", "维度", "---", ""}
@@ -100,11 +102,6 @@ def parse_em_module(module_text: str) -> tuple[list[dict[str, str]], list[tuple[
     in_index_section = False
     for line in lines:
         stripped = line.strip()
-        if stripped.startswith("## "):
-            in_index_section = "其他机制索引" in stripped
-            current = None
-            pending_field = None
-            continue
         header = EM_HEADER_RE.match(stripped)
         if header:
             current = {"em_id": header.group(1), "title": header.group(2)}
@@ -112,8 +109,13 @@ def parse_em_module(module_text: str) -> tuple[list[dict[str, str]], list[tuple[
             in_index_section = False
             pending_field = None
             continue
-        if EM_ANY_HEADING_RE.match(stripped) and EM_INDEX_ID_RE.search(stripped):
+        if EM_MISPLACED_HEADER_RE.match(stripped):
             problems.append(f"em_header_unrecognized:{stripped[:40]}——EM 卡标题须写成 `### EM-xxx 名称`")
+            current = None
+            pending_field = None
+            continue
+        if stripped.startswith("## "):
+            in_index_section = "其他机制索引" in stripped
             current = None
             pending_field = None
             continue
@@ -122,17 +124,22 @@ def parse_em_module(module_text: str) -> tuple[list[dict[str, str]], list[tuple[
             cells = [cell.strip() for cell in stripped.strip("|").split("|")]
             if len(cells) >= 2:
                 key = normalize_em_field(cells[0])
-                if key not in EM_TABLE_HEADER_KEYS and not set(key) <= {"-"}:
-                    if key in current:
+                if key not in EM_TABLE_HEADER_KEYS and not EM_TABLE_SEPARATOR_RE.match(key):
+                    if key in EM_REQUIRED_FIELDS and key in current:
                         problems.append(f"{current['em_id']}:em_field_duplicate:{key}")
                     current[key] = cells[1]
             continue
         if current is not None:
+            # 多行值：字段名行之后缩进的列表行一律是续行，哪怕它自己带粗体小标题
+            if pending_field is not None and stripped and line[:1] in (" ", "\t"):
+                appended = stripped.lstrip("-*").strip()
+                current[pending_field] = f"{current[pending_field]}；{appended}" if current[pending_field] else appended
+                continue
             bold = EM_BOLD_FIELD_RE.match(stripped)
             if bold:
                 key = normalize_em_field(bold.group(1))
                 value = bold.group(2).strip()
-                if key in current:
+                if key in EM_REQUIRED_FIELDS and key in current:
                     problems.append(f"{current['em_id']}:em_field_duplicate:{key}")
                 current[key] = value
                 pending_field = None if value else key
@@ -198,28 +205,34 @@ def character_names(workspace: Path, book: str) -> set[str]:
     if role_dir.is_dir():
         for entry in role_dir.rglob("*.md"):
             stem = re.sub(r"^\d+[-_.、\s]*", "", entry.stem)
-            if stem and stem != "角色关系" and len(stem) >= 2:
+            if len(stem) >= 2 and stem not in {"角色关系", "README", "readme", "索引", "目录"}:
                 names.add(stem)
     return names
 
 
-def load_rows(root: Path) -> tuple[list[dict[str, str]], list[str]]:
+def load_numbered_rows(root: Path) -> tuple[list[tuple[int, dict[str, str]]], list[str]]:
+    """索引行连同其文件行号；列数不对的行报错并剔除，行号仍按文件实际位置。"""
     errors: list[str] = []
     index_path = root / "灵感索引.csv"
     try:
         with index_path.open("r", encoding="utf-8-sig", newline="") as handle:
             reader = csv.DictReader(handle)
-            rows = []
-            for number, row in enumerate(reader, start=2):
+            rows: list[tuple[int, dict[str, str]]] = []
+            for row in reader:
                 if None in row or None in row.values():
-                    errors.append(f"line_{number}:column_count_mismatch")
+                    errors.append(f"line_{reader.line_num}:column_count_mismatch")
                     continue
-                rows.append(row)
+                rows.append((reader.line_num, row))
             if tuple(reader.fieldnames or ()) != COLUMNS:
                 errors.append("index_header_mismatch")
     except (OSError, UnicodeError, csv.Error) as exc:
         return [], [f"index_unreadable:{exc}"]
     return rows, errors
+
+
+def load_rows(root: Path) -> tuple[list[dict[str, str]], list[str]]:
+    numbered, errors = load_numbered_rows(root)
+    return [row for _, row in numbered], errors
 
 
 class RegisterError(ValueError):
@@ -236,6 +249,8 @@ def analyze_module(root: Path, module_path: Path, book: str,
     """解析并检查一本书的 EM 卡，收集全部 errors/warnings，不写盘。"""
     errors: list[str] = []
     warnings: list[str] = []
+    if not book or book in {".", ".."} or "/" in book or "\\" in book:
+        raise RegisterError([f"book_name_invalid:{book!r}——--book 只写书名本身"])
     try:
         ws = resolve_workspace(root, workspace)
     except ValueError as exc:
@@ -430,7 +445,8 @@ def load_book_em_ids(workspace: Path, source_book: str) -> tuple[set[str], str |
 
 
 def validate(root: Path, workspace: Path | None = None) -> list[str]:
-    rows, errors = load_rows(root)
+    numbered, errors = load_numbered_rows(root)
+    rows = [row for _, row in numbered]
     try:
         ws: Path | None = resolve_workspace(root, workspace)
     except ValueError as exc:
@@ -443,7 +459,7 @@ def validate(root: Path, workspace: Path | None = None) -> list[str]:
     ia_by_book: dict[str, dict[str, dict[str, str]]] = {}
     nm_by_book: dict[str, dict[str, dict[str, str]]] = {}
     active_single_book_cba: dict[str, int] = {}
-    for number, row in enumerate(rows, start=2):
+    for number, row in numbered:
         item_id = row.get("item_id", "").strip()
         layer = row.get("layer", "").strip()
         book = row.get("source_book", "").strip()
@@ -795,7 +811,8 @@ def main() -> int:
     try:
         return run(args)
     except (OSError, UnicodeError) as exc:
-        print(json.dumps({"ok": False, "error": f"io_error:{exc}"}, ensure_ascii=False))
+        message = f"io_error:{exc}"
+        print(json.dumps({"ok": False, "error": message, "errors": [message]}, ensure_ascii=False))
         return 2
 
 

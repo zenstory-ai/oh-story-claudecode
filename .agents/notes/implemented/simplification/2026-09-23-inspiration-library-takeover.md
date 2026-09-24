@@ -37,6 +37,11 @@ Related: [2026-09-22-inspiration-library-em-pipeline](../feature/2026-09-22-insp
   `coverage` 对 NM 成员的口径与 `validate` 一致；词表接受 `* 值`。
 - **删除**同轴子串近义判定（`tag_vocabulary_near_duplicate`），同义判定回到扩表时的人工
   比对。
+- **新增门禁只拦真问题**（复审后收窄）：`em_header_unrecognized` 只认以 EM 编号开头却不是
+  `### EM-xxx` 的标题（含 `## EM-002`），提到 EM 编号的普通标题不拦；`em_field_duplicate`
+  只查五个门禁字段；表格分隔行、字段名行后缩进的续行、`***字段***`、粗体卡头标题都按
+  原意解析；`--book` 拒绝 `.`、`..` 和带路径分隔符的值；坏行按文件实际行号报告；I/O
+  错误同时给 `error` 与 `errors`。
 - 并发登记不加锁，文档写明逐本串行运行。
 
 ## Alternatives considered
