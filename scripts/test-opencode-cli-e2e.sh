@@ -51,7 +51,10 @@ echo "================"
 echo "Repo: $REPO_ROOT"
 echo "OpenCode: $(command -v opencode) ($VERSION)"
 
-# 在项目外的目录拉起后台服务，之后所有请求都复用它。
+# 后台服务默认监听固定端口；开发机上已有 OpenCode 服务占着它时，隔离 HOME 里的服务起不来、
+# 请求会一直重试。先给隔离 HOME 钉一个空闲端口，再在项目外的目录拉起服务，之后所有请求都复用它。
+SERVICE_PORT="$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
+run_opencode service set port "$SERVICE_PORT" >/dev/null
 (cd "$CLI_HOME" && run_opencode api GET /api/info >/dev/null)
 
 # GET 一个 location 作用域的列表接口，等到 data 非空（location 插件异步就绪，首个请求可能为空）。

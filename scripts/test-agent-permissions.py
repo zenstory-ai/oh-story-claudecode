@@ -8,6 +8,7 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -398,6 +399,12 @@ def test_opencode_runtime(cli: str) -> None:
                 }},
             }), encoding="utf-8")
 
+            # 后台服务默认监听固定端口，开发机上已有 OpenCode 服务时会撞端口：给隔离 HOME 钉一个空闲端口。
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1", 0))
+                service_port = probe.getsockname()[1]
+            subprocess.run([cli, "service", "set", "port", str(service_port)], env=env, check=True,
+                           capture_output=True, timeout=60)
             # location 的 agent 是异步加载的，冷启动的服务上 `run --agent` 会先于加载报 Agent not found。
             # 先把后台服务预热到能列出全部 agent，之后每次 run 都复用这个服务。
             expected_agents = {path.stem for path in (project / ".opencode/agents").glob("*.md")}

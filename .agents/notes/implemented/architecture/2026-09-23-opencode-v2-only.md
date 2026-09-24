@@ -24,6 +24,7 @@ CI 一直绿，是因为 `cli-compat` 装的是 `opencode-ai@latest`，永远是
 - CI `cli-compat.yml` 安装 `@opencode/cli@latest`。`scripts/test-opencode-cli-e2e.sh` 先在项目外拉起后台服务，再断言 13 个 skill（`GET /api/skill` 的 `path`）、13 个 command、7 个原生权限 agent、`plugin.list` 中插件为 `active`；然后用 `scripts/opencode-mock-llm.mjs` 驱动真实 `opencode run`：无细纲的 write/shell/patch 被拦且模型收到拦截原因，有细纲的 write 落盘且模型收到兜底发现，`session.compact` 的摘要请求带 `Writing context: book/追踪/上下文.md`。
 - `scripts/test-agent-permissions.py --opencode` 预热后台服务后对每个 agent 跑 `opencode run --agent`，以 mock 收到的工具清单为运行时判定（2.x 把整条 deny 的工具从清单里摘掉），并验证允许的 write/shell 真实执行、被拒的 write 得到 `No tool named "write"`。`check-opencode-adapter.sh` 的静态裁决矩阵改为独立复刻 2.x `whollyDisabled()`。
 - `scripts/test-opencode-plugin.mjs` 以 `setup(ctx)` 注册钩子，且在项目外的 cwd 里调用 `setup` 与钩子，锁住 `ctx.location` 定位。
+- 2.x 后台服务默认监听固定端口，开发机上已有 OpenCode 服务时隔离 HOME 里的服务起不来、请求一直重试。e2e 与运行时权限测试先用 `opencode service set port` 给隔离 HOME 钉一个空闲端口。
 
 来源：#443（修复 #440、#441）
 
@@ -47,3 +48,5 @@ CI 一直绿，是因为 `cli-compat` 装的是 `opencode-ai@latest`，永远是
 - `python3 scripts/test-agent-permissions.py --opencode <opencode 2.0.15>` 通过，7 个 agent 的工具清单与能力声明一致。
 - `node scripts/test-opencode-plugin.mjs` 通过；`process.cwd()` 变体在该测试中失败。
 - `bash scripts/check-opencode-adapter.sh` 通过。
+- 默认服务端口被另一个 OpenCode 服务占用时，钉端口前 e2e 卡死，钉端口后 e2e 与权限测试均通过。
+- 真实模型（MiMo `xiaomi/mimo-v2.6-pro`，OpenCode 2.0.15，`opencode run --auto`）逐场景实测，均符合预期：全新项目按 story-setup 部署（不写 `opencode.json`，插件 `active`）；1.x 时代的旧部署重跑 story-setup 后插件由 `failed` 变 `active`，`opencode.json` 只删掉 story-hooks 注册、保留用户字段，agent 自配的 `model:` 保留；无细纲写正文被拦后模型补细纲、补追踪再落盘，写后兜底点出的 AI 句式被模型修掉；shell heredoc 写正文被拦；从 `book/` 子目录起会话、相对路径写正文按项目根判定；narrative-writer 子代理里钩子同样生效；短篇缺小节大纲被拦；`/story` 命令正常路由；真实 compaction 摘要把 `book/追踪/上下文.md` 列为续写入口。
