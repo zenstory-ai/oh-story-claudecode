@@ -26,7 +26,7 @@
     {
       "id": "open-xuanhuan",
       "fixture": "玄幻-ch0",
-      "book_dir": "玄幻-ch0",
+      "book_dir": "药园杂役：我能听见灵药心声",
       "chapters": 3,
       "turns": [
         "/story-long-write 写第1章"
@@ -37,7 +37,7 @@
     {
       "id": "open-nvpin",
       "fixture": "女频-ch0",
-      "book_dir": "女频-ch0",
+      "book_dir": "替嫁病世子后，我靠查账掌侯府",
       "chapters": 3,
       "turns": [
         "/story-long-write 写第1章"
