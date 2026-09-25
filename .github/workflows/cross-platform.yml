@@ -215,10 +215,8 @@ jobs:
         uses: browser-actions/setup-chrome@v1
         with:
           chrome-version: stable
-      - name: Verify cdp-utils loads
-        run: node -e "const u = require('./skills/story-short-scan/scripts/cdp-utils.js'); console.log('exports:', Object.keys(u));"
-      - name: Verify sleep works
-        run: node -e "const { sleep } = require('./skills/story-short-scan/scripts/cdp-utils.js'); const t0 = Date.now(); sleep(100); console.log('slept', Date.now()-t0, 'ms');"
+      - name: Verify sleep blocks
+        run: node -e "const { sleep } = require('./skills/story-short-scan/scripts/cdp-utils.js'); const t0 = Date.now(); sleep(100); const ms = Date.now() - t0; console.log('slept', ms, 'ms'); if (ms < 90) { console.error('sleep(100) returned after ' + ms + 'ms'); process.exit(1); }"
       - name: Verify setup script dry-run
         run: node skills/browser-cdp/scripts/setup-cdp-chrome.js 9222 --dry-run
       # Run under Git Bash (shell: bash on windows-latest), matching how Claude Code
@@ -304,10 +302,8 @@ jobs:
         uses: browser-actions/setup-chrome@v1
         with:
           chrome-version: stable
-      - name: Verify cdp-utils loads
-        run: node -e "const u = require('./skills/story-short-scan/scripts/cdp-utils.js'); console.log('exports:', Object.keys(u));"
-      - name: Verify sleep works
-        run: node -e "const { sleep } = require('./skills/story-short-scan/scripts/cdp-utils.js'); const t0 = Date.now(); sleep(100); console.log('slept', Date.now()-t0, 'ms');"
+      - name: Verify sleep blocks
+        run: node -e "const { sleep } = require('./skills/story-short-scan/scripts/cdp-utils.js'); const t0 = Date.now(); sleep(100); const ms = Date.now() - t0; console.log('slept', ms, 'ms'); if (ms < 90) { console.error('sleep(100) returned after ' + ms + 'ms'); process.exit(1); }"
       - name: Verify setup script dry-run
         run: node skills/browser-cdp/scripts/setup-cdp-chrome.js 9222 --dry-run
       - name: Portable char-count (real interpreter)
