@@ -19,10 +19,12 @@ const fs = require('fs')
 const path = require('path')
 
 // 权威模板：references/workflow-setup.md「细纲（全书每章）」
+// 必填只留有证据或事故撑腰的核心字段；阶段位置、章节定位、结构公式、本章标价、闭环状态、
+// 写手自由区、契约风险、镜头准入、信息差触发点与「分辨率」列是可选的阅读体验字段——
+// 写了照样消费，没写不拦（#383 隔离实验：只补目标情绪与主角目标就复现了补满全部字段的收益）。
 const FIELDS = [
-  '核心事件', '字数目标', '字数口径', '阶段位置', '单元ID/位置', '目标情绪',
-  '主角目标/关键选择', '章节定位', '本章结构公式', '章首钩子', '爽点',
-  '本章标价', '闭环状态', '本章禁止提前释放', '写手自由区', '契约风险',
+  '核心事件', '字数目标', '字数口径', '单元ID/位置', '目标情绪',
+  '主角目标/关键选择', '章首钩子', '爽点', '本章禁止提前释放',
 ]
 const SUBSECTIONS = ['内容概括', '情节安排', '人物关系和出场顺序', '情节细化']
 const FIVE_ACT = ['起因', '发展', '转折', '高潮', '结尾']
@@ -101,7 +103,7 @@ function checkSettingRefs(text, name, file, projectRoot) {
     name,
     missing.length ? `引用的路径不是可用文件：${missing.join('、')}` : `${refs.size} 处项目内引用全部存在`,
     '细纲引用的每个项目内 .md 文件都真实存在——不许把槽位指向查无实据的权威文件',
-    '修正引用路径；或按新增物三级先把缺的设定落档（「写了要报」直接补并登记、「先问作者」进《供给单》提案），再在细纲引用。'
+    '修正引用路径；或按新增物三级先把缺的设定落档（「写了要报」直接补并登记、「先问作者」进排纲底稿的供给自查提案），再在细纲引用。'
   )
 }
 
@@ -189,21 +191,21 @@ function verify(file, projectRoot = null) {
     headerOk,
     name,
     header ? `表头：${header.join(' | ')}` : '未找到 | # | 情节点 | 功能标签 | [分辨率] | 执行边界 | 表头',
-    '情节细化使用五列表格：# / 情节点（谁做了什么） / 功能标签 / 分辨率 / 执行边界（四列旧表仍收，但新建细纲按五列模板走）',
-    '只把情节点序列改成五列表格，逐点补功能标签、分辨率与执行边界；不增删情节点本身。'
+    '情节细化使用表格：# / 情节点（谁做了什么） / 功能标签 / 执行边界（禁＋放）；需要时可在功能标签后加「分辨率」列',
+    '只把情节点序列改成这张表，逐点补功能标签与执行边界；不增删情节点本身。'
   ))
 
-  // 「放」半边：五列表的执行边界必须至少一个点解除限制（模板既有要求），
-  // 全是禁令的情节点表实测会把整章压成同一个温度（015 章十一个点全「不许」）。
-  if (headerOk && header.length === 5) {
+  // 「放」半边：现行模板（五列表，或表头写明「禁＋放」的四列表）的执行边界必须至少一个点解除限制，
+  // 全是禁令的情节点表实测会把整章压成同一个温度（015 章十一个点全「不许」）。旧四列表不追溯。
+  if (headerOk && (header.length === 5 || /放/.test(header[header.length - 1]))) {
     const rows = []
     for (const line of lines) {
       const cells = parseTableRow(line)
-      if (cells && cells.length === 5 && /^\d+$/.test(cells[0])) rows.push(cells)
+      if (cells && cells.length === header.length && /^\d+$/.test(cells[0])) rows.push(cells)
     }
     if (rows.length) {
       const released = rows.filter((cells) => {
-        const match = cells[4].match(/(?:^|[。；;\s])放\s*[：:]([^]*?)(?=(?:禁|放)\s*[：:]|$)/)
+        const match = cells[cells.length - 1].match(/(?:^|[。；;\s])放\s*[：:]([^]*?)(?=(?:禁|放)\s*[：:]|$)/)
         if (!match) return false
         const value = match[1].replace(/[\s。；;，,、\[\]【】]/g, '')
         return value.length > 0 && !/^(?:无|暂无|待补充|待定|无缺口)$/.test(value)
@@ -303,7 +305,7 @@ function resolveChapter(project, chapter) {
   return { file: path.join(dir, hit) }
 }
 
-// --supply：批末验证《供给单》已落盘。新书写在卷纲旁的 排纲底稿_{单元ID}.md；老卷纲写在单元卡块内。
+// --supply：批末验证供给自查已落盘。新书写在卷纲旁的 排纲底稿_{单元ID}.md；老卷纲写在单元卡块内。
 function hasSupplyHeading(text) {
   return text.split(/\r?\n/).some((line) => {
     const heading = line.replace(/\*\*/g, '').match(/^#{1,6}\s+(.+)$/)
@@ -318,7 +320,7 @@ function verifySupply(volumeFile, unitId) {
     const ok = hasSupplyHeading(draft.text)
     return {
       schema_version: 1, verifier: 'story-long-write.outline-supply', file: path.resolve(draftFile), unit: unitId, ok,
-      evidence: ok ? '排纲底稿含「供给自查」小节' : `${path.basename(draftFile)} 里没有「供给自查」小节——每批出细纲前须产出《供给单》（含「无缺口」情形），见 workflow-setup.md「按剧情批出细纲」步骤 3`,
+      evidence: ok ? '排纲底稿含「供给自查」小节' : `${path.basename(draftFile)} 里没有「供给自查」小节——每批出细纲前须做供给自查（含「无缺口」情形），见 workflow-setup.md「按剧情批出细纲」步骤 3`,
     }
   }
   const read = readUtf8(volumeFile)
@@ -361,7 +363,7 @@ function verifySupply(volumeFile, unitId) {
     file: path.resolve(volumeFile),
     unit: unitId,
     ok,
-    evidence: ok ? '单元卡含「供给自查」小节' : `没有 排纲底稿_${unitId}.md，剧情单元 ${unitId} 的卡内也没有「供给自查」小节——每批出细纲前须产出《供给单》（含「无缺口」情形），见 workflow-setup.md「按剧情批出细纲」步骤 3`,
+    evidence: ok ? '单元卡含「供给自查」小节' : `没有 排纲底稿_${unitId}.md，剧情单元 ${unitId} 的卡内也没有「供给自查」小节——每批出细纲前须做供给自查（含「无缺口」情形），见 workflow-setup.md「按剧情批出细纲」步骤 3`,
   }
 }
 

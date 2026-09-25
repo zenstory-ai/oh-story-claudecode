@@ -10,14 +10,6 @@
   ],
   "required_outline_sections": [
     {
-      "rule": "阶段位置",
-      "demo": "阶段位置"
-    },
-    {
-      "rule": "结构公式",
-      "demo": "本章结构公式"
-    },
-    {
       "rule": "禁止提前释放",
       "demo": "本章禁止提前释放"
     },

@@ -271,7 +271,7 @@ def build(project: Path, chapter: int, report: list):
         parts.append(
             "——— 文风 ———\n"
             "（本书无可用的 设定/文风.md，未进入自定义文风模式；"
-            "按 workflow-chapter 3(d) 走对标文风召回，由主会话补路径与召回指令）")
+            "按 benchmark-recall.md 走对标文风召回，由主会话补路径与召回指令）")
         report.append("文风：custom_style=false，文风召回归主会话（未跳过，留标题）")
 
     # ---- 上一章结尾（不给路径，避免写手回头读整章）----
@@ -334,7 +334,7 @@ def build(project: Path, chapter: int, report: list):
     else:
         slot_recall = ("——— 情绪与节奏召回 ———\n"
                        f"{SLOT_MARK} 降档不成立（" + "、".join(why) +
-                       "），按 workflow-chapter 3(a)(b)(e)(f) 走全量召回后填此槽")
+                       "），按 benchmark-recall.md 走全量召回后填此槽")
         report.append("召回降档：不成立（" + "、".join(why) + "）—— 全量召回归主会话")
 
     # ---- 需要主会话判断的槽位 ----
@@ -353,7 +353,7 @@ def build(project: Path, chapter: int, report: list):
     # 代价是它依赖主会话逐章想起来，所以这里把提示语写成写死的三问清单。
     parts.append(
         "——— 参考技法 ———\n"
-        f"{SLOT_MARK} 步骤 3 三问的第 ②③ 问：借鉴哪个参考文件的哪个技法、用在哪些段落。"
+        f"{SLOT_MARK} 借鉴哪个参考文件的哪个技法、用在哪些段落；没有就写「无」。"
         "按 reference 表的任务条件读取；本书文风只覆盖冲突表达条款，不停读整份文件。")
     parts.append(
         "——— 本节速记 ———\n"

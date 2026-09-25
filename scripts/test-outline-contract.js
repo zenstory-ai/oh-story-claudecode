@@ -157,6 +157,26 @@ try {
   assert.strictEqual(legacyFourCol.status, 0, legacyFourCol.stdout + legacyFourCol.stderr)
   assert.strictEqual(legacyFourCol.report.ok, true)
 
+  // 阅读体验字段可选：只写核心字段的细纲也过（#383 隔离实验只证明了目标情绪与主角目标的收益）。
+  const OPTIONAL = ['阶段位置', '章节定位', '本章结构公式', '本章标价', '闭环状态', '写手自由区', '契约风险']
+  const coreOnly = outline({ plotTable: [
+    '| # | 情节点（谁做了什么） | 功能标签 | 执行边界（禁＋放） |',
+    '|---|---|---|---|',
+    '| 1 | 江晨接到邀约 | 铺垫 | 禁：不提铁盒。放：无 |',
+    '| 2 | 老人推过铁盒 | 高潮 | 禁：不评价当下。放：允许老人当场说出这东西他留了几十年 |',
+  ].join('\n') }).split('\n').filter((line) => !OPTIONAL.some((name) => line.startsWith(`- ${name}：`))).join('\n')
+  const core = run(writeCase('core-fields-only', coreOnly))
+  assert.strictEqual(core.status, 0, core.stdout + core.stderr)
+
+  // 表头写明「禁＋放」的四列表同样要求至少一个点写了「放」；全是禁令判失败。
+  const allBan = run(writeCase('four-col-all-ban', outline({ plotTable: [
+    '| # | 情节点（谁做了什么） | 功能标签 | 执行边界（禁＋放） |',
+    '|---|---|---|---|',
+    '| 1 | 江晨接到邀约 | 铺垫 | 禁：不提铁盒。放：无 |',
+  ].join('\n') })))
+  assert.strictEqual(allBan.status, 1)
+  assert.deepStrictEqual(failureIds(allBan), ['outline.plotpoint-release'])
+
   // 五列但中间那列不是分辨率，判偏离——防止随便加一列就算数。
   const wrongFifth = run(writeCase('plot-wrong-fifth', outline({
     plotTable: [
