@@ -2,7 +2,7 @@
 """跑一个基准用例：从 fixture 起一个隔离项目，部署指定版本的包，用真实 CLI 会话执行用例的轮次。
 
 用法：
-  run.py --case demo-mid-daily --pkg <pkg目录> --host claude-code --out <runs目录> [--label v0711]
+  run.py --case mid-daily --pkg <pkg目录> --host claude-code --out <runs目录> [--label v0711]
 
 fixture 与主机配置都放在仓库外（见 README.md）：
   BENCH_HOME（默认 ~/.oh-story-bench）/fixtures/<fixture>/   一本冻结的书

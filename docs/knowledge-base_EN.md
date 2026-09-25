@@ -16,7 +16,7 @@ Each skill includes a `references/` knowledge base loaded on demand to keep cont
 | Twist Toolbox | Types · Timing · Misdirection base paths | long-write / short-write |
 | Style Modules | Dialogue · Combat · Mind games · Cinematic writing · Face-slapping · Plain description | long-write |
 | Advanced Techniques | 4-step micro-outline · Climax reverse-engineering · Dual-thread structure · AB interweaving | long-write |
-| De-AI-ify | Prevention · 3-pass de-AI method · Rewrite examples · Banned word list | deslop / long-write / short-write |
+| De-AI-ify | Prevention · Rewrite order · Rewrite examples · Banned word list | deslop / long-write / short-write |
 | Quality Checks | General · Long-form specific · Short-form specific · Toxic trope detection | long-write / short-write / short-analyze |
 | Writing Formulas | 21 genre formulas · Three-flip-four-shock (escalating reversal) · Romance four-stage | short-write / short-analyze |
 | Female-oriented Writing | Female reader preferences · Emotional description · Romance patterns · Benchmark analysis | short-write |

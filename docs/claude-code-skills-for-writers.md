@@ -28,7 +28,7 @@ The 13 skills in Oh Story, grouped by writing task:
 The parts that make it more than a prompt collection:
 
 - **Deterministic checks.** `story-deslop` runs `node scripts/check-ai-patterns.js` before any rewrite; `story-long-write` refuses to write a chapter whose brief lacks a word target instead of guessing.
-- **Blocking reference gates.** A chapter is written only after the agent has read the brief, the volume outline and the current tracking state and recorded a Constraint Lock (word range, must-happen, must-not-happen, time anchors).
+- **Blocking reference gates.** A chapter is written only after the agent has read the brief, the volume outline and the current tracking state and written down this round's constraints (word range, must-happen, must-not-happen, time anchors).
 - **Layered state on disk.** Settings, outlines, prose and tracking live in separate directories. The tracking state card is a fixed 7-section file capped at 12KB, so chapter 300 loads about as much context as chapter 30.
 - **Per-runtime deployers.** One `/story-setup` writes the right files for whichever agent you use (`.claude/`, `.codex/`, `.opencode/`, `.agents/` and so on).
 - **Cross-runtime packaging.** The repo ships `marketplace.json`, `.claude-plugin`, `.zcode-plugin` and `reasonix-plugin.json`, which is what a multi-host skill pack needs today.

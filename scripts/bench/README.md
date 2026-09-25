@@ -38,6 +38,8 @@ Codex 主机**必须**用独立的 `CODEX_HOME`：目录里只放一个指向 `~
 | `compare.py --base ... --cand ... --coverage ... --pairwise ...` | 汇总两个版本的效率与质量，按非劣效门槛给出通过/不通过 |
 | `metrics.py <run目录>... [--table] [--tell <tell仓库>]` | 每章平均墙钟、累计输入/输出 token、主会话调用、工具调用、子 agent 次数、上下文峰值、压缩次数；每章字数、首次字数检查结论、检测器命中；给 `--tell` 时加人类区间越界项数 |
 
+`--tell` 可不给；给时要指向一个外部私有仓库，用到其中的 `detectors/human_ref_check.py`。
+
 Claude Code 主机用隔离 HOME，会话与子 agent 转录都在 `<run>/home/.claude/projects/` 下，`metrics.py` 从那里取 token。Codex 主机用独立 CODEX_HOME（复用登录），token 取自 `--json` 输出的 `turn.completed`。
 
 ## 用例

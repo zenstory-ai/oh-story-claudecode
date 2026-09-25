@@ -1,6 +1,6 @@
 # 去AI味 Gate 执行细则
 
-本文件承接调用方选定 Gate；只执行所选范围，不扩大为全量。表达先按 [style-resolution.md](style-resolution.md) 的本书裁决，剧情和信息保护边界仍有效。写作自检与写后审查沿用下方「写手 A-G 判据」；独立去味沿用「删除优先判断」及各门禁详细步骤。模式解释、三遍法与范例见 [anti-ai-writing.md](anti-ai-writing.md)。
+本文件承接调用方选定 Gate；只执行所选范围，不扩大为全量。表达先按 [style-resolution.md](style-resolution.md) 的本书裁决，剧情和信息保护边界仍有效。写作自检与写后审查沿用下方「写手 A-G 判据」；独立去味沿用「删除优先判断」及各门禁详细步骤。模式解释、改写顺序与范例见 [anti-ai-writing.md](anti-ai-writing.md)。
 
 #### 删除优先判断（先于各 Gate）
 

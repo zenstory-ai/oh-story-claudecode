@@ -121,6 +121,7 @@ AI味不按语法错误处理，也不需要"修正"。它属于风格问题：�
 node scripts/check-ai-patterns.js --check --fail-on=blocking <正文文件...>
 ```
 
+- 检测器 blocking＝必须修，advisory＝建议看；轻/中/重分档另按「诊断与分级」定，用来选 Gate。
 - severity=blocking 的类别（`not-is-comparison` / `em-dash` / `voice-contrast` / `negation-parade` / `reverse-not-is` / `trailer-ending` / `trailer-summary`）并入 Gate B，属于写作/去 AI 味时优先处理的 blocking 类问题。
 - 其他 findings（碎句号、长段落、微动作、套式反应细节、动作清单、抽象总结、套词、比喻密度、解释链、公文腔、过度精炼、低连接密度、引号强调滥用、`formulaic-parallelism` 工整并列）只作读感提示；完整类别和修法见 `references/anti-ai-writing.md`。其中工整并列会扫描台词，必须读语境判断，不能因为 hook 对台词低误报豁免就跳过。
 - 处理方式：删掉否定铺垫，直接写后项；或改成角色动作、物件细节、身体反应来呈现。
@@ -175,7 +176,7 @@ node scripts/check-ai-patterns.js --check --fail-on=blocking <正文文件...>
 
 #### Gate 规则入口
 
-实际执行者在逐项清除前读取 [references/deslop-gates.md](references/deslop-gates.md) 的删除保护与所选 Gate 细则；inline 与 agent 使用同源规则。三遍法仍按前文安排所选 Gate 的执行顺序，不另起一次全篇去味。
+实际执行者在逐项清除前读取 [references/deslop-gates.md](references/deslop-gates.md) 的删除保护与所选 Gate 细则；inline 与 agent 使用同源规则。按上文「改写顺序」排所选 Gate 的先后，不另起一次全篇去味。
 
 ### Phase 4：确定性收尾（文件模式）
 
@@ -247,7 +248,7 @@ node scripts/normalize-punctuation.js <正文文件...>
 |------|----------|
 | [references/banned-words.md](references/banned-words.md) | 检测和替换禁用词时 |
 | [references/deslop-gates.md](references/deslop-gates.md) | 逐项清除前：删除保护与所选 Gate 的细则、示例 |
-| [references/anti-ai-writing.md](references/anti-ai-writing.md) | **去AI味完整指南**：预防+三遍法+范例 |
+| [references/anti-ai-writing.md](references/anti-ai-writing.md) | **去AI味完整指南**：预防+改写顺序+范例 |
 | [scripts/normalize-punctuation.js](scripts/normalize-punctuation.js) | 文件模式落盘后做确定性标点收尾；默认保留引号风格 |
 | [scripts/check-ai-patterns.js](scripts/check-ai-patterns.js) | 文件模式「AI味扫描」预检与「确定性收尾」复扫（只看引号外叙述），只报告不改写 |
 | [scripts/check-degeneration.js](scripts/check-degeneration.js) | 文件模式「确定性收尾」复扫，只报告不改写 |

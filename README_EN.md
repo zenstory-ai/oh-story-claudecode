@@ -368,7 +368,7 @@ No. oh-story-claudecode is a set of skills that runs inside the coding agent you
 
 ### Chapter lengths are inconsistent or the word count is off. What do I do?
 
-Since v0.7.7 long-form prose uses a single machine-counted length metric: every chapter blueprint must state a valid word target, and a missing target stops the run instead of falling back to 3,000; under-length chapters are not padded with new plot, and over-length chapters get at most one compression pass. `check-prose-after-write.sh` flags length debt after each write. Rerun `/story-setup` and start a new session after upgrading an older project.
+Since v0.7.7 long-form prose uses a single machine-counted length metric: every chapter blueprint must state a valid word target, and a missing target stops the run instead of falling back to 3,000; under-length chapters are not padded with new plot, and over-length chapters get at most one compression pass. Length is measured once by the writing workflow before delivery; the post-write hook no longer flags length debt. Rerun `/story-setup` and start a new session after upgrading an older project.
 
 ### After de-AI editing, detectors such as Zhuque still flag the text as AI. Why?
 

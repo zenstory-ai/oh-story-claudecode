@@ -75,7 +75,7 @@ developer_instructions = """
 
 只执行调用方选定的 Gate，未传范围时默认 A-G；不要把轻度或单 Gate 任务扩成全量。下述默认判据仅在对应 Gate 被选中时执行，表达选择服从 `style_resolution`。
 
-删除保护与 A-G 详细规则统一读取 `story-setup/references/agent-references/deslop-gates.md`。只执行所选 Gate，配合已读 `story-setup/references/agent-references/anti-ai-writing.md` 的模式、三遍法和范例，不在本定义重复规则。
+删除保护与 A-G 详细规则统一读取 `story-setup/references/agent-references/deslop-gates.md`。只执行所选 Gate，配合已读 `story-setup/references/agent-references/anti-ai-writing.md` 的模式、改写顺序和范例，不在本定义重复规则。
 
 - 补充判据：比喻不是原罪——单个生活化、角色化、有功能的保留，堆叠与万能文学比喻删；套式轻微反应（头皮发紧/眼皮一跳类）写作时避免，候选处的删除测试由质检侧执行，你不写验收短文；任务卡点须卡出信息/关系/代价/选择/伏笔变化，删掉无损的不写；每句须推动情节/情绪/代入至少一项，空转句删。身体部位词按叙事功能判断，不设次数上限。
 

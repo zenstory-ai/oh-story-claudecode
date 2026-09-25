@@ -18,7 +18,7 @@
 const fs = require('fs')
 const path = require('path')
 
-// 权威模板：references/workflow-setup.md「细纲（全书每章）」
+// 权威模板：references/workflow-setup.md「排纲自查与细纲」里的细纲模板
 // 必填只留有证据或事故撑腰的核心字段；阶段位置、章节定位、结构公式、本章标价、闭环状态、
 // 写手自由区、契约风险、镜头准入、信息差触发点与「分辨率」列是可选的阅读体验字段——
 // 写了照样消费，没写不拦（#383 隔离实验：只补目标情绪与主角目标就复现了补满全部字段的收益）。
@@ -175,8 +175,8 @@ function verify(file, projectRoot = null) {
   let header = null
   for (const line of lines) {
     const cells = parseTableRow(line)
-    // 四列是旧表（# / 情节点 / 功能标签 / 执行边界），五列是现行模板（中间多一列「分辨率」）。
-    // 两种都收：功能标签固定在第 3 列，执行边界一律取最后一列，旧细纲不因加列而失效。
+    // 现行模板默认四列（# / 情节点 / 功能标签 / 执行边界（禁＋放）），需要时在功能标签后加「分辨率」列成五列。
+    // 两种都收：功能标签固定在第 3 列，执行边界一律取最后一列。
     if (cells && (cells.length === 4 || cells.length === 5) && PLOT_HEADER_FIRST.test(cells[0])) {
       header = cells
       break
@@ -195,8 +195,8 @@ function verify(file, projectRoot = null) {
     '只把情节点序列改成这张表，逐点补功能标签与执行边界；不增删情节点本身。'
   ))
 
-  // 「放」半边：现行模板（五列表，或表头写明「禁＋放」的四列表）的执行边界必须至少一个点解除限制，
-  // 全是禁令的情节点表实测会把整章压成同一个温度（015 章十一个点全「不许」）。旧四列表不追溯。
+  // 「放」半边：五列表或表头写明「禁＋放」的四列表，执行边界必须至少一个点解除限制，
+  // 全是禁令的情节点表实测会把整章压成同一个温度（015 章十一个点全「不许」）。表头没写「禁＋放」的四列表不追溯。
   if (headerOk && (header.length === 5 || /放/.test(header[header.length - 1]))) {
     const rows = []
     for (const line of lines) {
@@ -320,7 +320,7 @@ function verifySupply(volumeFile, unitId) {
     const ok = hasSupplyHeading(draft.text)
     return {
       schema_version: 1, verifier: 'story-long-write.outline-supply', file: path.resolve(draftFile), unit: unitId, ok,
-      evidence: ok ? '排纲底稿含「供给自查」小节' : `${path.basename(draftFile)} 里没有「供给自查」小节——每批出细纲前须做供给自查（含「无缺口」情形），见 workflow-setup.md「按剧情批出细纲」步骤 3`,
+      evidence: ok ? '排纲底稿含「供给自查」小节' : `${path.basename(draftFile)} 里没有「供给自查」小节——每批出细纲前须做供给自查（含「无缺口」情形），见 workflow-setup.md「排纲自查与细纲」步骤 3`,
     }
   }
   const read = readUtf8(volumeFile)
@@ -363,7 +363,7 @@ function verifySupply(volumeFile, unitId) {
     file: path.resolve(volumeFile),
     unit: unitId,
     ok,
-    evidence: ok ? '单元卡含「供给自查」小节' : `没有 排纲底稿_${unitId}.md，剧情单元 ${unitId} 的卡内也没有「供给自查」小节——每批出细纲前须做供给自查（含「无缺口」情形），见 workflow-setup.md「按剧情批出细纲」步骤 3`,
+    evidence: ok ? '单元卡含「供给自查」小节' : `没有 排纲底稿_${unitId}.md，剧情单元 ${unitId} 的卡内也没有「供给自查」小节——每批出细纲前须做供给自查（含「无缺口」情形），见 workflow-setup.md「排纲自查与细纲」步骤 3`,
   }
 }
 

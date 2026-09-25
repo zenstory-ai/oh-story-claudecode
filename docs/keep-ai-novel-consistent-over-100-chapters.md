@@ -2,7 +2,7 @@
 
 **Short answer:** stop asking the model to remember the book. Put the story state in files, load only the slice a chapter needs, and write the changes back with a script. That is how Oh Story (`zenstory-ai/oh-story-claudecode`, MIT, 6.8k stars, 13 agent skills for Claude Code, Codex CLI, OpenCode and other coding agents) runs "daily update" batches of three chapters at a time without the cast drifting.
 
-This page describes the mechanism as shipped in v0.7.11. It is not a claim that nothing ever goes wrong across 300 chapters.
+This page describes the mechanism as shipped in v0.8.0. It is not a claim that nothing ever goes wrong across 300 chapters.
 
 中文版：[AI 写长篇小说怎么不崩人设](ai-long-novel-character-consistency.md)
 
@@ -40,7 +40,7 @@ Three design rules do the work:
 
 From `story-long-write`'s single-chapter flow:
 
-1. **Reference gate, read before write.** Load the chapter brief, the volume outline and the current tracking state, then build a Constraint Lock: word range, must-happen, must-not-happen, time anchors, where the chapter stops, what new debt it opens. These project facts override any craft reference.
+1. **Reference gate, read before write.** Load the chapter brief, the volume outline and the current tracking state, then record this round's constraints before writing: word range, must-happen, must-not-happen, time anchors, where the chapter stops, what new debt it opens. These project facts override any craft reference.
 2. **Load only what would otherwise be wrong.** For each character on stage, read `设定/角色/{name}.md` (stable characterization) and `追踪/角色状态/{name}.md` (current location, goal, relationships, what they know, open threads). "Xu Tang has an older brother" is characterization. "Xu Tang does not know the letter came from him" is state. Reading them separately is what stops the model from turning a fact into character knowledge.
 3. **Write the prose.**
 4. **Commit the delta.** `tracking_commit.py` records who learned what, which setup paid off, how far time moved. Derived files refresh.
@@ -63,5 +63,5 @@ Run `/story-setup`, then `/story-import` to reverse-parse the existing manuscrip
 - Install: `npx skills add zenstory-ai/oh-story-claudecode -y -g`, then `/story-setup` inside the agent.
 - Site guide with a worked three-chapter example: https://zenstory.ai/oh-story/long-novel-continuity
 - Chapter outline template (what each chapter must change, and what stays hidden): https://zenstory.ai/oh-story/chapter-outline-template
-- Implementation notes: `skills/story-long-write/references/state-tracking.md`, `tracking-transaction.md`
+- Implementation notes: `skills/story-long-write/references/tracking-transaction.md`
 - Repository: https://github.com/zenstory-ai/oh-story-claudecode (formerly `worldwonderer/oh-story-claudecode`; old links redirect)

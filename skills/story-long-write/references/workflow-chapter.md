@@ -12,14 +12,14 @@ agent 只查当前端 canonical 目录；Antigravity 用 `.agents/agents/agent-n
 
 缺 `_tracking-state.json` 时先按 workflow-daily「首次初始化」处理，`check` 通过才往下走。
 
-1. **检查细纲**：读 `大纲/细纲_第{N}章.md` 全文，取「单元ID/位置」，跑 `outline_view.py --unit {单元ID} {卷纲路径}` 取卷契约、全卷常任裁定、当前剧情单元与终局底牌边界——**不整读卷纲**；exit 1 按提示修，不改用整读。细纲缺失或缺必需字段时**先补建再写**：按卷纲补齐阶段位置、结构公式、禁止提前释放、内容概括、情节安排、人物关系/出场顺序、情节细化、结尾设定，无证据的写 `[待补充]`，补完跑 `check-outline-contract.js` 验收。
+1. **检查细纲**：读 `大纲/细纲_第{N}章.md` 全文，取「单元ID/位置」，跑 `outline_view.py --unit {单元ID} {卷纲路径}` 取卷契约、全卷常任裁定、当前剧情单元与终局底牌边界——**不整读卷纲**；exit 1 按提示修，不改用整读。细纲缺失或缺必需字段时**先补建再写**：按 workflow-setup 细纲模板补齐必填项（核心事件、字数目标、字数口径、单元ID/位置、目标情绪、主角目标/关键选择、章首钩子、爽点、本章禁止提前释放）和四个小节，无证据的写 `[待补充]`，补完跑 `check-outline-contract.js` 验收。
 2. **读取上下文**：`tracking_commit.py check`（取 `last_committed_chapter` / `state_revision`，完整 state 不进 prompt）→ `追踪/上下文.md` 全 7 栏 → 细纲点名或出场的 `设定/角色/`、`设定/势力/`、`设定/世界观/` 相关文件。上一章结尾由脚本代读，承接存疑才自己读。久别角色读 `追踪/角色状态/{名}.md`；更旧的信息按 workflow-daily「旧信息查找步骤」定点查。
 3. **写前准备**：
    - **先跑组装脚本**：`{PYTHON} {skill 根}/scripts/build_writer_prompt.py --project {项目根} --chapter {N} --out`。`====` 以上是 prompt、以下是核对报告；退出码 2 ＝数据问题，修完重跑，不手拼绕过。
    - **状态筛选**：从续写状态卡取本章在场角色、要碰/要避的伏笔、必须履行的下一章承诺与相关长期约束，写成本节速记。
    - **召回**：核对报告写「召回降档：成立」时直接用脚本给的情绪/节奏；不成立时才完整读取 [benchmark-recall.md](benchmark-recall.md) 执行全量召回。
    - **意图确认**：一句话写清本章意图（例：「快节奏打脸——账单暴露→逼问→反证→公开代价；读者等了三章，这章必须一拳到位。」）。确认时对照：细纲是唯一剧情蓝图，新增物按写手铁律 3 的三级（直接写 / 写了要报 / 先问作者）；后续阶段真相与底牌不因章尾钩子提前泄露；细纲多处重复的同一要求只算一个语义点，正文兑现一次；爽点前有可指认的危机/期待铺垫，打脸/揭露章写在场配角的差异反应；高压节拍收紧对话声线。
-   - **契约四问**：主角是否靠自己的选择挣到本章结果？收益是否被配角、机构或巧合无交换地拿走？有没有提前动用后面的底牌？旧期待付利息、留新期待了吗？任一答否，读 `references/reader-contract-and-progression.md` 对应小节，先修纲再写。
+   - **契约四问**：主角是否靠自己的选择挣到本章结果？收益是否被配角、机构或巧合无交换地拿走？有没有提前动用后面的底牌？旧期待付利息、留新期待了吗？任一问不过（没靠自己挣到、收益被拿走、提前动了底牌、旧期待没付利息），读 `references/reader-contract-and-progression.md` 对应小节，先修纲再写。
 4. **资料研究**（按需）：需查证外部事实时 spawn story-researcher 输出到 `参考资料/`，不可用则主线程查。
 5. **标题预检**：看核对报告的重名结论；重名或明显重复才按核心事件改名，并同步细纲标题与正文文件名。
 6. **写作准备**：全章细纲先交给 writer 统筹编排，默认同一 session 按前后两组交付。
@@ -35,7 +35,7 @@ agent 只查当前端 canonical 目录；Antigravity 用 `.agents/agents/agent-n
 9. **检查钩子与爽点**：章尾有往下看的理由（低压/过场章留阶段目标即可）；高压/推进章爽点到位。不达标只修复批准内容，修后重跑步骤 8，不借质量修复补新剧情追字数。
 10. **元信息扫描**：按步骤 6 的规则清掉标题行以外的工程词。
 11. **检测结果处理**：严重度统一读作必须修 / 建议看 / 仅提示——检测器 blocking 与 checker 的 S1/S2 是必须修，advisory 与 S3 是建议看，S4 仅提示。`quality.blocking_findings` 就地改到净；`advisories` 逐条读原文判断，确属问题才改，功能性写法保留，不为归零机械改写。`formulaic-parallelism` 连同台词一起复核；细纲照搬里判定保留的补进细纲「复沓锚句」。禁用词表不整读，拿不准的二级词才查 `references/banned-words.md` 对应条目。改完只重跑步骤 8，不另安排全篇去味。
-12. **更新追踪**：运行 `{PYTHON} {skill 根}/scripts/tracking_commit.py draft --project {项目根} --chapter {N}`，它把修订号、模式、章名和上下文当前值预填进工作目录 `tracking.json`，并给出字数上限与在场核心角色的当前快照。只填 `delta` 里本章的变化：本章变化的核心角色把快照整份改好放进 `character_snapshots`；撤下的长期约束或风险从 `context` 删掉并把原文列进 `delta.retired_context_items`。不读脚本源码或 state 文件找格式；schema 细节、修订与修复见 [tracking-transaction.md](tracking-transaction.md)，只在出错或 `mode=revision` 时读。带内执行 `storyctl.py chapter commit`，作者接受当前长度执行 `chapter accept-current-length`（两者都重读正文、重数、重跑 quality 后原子提交）。报错会一次列全要改的字段，按提示改完重跑同一命令。作者选「这章不要了」时删本章正文与工作目录，不提交。判为「登记」的申报项在这次事务里一并登记；有「先问作者」项时暂停提交与下一章。
+12. **更新追踪**：运行 `{PYTHON} {skill 根}/scripts/tracking_commit.py draft --project {项目根} --chapter {N}`，它把修订号、模式、章名和上下文当前值预填进工作目录 `tracking.json`，并给出字数上限与在场核心角色的当前快照。只填 `delta` 与留空的本章结尾时间、场景：本章变化的核心角色把快照整份改好放进 `character_snapshots`；撤下的长期约束或风险从 `context` 删掉并把原文列进 `delta.retired_context_items`。不读脚本源码或 state 文件找格式；schema 细节、修订与修复见 [tracking-transaction.md](tracking-transaction.md)，只在出错或 `mode=revision` 时读。带内执行 `storyctl.py chapter commit`，作者接受当前长度执行 `chapter accept-current-length`（两者都重读正文、重数、重跑 quality 后原子提交）。报错会一次列全要改的字段，按提示改完重跑同一命令。作者选「这章不要了」时删本章正文与工作目录，不提交。判为「登记」的申报项在这次事务里一并登记；有「先问作者」项时暂停提交与下一章。
 13. **提交后核对**：返回 `tracking_committed: true` 即本章完成，工作目录已删；连续写多章不另做快照。
 
 ## 向作者汇报
@@ -96,7 +96,7 @@ agent 只查当前端 canonical 目录；Antigravity 用 `.agents/agents/agent-n
 
 ### Agent 调用：consistency-checker
 
-**按需调用**：writer 申报表非 `0`，或核对细纲时发现未申报的跨章事实（新证词、证据、承诺、关系变化）才在本章 spawn；否则由日更批末整批查一次（workflow-daily Step 3）。Prompt：`项目目录：{dir}\n检查范围：{本次写作的章节}\n检查类型：事实冲突+伏笔断线+角色属性不一致\n本章新增申报：{申报表原样粘贴，无则写 0}；同时核对正文有无未申报的跨章事实，逐处列原文和细纲出处。只读与新增项和本章出场角色相关的设定、角色卡与追踪条目。冲突按 S1-S4 报出`。不可用则主线程参照 long-chapter-quality.md 检查。
+**按需调用**：writer 申报表非 `0`，或核对细纲时发现未申报的跨章事实（新证词、证据、承诺、关系变化）才在本章 spawn；否则日更由批末整批查一次（workflow-daily Step 3），非日更的单章写作在步骤 12 提交前对本章查一次。Prompt：`项目目录：{dir}\n检查范围：{本次写作的章节}\n检查类型：事实冲突+伏笔断线+角色属性不一致\n本章新增申报：{申报表原样粘贴，无则写 0}；同时核对正文有无未申报的跨章事实，逐处列原文和细纲出处。只读与新增项和本章出场角色相关的设定、角色卡与追踪条目。冲突按 S1-S4 报出`。不可用则主线程参照 long-chapter-quality.md 检查。
 
 **「写了要报」的处置**（正文定稿、追踪未提交时做）。checker 只给事实证据，归哪一栏由主会话判：
 
@@ -112,4 +112,4 @@ agent 只查当前端 canonical 目录；Antigravity 用 `.agents/agents/agent-n
 
 **按需调用**：步骤 8 里需要语义判断的 advisory（`stock-reaction-tic`、`formulaic-parallelism` 等）合计 ≥3 条，或 blocking 一次就地修改后仍未清零，才 spawn 一次；否则主会话按步骤 11 处理。Prompt：`项目目录：{dir}\n任务描述：审查+去AI味\n检查分工：你负责语义去味及原定自检；最终文件扫描由主会话执行\n检查范围：{本次写作的章节}\n文风路径：{设定/文风.md 全文路径}\nstyle_resolution：{与写作一致的裁决}\n作者偏好：{本章 query 命中的 prose_style/story_design 项}\n删除优先：每条 AI 味项先判能否删除，删后不丢伏笔/钩子/角色/情节/必要信息的直接删，会丢才润色\n按你的 7 Gate 与对话自检执行，台词里的工整否定不因脚本豁免而跳过\n删除测试：stock-reaction-tic 候选按 writing-craft.md「套式反应删除测试」逐处过，爽点段与 detector 标记处按同文件「写法抽查」表查，只指认已有问题、不补内容；报告列候选数/删改数/保留理由`。不可用则主线程按 `references/anti-ai-writing.md` 执行。
 
-审查改动了连续性事实时，按 tracking-transaction.md 为该章提交 `mode=revision` 事务（`draft --chapter {N}` 同样可生成预填草稿）。
+审查在本章首次提交前改动的连续性事实，直接写进步骤 12 的 `mode=append` 事务；本章提交后再改连续性事实，才按 tracking-transaction.md 提交 `mode=revision` 事务（`draft --chapter {N}` 同样可生成预填草稿）。

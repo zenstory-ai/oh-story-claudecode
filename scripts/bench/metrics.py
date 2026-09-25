@@ -2,7 +2,7 @@
 """从一次或多次基准运行里算效率与正文指标，输出 JSON（--table 另打一张对照表）。
 
 用法：
-  metrics.py <run目录>... [--table] [--tell ~/workspace/tell]
+  metrics.py <run目录>... [--table] [--tell <tell仓库>]
 
 效率（按提交章数平均）：墙钟、主会话回合、工具调用、子 agent 次数、累计输入/输出 token、
 主会话单次上下文峰值、自动压缩次数、每章提交时刻。
