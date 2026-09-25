@@ -69,7 +69,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | 5 主报告 | 权威底层结果 | 拆文报告、完整概要 | 文件存在、阶段状态完成 |
 | 6 文风 | 既有资料、样本或索引定点原文 | `文风.md` | 文件存在、阶段状态完成 |
 
-用户未要求一次跑完时，Stage 1 后按 author-facing.md「开头三章拆完、停下来问」询问是否继续；续跑不重复 Stage 0/1。Stage 3–5 不重读原文。Stage 6 可按索引定点读取 4–6 段原文锚点，但不重扫全书。
+用户未要求一次跑完时，Stage 1 后按 author-facing.md「开头三章拆完、停下来问」询问是否继续，并一并请作者选 Stage 2 派发方式（串行 / 有限并行 / 不限批次顺序，见 pipeline-ops「执行与提交一个批次」）；作者没选、要求一次跑完、多本书一起拆或由导入自动续跑时都按有限并行（每轮 3 批），后三种情况不停下询问；续跑不重复 Stage 0/1。Stage 3–5 不重读原文。Stage 6 可按索引定点读取 4–6 段原文锚点，但不重扫全书。
 
 ## Stage 0：机械章节索引
 
@@ -95,14 +95,14 @@ chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locato
 "{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" plan --root "{拆文目录}" --intent continue
 ```
 
-用户明确增强改为 `--intent enhance`。计划不落盘，批次 ID 固定为 `RAW-{起章}-{止章}` 或 `REUSE-{起章}-{止章}`。计划与提交都拒绝超过 3 章或 25,000 字符的非单章原文块；同一章不能出现在两个原文块。计划原文读取数为 0 时不得派发原文任务。
+用户明确增强改为 `--intent enhance`。逐批派发加 `--next 1` 只取下一批，确认进度用 `--next 0`。计划不落盘，批次 ID 固定为 `RAW-{起章}-{止章}` 或 `REUSE-{起章}-{止章}`。计划与提交都拒绝超过 3 章或 25,000 字符的非单章原文块；同一章不能出现在两个原文块。计划原文读取数为 0 时不得派发原文任务。
 
 ### 两种互斥输入
 
 - `raw-original`：只按索引读取计划范围，一次产生紧凑逐章事实和跨章观察；
 - `existing-results`：只读 `source_files` 列出的摘要或黄金三章，不得打开原文。完整旧项目增强只产批次观察；本批含摘要缺口时必须为每章生成紧凑章块。
 
-`chapter-extractor` 输出字段为：概要、因果、关键行动、局面结果、涉及人物、信息变化、状态变化、三维节奏、章尾钩子、证据，以及情节点列表（原文块每章 10–20 个、长章最多 30 个，格式见 output-templates）。不得另做章节卡表。
+`chapter-extractor` 输出字段为：概要、因果、关键行动、局面结果、涉及人物、信息变化、状态变化、三维节奏、章尾钩子、证据，以及情节点列表（原文块每章 10–20 个、长章最多 30 个，格式见 output-templates）。不得另做章节卡表。派发只给 `source_locator`、字数、输出文件路径和上一批缓存路径：子代理自己读原文、把完整结果写进 `_analysis_cache/输入-{批次ID}.md`，只回一行回执；主会话不转贴原文、不读这份输入，直接提交（细则见 pipeline-ops「执行与提交一个批次」）。
 
 提交：
 
@@ -122,6 +122,8 @@ chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locato
 拆分将父块记为 `superseded` 并持久化两个相邻子块，重规划不会合回。计划不再有批次、全部摘要落盘后运行 `manage_analysis_run.py mark-stage --stage stage2`；Stage 1 的黄金三章与快速预览落盘后同样标 `--stage stage1`。恢复只信任带结束标记且范围 hash 有效的完整缓存，只补缺失摘要，最后更新进度；不覆盖用户文件。
 
 ## Stage 3：剧情、双时间线与三维节奏
+
+Stage 3–5 用 `manage_analysis_run.py digest` 取料：先读全书跨章观察，逐章字段与情节点简表按章节窗口取，不整份读批次缓存（用法见 pipeline-ops「Stage 3–6」）。
 
 剧情点按“起始目标与阻碍 → 改变局面的选择/行动/外部事件 → 局面变化与得失 → 后续影响”合并。事件发生与信息披露分开；同一事实的异常、线索、解释、确认属于一条披露路径。全局只保留约 8–15 个主线或关键转折节点。
 

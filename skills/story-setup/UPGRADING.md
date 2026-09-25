@@ -15,6 +15,7 @@
 
 - `narrative-writer` 写正文不再预加载去 AI 味整套流程，也不自己跑检测脚本；`consistency-checker` 只读本次检查范围相关的设定与细纲。
 - 写正文守卫修正：`cd 书目录 && …` 这类命令不再被误报「缺少细纲」。
+- 长篇拆文的 `chapter-extractor` 改为可写：它按行号自己读原文，把整批结果写进 `{拆文目录}/_analysis_cache/输入-{批次ID}.md`，只回一行回执。Claude Code 上由 agent 内联 hook 限定只能写这类文件；Codex、OpenCode、Antigravity 没有这个挂载点，靠 agent 指令与提交校验约束。旧部署的 extractor 没有写权限，拿不到输入文件，所以必须重跑。
 - 长篇写作流程变短：每章收尾一次检查、追踪提交先生成草稿再填、作者记忆由脚本代查；一致性检查与去 AI 味审查改为按需。
 
 ### 已在写的长篇不用迁移

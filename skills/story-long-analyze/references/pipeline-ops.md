@@ -75,11 +75,27 @@ Stage 4 另用 `render_relation_chart.py` 从 `角色/角色关系.md` 生成人
 
 没有“整本重拆”意图：已有摘要永不覆盖。整本重拆就换一个新目录重新拆。
 
+逐批派发时加 `--next 1` 只取下一批，确认进度用 `--next 0` 只看 `remaining_batches` 与压缩成区间的 `summary_gaps`；全量计划每批约五百字符，整本书反复全量输出会白占主会话上下文。不带 `--next` 时输出全部批次。
+
 计划只存在内存和标准输出，`state_written` 必须为 `false`。每块最多 3 章、25,000 字符；批次 ID 直接使用章节范围。`RAW` 只覆盖缺失章和缓存失效批次，`REUSE` 只读取计划列出的旧成果。黄金三章深拆属于已有语义成果，可以生成缺失摘要，无需再次读取前三章原文。
 
 ## 4. 执行与提交一个批次
 
-`chapter-extractor` 只读取计划中一个批次；派发时带上计划里的 `chapter_chars`（每章字数，决定情节点密度）。把完整输出保存为 `{拆文目录}/_analysis_cache/输入-{批次ID}.md` 后提交（不写系统 `/tmp`：Windows 没有，多本书同批号会互相覆盖；提交成功后删掉这份输入）。子代理不可用时主线程自己写批次，包裹标记照 output-templates「批次提交格式」：
+`chapter-extractor` 只处理计划中一个批次。**主会话不中转内容**：原文和批次结果都不经过主会话上下文。派发时只给——
+
+- 批次 ID、输入类型、计划的 `source_files`（原文块是逐章 `source_locator`，子代理自己按行号读原文）和 `chapter_chars`（每章字数，决定情节点密度）；
+- 输出文件 `{拆文目录}/_analysis_cache/输入-{批次ID}.md`（不写系统 `/tmp`：Windows 没有，多本书同批号会互相覆盖）；
+- 交接缓存路径：按下方派发方式选定的已提交批次缓存（没有就不给），子代理只读其中 `### 跨批状态`。
+
+子代理把完整输出写进输出文件，只回一行 `BATCH_WRITTEN` 回执。主会话**不 Read 这份输入文件**，直接提交；提交被拒时把错误码和输出文件路径交回子代理，让它用 Edit 只改出错处后再提交（结构整体错乱才整份重写）。提交成功后删掉这份输入。不论哪种派发方式，`commit` 都由主会话逐个执行，不并发跑。
+
+**派发方式三档**（Stage 1 后停下询问时一并请作者选，话术见 author-facing「开头三章拆完、停下来问」）：
+
+1. **串行**：上一批提交成功再派下一批，交接缓存给紧邻的前一批。优点：剧情点、未决悬念和已确认别名逐批完整接续，Stage 3 合并最省事。缺点：最慢，墙钟时间随批数线性增长。
+2. **有限并行**：每轮同时派 3 批，同轮都给「本轮开始前最近一个已提交批次」的缓存；整轮提交完再派下一轮。优点：约快两到三倍，接续最多滞后一轮。缺点：同轮批次互相看不到对方新建的剧情点与别名，边界处可能重复建 ID，靠 Stage 3 跨块合并收拢。
+3. **不限批次顺序**：不等前批，同时在跑的子代理最多 12 个（宿主或账号上限更低时以环境为准）；在跑的少于上限一半时，补派到上限。补派用 `plan --next {在跑数＋补派数}`，跳过已在跑的批次号（计划只认已提交）。遇到限流、超时或子代理报错，把上限减半后再补派。每批给「本批起章之前最近的已提交批次」的缓存，没有就不给。优点：最快。缺点：接续最弱，剧情点与别名最依赖 Stage 3 跨块合并和 Stage 4 归并；并发越高，被限流、整批重跑的风险越大。
+
+作者没选、要求一次拆完 / 全量拆、多本书一起拆，或由 story-import 自动续跑时，都按第 2 档；第 3 档只在作者明确选择时使用。多本书同拆时按书轮流派，第 3 档的总并发也不超过同一上限。第 1、2 档用 `plan --next 1` / `--next 3` 取批。子代理不可用时主线程自己写批次，包裹标记照 output-templates「批次提交格式」：
 
 ```text
 "{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" commit \
@@ -138,6 +154,17 @@ Stage 1 黄金三章与快速预览落盘后标 `stage1`；计划不再有批次
 "{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" mark-stage \
   --root "{拆文目录}" --stage stage3 --output "剧情/节奏.md"
 ```
+
+**Stage 3–5 的读法**：不整份 Read 批次缓存（每批约七成是和逐章摘要重复的章节块），改用只读的 `digest` 按需取料，输出是 Markdown：
+
+```text
+"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" digest --root "{拆文目录}" --part observations [--chapters 1-60]
+"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" digest --root "{拆文目录}" --part chapters --chapters 1-60 --fields 三维节奏,涉及,状态变化 --points brief
+```
+
+- `observations`：按章序汇总已提交批次的跨章观察（剧情点、关键事件与披露候选、关系变化、三维峰谷、跨批状态），是 Stage 3–4 的主语料；
+- `chapters`：从逐章摘要抽字段（概要、关键事件、因果、局面结果、涉及、信息变化、状态变化、三维节奏、章尾钩子、证据），`--points brief` 给每点「标题｜类型｜基调」，`full` 另带白描；
+- 全书放不进一次上下文时按 `--chapters` 分窗口取，窗口间只带剧情状态与证据引用；只有关键证据冲突才定点 Read 单章摘要。
 
 阶段完成只看约定产物存在且进度行完成；没有依赖 hash 或 Stage receipt。`mark-stage` 会按阶段检查：Stage 1 的黄金三章与快速预览、Stage 2 的全部摘要、Stage 3 的情绪模块与节奏、Stage 4 的角色与设定、Stage 5 的报告、Stage 6 的文风。Stage 6 的单独重建见 [style-profile-generator.md](style-profile-generator.md)，允许按索引定点读取 4–6 段原文，不重扫全书，也不触发其他阶段。
 

@@ -463,7 +463,7 @@ TOOL_ACTION = {
     'unlisted-future-tool': 'unlisted-future-tool',
 }
 READ_LIKE = {'read', 'glob', 'grep'}
-read_only = {'chapter-extractor', 'consistency-checker', 'story-explorer'}
+read_only = {'consistency-checker', 'story-explorer'}  # chapter-extractor 写批次输入文件，不再只读
 shell_agents = {'narrative-writer', 'story-researcher'}
 base = Path('skills/story-setup/references/opencode/agents')
 for path in sorted(base.glob('*.md')):
