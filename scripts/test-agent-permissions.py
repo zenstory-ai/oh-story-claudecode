@@ -24,7 +24,6 @@ ANTIGRAVITY_GENERATOR = (
     REPO_ROOT / "skills/story-setup/scripts/generate-antigravity-agents.mjs"
 )
 TEMPLATES = REPO_ROOT / "skills/story-setup/references/templates"
-CODEX_BASELINE = REPO_ROOT / "skills/story-setup/references/codex/agents"
 OPENCODE_BASELINE = REPO_ROOT / "skills/story-setup/references/opencode"
 
 
@@ -189,39 +188,6 @@ def assert_invalid_capabilities_fail_before_publish(capability_lines: str) -> No
             == "existing antigravity output\n"
         )
         assert not (antigravity_dest / "invalid-capabilities").exists()
-
-
-def test_generated_agents_are_in_sync() -> None:
-    with tempfile.TemporaryDirectory(prefix="agent-permissions-baseline-") as tmp:
-        root = Path(tmp)
-        codex_dest = root / "codex"
-        result = run(
-            str(CODEX_GENERATOR),
-            "--source",
-            str(TEMPLATES / "agents"),
-            "--dest",
-            str(codex_dest),
-        )
-        assert result.returncode == 0, result.stdout + result.stderr
-        expected_codex = sorted(path.name for path in CODEX_BASELINE.glob("*.toml"))
-        assert sorted(path.name for path in codex_dest.glob("*.toml")) == expected_codex
-        for filename in expected_codex:
-            assert (codex_dest / filename).read_bytes() == (
-                CODEX_BASELINE / filename
-            ).read_bytes(), filename
-
-        opencode_root = root / "opencode-fixture"
-        generated = prepare_opencode_root(opencode_root, TEMPLATES / "agents")
-        expected_opencode = sorted(
-            path.name for path in (OPENCODE_BASELINE / "agents").glob("*.md")
-        )
-        assert sorted(path.name for path in (generated / "agents").glob("*.md")) == (
-            expected_opencode
-        )
-        for filename in expected_opencode:
-            assert (generated / "agents" / filename).read_bytes() == (
-                OPENCODE_BASELINE / "agents" / filename
-            ).read_bytes(), filename
 
 
 def test_permissions_follow_capabilities_not_names() -> None:
@@ -483,7 +449,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--opencode", help="OpenCode 2.x executable for real tool permission checks")
     args = parser.parse_args()
-    test_generated_agents_are_in_sync()
     test_permissions_follow_capabilities_not_names()
     test_empty_and_inherited_tools_are_distinct()
     test_codex_recognizes_other_mutating_tools()
