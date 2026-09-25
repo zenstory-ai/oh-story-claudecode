@@ -100,7 +100,7 @@ def json_report(result: subprocess.CompletedProcess[str]) -> dict[str, Any]:
 
 
 def error_codes(report: dict[str, Any]) -> set[str]:
-    errors = cast(list[Any] | None, report.get("errors"))
+    errors = cast("list[Any] | None", report.get("errors"))
     if not isinstance(errors, list):
         raise AssertionError("report errors must be a list")
     return {
