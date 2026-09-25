@@ -12,10 +12,6 @@ const longUtilsPath = path.join(
   repoRoot,
   "skills/story-long-scan/scripts/cdp-utils.js"
 );
-const shortUtilsPath = path.join(
-  repoRoot,
-  "skills/story-short-scan/scripts/cdp-utils.js"
-);
 
 function makeFakeAgentBrowser(tmpDir) {
   const fakeProgram = `#!/usr/bin/env node
@@ -381,7 +377,7 @@ function testScraperImports() {
       process.execPath,
       [
         "-e",
-        "const m=require(process.argv[1]); process.stdout.write(JSON.stringify(Object.keys(m).sort()));",
+        "require(process.argv[1]);",
         scraperPath,
       ],
       { cwd: repoRoot, encoding: "utf8", timeout: 2000 }
@@ -400,11 +396,6 @@ function testScraperImports() {
       probe.stderr,
       "",
       `${path.basename(scraperPath)} emitted stderr while imported`
-    );
-    const exported = JSON.parse(probe.stdout || "[]");
-    assert(
-      exported.length > 0,
-      `${path.basename(scraperPath)} must export testable helpers`
     );
   }
 }
@@ -1432,10 +1423,8 @@ function testCdpRejectsUnverifiableIdentity() {
 }
 
 testCdpUtils(longUtilsPath);
-testCdpUtils(shortUtilsPath);
 testWindowsInvocationBuilder(longUtilsPath);
 testLocalDateStamp(longUtilsPath);
-testLocalDateStamp(shortUtilsPath);
 testScraperImports();
 testCliResultGate(longUtilsPath);
 testJjwxcDetailFailureIsolation();

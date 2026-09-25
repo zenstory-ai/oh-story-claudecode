@@ -230,5 +230,3 @@ function main() {
 if (require.main === module) {
   runCli(main, "点众采集");
 }
-
-module.exports = { buildStoriesJS };

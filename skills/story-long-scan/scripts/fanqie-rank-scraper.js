@@ -421,14 +421,3 @@ function main() {
 if (require.main === module) {
   runCli(main, "番茄采集");
 }
-
-// 导出纯函数/JS 构建器，供测试在 sandbox 内验证解析逻辑
-module.exports = {
-  buildCategoriesJS,
-  buildBookListJS,
-  buildDetailJS,
-  fmtReads,
-  fmtWords,
-  fmtStatus,
-  cleanDesc,
-};

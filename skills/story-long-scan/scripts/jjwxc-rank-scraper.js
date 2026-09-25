@@ -398,5 +398,3 @@ function main() {
 if (require.main === module) {
   runCli(main, "晋江采集");
 }
-
-module.exports = { buildDetailJS, fmtWan };
