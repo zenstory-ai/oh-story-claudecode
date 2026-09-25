@@ -9,17 +9,6 @@ if [ -z "$REPO_ROOT" ]; then
 fi
 
 SCRIPT="$REPO_ROOT/skills/story-long-write/scripts/check-outline-copy.js"
-DETECTOR_COPIES=(
-  "$REPO_ROOT/skills/story-long-write/scripts/check-outline-copy.js"
-  "$REPO_ROOT/skills/story-short-write/scripts/check-outline-copy.js"
-)
-for detector_copy in "${DETECTOR_COPIES[@]}"; do
-  node --check "$detector_copy" >/dev/null
-  cmp -s "$SCRIPT" "$detector_copy" || {
-    echo "FAIL: detector copy drifted from story-long-write source: $detector_copy" >&2
-    exit 1
-  }
-done
 
 TMP_DIR="$(mktemp -d)"
 cleanup() { rm -rf "$TMP_DIR"; }

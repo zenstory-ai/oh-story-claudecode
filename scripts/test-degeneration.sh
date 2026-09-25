@@ -230,12 +230,14 @@ if (rep.length === 0) throw new Error('引号整行豁免回归：混合行复�
 if (!rep.every((f) => f.severity === 'blocking')) throw new Error('verbatim-repeat 应为 severity=blocking');
 NODE
 
-# 纯台词复沓仍豁免（体裁手法）：三行相同台词不报。
+# 纯台词复沓仍豁免（体裁手法）：同一句长台词紧邻重复、全文三次都不报。台词本身
+# 过了紧邻复读与长句复读的长度门槛，只能靠去引号豁免，而不是短句豁免。
 PURE_DLG="$TMP_DIR/pure-dialogue.md"
 cat > "$PURE_DLG" <<'EOF'
-“我不走。”
-“我不走。”
-“我不走。”
+“我说了今天晚上哪儿也不去，就在这儿等他回来。”
+“我说了今天晚上哪儿也不去，就在这儿等他回来。”
+他没回头。
+“我说了今天晚上哪儿也不去，就在这儿等他回来。”
 EOF
 set +e
 pure_dlg_out="$(node "$SCRIPT" "$PURE_DLG" 2>&1)"
