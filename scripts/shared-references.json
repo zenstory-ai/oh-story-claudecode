@@ -166,11 +166,6 @@
       "targets": ["skills/story-setup/references/agent-references/long-genre-mechanics.md"]
     },
     {
-      "name": "state-tracking",
-      "source": "skills/story-long-write/references/state-tracking.md",
-      "targets": ["skills/story-import/references/state-tracking.md"]
-    },
-    {
       "name": "style-combat-face",
       "source": "skills/story-long-write/references/style-combat-face.md",
       "targets": ["skills/story-setup/references/agent-references/style-combat-face.md"]

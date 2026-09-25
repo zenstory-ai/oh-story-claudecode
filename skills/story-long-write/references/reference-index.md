@@ -55,7 +55,6 @@
 | 情绪技法 + 叙事单元 | `references/plot-emotion-system.md` + `references/emotional-methods.md` |
 | 写作技法全程参考 | `references/writing-craft.md` |
 | 格式 | `references/long-format.md`（章节、段落、对话、标点与工程元信息） |
-| 状态追踪协议 | `references/state-tracking.md` |
 | 当前剧情单元与契约校准 | `references/reader-contract-and-progression.md` |
 
 ### Phase 5：质量检查
