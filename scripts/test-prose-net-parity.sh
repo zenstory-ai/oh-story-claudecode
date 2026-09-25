@@ -95,7 +95,14 @@ run_functional() {
   "toxic_trailer": "他放下麦克风朝台下鞠了一躬。\n没人知道，这才刚刚开头。",
   "toxic_trailer_summary": "他放下麦克风朝台下鞠了一躬。\n这一切都结束了。",
   "toxic_trailer_summary_fate": "她把账单折好塞回包里。\n这一夜注定无人入眠。",
-  "toxic_bare_realize_ok": "那一刻我终于明白，母亲当年为什么总在夜里哭。\n我抓起外套就往门口走。",
+  "toxic_trailer_summary_sozhe": "他把钥匙交了出去。\n就这样，一切都结束了。",
+  "toxic_trailer_summary_new_chapter": "他收拾好行李。\n新的篇章就此开始。",
+  "toxic_trailer_summary_fate_gear": "他握紧了那枚铜钱。\n命运的齿轮开始转动。",
+  "toxic_trailer_shubuzhi": "他笑着把门关上。\n殊不知门外早有人等着。",
+  "toxic_trailer_imminent": "城门缓缓合拢。\n一场大战即将来临。",
+  "toxic_trailer_pressing": "他站在城头往下看。\n黑压压的军阵正朝着城门压过去。",
+  "toxic_trailer_alternatives": "他走了。\n谁也不知道他去了哪里。\n谁也没想到会是他。\n这才刚刚开始。\n一场好戏拉开序幕。\n大戏终于拉开帷幕。\n好戏即将开始。\n风暴即将降临。\n潮水正向着堤岸涌来。\n敌军正朝着营地逼了过来。\n骑兵正朝着山口袭过去。\n这一天注定要被记住。\n这一切都说明了问题。\n这一切意味着新生。\n就这样，全部收场。\n就这样，一切都落幕。\n新的旅程就此展开。\n崭新的篇章正在展开。\n新的人生从此开始。",
+  "toxic_bare_realize_ok":"那一刻我终于明白，母亲当年为什么总在夜里哭。\n我抓起外套就往门口走。",
   "toxic_summary_subclause_ok": "等这一切结束了，我们就能过上平静幸福的生活了。\n他把门带上了。",
   "toxic_summary_idiom_ok": "世间的这一刻，所有人都接受了命中注定的结局！\n他转身走了。",
   "toxic_dialogue_ok": "「没人知道。」\n他笑了笑接着往前走。",
@@ -211,6 +218,17 @@ PY
   grep -q '^toxic_trailer | 第2行 毒句式\[trailer-ending\]' "$tmp/py.txt" || { echo "FAIL: 毒句式正例 trailer-ending 未命中「没人知道，这才刚刚开头」" >&2; return 3; }
   grep -q '^toxic_trailer_summary | 第2行 毒句式\[trailer-summary\]' "$tmp/py.txt" || { echo "FAIL: 毒句式正例 trailer-summary 未命中「这一切都结束了」" >&2; return 3; }
   grep -q '^toxic_trailer_summary_fate | 第2行 毒句式\[trailer-summary\]' "$tmp/py.txt" || { echo "FAIL: 毒句式正例 trailer-summary 未命中「这一夜注定无人入眠」" >&2; return 3; }
+  # trailer 两条正则的各分支各锁一个正例（此前只靠 check-hook-regex-sync 的规范串 grep）。
+  for pair in toxic_trailer_summary_sozhe:trailer-summary toxic_trailer_summary_new_chapter:trailer-summary \
+      toxic_trailer_summary_fate_gear:trailer-summary toxic_trailer_shubuzhi:trailer-ending \
+      toxic_trailer_imminent:trailer-ending toxic_trailer_pressing:trailer-ending; do
+    grep -q "^${pair%%:*} | 第2行 毒句式\[${pair#*:}\]" "$tmp/py.txt" || { echo "FAIL: 毒句式正例 ${pair%%:*} 未命中 ${pair#*:}" >&2; return 3; }
+  done
+  # 其余备选词各占一行、各命中一条，数量锚死（10 条预告腔 + 8 条状态总结）：任一备选词在
+  # 单端被删或改写，两端逐字 diff 或这里的计数就会红。
+  [ "$(grep '^toxic_trailer_alternatives |' "$tmp/py.txt" | grep -o '毒句式\[trailer-ending\]' | wc -l | tr -d ' ')" = 10 ] \
+    && [ "$(grep '^toxic_trailer_alternatives |' "$tmp/py.txt" | grep -o '毒句式\[trailer-summary\]' | wc -l | tr -d ' ')" = 8 ] \
+    || { echo "FAIL: trailer 备选词正例未逐行命中（期望 10 条 trailer-ending + 8 条 trailer-summary）" >&2; return 3; }
   grep -q '^toxic_bare_realize_ok | $' "$tmp/py.txt" || { echo "FAIL: 「那一刻…终于明白」审判金句被误报（短篇卖点，本规则不收认知节拍）" >&2; return 3; }
   grep -q '^toxic_summary_subclause_ok | $' "$tmp/py.txt" || { echo "FAIL: 条件从句「等这一切结束了，…」被误报（未落句末断言位）" >&2; return 3; }
   grep -q '^toxic_summary_idiom_ok | $' "$tmp/py.txt" || { echo "FAIL: 成语「命中注定」被跨匹配成 trailer-summary" >&2; return 3; }
