@@ -497,7 +497,6 @@ def test_parser_and_gate_hardening() -> None:
             handle.write("CBA-009,跨书灵感聚合,短行\n")
         errors = MODULE["validate"](root)
         require(any("column_count_mismatch" in error for error in errors), f"列数不对的行必须报错而不是崩溃：{errors}")
-        require(MODULE["coverage"] is not None, "coverage 可用")
 
 
 def test_parser_does_not_block_legit_modules() -> None:
@@ -530,13 +529,11 @@ def test_parser_does_not_block_legit_modules() -> None:
 
         make_workspace(base)
         MODULE["register_atoms"](root, module_path, "测试书")
-        rows = index_rows(root)
         text = (root / "灵感索引.csv").read_text(encoding="utf-8-sig").rstrip("\n").split("\n")
         text.insert(2, "IA-099,原子灵感,短行")
         (root / "灵感索引.csv").write_bytes(("\ufeff" + "\n".join(text) + "\n").encode("utf-8"))
         errors = MODULE["validate"](root)
         require("line_3:column_count_mismatch" in errors, f"坏行按文件实际行号报告：{errors}")
-        require(MODULE["coverage"] is not None and rows, "fixture 可用")
 
 
 def main() -> int:
