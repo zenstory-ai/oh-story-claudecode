@@ -112,7 +112,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 1. **先去 setup**：暂停导入，运行 `/story-setup`，部署完成后重新触发 `/story-import`；
 2. **继续导入**：Phase 2 降级为主线程串行处理（长篇逐章摘要由主线程自己写，速度较慢，但产物完整）。
 
-用户选择记入上下文，Phase 2 据此决定是否派 chapter-extractor。有子代理时，导入属自动续跑，按 story-long-analyze 的「不限批次顺序」档派发（同时最多 12 个子代理，不超过环境上限）；用户明确要求时改用串行或有限并行。
+用户选择记入上下文，Phase 2 据此决定是否派 chapter-extractor。有子代理时，导入属自动续跑，按 story-long-analyze 的「有限并行」档派发（每轮 3 批）；用户明确要求时改用串行或不限批次顺序。
 
 ### Step 6：原文备份
 
