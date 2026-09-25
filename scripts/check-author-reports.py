@@ -184,6 +184,8 @@ def self_test() -> int:
         "按安全七检过了一遍",
         "字数 borderline，要不要 discard",
         "Constraint Lock 已生效",
+        "正文已回到内带",
+        "这条先收编进追踪",
     ]
     good = [
         "下一步：说「日更」就从第 7 章接着写；也可运行 `/story-long-write`。",

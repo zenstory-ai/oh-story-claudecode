@@ -1145,8 +1145,17 @@ def test_extractor_write_guard() -> None:
         require(guard(None, raw=edit_bad).returncode == 2, "Edit 其他文件同样阻断")
 
 
+def test_invalid_root_exits_nonzero() -> None:
+    with tempfile.TemporaryDirectory(prefix="long-runtime-root-") as temporary:
+        missing = Path(temporary) / "不存在"
+        require(run(INSPECT, "--root", missing).returncode != 0, "错误 root 必须非零退出")
+        for args in (("plan", "--root", missing), ("digest", "--root", missing, "--part", "observations")):
+            require(run(MANAGE, *args).returncode != 0, f"错误 root 必须非零退出：{args[0]}")
+
+
 def main() -> int:
     test_index_contract()
+    test_invalid_root_exits_nonzero()
     test_index_existing_supported_forms()
     test_inspection_legacy_and_partial()
     test_plan_commit_repair_and_state_preservation()

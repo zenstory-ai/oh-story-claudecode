@@ -682,6 +682,20 @@
       ],
       "budget": 11950,
       "why": "合计约束原入口拆分后的执行指令，避免迁出文件不计入预算；原短篇入口预算11300，新增200仅容纳阶段入口和相对路径说明。 +450：Phase 3 自足的写前参数验收命令与计数口径、Phase 4 给作者的交付说明，见 workflow-draft / workflow-revision 两条登记。"
+    },
+    {
+      "label": "拆文每批（chapter-extractor 每次调用）",
+      "agent": "skills/story-setup/references/templates/agents/chapter-extractor.md",
+      "budget": 6900,
+      "files": [],
+      "why": "v0.8：长篇拆文每批调用一次，一本书几十到上百次；#446 让它自读原文、自写批次输入并机械自查后涨到约 6.7K，锁住。"
+    },
+    {
+      "label": "日更查旧信息（story-explorer 每次调用）",
+      "agent": "skills/story-setup/references/templates/agents/story-explorer.md",
+      "budget": 10900,
+      "files": [],
+      "why": "v0.8：日更 Step 1 与审查查设定时调用；书内资料按查询定点读，不在此计。"
     }
   ]
 }

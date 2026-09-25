@@ -69,6 +69,8 @@ for (const flag of ['--check-contract', '--min-chars {MIN}', '--max-chars {MAX}'
 const draftingStep = shortDraft.indexOf('**写前准备**')
 assert(draftingStep > 0 && precheck.index < draftingStep, 'workflow-draft precheck must come before the drafting step')
 assert.doesNotMatch(shortDraft, /Phase 4 的交付命令/, 'workflow-draft must not defer the precheck command to Phase 4')
+// #445 实跑会话在批间自己写了约 40 轮 Python 计数：批间要有「去掉 --check-contract 重跑同一命令」这条命令锚。
+assert.match(shortDraft, /去掉 `--check-contract` 重跑/, 'workflow-draft must tell the writer to re-run the same command between batches')
 
 const shortRevision = fs.readFileSync(path.join(repoRoot, 'skills/story-short-write/references/workflow-revision.md'), 'utf8')
 const finalCheck = shortRevision.match(/`node scripts\/check-delivery-contract\.js ([^`]*)`/)

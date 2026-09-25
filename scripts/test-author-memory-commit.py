@@ -1122,8 +1122,16 @@ def main() -> None:
         REPO / "skills/story-long-write/references/workflow-chapter.md": (
             "`author_preferences`",
         ),
+        # 查到的偏好要进子代理 prompt 的槽位，否则 query 照跑、结果到不了写手。
+        REPO / "skills/story-short-write/references/workflow-draft.md": (
+            "作者偏好 query",
+        ),
+        REPO / "skills/story-short-write/references/workflow-revision.md": (
+            "\\n作者偏好：{",
+        ),
         REPO / "skills/story-deslop/SKILL.md": (
             "query --kind prose_style --book-root",
+            "\\n作者偏好：{",
         ),
         REPO / "skills/story-review/SKILL.md": (
             "query --kind delivery --kind interaction --kind prose_style --book-root",

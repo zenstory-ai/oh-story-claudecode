@@ -65,6 +65,21 @@ class DocBudgetCliTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("预加载了 pre，但没有登记 agent 路径", result.stdout)
 
+    def test_block_list_preload_is_counted_too(self) -> None:
+        agent = "skills/story-setup/references/templates/agents/w.md"
+        result = self.run_checker(
+            {agent: "---\nname: w\nskills:\n  - pre\n---\n正文", "skills/pre/SKILL.md": "预加载"},
+            {"files": [], "paths": []},
+        )
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("预加载了 pre，但没有登记 agent 路径", result.stdout)
+
+    def test_unreadable_preload_form_fails(self) -> None:
+        agent = "skills/story-setup/references/templates/agents/w.md"
+        result = self.run_checker({agent: "---\nname: w\nskills: pre\n---\n正文"}, {"files": [], "paths": []})
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("skills 预加载写法认不出", result.stdout)
+
     def test_fails_when_path_sum_exceeds_budget(self) -> None:
         result = self.run_checker(
             {"a.md": "abc", "b.md": "1234"},

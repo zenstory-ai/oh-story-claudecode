@@ -106,8 +106,13 @@ const preloads = (rel) => {
   const abs = path.join(repoRoot, rel);
   if (!fs.existsSync(abs)) return null;
   const head = fs.readFileSync(abs, "utf8").split(/^---\s*$/m)[1] || "";
-  const match = head.match(/^skills:\s*\[([^\]]*)\]/m);
-  return match ? match[1].split(",").map((s) => s.trim()).filter(Boolean) : [];
+  const inline = head.match(/^skills:[ \t]*\[([^\]]*)\]/m);
+  if (inline) return inline[1].split(",").map((s) => s.trim()).filter(Boolean);
+  const block = head.match(/^skills:[ \t]*\r?\n((?:[ \t]+-[^\n]*\n?)+)/m);
+  if (block) return block[1].split("\n").map((s) => s.replace(/^[ \t]+-[ \t]*/, "").trim()).filter(Boolean);
+  // 读不出的 skills 写法不能当成「没有预加载」放过去。
+  if (/^skills:/m.test(head)) fail.push(`${rel} 的 skills 预加载写法认不出，改成 skills: [a, b] 或逐行 - a`);
+  return [];
 };
 const agentPaths = new Set();
 for (const group of manifest.paths || []) {

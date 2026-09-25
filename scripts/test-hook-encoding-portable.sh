@@ -8,6 +8,7 @@
 #      按 GBK 多字节解码 UTF-8 内容/路径会乱。修法：hook 内 export LC_ALL=C 走字节匹配。
 #
 # 坑 1 随 #243 hook 去掉内嵌 python 已不存在（node 按 UTF-8 写 stdout）。本测试覆盖：
+#   Part 1a：默认区域下长篇/短篇相对路径的拦截与放行（三平台都跑）。
 #   Part 1b/1c：Windows 盘符绝对路径分类（issue #184；1b 任何平台可跑，1c 仅 Windows/MSYS）。
 #   Part 2：在真实 GBK 区域下跑全部 hook，复现坑 2（需系统装有 zh_CN.GBK 类 locale；
 #           macOS 自带，CI ubuntu 由 workflow localedef 生成，Windows Git Bash 若无则跳过）。
@@ -39,8 +40,30 @@ deploy() { # $1 = project root
 echo "Hook encoding portability test (issue #164)"
 echo "==========================================="
 
-# Part 1b/1c 共用的部署工程（1c 自建带追踪 state 的书目录）。
+# Part 1a/1b/1c 共用的部署工程（1c 自建带追踪 state 的书目录）。
 P1="$WORK/p1"; deploy "$P1"
+
+# ===== Part 1a：默认区域下长篇/短篇相对路径（三平台都跑）=====
+# 短篇分支是纯 bash 判断中文路径（[ -f "$BOOK_DIR/设定.md" ]），与 #164/#184 同类；
+# Windows Git Bash 与 macOS bash 3.2 上只有这里会真跑它（部署检查 TS11 只在 ubuntu 跑）。
+echo "--- Part 1a: relative long/short paths in the default locale ---"
+mkdir -p "$P1/book/正文" "$P1/book/大纲" "$P1/book/追踪" "$P1/short"
+# 落一份有效 state，让细纲门成为唯一变量（state 缺失会先被追踪检查点拦下）。
+printf '{"schema_version":4,"state_revision":0,"last_committed_chapter":0}\n' > "$P1/book/追踪/_tracking-state.json"
+printf '> 状态修订：0。\n' > "$P1/book/追踪/上下文.md"
+run_guard_rel() { # $1 file_path -> exit code
+  local ec=0
+  printf '{"tool_name":"Write","tool_input":{"file_path":"%s","content":"x"}}' "$1" \
+    | CLAUDE_PROJECT_DIR="$P1" bash "$P1/.claude/hooks/guard-outline-before-prose.sh" >/dev/null 2>&1 || ec=$?
+  printf '%s' "$ec"
+}
+[ "$(run_guard_rel 'book/正文/第1章_开端.md')" = 2 ] && pass "long blocked, 细纲 missing" || bad "long should block when 细纲 missing"
+: > "$P1/book/大纲/细纲_第1章.md"
+[ "$(run_guard_rel 'book/正文/第1章_开端.md')" = 0 ] && pass "long allowed, 细纲 present" || bad "long should allow when 细纲 present"
+: > "$P1/short/设定.md"
+[ "$(run_guard_rel 'short/正文.md')" = 2 ] && pass "short blocked, 小节大纲 missing" || bad "short should block when 小节大纲 missing"
+: > "$P1/short/小节大纲.md"
+[ "$(run_guard_rel 'short/正文.md')" = 0 ] && pass "short allowed, 小节大纲 present" || bad "short should allow when 小节大纲 present"
 
 # ===== Part 1b：Windows 盘符绝对路径分类（issue #184，任何平台可跑）=====
 # Windows + Git Bash 下 Claude Code 传入盘符绝对路径（F:/... 或 F:\...）。旧 case 只认 /*，
