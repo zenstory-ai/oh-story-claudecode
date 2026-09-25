@@ -217,9 +217,11 @@ def main():
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--history", action="store_true")
     parser.add_argument("--strict", action="store_true", help="新建卷纲校验：缺作用域也视为错误")
-    parser.add_argument("--stage", choices=["outline", "write"], default="outline",
-                        help="outline＝排纲档（带在用批次底稿）；"
-                             "write＝写作档（只要卷级常任＋单元级，底稿一概不给）")
+    # 排纲底稿现在放在卷纲外的 大纲/排纲底稿_{单元ID}.md，默认输出就是写作要的闭包。
+    # --stage outline 只为老卷纲保留：它们的供给自查等底稿还写在卷纲里（作用域：批次底稿）。
+    parser.add_argument("--stage", choices=["outline", "write"], default="write",
+                        help="write（默认）＝卷级常任＋单元级；"
+                             "outline＝另带老卷纲里仍在用的批次底稿段")
     args = parser.parse_args()
 
     if hasattr(sys.stdout, "reconfigure"):

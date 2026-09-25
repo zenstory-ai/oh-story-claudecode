@@ -12,7 +12,7 @@ agent 只查当前端 canonical 目录；Antigravity 用 `.agents/agents/agent-n
 
 缺 `_tracking-state.json` 时先按 workflow-daily「首次初始化」处理，`check` 通过才往下走。
 
-1. **检查细纲**：读 `大纲/细纲_第{N}章.md` 全文，取「单元ID/位置」，跑 `outline_view.py --unit {单元ID} --stage write {卷纲路径}` 取卷契约、全卷常任裁定、当前剧情单元与终局底牌边界——**不整读卷纲**，批次底稿不进写作回路；exit 1 按提示修，不改用整读。细纲缺失或缺必需字段时**先补建再写**：按卷纲补齐阶段位置、结构公式、禁止提前释放、内容概括、情节安排、人物关系/出场顺序、情节细化、结尾设定，无证据的写 `[待补充]`，补完跑 `check-outline-contract.js` 验收。
+1. **检查细纲**：读 `大纲/细纲_第{N}章.md` 全文，取「单元ID/位置」，跑 `outline_view.py --unit {单元ID} {卷纲路径}` 取卷契约、全卷常任裁定、当前剧情单元与终局底牌边界——**不整读卷纲**；exit 1 按提示修，不改用整读。细纲缺失或缺必需字段时**先补建再写**：按卷纲补齐阶段位置、结构公式、禁止提前释放、内容概括、情节安排、人物关系/出场顺序、情节细化、结尾设定，无证据的写 `[待补充]`，补完跑 `check-outline-contract.js` 验收。
 2. **读取上下文**：`tracking_commit.py check`（取 `last_committed_chapter` / `state_revision`，完整 state 不进 prompt）→ `追踪/上下文.md` 全 7 栏 → 细纲点名或出场的 `设定/角色/`、`设定/势力/`、`设定/世界观/` 相关文件。上一章结尾由脚本代读，承接存疑才自己读。久别角色读 `追踪/角色状态/{名}.md`；更旧的信息按 workflow-daily「旧信息查找步骤」定点查。
 3. **写前准备**：
    - **先跑组装脚本**：`{PYTHON} {skill 根}/scripts/build_writer_prompt.py --project {项目根} --chapter {N} --out`。`====` 以上是 prompt、以下是核对报告；退出码 2 ＝数据问题，修完重跑，不手拼绕过。

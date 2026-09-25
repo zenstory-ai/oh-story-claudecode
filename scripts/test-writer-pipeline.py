@@ -72,6 +72,13 @@ class PipelineTests(unittest.TestCase):
                 self.assertNotIn('不能串卡', result.stdout)
                 self.assertEqual(self.view('--check', '--strict').returncode, 0)
 
+    def test_default_view_is_the_writing_closure(self):
+        result = self.view('--unit', 'L1-01')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('本卷不揭示', result.stdout)
+        self.assertNotIn('供给材料', result.stdout)
+        self.assertIn('供给材料', self.view('--unit', 'L1-01', '--stage', 'outline').stdout)
+
     def test_legacy_unit_field(self):
         self.volume.write_text('## 第一单元\n- **单元ID**：L1-01\n旧约束', encoding='utf-8')
         result = self.view('--unit', 'L1-01')
@@ -105,8 +112,11 @@ class PipelineTests(unittest.TestCase):
             for old in ['旧方案', '旧口径', '旧行']:
                 self.assertNotIn(old, current)
         history = self.view('--unit', 'L1-01', '--history').stdout
-        for old in ['旧方案', '旧口径', '旧行']:
+        for old in ['旧口径', '旧行']:
             self.assertIn(old, history)
+        # 老卷纲里的批次底稿只在排纲档出现（默认写作档不带底稿）
+        self.assertNotIn('旧方案', history)
+        self.assertIn('旧方案', self.view('--unit', 'L1-01', '--history', '--stage', 'outline').stdout)
 
     def test_fenced_example_not_a_section_and_blank_scope(self):
         text = self.volume_text().replace('## 卷契约\n', '## 卷契约\n\n\n\n')

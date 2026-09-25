@@ -250,6 +250,13 @@ try {
   const supplyMissing = spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' })
   assert.strictEqual(supplyMissing.status, 1)
   assert.match(JSON.parse(supplyMissing.stdout).evidence, /供给自查/)
+  // 新书：供给自查写在卷纲旁的 排纲底稿_{单元ID}.md，优先于单元卡。
+  fs.writeFileSync(path.join(volumeDir, '排纲底稿_D1-03.md'), '# D1-03 排纲底稿\n\n## 供给自查\n无缺口\n', 'utf8')
+  const supplyDraft = spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' })
+  assert.strictEqual(supplyDraft.status, 0, supplyDraft.stdout + supplyDraft.stderr)
+  assert.match(JSON.parse(supplyDraft.stdout).evidence, /排纲底稿含「供给自查」/)
+  fs.writeFileSync(path.join(volumeDir, '排纲底稿_D1-03.md'), '# D1-03 排纲底稿\n\n## 建纲追加\n无追加\n', 'utf8')
+  assert.strictEqual(spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' }).status, 1)
 
   for (const empty of ['无', '无。', '[待补充]', '；禁：不说破', '']) {
     const body = outline().replace('允许老人当场说出这东西他留了几十年', empty)

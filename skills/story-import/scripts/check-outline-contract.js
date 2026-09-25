@@ -303,8 +303,24 @@ function resolveChapter(project, chapter) {
   return { file: path.join(dir, hit) }
 }
 
-// --supply：批末验证《供给单》已落卷纲——定位单元卡块，确认其中有「供给自查」小节。
+// --supply：批末验证《供给单》已落盘。新书写在卷纲旁的 排纲底稿_{单元ID}.md；老卷纲写在单元卡块内。
+function hasSupplyHeading(text) {
+  return text.split(/\r?\n/).some((line) => {
+    const heading = line.replace(/\*\*/g, '').match(/^#{1,6}\s+(.+)$/)
+    return Boolean(heading) && /^供给自查(?:\s|[（(]|$)/.test(heading[1])
+  })
+}
+
 function verifySupply(volumeFile, unitId) {
+  const draftFile = path.join(path.dirname(volumeFile), `排纲底稿_${unitId}.md`)
+  const draft = readUtf8(draftFile)
+  if (draft.ok) {
+    const ok = hasSupplyHeading(draft.text)
+    return {
+      schema_version: 1, verifier: 'story-long-write.outline-supply', file: path.resolve(draftFile), unit: unitId, ok,
+      evidence: ok ? '排纲底稿含「供给自查」小节' : `${path.basename(draftFile)} 里没有「供给自查」小节——每批出细纲前须产出《供给单》（含「无缺口」情形），见 workflow-setup.md「按剧情批出细纲」步骤 3`,
+    }
+  }
   const read = readUtf8(volumeFile)
   if (!read.ok) {
     return { schema_version: 1, verifier: 'story-long-write.outline-supply', file: path.resolve(volumeFile), unit: unitId, ok: false, evidence: read.error || '卷纲文件为空' }
@@ -345,7 +361,7 @@ function verifySupply(volumeFile, unitId) {
     file: path.resolve(volumeFile),
     unit: unitId,
     ok,
-    evidence: ok ? '单元卡含「供给自查」小节' : `剧情单元 ${unitId} 的卡内没有「供给自查」小节——每批出细纲前须产出《供给单》（含「无缺口」情形），见 workflow-setup.md「按剧情批出细纲」步骤 3`,
+    evidence: ok ? '单元卡含「供给自查」小节' : `没有 排纲底稿_${unitId}.md，剧情单元 ${unitId} 的卡内也没有「供给自查」小节——每批出细纲前须产出《供给单》（含「无缺口」情形），见 workflow-setup.md「按剧情批出细纲」步骤 3`,
   }
 }
 
