@@ -1220,6 +1220,51 @@ def check_project(project: Path) -> dict[str, Any]:
     return state
 
 
+# 事务草稿里各文本字段的字数上限（按全中文估：UTF-8 每字 3 字节），写进提示，免得模型反复试错。
+DRAFT_LIMITS = {
+    "delta.result": 160, "character_changes[].change": 120, "foreshadow_changes[].summary": 120,
+    "timeline_events[].objective_fact / reader_knowledge": 160, "context.position.story_time / scene": 80,
+    "character_snapshots.*.goal / state": 100, "逐章记录总量": 1024,
+}
+
+
+def draft_transaction(project: Path, chapter: int) -> tuple[dict[str, Any], dict[str, Any]]:
+    """按当前 state 预填一份逐章事务：修订号、模式、章名和整份提交的上下文当前值都填好，
+    调用方只写本章变化。另返回在场核心角色的当前快照，供有变化时整份改写后放进事务。"""
+    state = load_state(project)
+    last = state["last_committed_chapter"]
+    require(1 <= chapter <= last + 1, f"draft chapter must be between 1 and {last + 1}")
+    mode = "append" if chapter == last + 1 else "revision"
+    title = ""
+    for outline in sorted((project / "大纲").glob(f"细纲_第{chapter:03d}章*.md")):
+        match = re.search(rf"^#{{1,4}}\s*第\s*0*{chapter}\s*章\s*[：:]\s*(.+?)\s*$",
+                          outline.read_text(encoding="utf-8"), re.M)
+        if match:
+            title = match.group(1).strip()
+            break
+    context = state["context"]
+    delta: dict[str, Any] = {
+        "result": "", "character_changes": [], "foreshadow_changes": [], "timeline_events": [],
+        "constraints": [], "next_chapter_commitments": [],
+    }
+    if mode == "append":
+        delta.update({"retired_context_items": [], "retired_characters": []})
+    document = {
+        "schema_version": INPUT_SCHEMA_VERSION,
+        "mode": mode,
+        "chapter": chapter,
+        "chapter_title": title,
+        "expected_state_revision": state["state_revision"],
+        "delta": delta,
+        "context": {key: context[key] for key in
+                    ("position", "long_term_constraints", "active_character_names", "continuity_risks")},
+        "character_snapshots": {},
+    }
+    snapshots = {name: state["characters"][name] for name in context["active_character_names"]
+                 if name in state["characters"]}
+    return document, snapshots
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -1229,12 +1274,32 @@ def build_parser() -> argparse.ArgumentParser:
         subparser.add_argument("--input", type=Path, required=True, help="UTF-8 JSON input document")
     check_parser = subparsers.add_parser("check")
     check_parser.add_argument("--project", type=Path, required=True, help="book project root containing 追踪/")
+    draft_parser = subparsers.add_parser("draft", help="write a pre-filled chapter transaction to fill in")
+    draft_parser.add_argument("--project", type=Path, required=True, help="book project root containing 追踪/")
+    draft_parser.add_argument("--chapter", type=int, required=True)
+    draft_parser.add_argument("--out", type=Path, help="default: <project>/.story/work/第NNN章/tracking.json")
     return parser
 
 
 def main() -> int:
     args = build_parser().parse_args()
     try:
+        if args.command == "draft":
+            document, snapshots = draft_transaction(args.project, args.chapter)
+            out = args.out or args.project / ".story" / "work" / f"第{args.chapter:03d}章" / "tracking.json"
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(json.dumps(document, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+            emit(json.dumps({
+                "draft": str(out),
+                "mode": document["mode"],
+                "expected_state_revision": document["expected_state_revision"],
+                "fill": "只填 delta 里本章的变化；context 已是当前值，要撤下的长期约束或连贯性风险从 context 删掉并把原文放进 "
+                        "delta.retired_context_items（仅 append）；本章有变化的核心角色把下面的当前快照整份改好放进 character_snapshots，"
+                        "并在 character_changes 写一句变化。不要从脚本源码或 state 文件里另找格式。",
+                "limits_chars": DRAFT_LIMITS,
+                "current_snapshots": snapshots,
+            }, ensure_ascii=False))
+            return 0
         if args.command == "init":
             result = initialize(args.project, read_json(args.input))
         elif args.command == "commit":

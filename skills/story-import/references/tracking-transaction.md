@@ -20,13 +20,15 @@ Markdown 只负责给作者和 Agent 阅读，工具不再反向解析 Markdown�
 ```text
 {PYTHON} {当前 skill 根}/scripts/tracking_commit.py init   --project {书项目根} --input {书项目根}/.story/work/init.json
 {PYTHON} {当前 skill 根}/scripts/tracking_commit.py check  --project {书项目根}
+{PYTHON} {当前 skill 根}/scripts/tracking_commit.py draft  --project {书项目根} --chapter {N}
 {PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter check   --project {书项目根} --chapter {N}
 {PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter commit  --project {书项目根} --chapter {N} --input {书项目根}/.story/work/第{NNN}章/tracking.json
 {PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter accept-current-length --project {书项目根} --chapter {N} --input {书项目根}/.story/work/第{NNN}章/tracking.json
 ```
 
 - `init`：只在 `_tracking-state.json` 不存在时执行，绝不覆盖已初始化项目。
-- `wordcount measure` / `wordcount checkpoint`：纯测量入口；不写正文、不写 tracking、不做语义判断。长篇正文流程一次写完整章，**不在章中调用测量**，长度由 `chapter check` 一次收口；这两个入口供导入、审查等其他场景使用。
+- `draft`：按当前 state 把逐章事务预填到 `.story/work/第NNN章/tracking.json`（修订号、模式、章名、`context` 四项当前值），并输出各文本字段的字数上限与在场核心角色的当前快照；调用方只填 `delta` 与有变化角色的快照。
+- `wordcount measure` / `wordcount checkpoint`：纯测量入口；不写正文、不写 tracking、不做语义判断。长篇正文只在前组写完后由父流程调用一次 `checkpoint`（见 workflow-chapter 步骤 6），整章长度由 `chapter check` 收口。
 - `chapter check`：重新读取当前正文与细纲目标，返回确定性长度状态、现有 blocking quality、`state_revision` 和当前可执行动作，不保存 approval。`under` 不提供自动补写；`over` 额外返回一次净删型 `compress-once` 及进入内带/用户带所需的机器删除区间。
 - `chapter commit`：再次读取当前文件、重新计数并重跑 blocking quality；只接受用户带内章节，把简短字数记录与逐章事务一起原子提交。
 - `chapter accept-current-length`：只接受带外但 quality pass 的章节；接受动作发生时重新读取、重新计数并立即原子提交，不保存可陈旧的历史决议。

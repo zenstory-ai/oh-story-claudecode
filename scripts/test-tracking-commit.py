@@ -479,6 +479,28 @@ class TrackingCommitTests(unittest.TestCase):
         result = self.run_tool("check", expect=2)
         self.assertIn("character snapshot files differ", result.stderr)
 
+    def test_draft_prefills_current_context_so_only_the_delta_is_written(self) -> None:
+        self.init()
+        (self.project / "大纲").mkdir(exist_ok=True)
+        (self.project / "大纲" / "细纲_第001章.md").write_text("### 第 1 章：看片会\n", encoding="utf-8")
+        completed = subprocess.run(
+            [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"],
+            text=True, capture_output=True, check=False, encoding="utf-8")
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        guide = json.loads(completed.stdout)
+        draft_path = Path(guide["draft"])
+        self.assertEqual(draft_path, self.project / ".story/work/第001章/tracking.json")
+        self.assertEqual(guide["mode"], "append")
+        self.assertEqual(guide["limits_chars"]["delta.result"], 160)
+        draft = json.loads(draft_path.read_text(encoding="utf-8"))
+        self.assertEqual(draft["chapter_title"], "看片会")
+        self.assertEqual(draft["expected_state_revision"], self.read_state()["state_revision"])
+        self.assertEqual(draft["context"]["long_term_constraints"],
+                         self.read_state()["context"]["long_term_constraints"])
+        draft["delta"]["result"] = "江晨在看片会上保住了原版。"
+        self.run_tool("commit", draft)
+        self.assertEqual(self.read_state()["last_committed_chapter"], 1)
+
     def test_all_over_length_fields_are_reported_at_once_in_characters(self) -> None:
         self.init()
         document = transaction(1, foreshadow=True)
