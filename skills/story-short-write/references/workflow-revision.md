@@ -2,7 +2,7 @@
 
 本文件中的 `scripts/` 与 `references/` 路径均相对本 skill 根目录。
 
-Phase 3 写手负责内容覆盖与格式自检，不提前执行完整语义去味；该分工须随写作 prompt 传入。Phase 4 的 Gate 检查由一个执行者完成（下方 narrative-writer 或主会话），保留原检查清单、所选 Gate 与内部三遍法；一致性检查职责不变。最终扫描及 delivery 验收由主会话对最终落盘文件执行，修改后只复核改动和重跑受影响检查，不另开整轮去味。
+Phase 3 写手负责内容覆盖与格式自检，不提前执行完整语义去味；该分工须随写作 prompt 传入。Phase 4 的 Gate 检查由一个执行者完成（下方 narrative-writer 或主会话），保留原检查清单与所选 Gate 的改写顺序；一致性检查职责不变。最终扫描及 delivery 验收由主会话对最终落盘文件执行，修改后只复核改动和重跑受影响检查，不另开整轮去味。
 
 加载 `references/writing-workflow.md` 中的精修清单完成检查。
 重点：开头钩子、情绪曲线、反转铺垫、每句话价值、格式规范、AI 腔。文件模式依次运行 `node scripts/check-ai-patterns.js --check --fail-on=blocking 正文.md`、`node scripts/check-outline-copy.js --outline 小节大纲.md 正文.md`、`node scripts/normalize-punctuation.js 正文.md`、`node scripts/check-degeneration.js --check 正文.md`。blocking 或确属细纲照搬先改正文再复扫；其他提示仅作读感复核，功能性写法可保留。

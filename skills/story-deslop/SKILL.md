@@ -85,6 +85,8 @@ AI味不按语法错误处理，也不需要"修正"。它属于风格问题：�
 
 ## 检测流程
 
+去 AI 味只有一条管线：确定性检测器 → 按分级选 Gate → 一次定点改写 → 复扫。长篇写作的章末检测与按需审查、story-review 的确定性预检用的是同一套检测器与 Gate，本 skill 是它的独立入口。
+
 ### Phase 1：AI味扫描
 
 对用户提交的文本做快速扫描，标记AI味浓重的位置。报告写给作者：问题用白话说并附原文，脚本名、检测器类别名、Gate 字母不进报告。
@@ -157,11 +159,7 @@ node scripts/check-ai-patterns.js --check --fail-on=blocking <正文文件...>
 >
 > **综合判定规则**：取六项指标中的最高档位。任一指标达重度即按重度处理；无重度时，中度指标 ≥3 项按中度处理，否则按轻度处理。
 
-加载 [references/anti-ai-writing.md](references/anti-ai-writing.md) 的「系统性去AI三遍法」获取完整流程。三遍法与本 skill 的关系（覆盖关系，不是 1:1 映射）：
-- **Pass 1（去泛化）** 覆盖 Gate A 的禁用词、Gate C 的抽象情绪、Gate D 的工整对仗、Gate E 的同语气对话粗扫、Gate G 的解释腔/上帝视角剧透/软评判
-- **Pass 2（去书面化）** 覆盖 Gate A 中的书面腔词、Gate B 的句式套路深化
-- **Pass 3（回自然感）** 覆盖 Gate D 的长短节奏、Gate E 的对话差异化、Gate F 的结尾去升华、补具体感官细节
-- Gate 范围以用户指定为先，未指定时按上方处理策略表；三遍法仅安排所选 Gate 的执行顺序，不扩大改写范围。
+**改写顺序**（只排所选 Gate 的先后，不扩大范围）：先去泛化与套话（禁用词、抽象情绪、工整对仗、解释腔），再去书面腔，最后回自然节奏、对话差异与结尾落点；做法与范例见 [references/anti-ai-writing.md](references/anti-ai-writing.md)。
 
 ---
 

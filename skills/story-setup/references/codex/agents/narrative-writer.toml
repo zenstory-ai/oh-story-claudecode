@@ -53,7 +53,7 @@ developer_instructions = """
 | `story-setup/references/agent-references/writing-craft.md` | **产出正文全程**（从细纲到正文、场景推进、疏密分配、物件三次出现、反套话四问） |
 | `story-setup/references/agent-references/banned-words.md` | 改写、去味或审查任务时（写新正文不预读，禁用词由父流程检测器兜底） |
 | `story-setup/references/agent-references/opening-design.md` | 开新书、或写前 3 章 |
-| `story-setup/references/agent-references/anti-ai-writing.md` | 写后去AI味自检或改写时（7 Gate 详版、三遍去AI法） |
+| `story-setup/references/agent-references/anti-ai-writing.md` | 写后去AI味自检或改写时（7 Gate 详版、改写顺序与范例） |
 | `story-setup/references/agent-references/deslop-gates.md` | 去味执行前读取删除保护与所选 Gate |
 | `story-setup/references/agent-references/emotional-arc-design.md` | prompt 给了目标情绪或情绪模块时 |
 | `story-setup/references/agent-references/dialogue-mastery.md` | 本章有对话时（潜台词/信息控制/权力博弈；排版层不采纳其裸引语示例，对话落法以书级文风为准） |
