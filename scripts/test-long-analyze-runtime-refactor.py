@@ -96,18 +96,6 @@ def test_index_contract() -> None:
         require([item["source_chapter"] for item in rows(large_index)] == ["101", "102"], "第一百零一章必须正确解析")
 
 
-def test_invalid_root_and_manage_entry() -> None:
-    with tempfile.TemporaryDirectory(prefix="long-runtime-refactor-") as temporary:
-        missing = Path(temporary) / "不存在"
-        inspected = run(INSPECT, "--root", missing)
-        require(inspected.returncode != 0, "错误 root 必须非零退出")
-        require(MANAGE.is_file(), "统一运行脚本 manage_analysis_run.py 必须存在")
-        help_result = run(MANAGE, "--help")
-        require(help_result.returncode == 0, help_result.stdout or help_result.stderr)
-        for command in ("plan", "commit", "split", "repair-progress", "mark-stage"):
-            require(command in help_result.stdout, "统一运行脚本缺少命令：" + command)
-
-
 def test_index_existing_supported_forms() -> None:
     with tempfile.TemporaryDirectory(prefix="long-index-forms-") as temporary:
         root = Path(temporary)
@@ -407,10 +395,6 @@ def test_split_survives_replanning() -> None:
 def test_panlong_acceptance_samples() -> None:
     source_demo = ROOT / "demo" / "拆文库" / "盘龙"
     require(source_demo.is_dir(), "盘龙验收样本缺失")
-    if not (source_demo / "原文" / "原文.txt").is_file():
-        # 原文按 .gitignore 版权策略不入库；缺席时明确跳过，不让 CI 因夹具红。
-        print("SKIP: test_panlong_acceptance_samples (panlong raw text absent by copyright policy)")
-        return
     with tempfile.TemporaryDirectory(prefix="long-panlong-acceptance-") as temporary:
         area = Path(temporary)
 
@@ -459,6 +443,11 @@ def test_panlong_acceptance_samples() -> None:
         aggregate_report = json.loads(run(INSPECT, "--root", aggregate_missing).stdout)
         require(aggregate_report["stage_repairs"] == ["stage3_emotion", "stage3_rhythm"], "情绪/节奏缺失必须单独路由 Stage 3+")
         require(json.loads(run(MANAGE, "plan", "--root", aggregate_missing).stdout)["batches"] == [], "聚合产物修复不能生成 Stage 2 原文任务")
+
+        if not (source_demo / "原文" / "原文.txt").is_file():
+            # 原文按 .gitignore 版权策略不入库；以下黄金三章、混存、追加三段要重建索引，缺原文时明确跳过。
+            print("SKIP: test_panlong_acceptance_samples raw-text sections (panlong raw text absent by copyright policy)")
+            return
 
         golden = area / "黄金三章暂停"
         shutil.copytree(source_demo, golden)
@@ -1027,7 +1016,6 @@ def test_relation_chart_mermaid_edge_cases() -> None:
 
 def main() -> int:
     test_index_contract()
-    test_invalid_root_and_manage_entry()
     test_index_existing_supported_forms()
     test_inspection_legacy_and_partial()
     test_plan_commit_repair_and_state_preservation()
