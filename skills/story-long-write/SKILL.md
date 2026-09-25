@@ -17,7 +17,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 1. 规划/开书/补纲先完整读取 `references/workflow-setup.md`；写指定章读取 `references/workflow-chapter.md`；日更/大修先读取 `references/workflow-daily.md` 或 `references/workflow-revision.md`，进入正文前再完整读取 `workflow-chapter.md`。
 2. 主会话直接写正文时，首次落笔前完整读取 `references/long-format.md`、`references/writing-craft.md`、`references/long-chapter-quality.md`、`references/long-chapter-hooks.md`；交给 narrative-writer 时，由该 agent 按自己的 reference 表完成同等写前读取，主会话不得用未读 reference 的临时 prompt 替代。
 3. 悬疑、惊悚、异常线索章加读 `references/long-suspense.md`；身份/认知/立场反转章加读 `references/long-reversal.md`。
-4. 正文写前，references 读完后立即重读当前用户请求、本章细纲和卷纲，在上下文内建立 **Constraint Lock**：原样记录用户明确字数范围、必发生、禁止发生、精确时间锚与本章停笔点、章尾新债。references 只提供技法，不得覆盖这些项目事实；用户明确范围优先于自动 ± 比例带。交付前逐项复核：字数带外按 `workflow-chapter.md` 的收口流程交用户处置，不自动补字；其余项越界不算完成。
+4. 正文写前，references 读完后立即重读当前用户请求、本章细纲和卷纲，先在上下文里**记下本轮约束**：原样记录用户明确字数范围、必发生、禁止发生、精确时间锚与本章停笔点、章尾新债。references 只提供技法，不得覆盖这些项目事实；用户明确范围优先于自动 ± 比例带。交付前逐项复核：字数带外按 `workflow-chapter.md` 的收口流程交用户处置，不自动补字；其余项越界不算完成。
 
 任一必需路径不存在、不可读或未读完时立即停止，报告准确路径，**不得先写正文再补读**。门禁按当前任务、当前会话重新执行；旧会话的“读过”不能沿用。
 
@@ -92,7 +92,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ### 面向作者的汇报
 
-所有给作者看的汇报、提问和停下说明只讲三件事：写了/改了什么（章名、发生了什么）；要作者定的事（一句白话问题＋白话选项＋推荐默认）；下一步。不写脚本、字段、参数名、状态码和内部清单名（如 Constraint Lock、安全七检、供给自查、S1-S4、内带/用户带）；编号必带故事标签，如「伏笔 F057（那封信的去处）」。检查结果一句白话带过，如「自查过设定和前文，没发现冲突」。回执、Notice、Fallback 等机器行放末尾一行。汇报照各 workflow 的模板写，不带代码块围栏；子 agent 返回的术语由主会话翻译后再说。
+所有给作者看的汇报、提问和停下说明只讲三件事：写了/改了什么（章名、发生了什么）；要作者定的事（一句白话问题＋白话选项＋推荐默认）；下一步。不写脚本、字段、参数名、状态码和内部清单名（如 安全七检、供给自查、S1-S4、字数带）；编号必带故事标签，如「伏笔 F057（那封信的去处）」。检查结果一句白话带过，如「自查过设定和前文，没发现冲突」。回执、Notice、Fallback 等机器行放末尾一行。汇报照各 workflow 的模板写，不带代码块围栏；子 agent 返回的术语由主会话翻译后再说。
 
 ### 路径与术语约定
 

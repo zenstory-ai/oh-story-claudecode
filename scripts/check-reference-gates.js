@@ -35,7 +35,7 @@ for (const reference of [
   assert(long.includes(reference), `long gate must route ${reference}`)
 }
 assert.match(long, /不得先写正文再补读/)
-assert.match(long, /Constraint Lock/)
+assert.match(long, /记下本轮约束/)
 assert.match(long, /references 只提供技法，不得覆盖这些项目事实/)
 
 const short = readSkill('story-short-write')

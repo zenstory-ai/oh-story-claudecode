@@ -88,7 +88,7 @@ agent 只查当前端 canonical 目录；Antigravity 用 `.agents/agents/agent-n
 
 ## 字数测量权威
 
-细纲 `字数目标` + `visible_chars_v1`：内带 ±12%，用户带 ±15%；**用户本轮明确给出上下限时原样优先**。缺目标即 `invalid`。带内提交，`under` 不补，`over` 最多净删一次；仍带外由作者接受、改目标/细纲或放弃。
+细纲 `字数目标` + `visible_chars_v1`，默认范围 ±15%（`internal_pass`、`borderline` 都算在内）；**用户本轮明确给出上下限时原样优先**。缺目标即 `invalid`。带内提交，`under` 不补，`over` 最多净删一次；仍带外由作者接受、改目标/细纲或放弃。
 
 ---
 
