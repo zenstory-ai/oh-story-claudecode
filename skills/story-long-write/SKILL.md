@@ -146,7 +146,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 #### 单章写作流程
 
-**执行前先读 [references/workflow-chapter.md](references/workflow-chapter.md)**，按其中的单章写作流程（步骤 1-13）、写作技巧提醒、字数测量权威与质量检查执行。日更批量另加载 `references/workflow-daily.md` 控制批次。
+**执行前先读 [references/workflow-chapter.md](references/workflow-chapter.md)**，按其中的单章写作流程（步骤 1-13）、字数测量权威与质量检查执行。日更批量另加载 `references/workflow-daily.md` 控制批次。
 
 #### 追踪文件体积
 

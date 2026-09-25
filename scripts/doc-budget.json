@@ -17,13 +17,13 @@
     },
     {
       "path": "skills/story-long-write/references/workflow-daily.md",
-      "budget": 12250,
-      "why": "日更每次会话加载，且与 SKILL.md 叠加。+190：卷纲读取全部改走取段器（不整读）；批末「本章没写成的」按被挡原因四路分流（补纲扩产候选/分辨率与准入参考/当章查设定/并入三档处置），原「想要没拿到」单路汇集升级——不分流，四类输入会在下一批排纲时混作一团各自失效＋112：批末供给反馈汇集——把各章写手申报的「想要没拿到」汇成下一批供给自查的固定输入，补上正文→排纲的向上反馈通道。 调高：批末汇报改为白话模板（不再报漂移/供给反馈等内部词），「继续写」规划后一句话确认，事务 JSON 落工作目录。"
+      "budget": 5300,
+      "why": "日更每次会话加载，且与 SKILL.md 叠加。+190：卷纲读取全部改走取段器（不整读）；批末「本章没写成的」按被挡原因四路分流（补纲扩产候选/分辨率与准入参考/当章查设定/并入三档处置），原「想要没拿到」单路汇集升级——不分流，四类输入会在下一批排纲时混作一团各自失效＋112：批末供给反馈汇集——把各章写手申报的「想要没拿到」汇成下一批供给自查的固定输入，补上正文→排纲的向上反馈通道。 调高：批末汇报改为白话模板（不再报漂移/供给反馈等内部词），「继续写」规划后一句话确认，事务 JSON 落工作目录。 v0.8 收紧：单章/日更工作流改为短手册（组装脚本代查作者记忆、追踪事务 draft 预填、收尾检测一次调用），锁住精简。"
     },
     {
       "path": "skills/story-long-write/references/workflow-chapter.md",
-      "budget": 13400,
-      "why": "每章组装与质量流程；原 (a)-(g) 迁入 benchmark-recall，合计路径继续计入。 调高：新增「向作者汇报」四个白话模板（写完一章／字数不在范围／新增内容要拍板／停下）与书内工作目录 .story/work/ 约定；原先字数问法直接把 storyctl 动作名交给作者，临时文件无落点导致 /tmp 撞车和正文目录污染。"
+      "budget": 7050,
+      "why": "每章组装与质量流程；原 (a)-(g) 迁入 benchmark-recall，合计路径继续计入。 调高：新增「向作者汇报」四个白话模板（写完一章／字数不在范围／新增内容要拍板／停下）与书内工作目录 .story/work/ 约定；原先字数问法直接把 storyctl 动作名交给作者，临时文件无落点导致 /tmp 撞车和正文目录污染。 v0.8 收紧：单章/日更工作流改为短手册（组装脚本代查作者记忆、追踪事务 draft 预填、收尾检测一次调用），锁住精简。"
     },
     {
       "path": "skills/story-long-write/references/workflow-setup.md",
@@ -224,7 +224,7 @@
   "paths": [
     {
       "label": "长篇日更主会话",
-      "budget": 45500,
+      "budget": 32250,
       "files": [
         "skills/story-long-write/SKILL.md",
         "skills/story-long-write/references/workflow-daily.md",
@@ -234,7 +234,7 @@
         "skills/story-long-write/references/reference-index.md",
         "skills/story-long-write/references/benchmark-recall.md"
       ],
-      "why": " 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。 作者汇报白话模板与书内工作目录约定（2026-09-24）按实际增量显式调高，理由同 SKILL.md 与 workflow-chapter/daily/setup/revision 各自条目。"
+      "why": " 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。 作者汇报白话模板与书内工作目录约定（2026-09-24）按实际增量显式调高，理由同 SKILL.md 与 workflow-chapter/daily/setup/revision 各自条目。 v0.8 收紧：单章/日更工作流改为短手册（组装脚本代查作者记忆、追踪事务 draft 预填、收尾检测一次调用），锁住精简。"
     },
     {
       "label": "长篇开书",
@@ -282,26 +282,26 @@
       "branches": [
         {
           "label": "基础",
-          "budget": 76700,
+          "budget": 70400,
           "files": []
         },
         {
           "label": "悬疑",
-          "budget": 82300,
+          "budget": 75950,
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ]
         },
         {
           "label": "反转",
-          "budget": 82450,
+          "budget": 76150,
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ]
         },
         {
           "label": "悬疑+反转",
-          "budget": 88050,
+          "budget": 81700,
           "files": [
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
@@ -332,26 +332,26 @@
       "branches": [
         {
           "label": "基础",
-          "budget": 88900,
+          "budget": 75650,
           "files": []
         },
         {
           "label": "悬疑",
-          "budget": 94450,
+          "budget": 81250,
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ]
         },
         {
           "label": "反转",
-          "budget": 94650,
+          "budget": 81400,
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ]
         },
         {
           "label": "悬疑+反转",
-          "budget": 100200,
+          "budget": 87000,
           "files": [
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
@@ -565,21 +565,21 @@
         {
           "label": "基础",
           "files": [],
-          "budget": 79750
+          "budget": 73450
         },
         {
           "label": "悬疑",
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ],
-          "budget": 85300
+          "budget": 79000
         },
         {
           "label": "反转",
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ],
-          "budget": 85500
+          "budget": 79200
         },
         {
           "label": "悬疑+反转",
@@ -587,7 +587,7 @@
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
           ],
-          "budget": 91050
+          "budget": 84750
         }
       ],
       "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。 作者汇报白话模板与书内工作目录约定（2026-09-24）按实际增量显式调高，理由同 SKILL.md 与 workflow-chapter/daily/setup/revision 各自条目。"
@@ -615,21 +615,21 @@
         {
           "label": "基础",
           "files": [],
-          "budget": 91500
+          "budget": 85200
         },
         {
           "label": "悬疑",
           "files": [
             "skills/story-long-write/references/long-suspense.md"
           ],
-          "budget": 97050
+          "budget": 90750
         },
         {
           "label": "反转",
           "files": [
             "skills/story-long-write/references/long-reversal.md"
           ],
-          "budget": 97250
+          "budget": 90950
         },
         {
           "label": "悬疑+反转",
@@ -637,7 +637,7 @@
             "skills/story-long-write/references/long-suspense.md",
             "skills/story-long-write/references/long-reversal.md"
           ],
-          "budget": 102850
+          "budget": 96500
         }
       ],
       "why": "包含 workflow-chapter 的状态速记、契约校准与 Phase 5 fallback 必读项。 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +900：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。 作者汇报白话模板与书内工作目录约定（2026-09-24）按实际增量显式调高，理由同 SKILL.md 与 workflow-chapter/daily/setup/revision 各自条目。"
