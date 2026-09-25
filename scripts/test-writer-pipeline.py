@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """公开 CLI 回归：取段闭包、存量卷纲、组装与召回降档。"""
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -124,6 +125,25 @@ class PipelineTests(unittest.TestCase):
         self.assertNotIn('不能串卡', prompt)
         self.assertIn('召回降档：成立', result.stdout)
         self.assertNotIn('以上是 prompt 正文', prompt)
+
+    def test_builder_injects_author_memory_query(self):
+        result = self.build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('author_preferences（作者记忆', result.stdout)
+        self.assertIn('作者记忆：无相关 active 条目', result.stdout)
+        (self.book / '.story-deployed').write_text('agents_version: 31\n', encoding='utf-8')
+        event = {'schema_version': 1, 'event_id': 'e1', 'operation': {'action': 'remember', 'preference': {
+            'kind': 'prose_style', 'scope': {'level': 'global', 'value': None}, 'assertion': '对话一律用直角引号',
+            'quote': '对话一律用「」', 'source_ref': 'test', 'source': 'explicit_user', 'confidence': 'high',
+            'importance': 'high', 'status': 'active', 'reason': '作者明确要求', 'conflicts_with': [],
+            }}}
+        memory_input = Path(self.tmp.name) / 'memory.json'
+        memory_input.write_text(json.dumps(event, ensure_ascii=False), encoding='utf-8')
+        recorded = self.call('author_memory_commit.py', 'record', '--workspace', self.book, '--input', memory_input)
+        self.assertEqual(recorded.returncode, 0, recorded.stdout + recorded.stderr)
+        result = self.build()
+        self.assertIn('- 对话一律用直角引号（AP001）', result.stdout)
+        self.assertIn('作者记忆：已注入 1 条', result.stdout)
 
     def test_bare_out_archives_into_book_work_dir(self):
         result = self.call('build_writer_prompt.py', '--project', self.book, '--chapter', 1, '--out')

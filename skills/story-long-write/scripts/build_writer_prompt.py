@@ -15,8 +15,9 @@
 职责边界:
 - 脚本做确定性部分：固定首行、定位、标题行字面量、细纲指针、文风全文路径与裁决、
   上一章结尾、降档判定与情绪/节奏槽、固定块指针。
+- 脚本代查作者记忆（prose_style + story_design）并填好 author_preferences。
 - 主会话填八槽：执行安排 / 本章意图 / 参考技法 / 本节速记 / 涉及角色 / genre_prose_card /
-  必读设定 / author_preferences。降档不成立时情绪与节奏槽也归主会话。
+  必读设定 / style_resolution。降档不成立时情绪与节奏槽也归主会话。
   材料槽对应原流程步骤 3「写前准备」的四项输出（本节速记 / 情绪目标 / 涉及角色 /
   参考技法）加上题材卡、设定补漏与作者偏好——都是判断，脚本做不了。
 - 续写状态卡校验后由主会话筛选，在「本节速记」槽内写入本章需要的状态。
@@ -28,7 +29,9 @@ Exit: 0 = 骨架已输出；2 = 输入缺失或无效。
 
 import argparse
 import io
+import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 from outline_view import parse as parse_volume
@@ -135,6 +138,29 @@ def previous_chapter_tail(project: Path, chapter: int):
         if total >= TAIL_CHARS:
             break
     return prev, "\n".join(reversed(picked))
+
+
+def query_author_memory(project: Path):
+    """代主会话做写正文那一次作者记忆查询（prose_style + story_design，≤2KB）。
+
+    工作区取书目录及其祖先里第一个带 `.story-deployed` 的目录；找不到就把书目录当工作区。
+    返回 (条目列表, 超编 ID 列表, 错误)；错误时由主会话按 author-memory.md 手动查询。
+    """
+    workspace = next((d for d in (project, *project.parents) if (d / ".story-deployed").is_file()), project)
+    script = Path(__file__).with_name("author_memory_commit.py")
+    if not script.is_file():
+        return None, [], "author_memory_commit.py 缺失"
+    completed = subprocess.run(
+        [sys.executable, str(script), "query", "--workspace", str(workspace), "--book-root", str(project),
+         "--kind", "prose_style", "--kind", "story_design"],
+        capture_output=True, text=True, encoding="utf-8", check=False)
+    try:
+        result = json.loads(completed.stdout or "{}")
+    except ValueError:
+        result = {}
+    if not result.get("ok"):
+        return None, [], result.get("error") or completed.stderr.strip() or "query 失败"
+    return result.get("items") or [], result.get("omitted_ids") or [], None
 
 
 def learn_heading_form(project: Path, chapter: int, title: str):
@@ -343,9 +369,22 @@ def build(project: Path, chapter: int, report: list):
     parts.append("——— 题材正文提示卡（genre_prose_card，只含本章相关条目）———\n"
                  f"{SLOT_MARK} 主题材抽 3-5 条、辅题材 1-2 条；只作内部校准，不进正文")
     parts.append(slot_setting)
-    parts.append("——— style_resolution / author_preferences ———\n"
-                 f"{SLOT_MARK} author_memory query 命中本章的 prose_style/story_design 项；"
-                 "query 显式传本书/题材/流程；偏好是低优先级倾向，无则写「无」。附 style_resolution：生效要求及来源、被覆盖的默认条款和事实边界；同一裁决传去味与审稿，不逐条追求命中。")
+    items, omitted, memory_error = query_author_memory(project)
+    if memory_error:
+        memory_block = (f"{SLOT_MARK} 组装脚本查询作者记忆失败（{memory_error}），"
+                        "按 author-memory.md 手动 query prose_style + story_design 后填入；无则写「无」")
+        report.append(f"作者记忆：脚本查询失败——{memory_error}，归主会话手动查询")
+    elif items:
+        memory_block = "\n".join(f"- {item.get('assertion', '').strip()}（{item.get('id', '')}）" for item in items)
+        report.append(f"作者记忆：已注入 {len(items)} 条" + (
+            f"；超编未装下 {len(omitted)} 条（{'、'.join(omitted)}），转告作者建议「整理作者记忆」" if omitted else ""))
+    else:
+        memory_block = "无"
+        report.append("作者记忆：无相关 active 条目")
+    parts.append("——— author_preferences（作者记忆，低优先级倾向，不逐条追求命中）———\n" + memory_block)
+    parts.append("——— style_resolution ———\n"
+                 f"{SLOT_MARK} 本轮请求里作者对表达的明确要求及其覆盖的默认条款（没有写「无」）；"
+                 "本书文风与作者记忆的裁决见上方各块，同一裁决传去味与审稿。")
 
     parts.append("检查分工：写手负责编排、内容覆盖和格式自检；父流程质量阶段负责语义去味及最终文件扫描。写手不提前重复整轮去味或相同检查链，保留时空表、新增申报与原定交付。")
 
