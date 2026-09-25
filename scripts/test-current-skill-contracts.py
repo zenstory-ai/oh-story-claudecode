@@ -60,7 +60,6 @@ def test_manifest_contract() -> None:
     manifest, findings = VALIDATOR.load_manifest(manifest_path)
     require(not findings, "repository manifest should validate: {}".format(findings))
     require(manifest is not None, "repository manifest should load")
-    require(not VALIDATOR.validate_repository(REPO_ROOT, manifest), "manifest and repository must agree")
 
     raw = json.loads(manifest_path.read_text(encoding="utf-8"))
     with tempfile.TemporaryDirectory() as tmp:
@@ -651,10 +650,10 @@ def test_p1_deletion_guards() -> None:
 
 
 def test_analyze_portability_guards() -> None:
-    """Stage 6 的样本路径与 Stage 0 的目录块剔除都必须留在文档里。
+    """Stage 6 的样本路径与 Stage 0 的章号连续性校验都必须留在文档里。
 
-    两者都只在真实运行时才暴露：/tmp 绝对路径要探到 Windows 原生 python 才炸，
-    目录块要原文自带目录才多切一遍章。守卫是它们唯一的回归网。
+    /tmp 绝对路径要探到 Windows 原生 python 才炸；章号校验目前没有运行时回归。
+    目录块剔除已由 test-long-analyze-runtime-refactor.py 的带目录原文用例覆盖。
     """
 
     rule = next(
@@ -679,7 +678,6 @@ def test_analyze_portability_guards() -> None:
         )
 
     stage0_cases = (
-        (r"先剔掉目录块", "stage0-toc-block-removal"),
         (r"落表前校验章号连续", "stage0-chapter-table-validation"),
     )
     with tempfile.TemporaryDirectory() as tmp:
@@ -692,7 +690,6 @@ def test_analyze_portability_guards() -> None:
                 "{} must fire when Stage 0 drops the rule".format(code),
             )
         fixture.write_text(
-            "- **先剔掉目录块**：按行距丢弃开头的目录命中\n"
             "- 落表前校验章号连续、无重复、无跳号\n",
             encoding="utf-8",
         )

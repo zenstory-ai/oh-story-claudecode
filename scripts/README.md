@@ -15,7 +15,7 @@
 
 | 脚本 | 检查什么 | 何时跑 |
 |---|---|---|
-| `static-check.sh` + `static-check.py` | 结构化验证 frontmatter、Markdown 路径/锚点、Agent 引用、references 可达性；除基础组件 `browser-cdp` 外禁止跨 Skill 文件引用；`author-report` 作者汇报模板不得含工程词 | CI |
+| `static-check.sh` + `static-check.py` | 结构化验证 frontmatter、Markdown 路径/锚点、Agent 引用、references 可达性；除基础组件 `browser-cdp` 外禁止跨 Skill 文件引用 | CI |
 | `skill-numbering.py check` | 工作流 Step/Phase/Stage 编号策略、引用绑定、SKILL.md 裸编号/子步骤小数守卫 | CI；改工作流结构后 |
 | `check-current-skill-contracts.sh` + `.py` + `current-contract.json` | 从结构化 manifest 校验当前版本、Phase、schema、主产物与细纲契约；保留 legacy/path 守卫并拦截缺主产物后的静默替代 | CI |
 | `check-shared-files.sh` | 调两个显式 manifest 验 runtime/reference 副本，拦截未声明 exact/near-copy，并检查 setup profile 契约与消费可达性 | CI |
@@ -29,7 +29,7 @@
 | `check-hook-locale-safety.sh` | 部署 hook 在 Windows 中文 GBK 区域的字节安全 | CI |
 | `check-python-invocation.sh` | 技能文档禁止裸调 `python3`（须 python3→python→py 探测） | CI |
 | `check-agent-notes.py` + `test-agent-notes.py` | `.agents/notes/` 决策笔记的目录布局（状态/分类/日期文件名）、`Status` 与目录一致、必需小节（Problem / Decision 或 Proposal / Alternatives considered / Consequences）、禁止手工索引；test 用临时目录逐类违规回归 | CI；新增或移动笔记后 |
-| `check-author-reports.py` | `<!-- author-report -->` 标记的作者报告模板里不许出现工程黑话：内部字段/状态名、脚本名、flag、snake/kebab 标识符、S1–S4、Gate、裸编号；块尾一行「技术备注：」豁免；`--self-test` 自带正反例 | CI；改报告模板后 |
+| `check-author-reports.py` | `<!-- author-report -->` 标记的作者报告模板里不许出现工程黑话：内部字段/状态名、脚本名、flag、snake/kebab 标识符、S1–S4、Gate、裸编号；块尾一行「技术备注：」豁免；登记文件（含长篇规划/单章/日更/大修模板）的报告块不得少于登记数量；`--self-test` 自带正反例 | CI；改报告模板后 |
 | `check-plugin-packaging.py` | Claude/ZCode 两个 catalog 与两个原生 manifest 的单 bundle 身份、版本、默认组件发现和 13 个根 Skills | CI；改 plugin packaging 后 |
 | `check-claude-adapter.sh` | Claude marketplace、根 plugin manifest 与 13 个 skill 自动发现；可选真实 CLI 生命周期 | CI（静态）；`CLAUDE_REAL_CHECK=1`（真实 CLI） |
 | `check-opencode-adapter.sh` | OpenCode 2.x 适配层同步 + commands/agents 结构 + 生成权限的 2.x 裁决矩阵 + plugin 行为回归 | CI + sync CI（调 sync-opencode.py） |
@@ -50,10 +50,10 @@
 | `test-phase2-contract.js` | 短篇 Phase 2 verifier 行为回归：设计字段、12 列大纲、字数区间、具名失败与 repair_scope | Linux / Windows / macOS CI |
 | `test-doc-budget.py` | 临时文档工程中的路径求和、超限和缺失文件失败 | CI |
 | `test-delivery-contract.js` | 短篇最终字数、节数、标记与空行交付契约回归 | Linux / Windows / macOS CI |
-| `check-reference-gates.js` | 长短篇 Reference Gate 的首屏位置、完整读取语义与关键路由静态守卫（gate 是提示词，无运行时入口可断言） | Linux / Windows / macOS CI |
+| `check-reference-gates.js` | 长短篇 Reference Gate 的首屏位置、关键路由、Constraint Lock 与短篇交付预检命令的静态守卫（gate 是提示词，无运行时入口可断言） | Linux / Windows / macOS CI |
 | `test-outline-contract.js` | 长篇细纲结构验收：字段、小节、五段式、四列情节点表与字数口径的正负例回归 | Linux / Windows / macOS CI |
 | `test-degeneration.sh` | 模型退化检测器 `check-degeneration.js` 回归 | CI |
-| `test-prose-net-parity.sh` | 正文兜底「轻量确定性网」Claude/OpenCode/Codex/ZCode parity | CI（调 check-hook-regex-sync） |
+| `test-prose-net-parity.sh` | 正文兜底「轻量确定性网」、写正文守卫与命令目标抽取的 JS 核 / Codex Python / Claude bash parity | CI |
 | `test-prose-backstop-hook.sh` | `check-prose-after-write.sh` 回归 | CI |
 | `test-story-continuity.sh` | `detect-story-gaps.sh` 跨批连续性兜底回归 | CI |
 | `test-tracking-commit.py` | 单权威追踪行为：原子 state、字数事件链、hash 失效、激活边界、幂等与并发提交 | CI |
@@ -61,7 +61,7 @@
 | `test-chapter-completion-lifecycle.py` | 公开 CLI 的 checkpoint、正常提交、欠长接受、超长单次压缩区间、blocking quality 阻断与下一章继续 | Linux / Windows / macOS CI |
 | `test-author-memory-commit.py` | 工作区作者记忆行为：单事件回执、≤2KB 相关查询、证据候选、冲突替代、撤回、失败零写入、旧修订、幂等重放与派生修复 | CI |
 | `test-codex-hooks.sh` | Codex hook 合成 stdin/stdout 契约 | CI |
-| `test-static-check.py` | 真 frontmatter block、精确路径/锚点、跨 Skill 引用、fence、死 reference、Agent 与章节链接 fixture；作者汇报模板工程词守卫及长篇模板在位 | CI |
+| `test-static-check.py` | 真 frontmatter block、精确路径/锚点、跨 Skill 引用、fence、死 reference、Agent 与章节链接 fixture | CI |
 | `test-current-skill-contracts.py` | current-contract manifest 类型/固定值与主产物 fail-fast 语义 fixture | CI |
 | `test-plugin-packaging.py` | 执行公开 packaging CLI，在临时仓库中变异 catalog/manifest/版本/组件过滤并断言结构化失败 | CI |
 | `test-claude-plugin-lifecycle.py` | 隔离 HOME 后用真实 Claude CLI 演练 13 个旧身份迁移为单 bundle、更新/卸载及无关插件保留 | `CLAUDE_REAL_CHECK=1`，由 `check-claude-adapter.sh` 调用 |

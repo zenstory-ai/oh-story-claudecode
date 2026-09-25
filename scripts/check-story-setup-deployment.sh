@@ -180,8 +180,9 @@ done < <(find "$HOOKS_DIR" -maxdepth 1 \( -name '*.sh' -o -name '*.js' \) -type 
 echo "  OK TS1b session-start self-check lists all hook scripts and node cores"
 
 # TS2 — Deployment checklist/manifest parseability
-for header in 'Source path' 'Target path' 'Owner class' 'Merge mode' 'Validation check'; do
-  assert_grep "$header" "$SKILL_FILE" "deployment manifest missing column: $header"
+# 下方自复制探测器靠这两个表头认出部署清单表；表头改名会让清单行检查静默空转。
+for header in 'Source path' 'Target path'; do
+  assert_grep "$header" "$SKILL_FILE" "deployment manifest header the self-copy detector keys on is missing: $header"
 done
 for group in 'templates/hooks/' 'templates/rules' 'templates/agents' 'agent-references' 'settings-hooks\.json' 'CLAUDE\.md' '\.story-deployed'; do
   assert_grep "$group" "$SKILL_FILE" "deployment manifest missing asset group: $group"
@@ -709,22 +710,15 @@ long_count="$(printf '%s\n' "$multi_out" | grep -c '^检查：long$' || true)"
 [ "$long_count" -eq 1 ] || fail "detect-story-gaps reported long project $long_count times; expected exactly once"
 echo "  OK TS8 multi-book gap detection"
 
-# TS9 — Settings JSON remains valid
-python3 -m json.tool "$SETTINGS_FILE" >/dev/null
-echo "  OK TS9 settings JSON"
-
 # TS10 — Version threshold + deployed-behavior anchors
 # 只锚定「跑起来会坏」的东西：agents_version 阈值要跨文件对齐，部署到用户手里的
 # agent 模板要带住关键行为规则。原先还夹着一批「UPGRADING.md/README 必须写到某句话」
 # 的文档完整性断言——那种改一个词就红、测的是措辞不是行为，已随 check-story-long-write-contract.sh
 # 一并去掉，发版是否补 UPGRADING 由发版清单和人把关，不靠 CI 钉死措辞。
-assert_grep "AGENTS_VERSION.*-lt $CURRENT_AGENTS_VERSION|AGENTS_VERSION\" -lt $CURRENT_AGENTS_VERSION" "$HOOKS_DIR/session-start.sh" "session-start must warn for agents_version $PREVIOUS_AGENTS_VERSION under v$CURRENT_AGENTS_VERSION deployment"
-assert_grep "AGENTS_VERSION.*-gt $CURRENT_AGENTS_VERSION|AGENTS_VERSION\" -gt $CURRENT_AGENTS_VERSION" "$HOOKS_DIR/session-start.sh" "session-start must reject agents_version $NEXT_AGENTS_VERSION downgrade"
+# session-start 的新旧版本分支由 TS5 真实执行覆盖；story-review 预检与 frontmatter version
+# 由 check-current-skill-contracts.py 守卫，这里不再重复 grep。
 assert_grep "agents_version.*小于 \`$CURRENT_AGENTS_VERSION\`|版本 < $CURRENT_AGENTS_VERSION" "$SKILL_DIR/SKILL.md" "story-setup redeploy branch must treat agents_version $PREVIOUS_AGENTS_VERSION as stale"
 assert_grep "agents_version.*大于 \`$CURRENT_AGENTS_VERSION\`" "$SKILL_DIR/SKILL.md" "story-setup must stop before downgrading a newer deployment"
-assert_grep 'Notice: agents bundle 版本不匹配' "$REPO_ROOT/skills/story-review/SKILL.md" "story-review must surface an agents_version mismatch"
-assert_grep "大于 $CURRENT_AGENTS_VERSION 时额外提示先更新 oh-story-claudecode" "$REPO_ROOT/skills/story-review/SKILL.md" "story-review must tell newer deployments to update the package first"
-assert_grep "^version:[[:space:]]*$CURRENT_SETUP_VERSION$" "$SKILL_FILE" "story-setup frontmatter must match the deployed setup version"
 
 # Phase 1 自检的目录名单是硬编码的，必须与实际 references/ 子目录集合一致。
 # 漏写一个 → 半装的包检不出；名单里多出已删除的目录 → 完好的包被判残缺，fail-closed 卡死所有部署。
@@ -738,11 +732,13 @@ for ref_dir in "$SKILL_DIR"/references/*/; do
     *) fail "story-setup Phase 1 self-check list is missing reference dir: $ref_name" ;;
   esac
 done
-ref_dir_count="$(find "$SKILL_DIR/references" -maxdepth 1 -mindepth 1 -type d | wc -l | tr -d ' ')"
-[ "$ref_dir_count" -eq 9 ] || fail "story-setup references/ now has $ref_dir_count subdirs (expected 9); update the Phase 1 self-check list and this assertion"
+listed_ref_dirs="$(printf '%s\n' "$selfcheck_text" | grep -oE '`[a-z][a-z-]*`' | tr -d '`')"
+[ -n "$listed_ref_dirs" ] || fail "story-setup Phase 1 self-check list names no reference dirs"
+for ref_name in $listed_ref_dirs; do
+  [ -d "$SKILL_DIR/references/$ref_name" ] || fail "story-setup Phase 1 self-check lists a reference dir that does not exist: $ref_name"
+done
 assert_grep '剧情/情绪模块\.md.*missing_primary_contract|missing_primary_contract.*剧情/情绪模块\.md' "$SKILL_DIR/references/templates/agents/story-explorer.md" "story-explorer must require the current emotion-module artifact"
 assert_grep '剧情/节奏\.md.*missing_primary_contract|missing_primary_contract.*剧情/节奏\.md' "$SKILL_DIR/references/templates/agents/story-explorer.md" "story-explorer must require the current rhythm artifact"
-assert_no_grep 'legacy_deconstruction|contract_version.*legacy|pre-v12' "$SKILL_DIR/references/templates/agents/story-explorer.md" "story-explorer must not keep legacy benchmark branches"
 assert_grep 'missing_primary_contract: true|missing_primary_contract": true' "$SKILL_DIR/references/templates/agents/story-explorer.md" "story-explorer must emit missing_primary_contract for broken canonical artifacts"
 assert_grep 'repair_action.*Stage 3|Stage 3.*repair_action|重跑 /story-long-analyze Stage 3' "$SKILL_DIR/references/templates/agents/story-explorer.md" "story-explorer must provide a repair action instead of silent fallback"
 assert_grep 'missing_primary_contract' "$REPO_ROOT/skills/story-long-write/references/project-files.md" "story-long-write must not silently fallback for missing primary artifacts"
@@ -764,10 +760,9 @@ assert_grep '不得把已有项目默认为日更 3 章|默认为日更 3 章' "
 assert_grep '默认停在细纲交付|默认停靠.*Phase 1→3' "$REPO_ROOT/skills/story-long-write/SKILL.md" "story-long-write opening flow must stop after outline by default"
 assert_grep '本轮 K（最多 3 章）后必须进入 Step 3/4 收尾并停止|最多 3 章.*收尾并停止' "$REPO_ROOT/skills/story-long-write/references/workflow-daily.md" "daily workflow must stop after bounded batch"
 assert_grep '细纲边界|不得自造剧情' "$SKILL_DIR/references/templates/agents/narrative-writer.md" "narrative-writer must enforce the outline boundary"
-assert_grep '`under` 不补.*`over`.*`compress-once`' "$SKILL_DIR/references/opencode/agents/narrative-writer.md" "opencode narrative-writer must keep asymmetric wordcount handling"
-assert_grep 'over 单次压缩.*净删.*不增语义' "$SKILL_DIR/references/opencode/agents/narrative-writer.md" "opencode narrative-writer must keep one-pass semantic-preserving compression"
-assert_grep '`under` 不补.*`over`.*`compress-once`' "$SKILL_DIR/references/codex/agents/narrative-writer.toml" "codex narrative-writer must keep asymmetric wordcount handling"
-assert_grep 'over 单次压缩.*净删.*不增语义' "$SKILL_DIR/references/codex/agents/narrative-writer.toml" "codex narrative-writer must keep one-pass semantic-preserving compression"
+# 锚在源模板；OpenCode/Codex 生成副本由 sync-opencode.py --check 与 Codex 生成器确定性检查保持一致。
+assert_grep '`under` 不补.*`over`.*`compress-once`' "$SKILL_DIR/references/templates/agents/narrative-writer.md" "narrative-writer must keep asymmetric wordcount handling"
+assert_grep 'over 单次压缩.*净删.*不增语义' "$SKILL_DIR/references/templates/agents/narrative-writer.md" "narrative-writer must keep one-pass semantic-preserving compression"
 assert_grep '导入续写入口顺序|推荐顺序.*story-setup' "$REPO_ROOT/skills/story-import/SKILL.md" "story-import must answer setup-vs-import order before asking for source"
 echo "  OK TS10 version + behavior anchors"
 

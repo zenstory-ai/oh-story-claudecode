@@ -10,6 +10,7 @@ Status: implemented
 
 - 静态与契约守卫 must 只锚「跑起来会坏」的东西：跨文件必须对齐的阈值（`agents_version`）、部署到用户手里的 agent 模板必须带住的关键行为规则、部署行为锚点。文档完整性（是否补 UPGRADING、README 段落顺序）由发版清单和人把关，never 进 CI。
 - 行为用真实执行覆盖：hook 用合成 stdin/stdout 跑（`test-codex-hooks.sh`、`test-zcode-hooks.sh`、部署检查里的假 node 垫片）；四端 parity 按「同一工程同一次写入，bash 拦不拦 == JS 核拦不拦」逐场景比对，并锚死每个场景的期望方向——否则两端一起漏拦也能 diff 干净。
+- 写后毒句式网的 js↔py 同步同样走行为：`test-prose-net-parity.sh` A 段对每条正则的每个分支与备选词各有正例并锚定命中，文案随 findings 逐字 diff；Claude bash 欠账门（豁免窗口、全角冒号、拦截文案）归 D 段场景。`check-hook-regex-sync.sh` 只保留 fixture 够不着的常量表（文末窗口长度、分句边界集、疑问尾/确认语排除集）与欠账门标记的 js↔py 源文本比对。
 - 无法由隔离测试证明的依赖方向（scraper 输出文件名依赖本地日期 helper、CDP 探测源码策略）才用源码策略守卫，且 must 配变异测试证明无关或死代码关键词骗不过它。
 - 涉及 agent / skill / plugin / hook 协议的断言，先核对对应项目官方文档，再以真实 CLI 输出复核；不从其他 agent 的相似字段推断。
 
@@ -24,7 +25,7 @@ Status: implemented
 ## Consequences
 
 - **收益**：改措辞不再红；漏一端会被抓；守卫失败信息指向真实行为。
-- **代价与已知上限**：行为测试更慢（`check-story-setup-deployment.sh` 超过两分钟）；文档漂移没有 CI 兜底，只靠人；源码策略守卫要靠变异测试防被骗，多一层维护。若某条行为无法在 CI 环境执行（如 cmd.exe 路径），只能退回静态保形并在注释里写明是 best-effort。
+- **代价与已知上限**：行为测试更慢（`check-story-setup-deployment.sh` 超过两分钟）；文档漂移没有 CI 兜底，只靠人；源码策略守卫要靠变异测试防被骗，多一层维护。若某条行为无法在 CI 环境执行（如 cmd.exe 路径），只能退回静态保形并在注释里写明是 best-effort。毒句式正则改由 fixture 锁后，量词上下界（如 `{0,16}` 改成 `{0,15}`）的单端漂移不再有守卫，除非恰有 fixture 落在边界上。
 
 ## Verification
 

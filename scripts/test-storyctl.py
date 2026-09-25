@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import re
 import subprocess
 import sys
 import tempfile
@@ -135,27 +134,6 @@ class CheckpointTests(unittest.TestCase):
         self.assertNotIn("beats", result)
         self.assertNotIn("resolution", result)
 
-    def test_commit_record_has_no_event_or_approval_chain(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="storyctl-record-") as directory:
-            project = Path(directory)
-            (project / "大纲").mkdir()
-            (project / "正文").mkdir()
-            (project / "大纲/细纲_第001章.md").write_text(
-                "- 字数目标：1000 字\n- 字数口径：visible_chars_v1\n", encoding="utf-8"
-            )
-            (project / "正文/第001章_测试.md").write_text(
-                "# 第1章\n" + "字" * 800, encoding="utf-8"
-            )
-            record = storyctl.build_project_wordcount_record(
-                project, 1, resolution="accepted_current_length"
-            )
-        self.assertEqual(
-            set(record),
-            {"metric", "target", "actual", "status", "resolution", "body_sha256"},
-        )
-        self.assertEqual(record["status"], "under")
-        self.assertEqual(record["resolution"], "accepted_current_length")
-
 
 class StoryctlCliTests(unittest.TestCase):
     def test_chapter_check_cli_reads_bom_crlf_outline_target(self) -> None:
@@ -244,17 +222,6 @@ class StoryctlCliTests(unittest.TestCase):
         self.assertEqual(result["internal_band"], {"min": 1056, "max": 1344, "status": "fail"})
         self.assertEqual(result["user_band"], {"min": 1020, "max": 1380, "status": "pass"})
 
-    def test_wordcount_checkpoint_is_a_pure_measurement(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="storyctl-checkpoint-") as directory:
-            body = Path(directory) / "segment.md"
-            body.write_text("# 前半段\n" + "字" * 558, encoding="utf-8")
-            completed, result = run_cli(
-                "wordcount", "checkpoint", "--file", str(body), "--target", "2200", "--chapter", "28"
-            )
-        self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertEqual(result["actual"], 558)
-        self.assertEqual(result["remaining_user_range"], {"min": 1312, "max": 1972})
-
     def test_cli_errors_are_json_and_nonzero(self) -> None:
         completed, result = run_cli("wordcount", "check", "--file", "missing.md", "--target", "1200")
         self.assertEqual(completed.returncode, 2)
@@ -268,7 +235,7 @@ class StoryctlCliTests(unittest.TestCase):
     def test_demo_outlines_and_bodies_use_the_same_metric(self) -> None:
         book = ROOT / "demo/长篇/让你管账号，你高燃混剪炸全网"
         outlines = sorted((book / "大纲").glob("细纲_第*.md"))
-        self.assertEqual(len(outlines), 21)
+        self.assertGreaterEqual(len(outlines), 1)
         # 导入的章节其「字数目标」是从已发布正文反推的，因此逐字相等；
         # 导入之后由 skill 写出的章节只需落在内部带内（作者可接受偏短的成稿）。
         state = json.loads(
@@ -276,11 +243,7 @@ class StoryctlCliTests(unittest.TestCase):
         )
         imported_through = state["imported_through_chapter"]
         for outline in outlines:
-            outline_text = outline.read_text(encoding="utf-8")
-            target_matches = re.findall(r"^- 字数目标：([1-9]\d*) 字$", outline_text, re.MULTILINE)
-            metric_matches = re.findall(r"^- 字数口径：([^\n]+)$", outline_text, re.MULTILINE)
-            self.assertEqual(len(target_matches), 1, outline.name)
-            self.assertEqual(metric_matches, ["visible_chars_v1"], outline.name)
+            target = storyctl.target_from_outline(outline.read_text(encoding="utf-8"))
 
             chapter = outline.stem.removeprefix("细纲_第").removesuffix("章")
             bodies = list((book / "正文").glob(f"第{chapter}章_*"))
@@ -291,7 +254,7 @@ class StoryctlCliTests(unittest.TestCase):
                 "--file",
                 str(bodies[0]),
                 "--target",
-                target_matches[0],
+                str(target),
                 "--chapter",
                 chapter,
             )

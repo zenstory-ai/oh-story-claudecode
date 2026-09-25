@@ -652,18 +652,31 @@ class TrackingCommitTests(unittest.TestCase):
     def test_retiring_a_still_active_character_is_rejected(self) -> None:
         self.init()
         self.run_tool("commit", transaction(1, character=True))
-        conflict = transaction(2, character=True)
-        conflict["delta"]["retired_characters"] = ["江晨"]
-        result = self.run_tool("commit", conflict, expect=2)
-        self.assertIn("江晨", result.stderr)
+        still_listed = transaction(2)
+        still_listed["delta"]["retired_characters"] = ["江晨"]
+        still_listed["context"]["active_character_names"] = ["江晨"]
+        result = self.run_tool("commit", still_listed, expect=2)
+        self.assertIn("retired character 江晨 is still listed in context.active_character_names", result.stderr)
+        self.assertEqual(self.read_state()["state_revision"], 1)
+
+    def test_retiring_and_updating_a_character_in_one_transaction_is_rejected(self) -> None:
+        self.init()
+        self.run_tool("commit", transaction(1, character=True))
+        updated = transaction(2, character=True)
+        updated["delta"]["retired_characters"] = ["江晨"]
+        updated["context"]["active_character_names"] = []
+        result = self.run_tool("commit", updated, expect=2)
+        self.assertIn("character 江晨 cannot be retired and updated in the same transaction", result.stderr)
         self.assertEqual(self.read_state()["state_revision"], 1)
 
     def test_windows_reserved_character_name_is_rejected(self) -> None:
         self.init()
         invalid = transaction(1, character=True)
         invalid["delta"]["character_changes"][0]["name"] = "CON"
+        invalid["context"]["active_character_names"] = ["CON"]
         invalid["character_snapshots"] = {"CON": invalid["character_snapshots"]["江晨"]}
-        self.run_tool("commit", invalid, expect=2)
+        result = self.run_tool("commit", invalid, expect=2)
+        self.assertIn("is reserved on Windows", result.stderr)
         self.assertEqual(self.read_state()["state_revision"], 0)
 
 

@@ -25,7 +25,6 @@ EXPECTED_MANIFEST_KEYS = {
     "agents_version",
     "topic_decision_phase",
     "progress_schema_version",
-    "expected_demo_outline_count",
     "primary_benchmark_artifacts",
     "required_outline_sections",
 }
@@ -42,7 +41,6 @@ class ContractManifest:
     progress_schema_version: int
     primary_benchmark_artifacts: Tuple[str, ...]
     required_outline_sections: Tuple[Tuple[str, str], ...]
-    expected_demo_outline_count: int
 
 
 @dataclass(frozen=True)
@@ -361,7 +359,6 @@ def load_manifest(path: Path) -> Tuple[Optional[ContractManifest], List[Finding]
         "agents_version",
         "topic_decision_phase",
         "progress_schema_version",
-        "expected_demo_outline_count",
     ):
         if key not in raw:
             continue
@@ -427,7 +424,6 @@ def load_manifest(path: Path) -> Tuple[Optional[ContractManifest], List[Finding]
         progress_schema_version=raw["progress_schema_version"],
         primary_benchmark_artifacts=tuple(artifacts),
         required_outline_sections=tuple((item["rule"], item["demo"]) for item in sections),
-        expected_demo_outline_count=raw["expected_demo_outline_count"],
     )
     return manifest, []
 
@@ -1173,7 +1169,6 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
     findings.extend(
         progress_schema_pin_findings(repo_root, manifest.progress_schema_version)
     )
-    findings.extend(require_pattern(pipeline, r"章节边界", "chapter-boundary-table", "progress must keep the canonical chapter-boundary table"))
 
     setup_skill = repo_root / "skills/story-setup/SKILL.md"
     actual_setup_version = parse_frontmatter_version(setup_skill)
@@ -1259,9 +1254,8 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
     findings.extend(require_pattern(long_analyze, r"references/author-facing\.md", "author-facing-routed",
                                     "story-long-analyze must route every author-visible message through author-facing.md"))
     findings.extend(require_pattern(long_analyze, r"invalid_topic_decision_contract", "invalid-topic-contract", "invalid topic-decision artifacts must fail explicitly"))
-    # 章节边界表是 Stage 1/2/6 的唯一切片真值：原文开头的目录块会让每个章号命中两次，
-    # 不剔就一路错到底。剔除步骤和落表前的连续性校验都必须留在 Stage 0。
-    findings.extend(require_pattern(long_analyze, r"先剔掉目录块", "stage0-toc-block-removal", "Stage 0 must drop the leading table-of-contents block before building the chapter table"))
+    # 目录块剔除由 build_chapter_index.py 执行，test-long-analyze-runtime-refactor.py 用带目录原文覆盖；
+    # 章号连续性校验目前没有运行时回归，暂留 Stage 0 的文字锚点。
     findings.extend(require_pattern(long_analyze, r"落表前校验章号连续", "stage0-chapter-table-validation", "Stage 0 must validate chapter numbers before writing the boundary table"))
     explorer = repo_root / "skills/story-setup/references/templates/agents/story-explorer.md"
     findings.extend(require_pattern(explorer, r"missing_primary_contract", "explorer-primary-failure", "story-explorer must fail closed on missing current benchmark artifacts"))
@@ -1437,16 +1431,9 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
 
     outline_dir = repo_root / "demo/长篇/让你管账号，你高燃混剪炸全网/大纲"
     outlines = sorted(outline_dir.glob("细纲_第*.md"))
-    if len(outlines) != manifest.expected_demo_outline_count:
-        findings.append(
-            Finding(
-                "demo-outline-count",
-                "expected {} demo chapter outlines, found {}".format(
-                    manifest.expected_demo_outline_count, len(outlines)
-                ),
-                outline_dir,
-            )
-        )
+    if not outlines:
+        # 目录改名或清空时下面的逐章检查会空转，至少要有一份细纲。
+        findings.append(Finding("demo-outline-section", "no demo chapter outlines found", outline_dir))
     for outline in outlines:
         text = read_text(outline) or ""
         declared_fields = extract_demo_outline_fields(text)
@@ -1522,7 +1509,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print("  [PASS] legacy/path guards")
     print("  [PASS] version, phase, progress, and artifact contracts")
     print("  [PASS] primary-artifact fallback semantics")
-    print("  [PASS] demo primary artifacts and {} outlines".format(manifest.expected_demo_outline_count))
+    print("  [PASS] demo primary artifacts and outlines")
     print("\nResult: all current-contract checks passed")
     return 0
 

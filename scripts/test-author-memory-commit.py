@@ -1117,21 +1117,13 @@ def main() -> None:
         assert_omitted_ids_follow_priority()
         assert_slice_weight_counts_separators()
 
+    # 只锚 prompt 与运行时 CLI / 槽位的对接片段，不钉措辞
     injection_contracts = {
         REPO / "skills/story-long-write/references/workflow-chapter.md": (
             "`author_preferences`",
-            "作者偏好：{本章 query 命中的 prose_style/story_design 项}",
-            "不逐条展示或最大化命中",
-        ),
-        REPO / "skills/story-short-write/references/workflow-draft.md": (
-            "作者偏好 query 中的文风/故事设计项",
-        ),
-        REPO / "skills/story-short-write/references/workflow-revision.md": (
-            "作者偏好：{query 命中的 prose_style/story_design 项}",
         ),
         REPO / "skills/story-deslop/SKILL.md": (
             "query --kind prose_style --book-root",
-            "作者偏好：{query 命中的 prose_style 项}",
         ),
         REPO / "skills/story-review/SKILL.md": (
             "query --kind delivery --kind interaction --kind prose_style --book-root",
@@ -1148,7 +1140,6 @@ def main() -> None:
     for path in sorted((REPO / "skills").glob("*/references/author-memory.md")) + [REPO / "skills/story/SKILL.md", REPO / "skills/story-review/SKILL.md", REPO / "skills/story-deslop/SKILL.md"]:
         content = path.read_text(encoding="utf-8")
         assert "repeated_correction" not in content and "inferred_pattern" not in content, f"{path} 仍在引导推断写入"
-        assert "推断先待确认" not in content and "推断和重复修正先进入待确认" not in content and "重复修正/推断先待确认" not in content, f"{path} 仍在引导推断写入"
 
     print("OK: author-memory transaction behavior")
 

@@ -238,5 +238,3 @@ function main() {
 if (require.main === module) {
   runCli(main, "刺猬猫采集");
 }
-
-module.exports = { extractAllRanks, extractBookUrls };

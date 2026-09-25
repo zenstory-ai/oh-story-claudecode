@@ -422,6 +422,27 @@ describe("CLI portability", () => {
 });
 
 describe("HTTP API", () => {
+  test("serves the bundled page and every asset it references", async () => {
+    const baseUrl = await startServer(await createWorkspace());
+
+    const page = await fetch(`${baseUrl}/`);
+    assert.equal(page.status, 200);
+    assert.match(page.headers.get("content-type"), /^text\/html/);
+    const html = await page.text();
+    const assetPaths = [...html.matchAll(/(?:href|src)="(\/[^"]+)"/g)].map((match) => match[1]);
+    assert.deepEqual(assetPaths.sort(), ["/app.js", "/styles.css"]);
+
+    for (const [assetPath, contentType] of [
+      ["/styles.css", /^text\/css/],
+      ["/app.js", /javascript/],
+    ]) {
+      const asset = await fetch(`${baseUrl}${assetPath}`);
+      assert.equal(asset.status, 200, `${assetPath} must be served from the story skill bundle`);
+      assert.match(asset.headers.get("content-type"), contentType);
+      assert.ok((await asset.text()).length > 0, `${assetPath} must not be empty`);
+    }
+  });
+
   test("serves lazy roots, directory pages, and on-demand search", async () => {
     const root = await createWorkspace();
     const baseUrl = await startServer(root);

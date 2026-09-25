@@ -322,32 +322,11 @@ expected = {
     'chapter-extractor', 'character-designer', 'consistency-checker',
     'narrative-writer', 'story-architect', 'story-explorer', 'story-researcher',
 }
-read_only = {'chapter-extractor', 'consistency-checker', 'story-explorer'}
 base = Path('skills/story-setup/references/opencode/agents')
 found = {p.stem for p in base.glob('*.md')}
 assert found == expected, found
 
-
-def permission_rules(fm: str):
-    """2.x 原生 `permissions:` 列表 → [(action, resource, effect)]，保持书写顺序。"""
-    rules, current, inside = [], {}, False
-    for line in fm.split('\n'):
-        if line == 'permissions:':
-            inside = True
-            continue
-        if not inside:
-            continue
-        if not line.startswith('  '):
-            break
-        if line.startswith('  - '):
-            current = {}
-        key, _, value = line.strip().removeprefix('- ').partition(':')
-        current[key] = value.strip().strip('"')
-        if len(current) == 3:
-            rules.append((current['action'], current['resource'], current['effect']))
-    return rules
-
-
+# 各 agent 的工具可用性（含未列出工具一律摘除）由下方 whollyDisabled 裁决矩阵锁。
 for p in sorted(base.glob('*.md')):
     text = p.read_text()
     assert text.startswith('---\n'), f'{p}: missing frontmatter'
@@ -358,15 +337,7 @@ for p in sorted(base.glob('*.md')):
     assert 'mode: subagent' in fm, f'{p}: missing mode: subagent'
     assert 'description:' in fm, f'{p}: missing description'
     assert '\npermission:' not in fm, f'{p}: legacy 1.x permission map'
-    rules = permission_rules(fm)
-    assert rules and rules[0] == ('*', '*', 'deny'), f'{p}: permissions must open with a blanket deny: {rules}'
-    assert ('read', '*', 'allow') in rules, f'{p}: missing read allow'
     assert 'steps:' in fm, f'{p}: missing steps limit'
-    if p.stem in read_only:
-        assert ('edit', '*', 'deny') in rules, f'{p}: read-only agent must deny edit'
-        assert ('shell', '*', 'deny') in rules, f'{p}: read-only agent must deny shell'
-    else:
-        assert ('edit', '*', 'allow') in rules, f'{p}: write-capable agent must allow edit'
     assert '.claude/skills/story-setup/references/agent-references/' not in text, f'{p}: leaked Claude reference path'
     assert '.opencode/skills/story-setup/references/agent-references/' not in text, f'{p}: stale hidden OpenCode reference fallback'
     if p.stem in {'character-designer', 'consistency-checker', 'narrative-writer', 'story-architect'}:
@@ -488,6 +459,8 @@ TOOL_ACTION = {
     'write': 'edit', 'edit': 'edit', 'patch': 'edit',
     'shell': 'shell', 'subagent': 'subagent', 'webfetch': 'webfetch', 'websearch': 'websearch',
     'skill': 'skill', 'question': 'question', 'execute': 'execute',
+    # 本表没列出的工具（上游日后新增的也算）：只有开头那条整条 deny 能把它摘掉。
+    'unlisted-future-tool': 'unlisted-future-tool',
 }
 READ_LIKE = {'read', 'glob', 'grep'}
 read_only = {'chapter-extractor', 'consistency-checker', 'story-explorer'}
@@ -591,13 +564,6 @@ PY
 
 echo "  OK slash command templates (含 \$ARGUMENTS 占位符与 ZCode 对齐)"
 
-assert_grep 'session\.hook\("compaction"' "$ROOT/plugin.ts" "OpenCode plugin must inject pre-compact context"
-assert_grep 'tool\.hook\("execute\.before"' "$ROOT/plugin.ts" "OpenCode plugin must guard tool writes"
-assert_grep 'proseBlockReason' "$ROOT/plugin.ts" "OpenCode plugin must keep outline-before-prose guard"
-assert_grep 'tool\.hook\("execute\.after"' "$ROOT/plugin.ts" "OpenCode plugin must run the prose backstop after writes"
-assert_grep 'ctx\.location\.directory' "$ROOT/plugin.ts" "OpenCode plugin must locate the project from ctx.location (2.x service cwd is not the project)"
-assert_grep 'proseAfterWrite' "$ROOT/plugin.ts" "OpenCode plugin must surface backstop findings on the write result"
-assert_grep 'from "\./lib/story_hook_core\.js"' "$ROOT/plugin.ts" "OpenCode plugin must consume the shared prose-guard core"
 # This job has no opencode CLI (the real load is asserted by test-opencode-cli-e2e.sh), so this is a
 # structural proxy: the deploy manifest must place the core under .opencode/plugins/lib/, never flat
 # in .opencode/plugins/ (a flat *.js there is auto-loaded by OpenCode as a broken second plugin).
@@ -610,16 +576,9 @@ assert_grep '命令不可用或解析不出版本 → 同样停止 OpenCode 部�
 assert_grep 'target 只有 opencode 则不写、不更新 `\.story-deployed`' "$SETUP_MD" "blocked OpenCode-only deploy must not write or bump .story-deployed"
 if grep -q '解析不出版本 → 继续部署' "$SETUP_MD"; then fail "OpenCode version gate must not continue on an unknown version"; fi
 assert_grep 'permissions:` 规则列表' "$REPO_ROOT/skills/story-review/SKILL.md" "story-review must validate OpenCode 2.x agents by their permissions: list"
-assert_grep '正文' "$ROOT/plugin.ts" "OpenCode plugin must inspect prose targets"
-assert_grep '@opencode/plugin' "$ROOT/plugin.ts" "OpenCode plugin must import OpenCode 2.x plugin types"
-# The shared prose-guard core (light net / outline guard / wordcount·landing·dup-title) deploys
-# alongside plugin.ts and is imported by it; it must be byte-identical to the ZCode copy and valid JS.
-ZCODE_CORE="$REPO_ROOT/skills/story-setup/references/zcode/hooks/story_hook_core.js"
-cmp -s "$ROOT/story_hook_core.js" "$ZCODE_CORE" || fail "story_hook_core.js drifted from the ZCode copy (must be byte-identical)"
-node --check "$ROOT/story_hook_core.js" || fail "story_hook_core.js is not valid JavaScript"
-assert_grep 'proseNetFindings' "$ROOT/story_hook_core.js" "shared core must carry the light prose net (parity with codex/claude)"
-# #242: runtime behavioral test — actually loads the plugin against the deployed core layout and
-# exercises the execute.before/after and compaction hooks (stronger than the structural greps above).
+# #242: runtime behavioral test — loads plugin.ts against the deployed core layout (lib/) and
+# exercises ctx.location, the execute.before/after and compaction hooks. The core's byte identity is
+# owned by check-shared-files.sh; its net/guard semantics by test-prose-net-parity.sh.
 node --experimental-strip-types scripts/test-opencode-plugin.mjs
 assert_grep 'AGENTS\.md|OpenCode' "$ROOT/AGENTS.md.tmpl" "OpenCode AGENTS template must be present"
 assert_grep 'story-long-write|story-short-write|story-review' "$ROOT/AGENTS.md.tmpl" "OpenCode AGENTS template must mention story skill routing"

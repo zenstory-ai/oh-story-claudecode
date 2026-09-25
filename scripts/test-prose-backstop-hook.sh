@@ -2,7 +2,7 @@
 # test-prose-backstop-hook.sh — regression tests for check-prose-after-write.sh
 # 核心保证：① 绝不过度捕获非正文文件（代码/细纲/设定/大纲/游离正文）；② 真正文兜底触发；
 # ③ 轻量内容网抓对硬信号（截断/拒绝语/工程词/复读），干净正文（排比+对话+悬念）静默。
-# 过度捕获用路径门验证（不依赖解释器）；内容网用内嵌 python（与 parity 测试同源）。
+# 过度捕获用路径门验证（不依赖解释器）；内容网走 node 共享核（与 parity 测试同一份核）。
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
