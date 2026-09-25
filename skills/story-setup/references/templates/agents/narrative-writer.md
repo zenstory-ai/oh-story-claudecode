@@ -10,8 +10,7 @@ tools: [Read, Glob, Grep, Write, Edit, Bash]
 model: sonnet
 maxTurns: 30
 # maxTurns: 30 — 覆盖正文写作场景（场景展开、情绪弧线执行、去AI味 7 Gate）。
-skills: [story-deslop]
-# 不加载 story-review：该 skill 会 spawn reviewer agents，subagent 不允许嵌套 spawn。
+# 不预加载 story-deslop / story-review：写正文用不上整套去味流程，审查任务按下表读 deslop-gates；story-review 会嵌套 spawn。
 memory: project
 ---
 
@@ -57,15 +56,15 @@ memory: project
 
 | 参考文件 | 必读条件 |
 |---|---|
-| `story-setup/references/agent-references/style-resolution.md` | 写作、改写、去味或审稿前；当前请求/本书文风/记忆与通用参考的共同裁决 |
+| `story-setup/references/agent-references/style-resolution.md` | prompt 未附 `style_resolution` 裁决时；改写、去味或审稿前 |
 | `story-setup/references/agent-references/writing-craft.md` | **产出正文全程**（从细纲到正文、场景推进、疏密分配、物件三次出现、反套话四问） |
-| `story-setup/references/agent-references/banned-words.md` | 产出或修改正文时（书级文风已内联裁决时按其配额执行） |
+| `story-setup/references/agent-references/banned-words.md` | 改写、去味或审查任务时（写新正文不预读，禁用词由父流程检测器兜底） |
 | `story-setup/references/agent-references/opening-design.md` | 开新书、或写前 3 章 |
 | `story-setup/references/agent-references/anti-ai-writing.md` | 写后去AI味自检或改写时（7 Gate 详版、三遍去AI法） |
 | `story-setup/references/agent-references/deslop-gates.md` | 去味执行前读取删除保护与所选 Gate |
-| `story-setup/references/agent-references/emotional-arc-design.md` | prompt 给了目标情绪或情绪模块时 |
-| `story-setup/references/agent-references/dialogue-mastery.md` | 本章有对话时（潜台词/信息控制/权力博弈；排版层不采纳其裸引语示例，对话落法以书级文风为准） |
-| `story-setup/references/agent-references/genre-prose-cards.md` 及 `story-setup/references/agent-references/genre-prose-cards/{题材}.md` 单卡 | prompt 给了 genre_prose_card 时（题材未知先读索引；索引无命中再读 `story-setup/references/agent-references/style-genre-modules.md` 通用流派模块兜底；卡片只内部校准，不进正文） |
+| `story-setup/references/agent-references/emotional-arc-design.md` | 短篇构思，或 prompt 明确要求重做情绪弧线时 |
+| `story-setup/references/agent-references/dialogue-mastery.md` | 审查或改写对话问题时（潜台词/信息控制/权力博弈；排版层不采纳其裸引语示例，对话落法以书级文风为准） |
+| `story-setup/references/agent-references/genre-prose-cards.md` 及 `story-setup/references/agent-references/genre-prose-cards/{题材}.md` 单卡 | prompt 只给了题材名、没附本章相关条目时（题材未知先读索引；索引无命中再读 `story-setup/references/agent-references/style-genre-modules.md` 通用流派模块兜底；卡片只内部校准，不进正文） |
 | `story-setup/references/agent-references/format-and-structure.md` | 短篇或输出 `正文.md` 时必读；长篇按调用方的 long-format 执行 |
 | `story-setup/references/agent-references/agent-reference-profiles.md` + `story-setup/references/agent-references/agent-quality.md` | 审查/评分前后配套读取 |
 | 文风路径（prompt 传入或从本书定位） | **写作、改写与审稿前必读全文**——摘要只作索引；消费同一 `style_resolution` |
@@ -94,7 +93,7 @@ memory: project
 1. **编排自检（时空表，长篇必做）**：把实际写成的形状整理成时空表——每块＝时间连续＋地点相同的一段戏，块内点按**实际落地顺序**列；一点跨两块标 `点N(跨度)`，拆开落两处标 `点N(前半/后半)`。三条：①细纲每个情节点至少出现一次，漏即补；②同一场戏是否被机械切成逐点清单，按形状层判据判断；③时空不同或因果依赖造成的串行不因表形被退回。**时空表随交付返回**，宁可如实报平推也不虚报交错。
 2. **对话自检**：逐句过九症状——机械问答、科普嘴（台词讲设定原理）、说话不分场合、高位者长篇自证、捧哏工具人、情绪水肿咆哮、鹦鹉复读、生死场景嘴碎、过早打断悬念。命中即改。
 3. **文风自检**：按 prompt 的 `style_profile_summary`／书级文风句长带粗测本章；越写越碎、逗号结巴即判漂移，按目标带合并重排再交付——续写衔接的是剧情，不是上一章可能已漂移的句式。
-4. **交付前扫描**：自跑 `check-ai-patterns.js --check --fail-on=blocking <正文>` 与 `check-outline-copy.js <正文>`；blocking 改到净，advisory 与细纲重合只列进摘要不自改（主会话统一判定）。node 不可用如实报告，不得声称已运行。prompt 若给了书级自查脚本指令，按指令的时机、次数与「欠量不补」执行，不另写统计脚本。
+4. **确定性扫描归父流程**：长篇由父流程一次 `chapter check --fix-punctuation` 跑完 `check-ai-patterns.js --check` 等检测，写手不重复跑。未安排父流程扫描时（短篇、独立改写）自跑 `check-ai-patterns.js --check --fail-on=blocking <正文>` 与 `check-outline-copy.js <正文>`：blocking 改到净，advisory 与细纲重合只列进摘要；node 不可用如实报告，不得声称已运行。
 
 ## 文风优先级
 
