@@ -95,13 +95,6 @@ try {
   assert.strictEqual(good.report.ok, true)
   assert.deepStrictEqual(good.report.failures, [])
 
-  // 值未定时写 [待补充] 是契约允许的写法，不能因此判失败。
-  const pending = run(writeCase('pending-value', outline({
-    fieldValues: { 契约风险: '[待补充]', 单元ID位置: '[待补充]' },
-  })))
-  assert.strictEqual(pending.status, 0, pending.stdout + pending.stderr)
-  assert.strictEqual(pending.report.ok, true)
-
   // 加粗字段名与半角冒号也要认，否则会误伤正常写法。
   const boldHalfWidth = outline().replace('- 目标情绪：', '- **目标情绪**: ')
   const bold = run(writeCase('bold-halfwidth', boldHalfWidth))
@@ -123,7 +116,7 @@ try {
 
   // ……但其余字段仍按契约允许 [待补充]，不能因此判失败。
   const hollowOther = run(writeCase('hollow-other', outline({
-    fieldValues: { 契约风险: '[待补充]', 章节定位: '[待补充]' },
+    fieldValues: { 契约风险: '[待补充]', 章节定位: '[待补充]', '单元ID/位置': '[待补充]' },
   })))
   assert.strictEqual(hollowOther.status, 0, hollowOther.stdout + hollowOther.stderr)
   assert.strictEqual(hollowOther.report.ok, true)
