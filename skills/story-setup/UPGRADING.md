@@ -2,14 +2,28 @@
 
 ## 当前版本
 
-发布版本 `v0.7.11`。`agents_version` 从上一发布 tag v0.7.10 的 30 增加到 31；已部署项目需更新技能包、重新运行 `/story-setup` 并新开会话，以加载本次完整部署内容。
+发布版本 `v0.8.0`。`agents_version` 从上一发布 tag v0.7.11 的 31 增加到 32；已部署项目需更新技能包、重新运行 `/story-setup` 并新开会话，以加载本次完整部署内容。
 
-- `setup_skill_version: 1.2.11`
-- `agents_version: 31`
+- `setup_skill_version: 1.3.0`
+- `agents_version: 32`
 
-`.story-deployed` 缺失任一字段，或 `agents_version` 缺失 / 非整数 / 小于 `31`，都视为待更新部署。直接重新运行 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或自然语言点名）；不在运行时逐级兼容历史模板。如项目 `agents_version` 大于 `31`，说明本地 story-setup 比项目旧：先更新 oh-story-claudecode，不得用 v31 降级覆盖。历史版本改动见仓库根目录 `CHANGELOG.md`。
+`.story-deployed` 缺失任一字段，或 `agents_version` 缺失 / 非整数 / 小于 `32`，都视为待更新部署。直接重新运行 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或自然语言点名）；不在运行时逐级兼容历史模板。如项目 `agents_version` 大于 `32`，说明本地 story-setup 比项目旧：先更新 oh-story-claudecode，不得用 v32 降级覆盖。历史版本改动见仓库根目录 `CHANGELOG.md`。
 
-### v0.7.11 必须重跑 story-setup
+### v0.8.0 必须重跑 story-setup
+
+各端用户更新技能包后都要在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`），再新开会话：
+
+- `narrative-writer` 写正文不再预加载去 AI 味整套流程，也不自己跑检测脚本；`consistency-checker` 只读本次检查范围相关的设定与细纲。
+- 写正文守卫修正：`cd 书目录 && …` 这类命令不再被误报「缺少细纲」。
+- 长篇写作流程变短：每章收尾一次检查、追踪提交先生成草稿再填、作者记忆由脚本代查；一致性检查与去 AI 味审查改为按需。
+
+### 已在写的长篇不用迁移
+
+- 老卷纲里写在单元卡内的「供给自查」「建纲追加」照常可读；之后排纲，新批次的这两节写进 `大纲/排纲底稿_{单元ID}.md`，不再写进卷纲。
+- `outline_view.py` 默认输出就是写正文要的内容；老卷纲排纲时想一并看旧底稿，加 `--stage outline`。
+- 细纲里的「契约风险」三档名称不变。
+
+### v0.7.11 必须重跑 story-setup（历史）
 
 Claude Code、Codex、Antigravity、OpenCode、ZCode、OpenClaw、Reasonix 用户更新技能包后都要在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`），再新开会话：
 
@@ -132,7 +146,7 @@ OpenClaw / Reasonix / generic 三条路径的 skill 副本在项目 `skills/` �
 - story-long-analyze 新增可选「三层灵感库管道」：复用 Stage 3 的 EM 机制卡——IA 只是索引登记行（无文件），NM 只记合并增量，CBA 是唯一自包含写作消费卡；卡内禁路径引用，来源用 `书名/EM-xxx` 裸 ID，溯源经 `灵感索引.csv` 或 `resolve` 子命令。
 - story-long-write 在开书（适用阶段=设定）、卷纲、细纲三处可选召回 active CBA；逐章写前召回与写手 prompt 不接灵感库。无库或零命中只记 gap，不阻塞。
 
-## v31 当前契约
+## v32 当前契约
 
 - `chapter-extractor` 按原文块逐章输出紧凑字段与 10–20 个情节点（长章最多 30），由 `manage_analysis_run.py commit` 校验后生成章节摘要；不合格的整批拒收重跑。
 - `story-explorer` 读新版轻量章节摘要的「信息变化」「状态变化」「章尾钩子」「三维节奏」字段，旧摘要回退读「关键信息与扩写技法」表；对标主产物只以两份文件是否存在判定，不看 `schema_version`。
@@ -236,7 +250,7 @@ OpenClaw / Reasonix / generic 三条路径的 skill 副本在项目 `skills/` �
 ## 升级步骤
 
 1. 在项目根目录重新运行 story-setup。
-2. 确认 `.story-deployed` 写入 `agents_version: 31` 与 `setup_skill_version: 1.2.11`。
+2. 确认 `.story-deployed` 写入 `agents_version: 32` 与 `setup_skill_version: 1.3.0`。
 3. 确认目标 CLI 的 agents、hooks/rules 和 reference bundle 都通过安装验证。
 4. 新开会话，使 custom agents 与 hooks 按当前文件重新注册。
 5. **长篇在写项目必做**：检查每本书的 `追踪/_tracking-state.json` 是否存在。不存在就是旧追踪结构，按下方「追踪模型迁移」重建，否则写下一章会被拦。
