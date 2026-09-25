@@ -1,0 +1,49 @@
+{
+  "_comment": "基准用例。fixture 是 BENCH_HOME/fixtures 下冻结的书；chapters 是本用例要提交的章数；作者停下来问时用 follow_up 按推荐项回答，直到提交够章数或用完 max_follow_ups。",
+  "cases": [
+    {
+      "id": "smoke",
+      "fixture": "管账号-ch21-raw",
+      "book_dir": "让你管账号，你高燃混剪炸全网",
+      "chapters": 0,
+      "turns": [
+        "/story-long-write"
+      ],
+      "follow_up": "",
+      "max_follow_ups": 0
+    },
+    {
+      "id": "mid-daily",
+      "fixture": "管账号-ch21",
+      "book_dir": "让你管账号，你高燃混剪炸全网",
+      "chapters": 3,
+      "turns": [
+        "/story-long-write 日更3章"
+      ],
+      "follow_up": "按你推荐的处理，然后接着写，写满这一批。",
+      "max_follow_ups": 4
+    },
+    {
+      "id": "open-xuanhuan",
+      "fixture": "玄幻-ch0",
+      "book_dir": "玄幻-ch0",
+      "chapters": 3,
+      "turns": [
+        "/story-long-write 写第1章"
+      ],
+      "follow_up": "按你推荐的处理，然后接着写下一章。",
+      "max_follow_ups": 5
+    },
+    {
+      "id": "open-nvpin",
+      "fixture": "女频-ch0",
+      "book_dir": "女频-ch0",
+      "chapters": 3,
+      "turns": [
+        "/story-long-write 写第1章"
+      ],
+      "follow_up": "按你推荐的处理，然后接着写下一章。",
+      "max_follow_ups": 5
+    }
+  ]
+}

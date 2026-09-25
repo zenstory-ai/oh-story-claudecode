@@ -9,6 +9,8 @@
 
 `python scripts/test-long-analyze-runtime.py` 验证长篇拆文的单状态运行时：机械章节索引与逐章 hash、旧成果识别、只读计划、范围批次、兼容摘要投影、相邻拆分、原子提交和缓存恢复。实际运行只使用 `skills/story-long-analyze/scripts/` 下三个脚本：`build_chapter_index.py`、`inspect_existing_assets.py`、`manage_analysis_run.py`。测试还覆盖旧版（带「章节边界」表）拆文库遇到楔子时的章号核对与并入出路、Windows/GBK 控制台下的 UTF-8 输出，以及 `render_relation_chart.py` 在没有中文字体时只写 Markdown 关系图、不出拼音图。
 
+`scripts/bench/` 是 v0.8 起的真实会话基准：确定性部署某个版本的包、用真实 CLI 跑冻结的书、统计每章耗时/token/正文指标。它要真实模型和凭据，不在 CI 里跑；用法见 [bench/README.md](bench/README.md)。
+
 ## 静态守卫（check-*）
 
 | 脚本 | 检查什么 | 何时跑 |
