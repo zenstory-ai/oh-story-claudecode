@@ -20,9 +20,12 @@ $BENCH_HOME/
 {
   "claude-code": {"bin": "<claude 可执行文件>", "model": "<模型名>", "path": "<含 node 的 PATH>",
                   "env": {"ANTHROPIC_BASE_URL": "..."}, "env_files": {"ANTHROPIC_AUTH_TOKEN": "<密钥文件>"}},
-  "codex": {"bin": "<codex 可执行文件>", "model": "gpt-5.6-sol", "inherit_env": true}
+  "codex": {"bin": "<codex 可执行文件>", "model": "gpt-5.6-sol", "inherit_env": true,
+            "env": {"CODEX_HOME": "~/.oh-story-bench/codex-home"}}
 }
 ```
+
+Codex 主机**必须**用独立的 `CODEX_HOME`：目录里只放一个指向 `~/.codex/auth.json` 的软链接和最小 `config.toml`（只写模型）。直接用 `~/.codex` 会继承用户的插件（computer-use、浏览器）、`notify` 钩子和全局 skills——既污染测量，基准会话还会去操作用户的电脑。`run.py` 检测到没配或指向 `~/.codex` 时拒绝运行。
 
 ## 脚本
 
@@ -35,7 +38,7 @@ $BENCH_HOME/
 | `compare.py --base ... --cand ... --coverage ... --pairwise ...` | 汇总两个版本的效率与质量，按非劣效门槛给出通过/不通过 |
 | `metrics.py <run目录>... [--table] [--tell <tell仓库>]` | 每章平均墙钟、累计输入/输出 token、主会话调用、工具调用、子 agent 次数、上下文峰值、压缩次数；每章字数、首次字数检查结论、检测器命中；给 `--tell` 时加人类区间越界项数 |
 
-Claude Code 主机用隔离 HOME，会话与子 agent 转录都在 `<run>/home/.claude/projects/` 下，`metrics.py` 从那里取 token。Codex 主机沿用当前用户的登录，token 取自 `--json` 输出的 `turn.completed`。
+Claude Code 主机用隔离 HOME，会话与子 agent 转录都在 `<run>/home/.claude/projects/` 下，`metrics.py` 从那里取 token。Codex 主机用独立 CODEX_HOME（复用登录），token 取自 `--json` 输出的 `turn.completed`。
 
 ## 用例
 

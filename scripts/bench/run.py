@@ -112,6 +112,11 @@ def drive_codex(cfg, proj, home, log, prompt, resume):
             '--dangerously-bypass-approvals-and-sandbox'] + cfg.get('extra_args', [])
     cmd = base + (['resume', resume, prompt] if resume else ['-C', str(proj), prompt])
     env = dict(os.environ) if cfg.get('inherit_env', True) else host_env(cfg, home)
+    # 必须给独立 CODEX_HOME：用户全局配置里的插件（computer-use、浏览器）、notify 钩子和全局 skills
+    # 会被基准会话继承，既污染测量，也会去操作用户的电脑。
+    env.update({k: os.path.expanduser(v) for k, v in cfg.get('env', {}).items()})
+    if 'CODEX_HOME' not in env or Path(env['CODEX_HOME']).resolve() == (Path.home() / '.codex').resolve():
+        raise SystemExit('codex 主机必须在 hosts.json 里配置独立的 CODEX_HOME（见 README）')
     with open(log, 'w', encoding='utf-8') as out, open(str(log).replace('.jsonl', '.err'), 'w') as err:
         subprocess.run(cmd, cwd=proj, env=env, stdin=subprocess.DEVNULL, stdout=out, stderr=err,
                        timeout=HARD_S)
