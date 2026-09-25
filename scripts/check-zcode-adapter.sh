@@ -49,9 +49,8 @@ for key in ('agents', 'channels', 'lspServers', 'outputStyles', 'settings'):
 market = json.loads(Path('marketplace.json').read_text())
 assert market['version'] == 1
 PY
-# ZCode's GitHub importer may discover the Claude catalog (#390); verify both
-# catalog paths against both native manifests, not just the root ZCode catalog.
-python3 "$SCRIPT_DIR/check-plugin-packaging.py" --root "$REPO_ROOT"
+# Both catalog paths vs both native manifests (#390) and the exact root skill set are
+# checked by check-plugin-packaging.py, which check-claude-adapter.sh runs in the same CI job.
 echo "  OK native plugin/marketplace manifest"
 
 python3 - <<'PY'
@@ -60,8 +59,6 @@ from pathlib import Path
 
 skills = sorted(Path('skills').glob('*/SKILL.md'))
 commands = sorted(Path('skills/story-setup/references/zcode/commands').glob('*.md'))
-assert len(skills) == 13, f'expected 13 skills, got {len(skills)}'
-assert len(commands) == 13, f'expected 13 commands, got {len(commands)}'
 expected = {p.parent.name for p in skills}
 assert {p.stem for p in commands} == expected
 
@@ -86,7 +83,7 @@ for command in commands:
     assert 'description' in keys and 'skills' in keys
     assert '$ARGUMENTS' in body
 PY
-echo "  OK 13 Skills + 13 Commands (schema and one-to-one names)"
+echo "  OK Skills + Commands (schema and one-to-one names; skill set pinned by check-plugin-packaging.py)"
 
 python3 - <<'PY'
 import json
