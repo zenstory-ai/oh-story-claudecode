@@ -985,7 +985,8 @@ def _command_substitutions(command: str) -> list[str]:
     return substitutions
 
 
-def _redirect_targets(command: str) -> list[str]:
+def _redirect_targets(command: str, keep_all: bool = False) -> list[str]:
+    # keep_all：与 JS 核 redirectTargets 同构，有 cd 时先取全部目标，接上 cd 目录后再判正文。
     targets: list[str] = []
     quote = ""
     escaped = False
@@ -1018,7 +1019,7 @@ def _redirect_targets(command: str) -> list[str]:
         while command[cursor:cursor + 1] in (" ", "\t"):
             cursor += 1
         target, cursor = _read_shell_word(command, cursor)
-        if "正文" in target:
+        if keep_all or "正文" in target:
             targets.append(target)
         index = max(index + 1, cursor)
     return targets
@@ -1120,7 +1121,9 @@ def extract_prose_targets_from_command(command: str, depth: int = 0) -> list[str
     # 与 JS 核同构：`cd 书目录 && cat > 正文/...` 的相对写入目标接在 cd 之后的目录上；
     # 命令里没有 cd 时保持整条命令扫描重定向的原行为。
     parsed = []
-    for raw_segment in _shell_segments(scannable):
+    # `>|`、`>&file`、`&>` 是重定向，不是管道或后台符；先统一成 `>`，免得切段时把目标切丢。
+    segment_source = re.sub(r">&(?!\d)", ">", scannable.replace("&>", " >").replace(">|", ">"))
+    for raw_segment in _shell_segments(segment_source):
         # 引号感知分词（同 JS 核 shellWords）：str.split() 会按 U+3000 和引号内空格切碎目标，
         # 末位取到 book/正文/第1章.md —— 判到另一本书上（那本有细纲就直接放行）。
         words = _shell_words(_before_shell_redirection(raw_segment))
@@ -1145,21 +1148,24 @@ def extract_prose_targets_from_command(command: str, depth: int = 0) -> list[str
                 cwd = directory if is_absolute(directory) or not cwd else under_cwd(directory)
             continue
         if has_cd:
-            targets.extend(under_cwd(target) for target in _redirect_targets(raw_segment))
+            targets.extend(
+                resolved for resolved in (under_cwd(target) for target in _redirect_targets(raw_segment, True))
+                if "正文" in resolved
+            )
         if command_name in ("sh", "bash", "dash", "ksh", "zsh"):
             nested = _nested_shell_command(command_args)
             if nested:
                 targets.extend(extract_prose_targets_from_command(nested, depth + 1))
         if command_name in ("tee", "touch"):
             targets.extend(
-                under_cwd(destination)
-                for destination in _write_operands(command_name, command_args)
+                destination
+                for destination in map(under_cwd, _write_operands(command_name, command_args))
                 if "正文" in destination
             )
         if command_name in ("cp", "mv", "install"):
             targets.extend(
-                under_cwd(destination)
-                for destination in _copy_like_targets(command_name, command_args)
+                destination
+                for destination in map(under_cwd, _copy_like_targets(command_name, command_args))
                 if "正文" in destination
             )
     return list(dict.fromkeys(target for target in targets if target))

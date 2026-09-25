@@ -461,7 +461,9 @@ function commandSubstitutions(command) {
   return substitutions
 }
 
-function redirectTargets(command) {
+// keepAll：命令里有 cd 时，相对目标要先接上 cd 目录再判是不是正文（`cd 正文 && cat > 第3章.md`），
+// 所以先全部取出，由调用方接好目录后再过滤。
+function redirectTargets(command, keepAll = false) {
   const value = String(command)
   const targets = []
   let quote = ""
@@ -480,7 +482,7 @@ function redirectTargets(command) {
     if (value[cursor] === "|" || value[cursor] === "&") cursor++
     while (value[cursor] === " " || value[cursor] === "\t") cursor++
     const parsed = readShellWord(value, cursor)
-    if (parsed.word.includes("正文")) targets.push(parsed.word)
+    if (keepAll || parsed.word.includes("正文")) targets.push(parsed.word)
     index = Math.max(index, parsed.next - 1)
   }
   return targets
@@ -569,7 +571,8 @@ function extractProseTargets(command, depth = 0) {
   }
   // `cd 书目录 && cat > 正文/...`：相对写入目标要接在 cd 之后的目录上，否则守卫按会话目录去找细纲，
   // 把有细纲的章误报成缺细纲。命令里没有 cd 时保持整条命令扫描重定向的原行为。
-  const segments = shellSegments(scannable)
+  // `>|`、`>&file`、`&>` 是重定向，不是管道或后台符；先统一成 `>`，免得切段时把目标切丢。
+  const segments = shellSegments(scannable.replace(/&>/g, " >").replace(/>\|/g, ">").replace(/>&(?!\d)/g, ">"))
   const parsed = segments.map((raw) => {
     const words = shellWords(beforeShellRedirection(raw))
     const commandIndex = commandWordIndex(words)
@@ -588,19 +591,19 @@ function extractProseTargets(command, depth = 0) {
       if (directory) cwd = isAbsolute(directory) || !cwd ? directory : joinPosix(cwd, directory)
       continue
     }
-    if (hasCd) targets.push(...redirectTargets(raw).map(underCwd))
+    if (hasCd) targets.push(...redirectTargets(raw, true).map(underCwd).filter((target) => target.includes("正文")))
     if (["sh", "bash", "dash", "ksh", "zsh"].includes(commandName)) {
       const nested = nestedShellCommand(commandArgs)
       if (nested) targets.push(...extractProseTargets(nested, depth + 1))
     }
     if (commandName === "tee" || commandName === "touch") {
-      for (const destination of writeOperands(commandName, commandArgs)) {
-        if (destination.includes("正文")) targets.push(underCwd(destination))
+      for (const destination of writeOperands(commandName, commandArgs).map(underCwd)) {
+        if (destination.includes("正文")) targets.push(destination)
       }
     }
     if (commandName === "cp" || commandName === "mv" || commandName === "install") {
-      for (const destination of copyLikeTargets(commandName, commandArgs)) {
-        if (destination.includes("正文")) targets.push(underCwd(destination))
+      for (const destination of copyLikeTargets(commandName, commandArgs).map(underCwd)) {
+        if (destination.includes("正文")) targets.push(destination)
       }
     }
   }

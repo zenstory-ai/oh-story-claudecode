@@ -326,6 +326,12 @@ run_cmd_parity() {
   "cd_then_heredoc_redirect": "cd \"/p/书\" && cat > 正文/第022章_x.md <<EOF\nhi\nEOF",
   "cd_chain_tee": "cd /a && cd b && tee 正文/第3章.md",
   "cd_relative_cp": "cd 书 && cp draft.md 正文/第2章.md",
+  "cd_clobber_redirect": "cd 书 && cat draft >| 正文/第3章.md",
+  "cd_dup_redirect": "cd 书 && echo x >& 正文/第3章.md",
+  "cd_amp_redirect": "cd 书 && echo x &> 正文/第3章.md",
+  "cd_into_body_redirect": "cd 书/正文 && cat > 第3章.md",
+  "cd_into_body_tee": "cd 正文 && tee 第3章.md",
+  "cd_redirect_then_pipe": "cd 书 && cat x > 正文/第3章.md 2>&1 | tee log",
   "commit_plain": "git commit -m x",
   "commit_chain": "git add . && git commit -m x",
   "commit_if": "if true; then git commit -m x; fi",
@@ -368,6 +374,12 @@ JS
     || { echo "FAIL: 全角空格章名被 \\s 截断（U+3000 不是 shell 分词符）" >&2; return 3; }
   grep -q 'tee_quoted_space :: pros=\[my book/正文/第1章_x.md\]' "$tmp/cpy.txt" \
     || { echo "FAIL: 带空格的引号 tee 目标未被整段取出" >&2; return 3; }
+  # 有 cd 时按段扫描重定向：`>|` `>&` `&>` 不能被切段切丢，cd 进 正文/ 后的相对目标也要认出来。
+  for want in 'cd_clobber_redirect :: pros=\[书/正文/第3章.md\]' 'cd_dup_redirect :: pros=\[书/正文/第3章.md\]' \
+      'cd_amp_redirect :: pros=\[书/正文/第3章.md\]' 'cd_into_body_redirect :: pros=\[书/正文/第3章.md\]' \
+      'cd_into_body_tee :: pros=\[正文/第3章.md\]' 'cd_redirect_then_pipe :: pros=\[书/正文/第3章.md\]'; do
+    grep -q "$want" "$tmp/cpy.txt" || { echo "FAIL: cd 后的写正文目标没认出来：$want" >&2; return 3; }
+  done
   grep -q 'cp_quoted_space :: pros=\[my book/正文/第1章_x.md\]' "$tmp/cpy.txt" \
     || { echo "FAIL: cp 的引号目标被按空白切碎，末位取到了另一本书的路径" >&2; return 3; }
   grep -q 'cp_quoted_operator :: pros=\[book|archive/正文/第11章.md\]' "$tmp/cpy.txt" \
