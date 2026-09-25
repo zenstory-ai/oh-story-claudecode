@@ -11,6 +11,7 @@ check-ai-patterns 的 blocking/advisory 计数；给了 --tell 时加人类区�
 """
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -135,8 +136,6 @@ def codex_efficiency(run, meta):
             if d.get('type') == 'item.completed':
                 kind = item.get('type')
                 eff['tools'][kind] += 1
-                if kind == 'collab_tool_call' or 'spawn' in str(item.get('tool', '')):
-                    eff['spawns'] += 1
                 cmd = item.get('command') or ''
                 m = CHECK_RE.search(cmd)
                 if m:
@@ -146,8 +145,48 @@ def codex_efficiency(run, meta):
                     eff['commits'].append({'chapter': int(m.group(2)), 'action': m.group(1), 'at': None})
     # codex 的 input_tokens 已含 cached 部分
     eff['main']['input_tokens'] = eff['main'].get('input_tokens', 0) - eff['main'].get('cache_read_input_tokens', 0)
+    # --json 只有主线程；子 agent 线程的 token 与次数从 CODEX_HOME/sessions 的 rollout 里按 cwd 归到本次运行
+    eff['spawns'], eff['agents'] = 0, Counter()
+    for rollout in codex_rollouts(run):
+        first, last = None, None
+        for d in jl(rollout):
+            if first is None:
+                first = d
+            if (d.get('payload') or {}).get('type') == 'token_count':
+                last = (d['payload'].get('info') or {}).get('total_token_usage') or last
+        source = ((first or {}).get('payload') or {}).get('source')
+        if not (isinstance(source, dict) and 'subagent' in source) or not last:
+            continue
+        spawn = source['subagent'].get('thread_spawn') or {}
+        eff['spawns'] += 1
+        eff['agents'][spawn.get('agent_path', '?').rsplit('/', 1)[-1]] += 1
+        cached = int(last.get('cached_input_tokens') or 0)
+        usage_add(eff['sub'], {'input_tokens': int(last.get('input_tokens') or 0) - cached,
+                               'cache_read_input_tokens': cached, 'output_tokens': last.get('output_tokens')})
+    eff['agents'] = dict(eff['agents'])
     eff['tools'] = dict(eff['tools'])
     return eff
+
+
+def codex_rollouts(run):
+    try:
+        hosts = json.loads((Path(os.environ.get('BENCH_HOME', Path.home() / '.oh-story-bench')) / 'hosts.json')
+                           .read_text(encoding='utf-8'))
+        home = Path(os.path.expanduser(hosts['codex']['env']['CODEX_HOME']))
+    except (OSError, KeyError, ValueError):
+        return []
+    proj = str((Path(run) / 'proj').resolve())
+    found = []
+    for f in (home / 'sessions').rglob('rollout-*.jsonl'):
+        with open(f, encoding='utf-8', errors='replace') as handle:
+            try:
+                meta = json.loads(handle.readline()).get('payload') or {}
+            except ValueError:
+                continue
+        cwd = meta.get('cwd') or ''
+        if cwd and str(Path(cwd).resolve()) == proj:
+            found.append(f)
+    return found
 
 
 def prose(run, meta, tell):
