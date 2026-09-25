@@ -1,6 +1,6 @@
 # scripts/bench —— 真实会话基准
 
-v0.8 瘦身的每一项改动都要过这套基准：同一批冻结的书、同一个用例，用真实 CLI 会话把章写完，比较前后版本的耗时、token 和正文指标。决策背景见 `.agents/notes/proposed/architecture/2026-09-24-v0-8-lean-writing-loop.md`。
+v0.8 瘦身的每一项改动都要过这套基准：同一批冻结的书、同一个用例，用真实 CLI 会话把章写完，比较前后版本的耗时、token 和正文指标。决策背景见 `.agents/notes/implemented/architecture/2026-09-24-v0-8-lean-writing-loop.md`。
 
 只有工具进仓库；fixture、主机凭据和运行产物都放在仓库外（默认 `~/.oh-story-bench`，可用 `BENCH_HOME` 改），不提交。
 

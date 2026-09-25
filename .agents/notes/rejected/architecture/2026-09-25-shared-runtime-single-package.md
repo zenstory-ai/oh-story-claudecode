@@ -4,7 +4,7 @@ Status: rejected
 
 ## Problem
 
-v0.8 瘦身提案（[v0.8 提案](../../proposed/architecture/2026-09-24-v0-8-lean-writing-loop.md) 第 2 节）列了一项「共享运行时只打一个包」：author memory、tracking、检测器、字数脚本在 5 个 skill 里各放一份拷贝，仓库冗余约 1.76MB（其中脚本约 0.94MB），改一处要 sync 全部副本。提案设想把它们做成一个 runtime payload，由 story-setup 部署到用户项目，各 skill 调用那一份。
+v0.8 瘦身提案（[v0.8 提案](../../implemented/architecture/2026-09-24-v0-8-lean-writing-loop.md) 第 2 节）列了一项「共享运行时只打一个包」：author memory、tracking、检测器、字数脚本在 5 个 skill 里各放一份拷贝，仓库冗余约 1.76MB（其中脚本约 0.94MB），改一处要 sync 全部副本。提案设想把它们做成一个 runtime payload，由 story-setup 部署到用户项目，各 skill 调用那一份。
 
 ## Decision
 

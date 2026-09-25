@@ -12,6 +12,39 @@ compare 链接；小节名使用 Keep a Changelog 的六个英文类别（`Added
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-25
+
+> 本版 `agents_version: 32`（v0.7.11 为 31），`setup_skill_version: 1.3.0`。narrative-writer、consistency-checker 与写正文守卫都已更新：更新技能包后，在每个写作项目根重新运行 `/story-setup`（Codex 用 `$story-setup`），再新开会话。已在写的长篇不用迁移。升级细节见 [UPGRADING](skills/story-setup/UPGRADING.md)。
+
+v0.8 的主题是瘦身：同一本书、同一批细纲，Codex 上每章耗时从约 18 分钟降到约 11 分钟、累计输入 token 降约 39%；按同一套换家族评委的非劣效门槛，细纲兑现、越界新增、检测器提示与配对盲评都没有变差。
+
+### Added
+
+- `scripts/bench/`：真实会话基准。确定性部署任一版本的技能包，用真实 Claude Code / Codex 会话写冻结的书，按章统计耗时、token 与正文指标；另有换模型家族评委的细纲兑现核对、「演成场景 / 概括转述」严格判定与配对盲评。v0.8 每项瘦身都过这套基准。
+- `tracking_commit.py draft`：按当前追踪状态预填一章的追踪提交（修订号、章名、当前上下文、各字段字数上限、在场角色当前快照），只需填本章变化。
+- `storyctl.py chapter check --fix-punctuation`：一次调用整理标点并跑完 AI 句式、退化、细纲照搬与字数检测。
+
+### Changed
+
+- **单章流程变短**：长篇单章与日更流程改写为短手册（主会话每次会话要读的流程文字从约 4.5 万字降到约 3.2 万字）；每章收尾一次检测；作者记忆由组装脚本代查；一致性检查只在写手申报了新东西时按章做，否则每批一次，并且只读相关设定；去 AI 味审查只在检测器报出较多需要判断的问题时才调用。分段写作与中途一次字数检查、欠字不补 / 超字只删一次的规则保持不变。
+- **追踪提交出错一次说全**：超长的字段一次全部列出，并换算成「现 N 字、上限约 M 字、至少删 K 字」。
+- **概念收敛**：
+  - 写正文、排纲、主会话处置用同一套新增物三级：直接写 / 写了要报 / 先问作者。
+  - 读者契约收敛为「契约四问」，流程里不再逐一点名十几个术语。
+  - 排纲期的供给自查、建纲追加改写在 `大纲/排纲底稿_{单元ID}.md`，卷纲只放写作要用的内容，写正文不再需要 `--stage write`。
+  - 问题严重度统一读作 必须修 / 建议看 / 仅提示。
+  - 去 AI 味写明只有一条管线（检测器 → 选 Gate → 一次定点改写 → 复扫），三遍法不再作为独立层级。
+  - 去掉 Constraint Lock、「内带」两个名词，行为不变。
+- narrative-writer 写新正文不再预加载去 AI 味整套流程、不预读禁用词表，也不自己跑检测脚本；对话与情绪弧线参考照常读。
+- README 与 `/story` 只主推 5 个入口（setup、story、长篇、短篇、去 AI 味），只说 `/story` 时给四个白话选项。
+- 热路径预算按角色计每次调用的实际加载量，agent 模板预加载的 skill 自动计入。
+
+### Fixed
+
+- 写正文守卫在 `cd 书目录 && cat > 正文/…` 这类命令上按错误目录找细纲、误报「缺少细纲」。
+- 追踪文档与单章流程关于「写正文时是否在章中测字数」的说法互相矛盾。
+- 测试审计：清理重复、测不到东西或只钉措辭的测试与守卫，补上此前测不到的引号豁免、上一章毒句式欠账门与多条检测器分支的行为用例。
+
 ## [0.7.11] - 2026-09-24
 
 > 本版 `agents_version: 31`（v0.7.10 为 30），`setup_skill_version: 1.2.11`。chapter-extractor、story-explorer、narrative-writer 与各端部署模板都已更新：更新技能包后，在每个写作项目根重新运行 `/story-setup`（Codex 用 `$story-setup`），再新开会话。长篇拆文现在需要 Python 3。升级细节见 [UPGRADING](skills/story-setup/UPGRADING.md)。
@@ -1058,7 +1091,8 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 - 初始版本：长篇/短篇写作、拆文、扫榜、去 AI 味、浏览器操控
 - 用 52000+ 本真实数据增强知识库
 
-[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.7.11...HEAD
+[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.7.11...v0.8.0
 [0.7.11]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.7.10...v0.7.11
 [0.7.10]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.7.9...v0.7.10
 [0.7.9]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.7.8...v0.7.9
