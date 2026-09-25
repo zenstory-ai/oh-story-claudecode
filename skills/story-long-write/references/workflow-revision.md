@@ -41,13 +41,13 @@
 
 ## Step 3：修改
 
-1. **阅读原文**：读完整章内容，用 `{PYTHON} {story-long-write skill 根}/scripts/storyctl.py wordcount check` 记录原始 `visible_chars_v1` 结果
+1. **阅读原文**：读完整章，用 `{PYTHON} {skill 根}/scripts/storyctl.py wordcount check` 记下原始字数
 2. **备份原文**：将原文复制为 `正文/第{X}章_章名_原稿_{YYYYMMDD}.md`，确保可回退
 3. **确认修改范围**：问用户是"全文重写"还是"修改特定段落"
    - 全文重写：基于细纲重新写，保留备份
    - 局部修改：只改指定段落（按场景序号或关键词定位），保持其他部分不变
 4. **执行修改**：改写文件
-5. **一次检测**：修改后运行 `{PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter check --project {项目根} --chapter {X} --fix-punctuation`，一次拿到标点整理、AI 句式与禁用词、退化、细纲照搬和字数；blocking 就地改到净，改完重跑。字数与原文差异 >30% 或 >800 字时提醒用户（取较大值），用白话说「改后约 X 字，比原来多/少 Y 字，比目标多/少 Z 字」，不报状态码。测量状态不触发静默覆盖或二次改写正文
+5. **一次检测**：修改后运行 `{PYTHON} {skill 根}/scripts/storyctl.py chapter check --project {项目根} --chapter {X} --fix-punctuation`（含禁用词与字数）；blocking 改到净再重跑。字数与原文差异 >30% 或 >800 字时提醒用户（取较大值），用白话说「改后约 X 字，比原来多/少 Y 字，比目标多/少 Z 字」，不报状态码；字数不触发静默二次改写
 
 **资料研究（按需）**：如果修改涉及需要验证的外部事实（历史年代、地理方位、职业细节等），spawn `story-researcher` agent 搜索验证。
 
@@ -66,7 +66,7 @@
 7. **后续影响**：如果修改改变了角色状态/关系/世界观设定，扫描后续章节正文标记受影响项，放进下方汇报。
 
 8. **正文元信息扫描**：按 [workflow-chapter.md](workflow-chapter.md) 步骤 6「正文元信息隔离」扫描标题行以外的正文，沿用其中的改写方式与故事内真实阅读/读者身份例外。
-9. **收口**：运行 `tracking_commit.py check` 验证 state 与全部派生视图一致；禁用词已由 Step 3 的 `chapter check` 覆盖，不另整读词表
+9. **收口**：运行 `tracking_commit.py check` 验证 state 与全部派生视图一致
 
 ---
 

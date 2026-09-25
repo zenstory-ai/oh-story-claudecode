@@ -87,6 +87,7 @@ Status: implemented
 - 去 AI 味写明一条管线（检测器 → 选 Gate → 一次定点改写 → 复扫），三遍法不再作为独立层级；严重度统一读作 必须修 / 建议看 / 仅提示。
 - 删去 Constraint Lock、中途快照、「内带」三个仪式或名词，行为保留。
 - README 与 `/story` 只主推 5 个入口；只说 `/story` 时给四个白话选项。
+- 第二轮：细纲必填 16→9（[细纲核心字段](../simplification/2026-09-25-outline-core-fields.md)）；写手不交时空表、不默认交错，质检删除测试收成两块（[写手自检精简](../simplification/2026-09-25-writer-self-check-trim.md)）；explorer gaps 分流只在 benchmark-recall 一份；退役 long-write 的 state-tracking.md；旧信息查找 6 级→3 级；「本章没写成的」只分两路；改稿走一次 `chapter check`；品质清单的契约审查改指向契约四问。
 
 ### 维护规矩（已落地）
 
