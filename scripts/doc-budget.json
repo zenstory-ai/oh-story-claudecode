@@ -249,17 +249,52 @@
       "why": " 迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +200：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。 作者汇报白话模板与书内工作目录约定（2026-09-24）按实际增量显式调高，理由同 SKILL.md 与 workflow-chapter/daily/setup/revision 各自条目。"
     },
     {
-      "label": "正文 agent 基础规则（不含条件参考）",
-      "budget": 42700,
+      "label": "写手写正文（narrative-writer 每次调用）",
+      "agent": "skills/story-setup/references/templates/agents/narrative-writer.md",
       "files": [
-        "skills/story-setup/references/templates/agents/narrative-writer.md",
-        "skills/story-long-write/references/writing-craft.md",
-        "skills/story-long-write/references/anti-ai-writing.md",
-        "skills/story-long-write/references/banned-words.md",
-        "skills/story-long-write/references/style-resolution.md",
-        "skills/story-deslop/references/deslop-gates.md"
+        "skills/story-setup/references/agent-references/writing-craft.md",
+        "skills/story-setup/references/agent-references/dialogue-mastery.md",
+        "skills/story-setup/references/agent-references/emotional-arc-design.md"
       ],
-      "why": "保守计入完整 Gate 文件（原在预加载 story-deslop 与写手定义内）；不是新增技法。此路径不代表含预加载 skill 的完整上下文。 调高：写手定义补一句分组临时文件写到书内 .story/work/，不写 /tmp 或 正文/。"
+      "branches": [
+        {
+          "label": "常规章",
+          "budget": 29600,
+          "files": []
+        },
+        {
+          "label": "前三章",
+          "budget": 34500,
+          "files": [
+            "skills/story-setup/references/agent-references/opening-design.md"
+          ]
+        }
+      ],
+      "why": "v0.8：按角色计实际加载量。写新正文必读写作技法，另按铁律表读对话与情绪弧线（本章有对话/给了目标情绪即读）；前三章加读开篇设计。模板 frontmatter 预加载的 skill 由守卫自动计入。"
+    },
+    {
+      "label": "写手去味审查（narrative-writer 审查调用）",
+      "agent": "skills/story-setup/references/templates/agents/narrative-writer.md",
+      "budget": 47250,
+      "files": [
+        "skills/story-setup/references/agent-references/style-resolution.md",
+        "skills/story-setup/references/agent-references/anti-ai-writing.md",
+        "skills/story-setup/references/agent-references/deslop-gates.md",
+        "skills/story-setup/references/agent-references/banned-words.md",
+        "skills/story-setup/references/agent-references/writing-craft.md",
+        "skills/story-setup/references/agent-references/agent-reference-profiles.md",
+        "skills/story-setup/references/agent-references/agent-quality.md"
+      ],
+      "why": "v0.8：去味审查按需调用时的实际加载量（原「正文 agent 基础规则」混算了写作与审查两种调用）。"
+    },
+    {
+      "label": "一致性检查（consistency-checker 每次调用）",
+      "agent": "skills/story-setup/references/templates/agents/consistency-checker.md",
+      "budget": 6250,
+      "files": [
+        "skills/story-setup/references/agent-references/agent-quality.md"
+      ],
+      "why": "v0.8：规则部分；书内资料按检查范围定点读，不在此计。"
     },
     {
       "label": "长篇单章 direct/solo",

@@ -45,6 +45,26 @@ class DocBudgetCliTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertRegex(result.stdout, re.compile(r"\b7\s*/\s*7\s+0\s+fixture route\s+\[ok\]"))
 
+    def test_agent_path_counts_preloaded_skill(self) -> None:
+        agent = "skills/story-setup/references/templates/agents/w.md"
+        result = self.run_checker(
+            {agent: "---\nname: w\nskills: [pre]\n---\n正文", "skills/pre/SKILL.md": "预加载", "r.md": "参考"},
+            {"files": [], "paths": [{"label": "writer call", "agent": agent, "budget": 100, "files": ["r.md"]}]},
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        # 模板全文去空白 + 参考 2 字 + 预加载 SKILL 3 字
+        weight = len("---name:wskills:[pre]---正文") + 2 + 3
+        self.assertRegex(result.stdout, re.compile(rf"\b{weight}\s*/\s*100\b.*writer call"))
+
+    def test_preloading_agent_without_agent_path_fails(self) -> None:
+        agent = "skills/story-setup/references/templates/agents/w.md"
+        result = self.run_checker(
+            {agent: "---\nname: w\nskills: [pre]\n---\n正文", "skills/pre/SKILL.md": "预加载"},
+            {"files": [], "paths": []},
+        )
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("预加载了 pre，但没有登记 agent 路径", result.stdout)
+
     def test_fails_when_path_sum_exceeds_budget(self) -> None:
         result = self.run_checker(
             {"a.md": "abc", "b.md": "1234"},

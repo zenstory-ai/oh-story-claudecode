@@ -98,13 +98,42 @@ const checkPath = (label, budget, files) => {
     fail.push(`路径「${label}」超预算 ${-left} 字（${total} > ${budget}）`);
   }
 };
+// agent 模板 frontmatter 的 `skills: [...]` 会把整份 SKILL.md 预加载进该 agent 的每次调用；
+// 这部分以前不进任何预算（写手曾因此每次多付一整份 story-deslop）。登记了 agent 的路径自动计入，
+// 而带预加载的 agent 模板必须至少有一条 agent 路径，否则预加载就又成了看不见的成本。
+const AGENT_DIR = "skills/story-setup/references/templates/agents";
+const preloads = (rel) => {
+  const abs = path.join(repoRoot, rel);
+  if (!fs.existsSync(abs)) return null;
+  const head = fs.readFileSync(abs, "utf8").split(/^---\s*$/m)[1] || "";
+  const match = head.match(/^skills:\s*\[([^\]]*)\]/m);
+  return match ? match[1].split(",").map((s) => s.trim()).filter(Boolean) : [];
+};
+const agentPaths = new Set();
 for (const group of manifest.paths || []) {
+  let files = group.files;
+  if (group.agent) {
+    agentPaths.add(group.agent);
+    const skills = preloads(group.agent);
+    if (skills === null) { fail.push(`路径「${group.label}」登记的 agent 不存在：${group.agent}`); continue; }
+    files = [group.agent, ...files, ...skills.map((name) => `skills/${name}/SKILL.md`)];
+  }
   if (group.branches) {
     for (const branch of group.branches) {
-      checkPath(`${group.label}（${branch.label}）`, branch.budget, [...group.files, ...branch.files]);
+      checkPath(`${group.label}（${branch.label}）`, branch.budget, [...files, ...branch.files]);
     }
   } else {
-    checkPath(group.label, group.budget, group.files);
+    checkPath(group.label, group.budget, files);
+  }
+}
+const agentDir = path.join(repoRoot, AGENT_DIR);
+if (fs.existsSync(agentDir)) {
+  for (const name of fs.readdirSync(agentDir).filter((n) => n.endsWith(".md")).sort()) {
+    const rel = `${AGENT_DIR}/${name}`;
+    const skills = preloads(rel) || [];
+    if (skills.length && !agentPaths.has(rel)) {
+      fail.push(`${rel} 预加载了 ${skills.join("、")}，但没有登记 agent 路径——预加载内容进该 agent 每次调用，须计入预算`);
+    }
   }
 }
 
