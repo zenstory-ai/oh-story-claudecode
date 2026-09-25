@@ -324,7 +324,7 @@ expected = {
     'chapter-extractor', 'character-designer', 'consistency-checker',
     'narrative-writer', 'story-architect', 'story-explorer', 'story-researcher',
 }
-read_only = {'chapter-extractor', 'consistency-checker', 'story-explorer'}
+read_only = {'consistency-checker', 'story-explorer'}  # chapter-extractor 写批次输入文件，不再只读
 found = set()
 for path in sorted(Path('skills/story-setup/references/codex/agents').glob('*.toml')):
     data = tomllib.loads(path.read_text(encoding='utf-8'))

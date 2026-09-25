@@ -9,6 +9,12 @@
 
 `.story-deployed` 缺失任一字段，或 `agents_version` 缺失 / 非整数 / 小于 `31`，都视为待更新部署。直接重新运行 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或自然语言点名）；不在运行时逐级兼容历史模板。如项目 `agents_version` 大于 `31`，说明本地 story-setup 比项目旧：先更新 oh-story-claudecode，不得用 v31 降级覆盖。历史版本改动见仓库根目录 `CHANGELOG.md`。
 
+## 长篇拆文不中转契约（版本号与发布安排待维护者定）
+
+- `chapter-extractor` 模板改为可写：tools 增加 Write 与 Edit，frontmatter 内联 PreToolUse(Write|Edit) hook 调 `.claude/hooks/story_hook_cli.js analysis-input-guard`，只许写 `{拆文目录}/_analysis_cache/输入-{RAW|REUSE}-{起章}-{止章}.md`。Codex 不再给它只读沙箱，OpenCode/Antigravity 同步可写；这些端没有内联 hook，写入范围靠 agent 指令与提交校验约束。
+- `story-long-analyze` Stage 2 按新流程派发：只给 `source_locator`、字数、输出文件与上一批缓存路径，子代理自写输入文件、只回回执。旧部署的 extractor 没有写权限，走新流程会拿不到输入文件，所以已部署项目要更新技能包、重跑 story-setup 并新开会话。
+- 发布时需要提升 `agents_version`（本 PR 不改版本号）。
+
 ### v0.7.11 必须重跑 story-setup
 
 Claude Code、Codex、Antigravity、OpenCode、ZCode、OpenClaw、Reasonix 用户更新技能包后都要在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`），再新开会话：

@@ -1025,6 +1025,137 @@ def test_relation_chart_mermaid_edge_cases() -> None:
                 "认不出的关系行要报出数量：" + result.stdout)
 
 
+def test_digest_reads_observations_and_fields_without_whole_caches() -> None:
+    with tempfile.TemporaryDirectory(prefix="long-digest-") as temporary:
+        root = Path(temporary) / "书"
+        write_source_and_index(root, 6)
+        plan = json.loads(run(MANAGE, "plan", "--root", root, "--intent", "continue").stdout)
+        model = root / "_analysis_cache" / "输入.md"
+        model.parent.mkdir(parents=True, exist_ok=True)
+        for batch in plan["batches"]:
+            start, end = batch["chapter_range"]
+            text = compact_output(start, end, tone="紧张", theme="悬念").replace(
+                "因果连续，下一批继续核查代价。", f"观察标记-{start}-{end}")
+            model.write_text(text, encoding="utf-8")
+            committed = run(MANAGE, "commit", "--root", root, "--input", model, "--batch-id", batch["batch_id"],
+                            "--range-sha256", batch["range_sha256"], *[
+                                item for source in batch["source_files"] for item in ("--source-file", source)])
+            require(committed.returncode == 0, committed.stdout + committed.stderr)
+        # A stray cache that no committed batch owns must not leak into the digest.
+        stray = root / "_analysis_cache" / "legacy" / "批次-RAW-1-3.old.md"
+        stray.parent.mkdir(parents=True, exist_ok=True)
+        stray.write_text("观察标记-陈旧", encoding="utf-8")
+
+        observed = run(MANAGE, "digest", "--root", root, "--part", "observations")
+        require(observed.returncode == 0, observed.stdout + observed.stderr)
+        text = observed.stdout
+        require(text.index("观察标记-1-3") < text.index("观察标记-4-6"), "观察必须按章序输出")
+        require("## RAW-1-3（第1-3章）" in text, "每段观察必须带批次与章节范围标题")
+        require("CHAPTER_START" not in text and "P1 " not in text and "陈旧" not in text,
+                "观察输出不能夹带逐章块或非本批缓存")
+        windowed = run(MANAGE, "digest", "--root", root, "--part", "observations", "--chapters", "5-6").stdout
+        require("观察标记-4-6" in windowed and "观察标记-1-3" not in windowed, "章节窗口必须按范围重叠筛批次")
+
+        fields = run(MANAGE, "digest", "--root", root, "--part", "chapters", "--chapters", "2-3",
+                     "--fields", "涉及,三维节奏", "--points", "brief").stdout
+        require("### 第2章" in fields and "### 第3章" in fields and "### 第1章" not in fields, "逐章窗口不对")
+        require("- 涉及：人物甲、人物乙" in fields, "字段必须按摘要标签抽取")
+        require("P1 节拍1｜行动｜紧张" in fields, "简表情节点必须给标题、映射后类型与基调")
+        require("人物甲在第2章完成第1步" not in fields, "brief 不带白描")
+        full = run(MANAGE, "digest", "--root", root, "--part", "chapters", "--chapters", "2", "--points", "full").stdout
+        require("人物甲在第2章完成第1步" in full and "基调：紧张" in full, "full 带白描与基调")
+        bad = run(MANAGE, "digest", "--root", root, "--part", "chapters", "--fields", "不存在的字段")
+        require(bad.returncode == 2 and json.loads(bad.stdout)["error"] == "unknown_summary_field", "未知字段必须拒绝")
+        empty = run(MANAGE, "digest", "--root", root, "--part", "chapters")
+        require(empty.returncode == 2 and json.loads(empty.stdout)["error"] == "digest_empty_request", "空请求必须拒绝")
+
+
+HOOK_CLI = ROOT / "skills" / "story-setup" / "references" / "templates" / "hooks" / "story_hook_cli.js"
+
+
+def test_plan_next_prints_only_upcoming_batches() -> None:
+    with tempfile.TemporaryDirectory(prefix="long-plan-next-") as temporary:
+        root = Path(temporary) / "书"
+        write_source_and_index(root, 10)
+        full = json.loads(run(MANAGE, "plan", "--root", root, "--intent", "continue").stdout)
+        require(full["remaining_batches"] == len(full["batches"]) == 4, "默认输出全部批次并给出总数")
+        require(full["summary_gaps"] == list(range(1, 11)), "默认 summary_gaps 仍是逐章列表")
+        nxt = json.loads(run(MANAGE, "plan", "--root", root, "--intent", "continue", "--next", "1").stdout)
+        require([b["batch_id"] for b in nxt["batches"]] == [full["batches"][0]["batch_id"]], "--next 1 只给下一批")
+        require(nxt["batches"][0] == full["batches"][0], "下一批的内容与全量计划一致")
+        require(nxt["remaining_batches"] == 4 and nxt["summary_gaps"] == ["1-10"], "--next 仍给总数，缺口压成区间")
+        count = json.loads(run(MANAGE, "plan", "--root", root, "--intent", "continue", "--next", "0").stdout)
+        require(count["batches"] == [] and count["remaining_batches"] == 4, "--next 0 只看进度")
+        bad = run(MANAGE, "plan", "--root", root, "--intent", "continue", "--next", "-1")
+        require(bad.returncode == 2 and json.loads(bad.stdout)["error"] == "invalid_next", "负数必须拒绝")
+
+
+def test_extractor_self_check_patterns_match_commit_format() -> None:
+    """The Grep self-check in the extractor template must count exactly what commit accepts."""
+    template = (ROOT / "skills" / "story-setup" / "references" / "templates" / "agents" / "chapter-extractor.md")
+    section = template.read_text(encoding="utf-8").split("10. **写完先用 Grep", 1)[1].split("任一项对不上", 1)[0]
+    patterns = re.findall(r"`(\^[^`]+)`", section)
+    require(len(patterns) == 4, f"自查模式应为 P 行、标题行、标签行、字段行四条：{patterns}")
+    point, header, tag, field = (re.compile(p, re.MULTILINE) for p in patterns)
+    good = compact_output(4, 6, tone="紧张", theme="悬念", points=12)
+    points = len(point.findall(good))
+    require(points == 36, f"夹具应有 36 个情节点：{points}")
+    require(len(header.findall(good)) == points and len(tag.findall(good)) == points, "合格输出的标题行与标签行必须等于情节点数")
+    require(len(field.findall(good)) == 10 * 3, "合格输出的十个章级字段必须每章各一")
+    no_title = good.replace("P1 **节拍1**：类型动作", "P1 类型动作", 1)
+    require(len(header.findall(no_title)) == points - 1, "漏加粗短标题必须查得出")
+    no_tag = good.replace("\n\n主题标签悬念 | 基调：紧张", "", 1)
+    require(len(tag.findall(no_tag)) == points - 1, "漏主题标签｜基调行必须查得出")
+    no_people = good.replace("**涉及人物**：人物甲、人物乙\n", "", 1)
+    require(len(field.findall(no_people)) == 10 * 3 - 1, "漏涉及人物必须查得出")
+
+
+def test_extractor_write_guard() -> None:
+    node = shutil.which("node")
+    if not node:
+        print("SKIP: test_extractor_write_guard (node absent)")
+        return
+    with tempfile.TemporaryDirectory(prefix="extractor-guard-") as temporary:
+        project = Path(temporary) / "项目"
+        book = project / "拆文库" / "书"
+        (book / "_analysis_cache").mkdir(parents=True)
+        (book / "chapter_index.csv").write_text("chapter\n", encoding="utf-8")
+        bare = project / "拆文库" / "空目录"
+        (bare / "_analysis_cache").mkdir(parents=True)
+
+        def guard(file_path: str | None, raw: str | None = None) -> subprocess.CompletedProcess[str]:
+            payload = raw if raw is not None else json.dumps(
+                {"tool_name": "Write", "tool_input": {"file_path": file_path, "content": "x"}}, ensure_ascii=False)
+            return subprocess.run([node, str(HOOK_CLI), "analysis-input-guard"], input=payload, text=True,
+                                  encoding="utf-8", capture_output=True, check=False,
+                                  env={**os.environ, "CLAUDE_PROJECT_DIR": str(project)})
+
+        allowed = [book / "_analysis_cache" / "输入-RAW-4-6.md", book / "_analysis_cache" / "输入-REUSE-1-3.md"]
+        for path in allowed:
+            result = guard(str(path))
+            require(result.returncode == 0, f"合法输入文件必须放行：{path} {result.stderr}")
+        require(guard("拆文库/书/_analysis_cache/输入-RAW-7-9.md").returncode == 0, "相对路径按项目根解析后放行")
+        blocked = {
+            "文件名不对": book / "_analysis_cache" / "输入.md",
+            "写缓存本体": book / "_analysis_cache" / "批次-RAW-4-6.md",
+            "章号倒置": book / "_analysis_cache" / "输入-RAW-6-4.md",
+            "写摘要": book / "章节" / "第4章_摘要.md",
+            "非拆文目录": bare / "_analysis_cache" / "输入-RAW-1-3.md",
+            "项目外": Path(temporary) / "外面" / "_analysis_cache" / "输入-RAW-1-3.md",
+        }
+        for label, path in blocked.items():
+            result = guard(str(path))
+            require(result.returncode == 2 and "chapter-extractor 写入被拦截" in result.stderr,
+                    f"{label} 必须阻断：{result.returncode} {result.stderr}")
+        require(guard(None, raw="不是 JSON").returncode == 0, "读不到输入时放行，交给提交校验")
+        edit_ok = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": str(allowed[0]),
+                              "old_string": "a", "new_string": "b"}}, ensure_ascii=False)
+        require(guard(None, raw=edit_ok).returncode == 0, "Edit 自己的输入文件放行")
+        edit_bad = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": str(blocked["写摘要"]),
+                               "old_string": "a", "new_string": "b"}}, ensure_ascii=False)
+        require(guard(None, raw=edit_bad).returncode == 2, "Edit 其他文件同样阻断")
+
+
 def main() -> int:
     test_index_contract()
     test_invalid_root_and_manage_entry()
@@ -1043,6 +1174,10 @@ def main() -> int:
     test_relation_chart_never_falls_back_to_pinyin()
     test_relation_chart_font_choice()
     test_relation_chart_mermaid_edge_cases()
+    test_digest_reads_observations_and_fields_without_whole_caches()
+    test_extractor_write_guard()
+    test_extractor_self_check_patterns_match_commit_format()
+    test_plan_next_prints_only_upcoming_batches()
     print("OK: single-state long-analyze runtime regressions passed")
     return 0
 

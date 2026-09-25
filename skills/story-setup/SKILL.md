@@ -183,7 +183,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 - 读取 `skills/story-setup/references/codex/agents/` 下所有 `.toml` 文件，复制到用户项目 `.codex/agents/`
 - Agent 文件属于 story-setup 管理文件，可安全覆盖；`references/codex/agents/` 里的 TOML 由仓库根的 `scripts/generate-codex-agents.py` 从 Claude agent 模板确定性生成后提交入库，部署只做复制
 - 校验每个 TOML 都能解析，且包含 Codex 必需字段：`name`、`description`、`developer_instructions`
-- 只读职责 agent（`chapter-extractor`、`consistency-checker`、`story-explorer`）必须保留 `sandbox_mode = "read-only"`
+- 只读职责 agent（`consistency-checker`、`story-explorer`）必须保留 `sandbox_mode = "read-only"`；`chapter-extractor` 要写批次输入文件，不设只读沙箱
 - **部署后必须 trust + 新开 Codex 会话**（报告文案与 fallback 规则见「验证 Codex 部署」）；hooks 未在 `/hooks` 信任前会被 Codex 静默跳过，包括写正文前的大纲守卫；若运行时返回 `unknown agent_type`，调用方必须降级 solo/direct 并报告 fallback。
 - 将 `skills/story-setup/references/agent-references/` 同步复制到 `.codex/skills/story-setup/references/agent-references/`，作为 Codex agent 的项目内参考资料主路径
 
@@ -192,7 +192,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 - 先确认 `node` 在 PATH；Antigravity agent 生成与项目 hooks 都依赖 Node。缺失时停止 Antigravity 这一目标的部署，不留下半成品，并提示安装 Node 后重跑。
 - 执行 `node "{story-setup skill目录}/scripts/generate-antigravity-agents.mjs" --source "{story-setup skill目录}/references/templates/agents" --dest "{项目}/.agents/agents"`。生成器先渲染全部 7 个 agent，再原子替换这 7 个已知 `.agents/agents/agent-name/agent.md` 定义（`agent-name` 为实际名称），并清理旧版同名扁平 `.md`；保留其他用户 agent，任一源 frontmatter 异常时不得留下半更新目录，也不得沿 managed agent symlink 写出项目外。
 - 校验 7 个 `.md`：`name` 与文件名一致；`mainAgent: false`、`subagent: true`；模型只使用 `flash` / `pro`；工具只来自 Antigravity 官方名称 `view_file`、`find_by_name`、`grep_search`、`write_to_file`、`replace_file_content`、`multi_replace_file_content`、`run_command`；不得残留 Claude 的 `Read/Glob/Grep/Write/Edit/Bash` 工具名或 `.claude/skills/` reference 前缀。
-- 只读 agent（`chapter-extractor`、`consistency-checker`、`story-explorer`）不得包含写文件或命令工具；其他 agent 按 Claude 真源的能力边界映射。
+- 只读 agent（`consistency-checker`、`story-explorer`）不得包含写文件或命令工具；`chapter-extractor` 只有读取与写文件、无命令工具；其他 agent 按 Claude 真源的能力边界映射。
 - Antigravity 通过 `invoke_subagent` 的 `TypeName` 调用这些 agent。部署后新开 Antigravity conversation，再用 `story-review` 验证 full/lean；运行时无法解析某个 custom agent 时按 skill 的 solo/direct fallback 执行。
 
 #### 配置 OpenCode Agent 模型

@@ -322,7 +322,7 @@ expected = {
     'chapter-extractor', 'character-designer', 'consistency-checker',
     'narrative-writer', 'story-architect', 'story-explorer', 'story-researcher',
 }
-read_only = {'chapter-extractor', 'consistency-checker', 'story-explorer'}
+read_only = {'consistency-checker', 'story-explorer'}  # chapter-extractor 写批次输入文件，不再只读
 base = Path('skills/story-setup/references/opencode/agents')
 found = {p.stem for p in base.glob('*.md')}
 assert found == expected, found
@@ -490,7 +490,7 @@ TOOL_ACTION = {
     'skill': 'skill', 'question': 'question', 'execute': 'execute',
 }
 READ_LIKE = {'read', 'glob', 'grep'}
-read_only = {'chapter-extractor', 'consistency-checker', 'story-explorer'}
+read_only = {'consistency-checker', 'story-explorer'}  # chapter-extractor 写批次输入文件，不再只读
 shell_agents = {'narrative-writer', 'story-researcher'}
 base = Path('skills/story-setup/references/opencode/agents')
 for path in sorted(base.glob('*.md')):

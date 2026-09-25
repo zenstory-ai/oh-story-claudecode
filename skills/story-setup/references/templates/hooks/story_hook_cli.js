@@ -174,6 +174,41 @@ if (command === "extract-target") {
   const root = args[0]
   const out = core.continuityFindings(root)
   if (out.length) process.stdout.write(out.join("\n") + "\n")
+} else if (command === "analysis-input-guard") {
+  // chapter-extractor 的 PreToolUse(Write) 内联守卫：它只许把批次结果写到
+  // {拆文目录}/_analysis_cache/输入-{RAW|REUSE}-{起章}-{止章}.md。拆文目录以存在
+  // chapter_index.csv 或 _progress.md 认定，且必须在项目根内。exit 2 阻断并把原因交回子代理；
+  // 读不到输入视为无从判断，放行（提交脚本仍会完整校验文件内容）。
+  const raw = process.env.HOOK_INPUT || readStdin()
+  let obj
+  try {
+    obj = JSON.parse(raw)
+  } catch {
+    process.exit(0)
+  }
+  const target = digTargetPath(obj)
+  if (!target) process.exit(0)
+  const root = path.resolve(process.env.CLAUDE_PROJECT_DIR || digString(obj, ["cwd"]) || process.cwd())
+  const absolute = path.resolve(root, target)
+  const reasons = []
+  const match = /^输入-(RAW|REUSE)-(\d+)-(\d+)\.md$/.exec(path.basename(absolute))
+  if (!match) reasons.push("文件名必须是 输入-{RAW|REUSE}-{起章}-{止章}.md")
+  else if (Number(match[2]) < 1 || Number(match[3]) < Number(match[2])) reasons.push("批次章号范围无效")
+  const cacheDir = path.dirname(absolute)
+  const bookDir = path.dirname(cacheDir)
+  if (path.basename(cacheDir) !== "_analysis_cache") reasons.push("只能写在拆文目录的 _analysis_cache/ 下")
+  else if (!["chapter_index.csv", "_progress.md"].some((name) => fs.existsSync(path.join(bookDir, name)))) {
+    reasons.push("上级目录不是拆文目录（缺 chapter_index.csv 与 _progress.md）")
+  }
+  const relative = path.relative(root, absolute)
+  if (relative.startsWith("..") || path.isAbsolute(relative)) reasons.push("路径在项目目录之外")
+  if (reasons.length) {
+    process.stderr.write(
+      `⛔ chapter-extractor 写入被拦截：${target}\n${reasons.join("；")}。\n` +
+        "只允许写调用方给的 {拆文目录}/_analysis_cache/输入-{批次ID}.md（批次 ID 如 RAW-4-6），不写其他文件。"
+    )
+    process.exit(2)
+  }
 } else {
   process.exit(2)
 }

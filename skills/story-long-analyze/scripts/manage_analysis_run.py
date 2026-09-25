@@ -483,16 +483,27 @@ def plan_command(args: argparse.Namespace) -> Dict[str, Any]:
     required_stages = list(report.get("stage_repairs", []))
     if batches or recoverable_caches:
         required_stages = sorted(set(required_stages + ["stage2"]))
-    return {
+    summary_gaps = sorted(all_chapters - summaries)
+    payload = {
         "ok": True, "root": str(root), "intent": args.intent,
         "classification": report["classification"], "recommended_path": report["recommended_path"],
         "mixed_sources": report["mixed_sources"], "batches": batches,
+        "remaining_batches": len(batches),
         "recoverable_caches": recoverable_caches,
-        "summary_gaps": sorted(all_chapters - summaries),
+        "summary_gaps": summary_gaps,
         "read_counts": {"raw_chapters": raw_reads, "existing_result_files": result_reads},
         "required_stages": required_stages,
         "state_written": False,
     }
+    if args.next is not None:
+        if args.next < 0:
+            raise RunError("invalid_next", str(args.next))
+        # Dispatch one batch at a time without re-reading the whole remaining plan;
+        # counts above still describe everything that is left.
+        payload["batches"] = batches[:args.next]
+        payload["summary_gaps"] = ["%s-%s" % pair if pair[0] != pair[1] else str(pair[0])
+                                   for pair in compact_ranges(summary_gaps)]
+    return payload
 
 
 def parse_batch_id(batch_id: str) -> Tuple[str, int, int]:
@@ -910,6 +921,119 @@ def mark_stage_command(args: argparse.Namespace) -> Dict[str, Any]:
     return {"ok": True, "stage": args.stage, "status": args.status, "progress_updated": changed}
 
 
+OBS_START = "<!-- BATCH_OBSERVATIONS_START -->"
+OBS_END = "<!-- BATCH_OBSERVATIONS_END -->"
+# Labels as projected by render_summary (legacy summaries use the same labels).
+SUMMARY_FIELDS = ("概要", "关键事件", "因果", "局面结果", "涉及", "信息变化", "状态变化",
+                  "三维节奏", "章尾钩子", "证据")
+
+
+def parse_chapter_window(value: Optional[str]) -> Optional[Tuple[int, int]]:
+    if not value:
+        return None
+    match = re.fullmatch(r"(\d+)(?:-(\d+))?", value.strip())
+    if not match:
+        raise RunError("invalid_chapter_window", value)
+    start = int(match.group(1))
+    end = int(match.group(2) or start)
+    if start < 1 or end < start:
+        raise RunError("invalid_chapter_window", value)
+    return start, end
+
+
+def digest_caches(root: Path) -> List[Tuple[int, int, str, Path]]:
+    """Complete caches of committed batches, falling back to every complete cache on disk."""
+    state, _ = load_state(root / "_progress.md")
+    chosen = {}  # type: Dict[str, Tuple[int, int, str, Path]]
+    for row in state["batches"].values():
+        if row.get("status") not in {"completed", "success"}:
+            continue
+        path = root / row["cache"] if row.get("cache") else cache_path(root, row["batch_id"])
+        if cache_complete(path):
+            chosen[row["batch_id"]] = (row["start"], row["end"], row["batch_id"], path)
+    if not chosen:
+        for path in sorted((root / "_analysis_cache").glob("批次-*.md")):
+            try:
+                _, start, end = parse_batch_id(path.stem[len("批次-"):])
+            except RunError:
+                continue
+            if cache_complete(path):
+                chosen[path.stem] = (start, end, path.stem[len("批次-"):], path)
+    return sorted(chosen.values())
+
+
+def summary_field(text: str, name: str) -> str:
+    if name == "关键事件":
+        match = re.search(r"(?ms)^\*\*关键事件\*\*\s*[：:]\s*\n(.*?)(?=^\*\*|\Z)", text)
+        return " ".join(line.strip() for line in match.group(1).splitlines() if line.strip()) if match else ""
+    match = re.search(r"(?m)^\*\*%s\*\*\s*[：:]\s*(\S.*)$" % re.escape(name), text)
+    return match.group(1).strip() if match else ""
+
+
+def summary_points(text: str, mode: str) -> List[str]:
+    lines = text.split("\n")
+    points = []  # type: List[str]
+    for index, line in enumerate(lines):
+        header = POINT_HEADER_RE.match(line.strip())
+        if not header:
+            continue
+        segments = [item.strip() for item in re.split(r"[|｜]", header.group(3))]
+        tone = ""
+        for follow in lines[index + 1:index + 8]:
+            tag = POINT_TAG_RE.match(follow.strip())
+            if tag:
+                tone = tag.group(2)
+                break
+            if POINT_HEADER_RE.match(follow.strip()):
+                break
+        point_type = segments[0][2:].lstrip(" ：:") if segments[0].startswith("类型") else segments[0]
+        if mode == "brief":
+            points.append("P%s %s｜%s｜%s" % (header.group(1), header.group(2).strip(), point_type, tone or "—"))
+        else:
+            points.append("%s ｜基调：%s" % (line.strip(), tone or "—"))
+    return points
+
+
+def digest_command(args: argparse.Namespace) -> Dict[str, Any]:
+    root = require_root(args.root)
+    window = parse_chapter_window(args.chapters)
+    parts = []  # type: List[str]
+    if args.part == "observations":
+        for start, end, batch_id, path in digest_caches(root):
+            if window and (end < window[0] or start > window[1]):
+                continue
+            model = parse_cache(path)["model_output"]
+            if OBS_START not in model or OBS_END not in model:
+                continue
+            body = model.split(OBS_START, 1)[1].split(OBS_END, 1)[0].strip()
+            body = re.sub(r"(?m)^##\s*跨章观察\s*\n", "", body).strip()
+            parts.append("## %s（第%s-%s章）\n\n%s" % (batch_id, start, end, body))
+    else:
+        fields = [item.strip() for item in (args.fields or "").split(",") if item.strip()]
+        unknown = [item for item in fields if item not in SUMMARY_FIELDS]
+        if unknown:
+            raise RunError("unknown_summary_field", ",".join(unknown))
+        if not fields and args.points == "none":
+            raise RunError("digest_empty_request", "pass --fields and/or --points")
+        chapters = sorted(
+            int(match.group(1)) for match in
+            (re.fullmatch(r"第(\d+)章_摘要", path.stem) for path in (root / "章节").glob("第*章_摘要.md"))
+            if match
+        )
+        for chapter in chapters:
+            if window and not window[0] <= chapter <= window[1]:
+                continue
+            text = normalized(summary_path(root, chapter).read_text(encoding="utf-8-sig"))
+            lines = ["### 第%s章" % chapter]
+            lines.extend("- %s：%s" % (name, summary_field(text, name) or "未提供") for name in fields)
+            if args.points != "none":
+                lines.extend(summary_points(text, args.points))
+            parts.append("\n".join(lines))
+    if not parts:
+        raise RunError("digest_nothing_found", "no committed batch caches or summaries in range")
+    return {"ok": True, "text": "\n\n".join(parts) + "\n"}
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -918,6 +1042,8 @@ def build_parser() -> argparse.ArgumentParser:
     plan.add_argument("--index", type=Path)
     plan.add_argument("--expected-chapters", type=int)
     plan.add_argument("--intent", choices=("continue", "enhance"), default="continue")
+    plan.add_argument("--next", type=int, metavar="N",
+                      help="only print the first N batches (0 = counts only); remaining_batches stays total")
     plan.set_defaults(handler=plan_command)
     commit = sub.add_parser("commit", help="validate and atomically commit one batch")
     commit.add_argument("--root", required=True, type=Path)
@@ -945,6 +1071,13 @@ def build_parser() -> argparse.ArgumentParser:
     stage.add_argument("--output", type=Path)
     stage.add_argument("--prepare", action="store_true", help="before Stage 5, preserve the existing report")
     stage.set_defaults(handler=mark_stage_command)
+    digest = sub.add_parser("digest", help="print Stage 3-5 reading material without whole-cache reads")
+    digest.add_argument("--root", required=True, type=Path)
+    digest.add_argument("--part", required=True, choices=("observations", "chapters"))
+    digest.add_argument("--chapters", help="chapter window such as 1-40")
+    digest.add_argument("--fields", help="comma-separated summary fields, e.g. 三维节奏,涉及,状态变化")
+    digest.add_argument("--points", choices=("none", "brief", "full"), default="none")
+    digest.set_defaults(handler=digest_command)
     return parser
 
 
@@ -956,6 +1089,9 @@ def main() -> int:
     args = parser.parse_args()
     try:
         payload = args.handler(args)
+        if args.command == "digest":
+            sys.stdout.write(payload["text"])
+            return 0
         print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
         return 0 if payload.get("ok", True) else 2
     except (OSError, UnicodeError, RunError) as exc:
