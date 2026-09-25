@@ -147,9 +147,9 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 **执行前先读 [references/workflow-chapter.md](references/workflow-chapter.md)**，按其中的单章写作流程（步骤 1-13）、字数测量权威与质量检查执行。日更批量另加载 `references/workflow-daily.md` 控制批次。
 
-#### 追踪文件体积
+#### 追踪
 
-`追踪/_tracking-state.json` 是唯一结构化权威；`上下文.md`、核心角色快照、`伏笔.md`、作者真相与读者已知时间线都由它确定性派生，程序不反向解析 Markdown。`上下文.md` 固定 7 栏且 ≤12KB。`逐章记录/第NNN章.md` 每章只记录会影响后续连续性的紧凑变化，目标 ≤1536 字节、硬上限 3072 字节，不承诺单独重放出全部当前状态。阶段/卷级回看按需查询逐章记录或正文，不维护另一套长期摘要。所有追踪写入都通过 `scripts/tracking_commit.py`，禁止手改派生文件。
+所有追踪写入都走 `scripts/tracking_commit.py`：`追踪/_tracking-state.json` 是唯一权威，`上下文.md`、角色快照、`伏笔.md`、时间线都由它派生，禁止手改。体积上限由脚本检查、超限一次报全；字段与上限见 [tracking-transaction.md](references/tracking-transaction.md)，出错时才读。
 
 ---
 

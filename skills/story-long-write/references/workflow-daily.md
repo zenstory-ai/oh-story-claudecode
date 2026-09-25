@@ -17,7 +17,7 @@ SKILL.md 路由到「日更续写」后按本文件控制批次；每章正文�
 
 运行 `tracking_commit.py check`，取 `last_committed_chapter + 1` 作本批首章 N、`state_revision` 作修订号，并核对 `追踪/上下文.md` 的当前位置；章号不一致先修，不扫描正文猜编号。每章要读的上下文按 workflow-chapter 步骤 2；`追踪/伏笔.md`、`时间线/`、`逐章记录/` 默认不整读，缺旧信息按下方「旧信息查找步骤」定点查。
 
-`追踪/上下文.md` 是续写状态卡，固定 7 栏（当前位置 / 长期约束 / 核心角色状态 / 活跃伏笔 / 近三章速记 / 下一章承诺 / 连贯性风险），≤12288 字节，全部由 `tracking_commit.py` 从 `_tracking-state.json` 派生，禁止手改；schema、修订与修复见 [tracking-transaction.md](tracking-transaction.md)，出错时才读。
+`追踪/上下文.md` 是续写状态卡（7 栏，由 `tracking_commit.py` 派生，禁止手改）；schema、修订与修复见 [tracking-transaction.md](tracking-transaction.md)，出错时才读。
 
 **首次初始化**：
 
@@ -43,7 +43,7 @@ SKILL.md 路由到「日更续写」后按本文件控制批次；每章正文�
    - **状态来源**：不把完整 `_tracking-state.json` 读进上下文，缺的信息定点查，不用来源不明的聊天记忆替代。久别核心角色读 `追踪/角色状态/{名}.md`，重新活跃后放进本章事务的 `context.active_character_names`。
    - **用 story-explorer 召回时**：`gaps` 按 [benchmark-recall.md](benchmark-recall.md)「快捷路径」分流。
    - **写后清零不拖到批末**：hook 推回的命中当轮清零。
-   - **每章写完立即提交追踪**：按 workflow-chapter 步骤 12（`draft` 预填 → 填本章变化 → `chapter check` → `commit` / `accept-current-length`）。只记会影响后续章节的变化，过程日志、质检计数、去味统计不进事务。提交失败时 state 未推进，按报错改完重跑同一命令；不另写下一章、不手补派生视图。narrative-writer 不写 `追踪/`。
+   - **每章写完立即提交追踪**：按 workflow-chapter 步骤 12，提交成功才进下一章；只记会影响后续章节的变化，过程日志、质检计数、去味统计不进事务。narrative-writer 不写 `追踪/`。
 3. **不中断但不并发**：追踪已提交即进下一章；`under` 或一次压缩后仍带外，按 workflow-chapter 的字数问法请作者选，不静默推进。
 
 **资料研究**（按需）：需查证外部事实时暂停，spawn `story-researcher` 输出到 `参考资料/`，完成后继续。
