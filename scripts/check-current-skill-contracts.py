@@ -1342,10 +1342,10 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
     )
     findings.extend(
         require_pattern(
-            repo_root / "skills/story-long-write/references/workflow-daily.md",
+            repo_root / "skills/story-long-write/references/benchmark-recall.md",
             r"profile_missing[^\n]{0,60}custom_style[^\n]{0,40}继续",
             "daily-profile-missing-custom-style",
-            "workflow-daily must keep the profile_missing + custom_style continuation branch",
+            "benchmark-recall must keep the profile_missing + custom_style continuation branch",
         )
     )
 

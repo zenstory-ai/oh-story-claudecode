@@ -41,7 +41,7 @@ SKILL.md 路由到「日更续写」后按本文件控制批次；每章正文�
 2. **逐章执行**：每章按 workflow-chapter「单章写作流程」步骤 1-13 走完，叠加：
    - **上一章欠账**：写本章前上一章不得有未清 blocking 毒句式（写前 hook 会拦；hook 不可用时对上一章跑一次 `chapter check`），标了 `<!-- 去味:跳过 -->` 的除外。
    - **状态来源**：不把完整 `_tracking-state.json` 读进上下文，缺的信息定点查，不用来源不明的聊天记忆替代。久别核心角色读 `追踪/角色状态/{名}.md`，重新活跃后放进本章事务的 `context.active_character_names`。
-   - **用 story-explorer 召回时的 gaps 分流**：`no_benchmark` → `custom_style` 为真则用 `设定/文风.md` 写、情绪/节奏取本书内部材料，否则标「无对标参考」；`missing_primary_contract` → 停止，按 `repair_action` 重跑拆文或导入（自定义文风不豁免）；`benchmark_book_missing` → 停止核对登记名，不换书；`conflict` / `module_rhythm_conflict` → 意图里说明冲突并按情绪模块/节奏的权威执行；profile_missing → custom_style 为真则用本书文风继续，否则停止；`profile_degenerate` → 有本书文风就用，没有回默认；`tone_match_failed` → 只用整书文风。其余字段原样进 writer prompt，`gaps` 原值保留在写前准备记录里。
+   - **用 story-explorer 召回时**：`gaps` 按 [benchmark-recall.md](benchmark-recall.md)「快捷路径」分流。
    - **写后清零不拖到批末**：hook 推回的命中当轮清零。
    - **每章写完立即提交追踪**：按 workflow-chapter 步骤 12（`draft` 预填 → 填本章变化 → `chapter check` → `commit` / `accept-current-length`）。只记会影响后续章节的变化，过程日志、质检计数、去味统计不进事务。提交失败时 state 未推进，按报错改完重跑同一命令；不另写下一章、不手补派生视图。narrative-writer 不写 `追踪/`。
 3. **不中断但不并发**：追踪已提交即进下一章；`under` 或一次压缩后仍带外，按 workflow-chapter 的字数问法请作者选，不静默推进。

@@ -16,5 +16,5 @@
     - 按本文件顶部规则确认 story-explorer 已部署。
     - 查询类型：`benchmark_style_load`；传入项目目录、章节号、目标基调/字数和爽点类型。
     - 需要返回：`style_profile_path`、`style_profile_summary`、`selected_emotion_module`、`rhythm_reference`、来源路径、匹配章节、锚点片段、`gaps`。
-    - `gaps.missing_primary_contract` 为 true 时按 `repair_action` 修复并停止生成。
+    - `gaps` 分流：`no_benchmark` → `custom_style` 为真则用 `设定/文风.md` 写、情绪/节奏取本书内部材料，否则标「无对标参考」；`missing_primary_contract` → 按 `repair_action` 修复（重跑拆文或导入）并停止生成，自定义文风不豁免；`benchmark_book_missing` → 停止核对登记名，不换书；`conflict` / `module_rhythm_conflict` → 意图里说明冲突并按情绪模块/节奏的权威执行；profile_missing → custom_style 为真则用本书文风继续，否则停止；`profile_degenerate` → 有本书文风就用，没有回默认；`tone_match_failed` → 只用整书文风。其余字段原样进 writer prompt，`gaps` 原值保留在写前准备记录里。
     - 主会话另行直接读 `设定/文风.md`：含实质内容时作为本书风格基准；但不豁免情绪/节奏缺失。
