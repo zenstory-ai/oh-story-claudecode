@@ -8,11 +8,11 @@
 - 脚本/配置文件名（.py/.js/.sh/.json/...）、命令行 flag、snake_case 与 kebab-case 标识符
   （/story-xxx、$story-xxx 这类作者要敲的命令除外）；
 - 裸编号（F003、BP001、REL-001、L1-3）——编号必须挂故事标签：「描述（ID）」或「ID（描述）」。
-static-check.py 的 author-report 检查调用本文件的 check_block，两处只有这一份规则。
+本文件是作者报告规则的唯一守卫（static-check.py 不再重复扫描）。
 块内最后一个非空行若以「技术备注：」开头，可承载执行路径等工程细节，不受上述检查；
 技术备注只能有一行且必须在块尾。
 
-REQUIRED 里的文件必须至少有一个 author-report 块，防止模板标记被悄悄删掉。
+REQUIRED 里的文件必须有不少于登记数量的 author-report 块，防止模板标记被悄悄删掉。
 
 用法：python3 scripts/check-author-reports.py [--self-test]
 """
@@ -25,17 +25,23 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# 文件 -> 至少几个 author-report 块。
+# 长篇：规划、单章（完成/字数/拍板/停下）、日更批末、大修各有作者汇报模板。
 # 作者记忆回执不在此列：整条回复就是模板两行，写成围栏块时模型会把围栏原样回给作者（实测 2/2），
 # 所以 author-memory.md 用行内示例描述回执。
-REQUIRED = (
-    "skills/story-import/SKILL.md",
-    "skills/story-review/SKILL.md",
-    "skills/story-deslop/SKILL.md",
-    "skills/story-short-analyze/SKILL.md",
-    "skills/story-long-scan/SKILL.md",
-    "skills/story-short-scan/SKILL.md",
-    "skills/story-cover/SKILL.md",
-)
+REQUIRED = {
+    "skills/story-import/SKILL.md": 1,
+    "skills/story-review/SKILL.md": 1,
+    "skills/story-deslop/SKILL.md": 1,
+    "skills/story-short-analyze/SKILL.md": 1,
+    "skills/story-long-scan/SKILL.md": 1,
+    "skills/story-short-scan/SKILL.md": 1,
+    "skills/story-cover/SKILL.md": 1,
+    "skills/story-long-write/references/workflow-setup.md": 1,
+    "skills/story-long-write/references/workflow-chapter.md": 4,
+    "skills/story-long-write/references/workflow-daily.md": 1,
+    "skills/story-long-write/references/workflow-revision.md": 1,
+}
 
 TAIL_PREFIX = "技术备注："
 
@@ -140,21 +146,22 @@ def check_text(text: str) -> list[tuple[int, str]]:
 def run() -> int:
     failures = []
     files = sorted((ROOT / "skills").rglob("*.md"))
-    marked = set()
+    marked: dict[str, int] = {}
     for path in files:
         text = path.read_text(encoding="utf-8")
         rel = path.relative_to(ROOT).as_posix()
-        if any(True for _ in author_blocks(text)):
-            marked.add(rel)
+        count = sum(1 for _ in author_blocks(text))
+        if count:
+            marked[rel] = count
         for lineno, msg in check_text(text):
             failures.append(f"{rel}:{lineno}: {msg}")
         for lineno in legacy_fences(text):
             failures.append(f"{rel}:{lineno}: 围栏信息串不能写 author-report（模型会原样回给作者），改成上一行 {MARKER}、围栏用 ```md")
-    for rel in REQUIRED:
-        if rel not in marked:
-            failures.append(f"{rel}: 缺少 {MARKER} 标记的报告模板块")
+    for rel, minimum in REQUIRED.items():
+        if marked.get(rel, 0) < minimum:
+            failures.append(f"{rel}: {MARKER} 标记的报告模板块少于 {minimum} 个（现有 {marked.get(rel, 0)}）")
     if failures:
-        print("作者报告模板含工程黑话：")
+        print("作者报告模板检查未通过：")
         for f in failures:
             print("  " + f)
         return 1

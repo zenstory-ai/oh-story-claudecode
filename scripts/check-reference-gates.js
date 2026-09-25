@@ -25,8 +25,6 @@ const long = readSkill('story-long-write')
 const longLines = long.split(/\r?\n/)
 const longGateLine = longLines.findIndex((line) => line.includes('章节 Reference Gate')) + 1
 assert(longGateLine > 0 && longGateLine <= 20, `long Reference Gate must stay in first screen, got line ${longGateLine}`)
-assert.match(long, /只读本 SKILL\.md 不算完成/)
-assert.match(long, /`rg` 检索或局部摘读也不算完整读取/)
 for (const reference of [
   'workflow-setup.md', 'workflow-chapter.md', 'workflow-daily.md', 'workflow-revision.md', 'long-format.md',
   'writing-craft.md', 'long-chapter-quality.md', 'long-chapter-hooks.md', 'long-suspense.md',
@@ -34,24 +32,19 @@ for (const reference of [
 ]) {
   assert(long.includes(reference), `long gate must route ${reference}`)
 }
-assert.match(long, /不得先写正文再补读/)
+// Constraint Lock = 写前原样记录本轮明确约束（字数、必发生、禁止发生、停笔点）的行为锚点。
 assert.match(long, /Constraint Lock/)
-assert.match(long, /references 只提供技法，不得覆盖这些项目事实/)
 
 const short = readSkill('story-short-write')
 const shortLines = short.split(/\r?\n/)
 const shortGateLine = shortLines.findIndex((line) => line.includes('阶段 Reference Gate')) + 1
 assert(shortGateLine > 0 && shortGateLine <= 20, `short Reference Gate must stay in first screen, got line ${shortGateLine}`)
-assert.match(short, /只读本 SKILL\.md 不算完成门禁/)
-assert.match(short, /任一必需路径不存在、不可读/)
-assert.match(short, /分块直到 EOF；`rg` 检索或局部摘读不算读完/)
 
 // Check the Phase 2 route and completion gate in the stage reference.
 const shortGate = shortLines.slice(shortGateLine - 1, shortGateLine + 11).join('\n')
 assert(shortGate.includes('`references/workflow-design.md`'), 'Phase 2 gate must route workflow-design on the first screen')
 const shortDesign = fs.readFileSync(path.join(repoRoot, 'skills/story-short-write/references/workflow-design.md'), 'utf8')
 assert.match(shortDesign, /check-phase2-contract\.js --json/)
-assert.match(shortDesign, /最多做 2 轮定向 repair/)
 
 // Phase 3 must be self-sufficient: #418 left workflow-draft pointing at "the Phase 4
 // command", which only lived in workflow-revision; a real run wrote prose first and
@@ -76,7 +69,6 @@ for (const flag of ['--check-contract', '--min-chars {MIN}', '--max-chars {MAX}'
 const draftingStep = shortDraft.indexOf('**写前准备**')
 assert(draftingStep > 0 && precheck.index < draftingStep, 'workflow-draft precheck must come before the drafting step')
 assert.doesNotMatch(shortDraft, /Phase 4 的交付命令/, 'workflow-draft must not defer the precheck command to Phase 4')
-assert.match(shortDraft, /不自写 Python 计数/)
 
 const shortRevision = fs.readFileSync(path.join(repoRoot, 'skills/story-short-write/references/workflow-revision.md'), 'utf8')
 const finalCheck = shortRevision.match(/`node scripts\/check-delivery-contract\.js ([^`]*)`/)

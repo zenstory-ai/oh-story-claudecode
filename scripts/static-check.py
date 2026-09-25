@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import re
 import sys
 import unicodedata
@@ -72,21 +71,6 @@ EXTERNAL_URL_RE = re.compile(
 )
 # 花括号枚举（含逗号）是「逐个点名」，可以展开成具体路径；`{题材}` 这种单占位符不是枚举。
 BRACE_LIST_RE = re.compile(r"\{([^{}/]*,[^{}/]*)\}")
-# 面向作者的汇报模板：紧跟 <!-- author-report --> 标记行的围栏块是直接说给作者听的话，
-# 不得出现脚本/字段/参数名、状态码或内部清单名（SKILL.md「面向作者的汇报」）。
-
-
-def _load_author_report_rules():
-    """规则只有一份，放在 check-author-reports.py；这里只负责按全仓扫描调用它。"""
-    path = Path(__file__).resolve().with_name("check-author-reports.py")
-    spec = importlib.util.spec_from_file_location("check_author_reports", path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-AUTHOR_REPORT_RULES = _load_author_report_rules()
 # 跨 skill 扫描覆盖全部文本资产。模板（*.md.tmpl / *.json.patch）与前端资产同样会被
 # story-setup 部署进作者项目，漏扫等于把「skill 自包含」这条红线在部署面上放空。
 SKILL_TEXT_SUFFIXES = {
@@ -298,31 +282,6 @@ def parse_document(path: Path) -> Document:
     return document
 
 
-def author_report_blocks(path: Path) -> list[tuple[int, list[tuple[int, str]]]]:
-    """Return (opening line, [(line, text), ...]) for each fence marked by <!-- author-report -->."""
-    text = path.read_text(encoding="utf-8")
-    return [
-        (first - 1, [(first + k, line) for k, line in enumerate(body)])
-        for first, body in AUTHOR_REPORT_RULES.author_blocks(text)
-    ]
-
-
-def author_report_issues(path: Path) -> list[Issue]:
-    issues: list[Issue] = []
-    for _opening, lines in author_report_blocks(path):
-        for index, message in AUTHOR_REPORT_RULES.check_block([text for _line, text in lines]):
-            issues.append(
-                Issue(
-                    "error",
-                    "author-report-jargon",
-                    path,
-                    lines[index][0],
-                    f"作者汇报模板含{message}；改成作者能懂的白话",
-                )
-            )
-    return issues
-
-
 def parse_frontmatter(path: Path) -> tuple[dict[str, str], int | None]:
     lines = path.read_text(encoding="utf-8").splitlines()
     if not lines or lines[0].strip() != "---":
@@ -507,8 +466,6 @@ def validate_skill(
     issues.extend(cross_skill_path_issues(skill_dir, root))
 
     markdown_paths = sorted(path for path in skill_dir.rglob("*.md") if path.is_file())
-    for markdown_path in markdown_paths:
-        issues.extend(author_report_issues(markdown_path))
     documents = {path.resolve(): parse_document(path) for path in markdown_paths}
     resolved_by_document: dict[Path, set[Path]] = {path.resolve(): set() for path in markdown_paths}
 
