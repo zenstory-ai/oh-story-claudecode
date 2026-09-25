@@ -39,6 +39,18 @@ def usage_add(tot, u):
         tot[k] = tot.get(k, 0) + int(u.get(k) or 0)
 
 
+def check_status(text):
+    """chapter check 输出是一行 JSON；逐行找 story-chapter-check 的那行取 length.status。"""
+    for line in (text or '').splitlines():
+        line = line.strip()
+        if 'story-chapter-check' in line and line.startswith('{'):
+            try:
+                return json.loads(line)['length']['status']
+            except (ValueError, KeyError, TypeError):
+                pass
+    return None
+
+
 def tool_text(block):
     c = block.get('content')
     if isinstance(c, list):
@@ -86,8 +98,7 @@ def claude_efficiency(run, meta):
                         kind, groups, t = pending.pop(b['tool_use_id'])
                         text = tool_text(b)
                         if kind == 'check':
-                            st = re.search(r'"length":\s*\{[^{}]*?"status":\s*"(\w+)"', text, re.S)
-                            eff['checks'].append({'chapter': int(groups[0]), 'status': st.group(1) if st else None})
+                            eff['checks'].append({'chapter': int(groups[0]), 'status': check_status(text)})
                         elif not b.get('is_error') and '"ok": false' not in text:
                             eff['commits'].append({'chapter': int(groups[1]), 'action': groups[0],
                                                    'at': ts(d['timestamp']) if d.get('timestamp') else None})
@@ -129,8 +140,7 @@ def codex_efficiency(run, meta):
                 cmd = item.get('command') or ''
                 m = CHECK_RE.search(cmd)
                 if m:
-                    st = re.search(r'"length":\s*\{[^{}]*?"status":\s*"(\w+)"', item.get('aggregated_output') or '', re.S)
-                    eff['checks'].append({'chapter': int(m.group(1)), 'status': st.group(1) if st else None})
+                    eff['checks'].append({'chapter': int(m.group(1)), 'status': check_status(item.get('aggregated_output'))})
                 m = COMMIT_RE.search(cmd)
                 if m and item.get('exit_code') == 0:
                     eff['commits'].append({'chapter': int(m.group(2)), 'action': m.group(1), 'at': None})
