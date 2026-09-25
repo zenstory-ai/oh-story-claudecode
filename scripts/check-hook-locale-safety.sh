@@ -22,7 +22,7 @@ echo "========================"
 fail=0
 
 # Check 1：所有处理中文内容/路径的部署 hook 必须 export LC_ALL=C，在 GBK 区域下走字节匹配。
-# 含内嵌 python 的 hook（guard-outline/validate-story-commit）export 位置另有讲究（见各文件注释），
+# 调 node 共享核的 hook（guard-outline/validate-story-commit）export 位置另有讲究（见各文件注释），
 # 但都必须出现该 export。
 # 清单不再手抄：直接枚举 hooks 顶层 *.sh（lib/ 由 Check 3 的 per-command LC_ALL=C 管），新增 hook
 # 自动进检——原先手抄清单漏了 check-prose-after-write.sh，而它的 `case "$BASE" in 正文.md)`

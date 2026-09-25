@@ -27,6 +27,14 @@ def make_source(root: Path) -> Path:
 
 
 def main() -> None:
+    # The deployer materializes only the skills it names; a skill added under skills/
+    # without updating KNOWN_SKILLS would silently never reach Antigravity projects.
+    shipped = {path.parent.name for path in (ROOT / "skills").glob("*/SKILL.md")}
+    assert set(MODULE.KNOWN_SKILLS) == shipped, (
+        f"KNOWN_SKILLS drift: missing={sorted(shipped - set(MODULE.KNOWN_SKILLS))}, "
+        f"stale={sorted(set(MODULE.KNOWN_SKILLS) - shipped)}"
+    )
+
     with tempfile.TemporaryDirectory(prefix="oh-story-antigravity-skills-") as directory:
         root = Path(directory)
         source = make_source(root)

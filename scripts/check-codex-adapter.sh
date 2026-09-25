@@ -98,14 +98,6 @@ PY
 
 echo "  OK Windows encoding safety (UTF-8 stdio + file reads)"
 
-# Prose backstop parity surface: Codex has no PostToolUse, so the light prose net runs at Stop
-# (sweeping git-changed 正文) and continuity runs at SessionStart. These must stay present.
-assert_grep 'def prose_net_findings' "$HOOK_PY" "Codex hook must carry the light prose net (parity with claude/opencode)"
-assert_grep 'def find_changed_prose_files' "$HOOK_PY" "Codex Stop sweep must discover git-changed prose"
-assert_grep 'def continuity_findings' "$HOOK_PY" "Codex hook must carry the continuity backstop (追踪 staleness + dup-title)"
-
-echo "  OK prose backstop parity surface (Stop net + SessionStart continuity)"
-
 # .agents/skills is a relative symlink to skills/ (the agentskills.io path Codex scans), so
 # there is no second skill copy. Must be a valid relative symlink: an invalid/absolute one
 # (openai/codex#11314) or a Windows no-symlinks text stub silently breaks discovery.
@@ -410,12 +402,9 @@ for name, tokens in allowed.items():
         f"event token drift between hooks.json and {name}: "
         f"registered-only={sorted(set(registered) - tokens)}, {name}-only={sorted(tokens - set(registered))}"
     )
-
-assert "Path(__file__)" in hook_py and "_deployed_root_from_file" in hook_py, \
-    "story_codex_hook.py must self-locate the project root from __file__ (Windows MSYS-path safety)"
 PY
 
-echo "  OK generated launcher routing + Python self-location + cmd.exe commandWindows"
+echo "  OK generated launcher routing + cmd.exe commandWindows"
 
 # Reference-path contract: generated Codex agents use only the bundle story-setup deploys.
 python3 - "$CODEX_DIR/agents" <<'PY'

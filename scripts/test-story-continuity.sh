@@ -12,10 +12,8 @@ HOOK="$REPO_ROOT/skills/story-setup/references/templates/hooks/detect-story-gaps
 [ -f "$HOOK" ] || { echo "FAIL: hook not found: $HOOK" >&2; exit 1; }
 bash -n "$HOOK" || { echo "FAIL: hook has syntax errors" >&2; exit 1; }
 
-# 无 python 解释器则跳过（连续性扫描是内嵌 python；CI 三平台都装了 python）。
-PYBIN=""
-for c in python3 python py; do "$c" -c "" >/dev/null 2>&1 && { PYBIN="$c"; break; }; done
-[ -z "$PYBIN" ] && { echo "test-story-continuity: no python interpreter, skipped."; exit 0; }
+# 无 node 则跳过（连续性扫描走 story_hook_cli.js 调共享核，hook 探测不到 node 即静默；CI 三平台都装了 node）。
+node -e "" >/dev/null 2>&1 || { echo "test-story-continuity: no node runtime, skipped."; exit 0; }
 
 fails=0
 run() { CLAUDE_PROJECT_DIR="$1" bash "$HOOK"; }

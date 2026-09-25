@@ -749,7 +749,7 @@ function skippableLine(line) {
 // 问号占位（占位天然截断各规则的字符类，规则不会跨引号拼出假命中；见
 // maskQuotedSpans 为何用问号而不是句号），占位后仍残留引号字符（跨行对话/未闭合）
 // 的行整行跳过。js↔py 同构实现（codex
-// story_codex_hook.py）由 scripts/check-hook-regex-sync.sh（规范串逐字锁）与
+// story_codex_hook.py）由 scripts/check-hook-regex-sync.sh（常量表逐字锁）与
 // scripts/test-prose-net-parity.sh（fixture 逐字 diff）锁 parity，文案以本核为准。
 // 单引号须成对；词内撇号（don't、O’Connor）不作为开闭引号。
 const TOXIC_QUOTE_SPANS = [/「[^」]*」/g, /『[^』]*』/g, /【[^】]*】/g, /“[^”]*”/g, /(?<![A-Za-z0-9_])‘(?:[^’]|(?<=[A-Za-z0-9_])’(?=[A-Za-z0-9_]))*(?!(?<=[A-Za-z0-9_])’[A-Za-z0-9_])’/g, /"[^"]*"/g, /(?<![A-Za-z0-9_])'(?:[^']|(?<=[A-Za-z0-9_])'(?=[A-Za-z0-9_]))*(?!(?<=[A-Za-z0-9_])'[A-Za-z0-9_])'/g]

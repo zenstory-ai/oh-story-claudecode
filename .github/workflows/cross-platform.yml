@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          # Node 22.6+ lets test-prose-net-parity execute plugin.ts directly.
+          # Node 22.6+ lets test-opencode-plugin.mjs (via check-opencode-adapter) execute plugin.ts directly.
           node-version: 22
       - uses: actions/setup-python@v5
         with:
@@ -123,7 +123,7 @@ jobs:
       # not just on macOS. Best-effort: if it fails the test self-skips Part 2.
       - name: Generate zh_CN.GBK locale (Chinese Windows simulation)
         run: sudo localedef -f GBK -i zh_CN zh_CN.GBK || sudo locale-gen zh_CN.GBK || true
-      - name: Hook path-encoding portability (cp936 + real GBK locale)
+      - name: Hook path-encoding portability (drive paths + real GBK locale)
         run: bash scripts/test-hook-encoding-portable.sh
       - name: Portable char-count (real interpreter)
         run: bash scripts/test-charcount-portable.sh
@@ -229,8 +229,8 @@ jobs:
       - name: Portable char-count (simulated Windows Store stub)
         shell: bash
         run: bash scripts/test-charcount-portable.sh --stub
-      # Real Windows Git Bash path: the cp936 stdout bug (issue #164) bites here.
-      - name: Hook path-encoding portability (cp936 + GBK locale if present)
+      # Real Windows Git Bash: Part 1c exercises real drive-letter paths (issue #184) via cygpath.
+      - name: Hook path-encoding portability (drive paths + GBK locale if present)
         shell: bash
         run: bash scripts/test-hook-encoding-portable.sh
 
@@ -314,5 +314,5 @@ jobs:
         run: bash scripts/test-charcount-portable.sh
       - name: Portable char-count (simulated Windows Store stub)
         run: bash scripts/test-charcount-portable.sh --stub
-      - name: Hook path-encoding portability (cp936 + GBK locale if present)
+      - name: Hook path-encoding portability (drive paths + GBK locale if present)
         run: bash scripts/test-hook-encoding-portable.sh
