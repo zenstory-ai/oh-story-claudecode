@@ -172,6 +172,10 @@ class StoryctlCliTests(unittest.TestCase):
                     "timeline_events": [],
                 },
             )
+            # 改稿流程留在 正文/ 的原稿备份不算本章正文（否则「本章正文不唯一」直接失败）。
+            (project / "正文/第001章_测试_原稿_20260925.md").write_text(
+                "# 第一章\n" + "旧" * 500 + "。", encoding="utf-8"
+            )
             completed, result = run_cli(
                 "chapter", "check", "--project", str(project), "--chapter", "1"
             )

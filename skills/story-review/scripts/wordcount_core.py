@@ -172,6 +172,9 @@ def target_from_outline(value: str) -> int:
 
 
 def _chapter_number_from_name(name: str, *, outline: bool) -> int | None:
+    # 改稿流程把原文备份为 第N章_章名_原稿_{日期}.md，与 hooks 一样不把它当本章正文。
+    if not outline and "_原稿_" in name:
+        return None
     pattern = r"^细纲_第0*(\d+)章.*\.md$" if outline else r"^第0*(\d+)章(?:[_\- 　].*)?\.md$"
     match = re.match(pattern, name)
     return int(match.group(1)) if match else None

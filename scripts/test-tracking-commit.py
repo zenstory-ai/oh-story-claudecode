@@ -497,9 +497,27 @@ class TrackingCommitTests(unittest.TestCase):
         self.assertEqual(draft["expected_state_revision"], self.read_state()["state_revision"])
         self.assertEqual(draft["context"]["long_term_constraints"],
                          self.read_state()["context"]["long_term_constraints"])
+        # 新章的故事时间与场景不沿用上一章：留空，逼着按本章结尾填；上一章的值另给参考。
+        previous = self.read_state()["context"]["position"]
+        self.assertEqual((draft["context"]["position"]["story_time"], draft["context"]["position"]["scene"]), ("", ""))
+        self.assertEqual(guide["previous_position"], {"story_time": previous["story_time"], "scene": previous["scene"]})
+        self.assertEqual(draft["context"]["position"]["volume"], previous["volume"])
         draft["delta"]["result"] = "江晨在看片会上保住了原版。"
+        self.run_tool("commit", draft, expect=2)
+        self.assertEqual(self.read_state()["last_committed_chapter"], 0)
+        draft["context"]["position"].update({"story_time": "看片会当晚", "scene": "剪辑室"})
+        draft_path.write_text(json.dumps(draft, ensure_ascii=False), encoding="utf-8")
+        # 重跑 draft 只刷新修订号，不冲掉已填内容。
+        again = subprocess.run(
+            [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"],
+            text=True, capture_output=True, check=False, encoding="utf-8")
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertIn("只刷新了修订号", json.loads(again.stdout)["fill"])
+        draft = json.loads(draft_path.read_text(encoding="utf-8"))
+        self.assertEqual(draft["delta"]["result"], "江晨在看片会上保住了原版。")
         self.run_tool("commit", draft)
         self.assertEqual(self.read_state()["last_committed_chapter"], 1)
+        self.assertEqual(self.read_state()["context"]["position"]["scene"], "剪辑室")
 
     def test_all_over_length_fields_are_reported_at_once_in_characters(self) -> None:
         self.init()

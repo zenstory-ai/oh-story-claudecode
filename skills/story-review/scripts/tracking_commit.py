@@ -1228,9 +1228,11 @@ DRAFT_LIMITS = {
 }
 
 
-def draft_transaction(project: Path, chapter: int) -> tuple[dict[str, Any], dict[str, Any]]:
+def draft_transaction(project: Path, chapter: int) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     """按当前 state 预填一份逐章事务：修订号、模式、章名和整份提交的上下文当前值都填好，
-    调用方只写本章变化。另返回在场核心角色的当前快照，供有变化时整份改写后放进事务。"""
+    调用方只写本章变化。另返回在场核心角色的当前快照，供有变化时整份改写后放进事务。
+    新章（append）的故事时间与场景留空：它们必须是本章结束时的位置，沿用上一章的值能静默提交，
+    所以不预填，上一章的值另行返回作参考。"""
     state = load_state(project)
     last = state["last_committed_chapter"]
     require(1 <= chapter <= last + 1, f"draft chapter must be between 1 and {last + 1}")
@@ -1242,13 +1244,15 @@ def draft_transaction(project: Path, chapter: int) -> tuple[dict[str, Any], dict
         if match:
             title = match.group(1).strip()
             break
-    context = state["context"]
+    context = json.loads(json.dumps(state["context"], ensure_ascii=False))
+    previous_position = {key: context["position"][key] for key in ("story_time", "scene")}
     delta: dict[str, Any] = {
         "result": "", "character_changes": [], "foreshadow_changes": [], "timeline_events": [],
         "constraints": [], "next_chapter_commitments": [],
     }
     if mode == "append":
         delta.update({"retired_context_items": [], "retired_characters": []})
+        context["position"].update({"story_time": "", "scene": ""})
     document = {
         "schema_version": INPUT_SCHEMA_VERSION,
         "mode": mode,
@@ -1262,7 +1266,7 @@ def draft_transaction(project: Path, chapter: int) -> tuple[dict[str, Any], dict
     }
     snapshots = {name: state["characters"][name] for name in context["active_character_names"]
                  if name in state["characters"]}
-    return document, snapshots
+    return document, snapshots, previous_position if mode == "append" else {}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1278,6 +1282,8 @@ def build_parser() -> argparse.ArgumentParser:
     draft_parser.add_argument("--project", type=Path, required=True, help="book project root containing 追踪/")
     draft_parser.add_argument("--chapter", type=int, required=True)
     draft_parser.add_argument("--out", type=Path, help="default: <project>/.story/work/第NNN章/tracking.json")
+    draft_parser.add_argument("--force", action="store_true",
+                              help="discard an existing draft instead of only refreshing its revision")
     return parser
 
 
@@ -1285,20 +1291,36 @@ def main() -> int:
     args = build_parser().parse_args()
     try:
         if args.command == "draft":
-            document, snapshots = draft_transaction(args.project, args.chapter)
+            document, snapshots, previous_position = draft_transaction(args.project, args.chapter)
             out = args.out or args.project / ".story" / "work" / f"第{args.chapter:03d}章" / "tracking.json"
             out.parent.mkdir(parents=True, exist_ok=True)
+            refreshed = False
+            if out.exists() and not args.force:
+                # 修订号过期后重跑 draft 是常见动作：只刷新修订号，不冲掉已经填好的变化。
+                existing = read_json(out)
+                require(isinstance(existing, dict) and existing.get("chapter") == document["chapter"]
+                        and existing.get("mode") == document["mode"],
+                        f"{out} already holds a draft for a different chapter or mode; pass --force to replace it")
+                existing["expected_state_revision"] = document["expected_state_revision"]
+                document, refreshed = existing, True
             out.write_text(json.dumps(document, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-            emit(json.dumps({
+            fill = ("只填 delta 里本章的变化；context 其余字段已是当前值，要撤下的长期约束或连贯性风险从 context 删掉并把原文放进 "
+                    "delta.retired_context_items（仅 append）；本章有变化的核心角色把下面的当前快照整份改好放进 character_snapshots，"
+                    "并在 character_changes 写一句变化。不要从脚本源码或 state 文件里另找格式。")
+            if previous_position:
+                fill = ("context.position 的 story_time 与 scene 留空，填本章结束时的故事时间与场景（上一章结束时见 "
+                        "previous_position；换卷时连同 volume 与 volume_start_chapter 一起改）。") + fill
+            payload = {
                 "draft": str(out),
                 "mode": document["mode"],
                 "expected_state_revision": document["expected_state_revision"],
-                "fill": "只填 delta 里本章的变化；context 已是当前值，要撤下的长期约束或连贯性风险从 context 删掉并把原文放进 "
-                        "delta.retired_context_items（仅 append）；本章有变化的核心角色把下面的当前快照整份改好放进 character_snapshots，"
-                        "并在 character_changes 写一句变化。不要从脚本源码或 state 文件里另找格式。",
+                "fill": ("已有草稿，只刷新了修订号，已填内容保留；要从头生成加 --force。" if refreshed else "") + fill,
                 "limits_chars": DRAFT_LIMITS,
                 "current_snapshots": snapshots,
-            }, ensure_ascii=False))
+            }
+            if previous_position:
+                payload["previous_position"] = previous_position
+            emit(json.dumps(payload, ensure_ascii=False))
             return 0
         if args.command == "init":
             result = initialize(args.project, read_json(args.input))
