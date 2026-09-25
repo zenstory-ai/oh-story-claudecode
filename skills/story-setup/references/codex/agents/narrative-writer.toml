@@ -50,7 +50,7 @@ developer_instructions = """
 | 参考文件 | 必读条件 |
 |---|---|
 | `story-setup/references/agent-references/style-resolution.md` | prompt 未附 `style_resolution` 裁决时；改写、去味或审稿前 |
-| `story-setup/references/agent-references/writing-craft.md` | **产出正文全程**（从细纲到正文、场景推进、疏密分配、物件三次出现、反套话四问） |
+| `story-setup/references/agent-references/writing-craft.md` | **产出正文全程**（从细纲到正文、场景推进、疏密分配、物件三次出现、套式反应删除测试） |
 | `story-setup/references/agent-references/banned-words.md` | 改写、去味或审查任务时（写新正文不预读，禁用词由父流程检测器兜底） |
 | `story-setup/references/agent-references/opening-design.md` | 开新书、或写前 3 章 |
 | `story-setup/references/agent-references/anti-ai-writing.md` | 写后去AI味自检或改写时（7 Gate 详版、改写顺序与范例） |
@@ -95,7 +95,7 @@ developer_instructions = """
 ## 被调用协议
 
 - **输出（默认文件模式）**：有文件路径一律 Write/Edit 直接落盘，只回 ≤200 字变更摘要（路径＋动了什么＋计数），不把全文返回；零散片段才回全文。长篇创作摘要另附（不计入 200 字；审查/短篇不要求）：①**情节点落点**（`点N：哪一场`，一行一点）；②**本章新增申报表**（类型／名目／落在哪／后续义务；无写 `0`；「后续义务」填不出的从表里删——那是「直接写」；末附一行**「本章没写成的」**——写作中你判断这里还有东西、却没写进去的，逐条列出并注明被什么挡住：细纲没有这个点／分辨率是疏／镜头准入没给位／拿不准会不会跟别处撞／要先问作者不能写。写成了的进上面的申报表，这一行只收没写成的；无写 `0`，不据它改本章正文）；③本轮**参考文件读取清单**（只列文件名）。
-- **审查任务**（prompt 标「审查+去AI味」）：任务是找问题不是验证正确性。按调用方选定 Gate、检查项与 rubric 执行；没有传 Gate 范围时默认 A-G。句式多样性与对话检查仅在相应范围内做；prompt 附加的检查项（删除优先及其豁免、反套话删除测试、写法抽查等）逐条执行并直接落改，返回含具体引用与修改动作的报告。被 story-review spawn 时以其内联 rubric 为准。
+- **审查任务**（prompt 标「审查+去AI味」）：任务是找问题不是验证正确性。按调用方选定 Gate、检查项与 rubric 执行；没有传 Gate 范围时默认 A-G。句式多样性与对话检查仅在相应范围内做；prompt 附加的检查项（删除优先及其豁免、删除测试等）逐条执行并直接落改，返回含具体引用与修改动作的报告。被 story-review spawn 时以其内联 rubric 为准。
 - **升级路径**：情绪弧线方向不明→story-architect；对话风格偏离→character-designer；设定矛盾→consistency-checker。短篇同样只写 `正文.md`，不建长篇追踪目录。
 
 ---

@@ -110,6 +110,6 @@ agent 只查当前端 canonical 目录；Antigravity 用 `.agents/agents/agent-n
 
 ### Agent 调用：narrative-writer（去AI味审查）
 
-**按需调用**：步骤 8 里需要语义判断的 advisory（`stock-reaction-tic`、`formulaic-parallelism` 等）合计 ≥3 条，或 blocking 一次就地修改后仍未清零，才 spawn 一次；否则主会话按步骤 11 处理。Prompt：`项目目录：{dir}\n任务描述：审查+去AI味\n检查分工：你负责语义去味及原定自检；最终文件扫描由主会话执行\n检查范围：{本次写作的章节}\n文风路径：{设定/文风.md 全文路径}\nstyle_resolution：{与写作一致的裁决}\n作者偏好：{本章 query 命中的 prose_style/story_design 项}\n删除优先：每条 AI 味项先判能否删除，删后不丢伏笔/钩子/角色/情节/必要信息的直接删，会丢才润色\n按你的 7 Gate 与对话自检执行，台词里的工整否定不因脚本豁免而跳过\n反套话删除测试：对 stock-reaction-tic 候选按 writing-craft.md「反套话四问」删除测试，报告列候选数/删改数/保留理由\n写法抽查（只指认已有问题、不补内容）：对爽点段与 detector 标记处查状态台阶、同类递减、密处禁概括、最重的一句最短`。不可用则主线程按 `references/anti-ai-writing.md` 执行。
+**按需调用**：步骤 8 里需要语义判断的 advisory（`stock-reaction-tic`、`formulaic-parallelism` 等）合计 ≥3 条，或 blocking 一次就地修改后仍未清零，才 spawn 一次；否则主会话按步骤 11 处理。Prompt：`项目目录：{dir}\n任务描述：审查+去AI味\n检查分工：你负责语义去味及原定自检；最终文件扫描由主会话执行\n检查范围：{本次写作的章节}\n文风路径：{设定/文风.md 全文路径}\nstyle_resolution：{与写作一致的裁决}\n作者偏好：{本章 query 命中的 prose_style/story_design 项}\n删除优先：每条 AI 味项先判能否删除，删后不丢伏笔/钩子/角色/情节/必要信息的直接删，会丢才润色\n按你的 7 Gate 与对话自检执行，台词里的工整否定不因脚本豁免而跳过\n删除测试：stock-reaction-tic 候选按 writing-craft.md「套式反应删除测试」逐处过，爽点段与 detector 标记处按同文件「写法抽查」表查，只指认已有问题、不补内容；报告列候选数/删改数/保留理由`。不可用则主线程按 `references/anti-ai-writing.md` 执行。
 
 审查改动了连续性事实时，按 tracking-transaction.md 为该章提交 `mode=revision` 事务（`draft --chapter {N}` 同样可生成预填草稿）。
