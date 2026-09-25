@@ -114,8 +114,9 @@ MiMo（Claude Code 主机）只完成 demo 书一对：每章 80 → 47 分钟�
 - AI 味的三个可证伪实验（读感可数约束、检测器闭环改稿、换强写手）都未过预注册门槛，不合入，见 [AI 味干预笔记](../../rejected/feature/2026-09-25-ai-flavor-prompt-interventions.md)。
 - 「写手注入 ≤5K 要点、不再读 writing-craft」没有做：它改的是写作技法本身，没有 Claude 写手数据时风险最大。
 - 模型分工（Claude Code 写手用最强模型）未改：本机拿不到 Claude 写手数据，GPT 家族内换强写手未过门槛。`narrative-writer` 仍为 `model: sonnet`。
-- story-explorer 召回的 gaps 七路分流保留：它是选用路径，有契约守卫锚定 `profile_missing + custom_style` 分支，组装脚本的降档已覆盖多数场景。
+- story-explorer 召回的 gaps 七路分流保留：它是选用路径，有契约守卫锚定 `profile_missing + custom_style` 分支，组装脚本的降档已覆盖多数场景；第二轮起只在 benchmark-recall 写一份，日更流程改为指针。
 - 追踪逐章记录超限不自动截断：一次报全并换算字数后，实测改一轮即过，自动截断会悄悄丢信息。
+- **TODO：第二轮概念收敛（`b54f14e`..`dd5e52a`）未跑基准。** Codex 额度不足，c9 只跑了开头就中止，产物移到 `runs/discarded/`。合入判断凭既有证据：细纲删的都是 #383 消融测不出收益的字段，写手删的时空表与默认交错在反平推对照里跑不赢基线，其余是文字去重和指针化，不改检测与提交脚本。额度恢复后用同一包导出（`deploy.py export --ref dd5e52a`）在 Codex 三个用例上对 c5 复测，门槛同 c3：耗时与 token 不劣、兑现率与越界新增不劣、配对盲评不输。新书两个用例还要看新模板下生成的细纲是否仍带「目标情绪」「主角目标」的实际内容。
 
 来源：本分支 `feat/v0.8-slim-concepts`（含 `feat/v0.8-bench` 与 `chore/test-audit` 合并）
 
