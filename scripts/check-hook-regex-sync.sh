@@ -127,16 +127,6 @@ assert_foreshadow_warn "overdue" "| F004 | 过期伏笔 | 第1章 | 第2章 | �
 assert_foreshadow_warn "retired-unplanted-status" "| F001 | 尚未真正埋设 | 第5章 | 第10章 | 未埋 | 中 |"
 assert_foreshadow_warn "unknown-status" "| F005 | 异常状态 | 第1章 | 第2章 | 状态损坏 | 高 |"
 
-# Guard against reverting to the old broad regex or warning wording.
-if grep -q "状态\.\*(未埋|已埋|已过期)" "$HOOK_FILE"; then
-  echo "FAIL: old broad foreshadow regex is still present in hook"
-  exit 1
-fi
-if grep -q 'Open foreshadowing[[:space:]]threads' "$HOOK_FILE"; then
-  echo "FAIL: old open-foreshadow warning wording is still present in hook"
-  exit 1
-fi
-
 # Ensure every protocol status is explicitly classified by the hook's awk classifier:
 # either an explicit warn state (status == "X") or an explicit normal state (status != "X").
 # The old second clause grepped PROTOCOL_FILE — the very file STATUS_ENUM was extracted

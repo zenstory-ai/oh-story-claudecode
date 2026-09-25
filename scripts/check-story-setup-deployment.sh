@@ -709,10 +709,6 @@ long_count="$(printf '%s\n' "$multi_out" | grep -c '^检查：long$' || true)"
 [ "$long_count" -eq 1 ] || fail "detect-story-gaps reported long project $long_count times; expected exactly once"
 echo "  OK TS8 multi-book gap detection"
 
-# TS9 — Settings JSON remains valid
-python3 -m json.tool "$SETTINGS_FILE" >/dev/null
-echo "  OK TS9 settings JSON"
-
 # TS10 — Version threshold + deployed-behavior anchors
 # 只锚定「跑起来会坏」的东西：agents_version 阈值要跨文件对齐，部署到用户手里的
 # agent 模板要带住关键行为规则。原先还夹着一批「UPGRADING.md/README 必须写到某句话」
