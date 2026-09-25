@@ -124,6 +124,21 @@ class FinalChapterFlowTests(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def test_fix_punctuation_normalizes_body_before_the_single_check(self) -> None:
+        self.write_contract(1, 1000)
+        body = self.project / "正文" / "第001章_测试.md"
+        body.write_text(body.read_text(encoding="utf-8").replace("字字字字", "字……字", 1), encoding="utf-8")
+        plain = self.run_chapter("check", 1, expect=2)
+        self.assertEqual(plain["quality"]["status"], "fail")
+        self.assertNotIn("punctuation_fixed", plain)
+        args = [sys.executable, str(STORYCTL), "chapter", "check", "--project", str(self.project),
+                "--chapter", "1", "--fix-punctuation"]
+        fixed = self.run_process(args)
+        self.assertTrue(fixed["punctuation_fixed"])
+        self.assertEqual(fixed["quality"]["status"], "pass")
+        self.assertNotIn("……", body.read_text(encoding="utf-8"))
+        self.assertFalse(self.run_process(args)["punctuation_fixed"])
+
     def test_complete_user_flow_without_persisted_approval_state(self) -> None:
         # Checkpoint is pure: one call changes neither tracking state nor prose.
         segment = self.root / "segment.md"

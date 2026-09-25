@@ -117,11 +117,26 @@ def require_known_keys(mapping: dict[str, Any], allowed: set[str], label: str) -
     require(not unknown, f"{label} contains unsupported fields: {', '.join(sorted(unknown))}")
 
 
+# 事务校验期间收集全部超长字段，一次报完；None 表示逐条立即报错（初始化、状态读取等路径）。
+_LENGTH_ISSUES: list[str] | None = None
+
+
+def length_hint(label: str, text: str, max_bytes: int) -> str:
+    """把字节上限换算成字数：模型写的是中文，只看得懂「要删几个字」。"""
+    size = len(text.encode("utf-8"))
+    allowed = max(1, max_bytes * len(text) // size)
+    return (f"{label} exceeds {max_bytes} bytes（现 {len(text)} 字，上限约 {allowed} 字，"
+            f"至少删 {len(text) - allowed} 字）")
+
+
 def clean_text(value: object, label: str, *, allow_empty: bool = False, max_bytes: int = 768) -> str:
     require(isinstance(value, str), f"{label} must be a string")
     cleaned = " ".join(value.replace("|", "｜").split())
     require(allow_empty or bool(cleaned), f"{label} must not be empty")
-    require(len(cleaned.encode("utf-8")) <= max_bytes, f"{label} exceeds {max_bytes} bytes")
+    if len(cleaned.encode("utf-8")) > max_bytes:
+        if _LENGTH_ISSUES is None:
+            raise TrackingError(length_hint(label, cleaned, max_bytes))
+        _LENGTH_ISSUES.append(length_hint(label, cleaned, max_bytes))
     return cleaned
 
 
@@ -781,7 +796,13 @@ def render_delta(chapter: int, title: str, delta: dict[str, Any], core_names: se
         lines.extend(f"- {item}" for item in retired)
     payload = "\n".join(lines) + "\n"
     size = byte_size(payload)
-    require(size <= DELTA_MAX_BYTES, f"chapter delta is {size} bytes; hard cap is {DELTA_MAX_BYTES}")
+    if size > DELTA_MAX_BYTES:
+        longest = sorted((line for line in lines if line.startswith("- ")), key=len, reverse=True)[:3]
+        allowed = DELTA_MAX_BYTES * len(payload) // size
+        raise TrackingError(
+            f"chapter delta is {size} bytes; hard cap is {DELTA_MAX_BYTES}（逐章记录现 {len(payload)} 字，"
+            f"上限约 {allowed} 字，至少压缩 {len(payload) - allowed} 字；最长几项："
+            + "；".join(f"{line[2:18]}…（{len(line) - 2} 字）" for line in longest) + "）")
     return payload
 
 
@@ -901,6 +922,17 @@ def normalize_initial_document(document: object) -> dict[str, Any]:
 
 
 def normalize_transaction(project: Path, state: dict[str, Any], document: object) -> dict[str, Any]:
+    global _LENGTH_ISSUES
+    _LENGTH_ISSUES = []
+    try:
+        transaction = _normalize_transaction(project, state, document)
+    finally:
+        issues, _LENGTH_ISSUES = _LENGTH_ISSUES, None
+    require(not issues, f"{len(issues)} 个字段超长，一次改完再提交：" + "；".join(issues))
+    return transaction
+
+
+def _normalize_transaction(project: Path, state: dict[str, Any], document: object) -> dict[str, Any]:
     root = as_mapping(document, "transaction")
     require_known_keys(
         root,

@@ -229,6 +229,23 @@ def chapter_check(project: Path, chapter: int) -> dict[str, Any]:
     }
 
 
+def fix_punctuation(project: Path, chapter: int) -> bool:
+    """Run the deterministic punctuation normalizer on the chapter body in place.
+
+    Folding it into `chapter check --fix-punctuation` lets the parent flow close a
+    chapter with one call instead of running each cleanup script separately.
+    """
+    _, body, _ = _project_files(project, chapter)
+    node = shutil.which("node")
+    script = Path(__file__).with_name("normalize-punctuation.js")
+    if node is None or not script.is_file():
+        return False  # chapter check reports TOOL_UNAVAILABLE as a blocking finding
+    before = body.read_bytes()
+    subprocess.run([node, str(script), str(body)], text=True, encoding="utf-8",
+                   capture_output=True, check=False)
+    return body.read_bytes() != before
+
+
 def chapter_commit(project: Path, chapter: int, input_path: Path, *, accept_current_length: bool) -> dict[str, Any]:
     checked = chapter_check(project, chapter)
     require(checked["quality"]["status"] == "pass", "blocking quality findings must be fixed before commit")
@@ -278,6 +295,9 @@ def _build_parser() -> StructuredArgumentParser:
         subparser.add_argument("--chapter", type=int, required=True)
         if command != "check":
             subparser.add_argument("--input", type=Path, required=True)
+        else:
+            subparser.add_argument("--fix-punctuation", action="store_true",
+                                   help="先就地整理正文标点，再做检查")
     return parser
 
 
@@ -321,7 +341,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _wordcount_command(args)
     try:
         if args.chapter_command == "check":
+            fixed = fix_punctuation(args.project, args.chapter) if args.fix_punctuation else None
             result = chapter_check(args.project, args.chapter)
+            if fixed is not None:
+                result["punctuation_fixed"] = fixed
         else:
             result = chapter_commit(
                 args.project, args.chapter, args.input,

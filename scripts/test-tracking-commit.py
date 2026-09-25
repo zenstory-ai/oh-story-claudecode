@@ -479,6 +479,17 @@ class TrackingCommitTests(unittest.TestCase):
         result = self.run_tool("check", expect=2)
         self.assertIn("character snapshot files differ", result.stderr)
 
+    def test_all_over_length_fields_are_reported_at_once_in_characters(self) -> None:
+        self.init()
+        document = transaction(1, foreshadow=True)
+        document["delta"]["result"] = "江晨" * 100
+        document["delta"]["foreshadow_changes"][0]["summary"] = "老兵" * 70
+        result = self.run_tool("commit", document, expect=2)
+        self.assertIn("2 个字段超长", result.stderr)
+        self.assertIn("delta.result exceeds 480 bytes（现 200 字，上限约 160 字，至少删 40 字）", result.stderr)
+        self.assertIn("summary exceeds 360 bytes（现 140 字，上限约 120 字，至少删 20 字）", result.stderr)
+        self.assertEqual(self.read_state()["last_committed_chapter"], 0)
+
     def test_unknown_fields_are_rejected(self) -> None:
         invalid_init = initial_document()
         invalid_init["baseline"] = {}
