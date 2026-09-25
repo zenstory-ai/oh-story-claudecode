@@ -290,17 +290,24 @@ flowchart LR
 
 ## Skills
 
+**These are enough to write a book**: run `story-setup` once, then `story-long-write` for serials or `story-short-write` for short stories, and `story-deslop` to clean up AI tells; if unsure which to call, say `/story` plus one sentence.
+
 | Skill | Trigger | Description |
 |:------|:--------|:------------|
 | `story-setup` | `/story-setup` / `$story-setup` | Environment setup — Claude/Antigravity/OpenCode/Codex/ZCode/OpenClaw/Reasonix plus generic (safe merge) |
 | `story` | `/story` / `$story` / `/story dashboard` | Toolbox router, author-preference management, and local deconstruction/project dashboard |
 | `story-long-write` | `/story-long-write` | Long-form writing — outline building, character design, prose output |
+| `story-short-write` | `/story-short-write` | Short-form writing — emotion design, twist crafting, polish & delivery |
+| `story-deslop` | `/story-deslop` | De-AI-ify — detect and remove AI writing traces |
+
+**Advanced**: benchmark deconstruction, trend scans, importing drafts, multi-perspective review and covers, when you need them.
+
+| Skill | Trigger | Description |
+|:------|:--------|:------------|
 | `story-long-analyze` | `/story-long-analyze` | Long-form deconstruction — Golden First 3 Chapters, payoff design, pacing analysis |
 | `story-long-scan` | `/story-long-scan` | Long-form trend scan — Qidian/Fanqie/Jinjiang market trends |
-| `story-short-write` | `/story-short-write` | Short-form writing — emotion design, twist crafting, polish & delivery |
 | `story-short-analyze` | `/story-short-analyze` | Short-form deconstruction — story core, structure, emotional arc, reversal design, writing techniques, resonance analysis |
 | `story-short-scan` | `/story-short-scan` | Short-form trend scan — Zhihu Yanyan/Fanqie short-form trending data |
-| `story-deslop` | `/story-deslop` | De-AI-ify — detect and remove AI writing traces |
 | `story-import` | `/story-import` | Reverse import — parse existing novels into standard project structure |
 | `story-review` | `/story-review` | Multi-perspective review — 4-agent adversarial review + Fanqie/Qidian/Zhihu scoring rubrics |
 | `story-cover` | `/story-cover` | Cover generation — title/genre analysis + GPT-Image-2 via Codex included usage or API fallback |
