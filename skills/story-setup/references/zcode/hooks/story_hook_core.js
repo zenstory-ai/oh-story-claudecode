@@ -567,27 +567,40 @@ function extractProseTargets(command, depth = 0) {
       targets.push(...extractProseTargets(nested, depth + 1))
     }
   }
-  targets.push(...redirectTargets(scannable))
-  for (const raw of shellSegments(scannable)) {
-    const segment = beforeShellRedirection(raw)
+  // `cd 书目录 && cat > 正文/...`：相对写入目标要接在 cd 之后的目录上，否则守卫按会话目录去找细纲，
+  // 把有细纲的章误报成缺细纲。命令里没有 cd 时保持整条命令扫描重定向的原行为。
+  const segments = shellSegments(scannable)
+  const parsed = segments.map((raw) => {
+    const words = shellWords(beforeShellRedirection(raw))
+    const commandIndex = commandWordIndex(words)
+    return { raw, name: commandBasename(words[commandIndex]), args: words.slice(commandIndex + 1) }
+  })
+  const hasCd = parsed.some((item) => item.name === "cd")
+  if (!hasCd) targets.push(...redirectTargets(scannable))
+  let cwd = ""
+  const isAbsolute = (value) => /^([\\/~]|[A-Za-z]:[\\/])/.test(value)
+  const underCwd = (value) => (cwd && !isAbsolute(value) ? joinPosix(cwd, value) : value)
+  for (const { raw, name: commandName, args: commandArgs } of parsed) {
     // 引号感知分词（同 shellWords）：/\s+/ 会把 cp draft.md "my book/正文/第1章.md" 的目标切碎，
     // 末位取到 book/正文/第1章.md —— 判到另一本书上（那本有细纲就直接放行）。
-    const words = shellWords(segment)
-    const commandIndex = commandWordIndex(words)
-    const commandName = commandBasename(words[commandIndex])
-    const commandArgs = words.slice(commandIndex + 1)
+    if (commandName === "cd") {
+      const directory = commandArgs.find((arg) => !arg.startsWith("-"))
+      if (directory) cwd = isAbsolute(directory) || !cwd ? directory : joinPosix(cwd, directory)
+      continue
+    }
+    if (hasCd) targets.push(...redirectTargets(raw).map(underCwd))
     if (["sh", "bash", "dash", "ksh", "zsh"].includes(commandName)) {
       const nested = nestedShellCommand(commandArgs)
       if (nested) targets.push(...extractProseTargets(nested, depth + 1))
     }
     if (commandName === "tee" || commandName === "touch") {
       for (const destination of writeOperands(commandName, commandArgs)) {
-        if (destination.includes("正文")) targets.push(destination)
+        if (destination.includes("正文")) targets.push(underCwd(destination))
       }
     }
     if (commandName === "cp" || commandName === "mv" || commandName === "install") {
       for (const destination of copyLikeTargets(commandName, commandArgs)) {
-        if (destination.includes("正文")) targets.push(destination)
+        if (destination.includes("正文")) targets.push(underCwd(destination))
       }
     }
   }

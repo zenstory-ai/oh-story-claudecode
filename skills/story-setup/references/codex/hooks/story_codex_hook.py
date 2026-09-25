@@ -1117,30 +1117,48 @@ def extract_prose_targets_from_command(command: str, depth: int = 0) -> list[str
     if depth < 8:
         for nested in _command_substitutions(scannable):
             targets.extend(extract_prose_targets_from_command(nested, depth + 1))
-    targets.extend(_redirect_targets(scannable))
-    # cp/mv: the write destination is the last positional arg of the segment. Parse it (regex can't
-    # tell a 正文 source from a 正文 dest, and a trailing 2>/dev/null / >log / || breaks end-anchoring).
+    # 与 JS 核同构：`cd 书目录 && cat > 正文/...` 的相对写入目标接在 cd 之后的目录上；
+    # 命令里没有 cd 时保持整条命令扫描重定向的原行为。
+    parsed = []
     for raw_segment in _shell_segments(scannable):
-        seg = _before_shell_redirection(raw_segment)
         # 引号感知分词（同 JS 核 shellWords）：str.split() 会按 U+3000 和引号内空格切碎目标，
         # 末位取到 book/正文/第1章.md —— 判到另一本书上（那本有细纲就直接放行）。
-        words = _shell_words(seg)
+        words = _shell_words(_before_shell_redirection(raw_segment))
         command_index = _command_word_index(words)
-        command_name = _command_basename(words[command_index]) if command_index < len(words) else ""
-        command_args = words[command_index + 1:]
+        name = _command_basename(words[command_index]) if command_index < len(words) else ""
+        parsed.append((raw_segment, name, words[command_index + 1:]))
+    has_cd = any(name == "cd" for _, name, _ in parsed)
+    if not has_cd:
+        targets.extend(_redirect_targets(scannable))
+    cwd = ""
+
+    def is_absolute(value: str) -> bool:
+        return bool(re.match(r"^([\\/~]|[A-Za-z]:[\\/])", value))
+
+    def under_cwd(value: str) -> str:
+        return f"{cwd.rstrip('/')}/{value}" if cwd and not is_absolute(value) else value
+
+    for raw_segment, command_name, command_args in parsed:
+        if command_name == "cd":
+            directory = next((arg for arg in command_args if not arg.startswith("-")), None)
+            if directory:
+                cwd = directory if is_absolute(directory) or not cwd else under_cwd(directory)
+            continue
+        if has_cd:
+            targets.extend(under_cwd(target) for target in _redirect_targets(raw_segment))
         if command_name in ("sh", "bash", "dash", "ksh", "zsh"):
             nested = _nested_shell_command(command_args)
             if nested:
                 targets.extend(extract_prose_targets_from_command(nested, depth + 1))
         if command_name in ("tee", "touch"):
             targets.extend(
-                destination
+                under_cwd(destination)
                 for destination in _write_operands(command_name, command_args)
                 if "正文" in destination
             )
         if command_name in ("cp", "mv", "install"):
             targets.extend(
-                destination
+                under_cwd(destination)
                 for destination in _copy_like_targets(command_name, command_args)
                 if "正文" in destination
             )
