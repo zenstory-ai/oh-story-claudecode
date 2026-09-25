@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""基准正文的质量评测：单份细纲兑现核对 + 配对盲评，评委走 Antigravity（Gemini，与写手不同家族）。
+"""基准正文的质量评测：单份细纲兑现核对 + 配对盲评。评委默认走 Antigravity（Gemini），
+写手是 Gemini 时用 --judge claude 或 codex 换家族：评委必须与写手不同家族。
 
 用法：
-  judge.py coverage <run目录>... --out <结果目录>
-  judge.py pairwise --base <run目录>... --cand <run目录>... --out <结果目录>
+  judge.py [--judge agy|claude|codex] coverage <run目录>... --out <结果目录>
+  judge.py [--judge agy|claude|codex] pairwise --base <run目录>... --cand <run目录>... --out <结果目录>
 
 coverage：每章单独评，评委只看本章细纲与正文，不知道版本；逐条判情节点是否落地、
           列出细纲没授权的新剧情事实。可数，结论不靠打分。
           --strict：改判「演成场景 / 概括转述 / 缺失」并摘原句——默认口径对 Gemini Flash 太宽，
           两个版本全是 1.00，看不出关键交锋被写成概括的问题。
 pairwise：同 (主机, 用例, 章号) 的两个版本随机分 A/B，交换顺序各评一次；
-          两次一致才算胜负，不一致记平。评委不知道哪份是哪个版本。
+          两次一致才算胜负，不一致记平。评委不知道哪份是哪个版本。两版细纲不同（用例现补细纲）时
+          各附各的细纲，不拿一方的细纲评另一方。
 所有原始回复落在 --out，便于复核；重复运行跳过已有结果。
 """
 import argparse
@@ -22,7 +24,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-JUDGE_MODEL = 'gemini-3.8-flash-high'
+JUDGE_MODELS = {'agy': 'gemini-3.8-flash-high', 'claude': 'claude-opus-5-5', 'codex': 'gpt-5.6-sol'}
+JUDGE = 'agy'
 
 COVERAGE_PROMPT = """你是网文责编，只核对事实，不评文笔。下面是一章的细纲和成稿正文。
 
@@ -68,7 +71,6 @@ PAIRWISE_PROMPT = """你是番茄小说的资深编辑。下面是同一份细�
 只输出一个 JSON 对象，不要任何别的文字：
 {{"winner": "A|B|tie", "reason": "两三句具体理由，引用原文片段"}}
 
-===== 细纲 =====
 {outline}
 
 ===== A =====
@@ -80,10 +82,19 @@ PAIRWISE_PROMPT = """你是番茄小说的资深编辑。下面是同一份细�
 
 
 def ask(prompt, cwd):
-    completed = subprocess.run(
-        ['agy', '-p', prompt, '--model', JUDGE_MODEL, '--output-format', 'text', '--print-timeout', '10m',
-         '--disable-slash-commands', '--sandbox', '--dangerously-skip-permissions'],
-        cwd=cwd, capture_output=True, text=True, encoding='utf-8', stdin=subprocess.DEVNULL)
+    model = JUDGE_MODELS[JUDGE]
+    if JUDGE == 'claude':
+        # 不读任何用户/项目设置与 CLAUDE.md，评委只看 prompt。
+        cmd, stdin = ['claude', '-p', '--model', model, '--output-format', 'text', '--setting-sources', '',
+                      '--disallowedTools', 'Bash,Edit,Write,Read,Glob,Grep,WebFetch,WebSearch,Agent'], prompt
+    elif JUDGE == 'codex':
+        cmd, stdin = ['codex', 'exec', '-c', f'model="{model}"', '--skip-git-repo-check', '--sandbox', 'read-only',
+                      '-'], prompt
+    else:
+        cmd, stdin = ['agy', '-p', prompt, '--model', model, '--output-format', 'text', '--print-timeout', '10m',
+                      '--disable-slash-commands', '--sandbox', '--dangerously-skip-permissions'], None
+    completed = subprocess.run(cmd, cwd=cwd, input=stdin, capture_output=True, text=True, encoding='utf-8',
+                               **({} if stdin is not None else {'stdin': subprocess.DEVNULL}))
     text = completed.stdout
     match = re.search(r'\{.*\}', text, re.S)
     try:
@@ -114,7 +125,8 @@ def coverage(runs, out, strict=False):
                 outline=outline.read_text(encoding='utf-8'), body=body.read_text(encoding='utf-8'))
             result, raw = ask(prompt, out)
             dest.write_text(json.dumps({'run': Path(run).name, 'host': meta['host'], 'case': meta['case']['id'],
-                                        'pkg': meta['pkg'].get('ref'), 'chapter': n, 'result': result, 'raw': raw},
+                                        'pkg': meta['pkg'].get('ref'), 'chapter': n, 'judge': JUDGE_MODELS[JUDGE],
+                                        'result': result, 'raw': raw},
                                        ensure_ascii=False, indent=1), encoding='utf-8')
             print(dest.name, 'ok' if result else 'PARSE_FAIL', flush=True)
 
@@ -135,23 +147,31 @@ def pairwise(base_runs, cand_runs, out):
         seed = int(hashlib.sha256(f'{host}{case}{n}'.encode()).hexdigest(), 16)
         first = random.Random(seed).choice(['base', 'cand'])
         second = 'cand' if first == 'base' else 'base'
-        outline = pair['base'][1].read_text(encoding='utf-8')
+        outlines = {k: v[1].read_text(encoding='utf-8') for k, v in pair.items()}
         texts = {k: v[0].read_text(encoding='utf-8') for k, v in pair.items()}
         rounds = []
         for a, b in ((first, second), (second, first)):
+            if outlines['base'] == outlines['cand']:
+                outline = '===== 细纲 =====\n' + outlines['base']
+            else:
+                outline = '===== A 的细纲 =====\n%s\n\n===== B 的细纲 =====\n%s' % (outlines[a], outlines[b])
             result, raw = ask(PAIRWISE_PROMPT.format(chapter=n, outline=outline, a=texts[a], b=texts[b]), out)
             w = (result or {}).get('winner')
             rounds.append({'A': a, 'B': b, 'winner': {'A': a, 'B': b}.get(w, 'tie' if w == 'tie' else None),
                            'reason': (result or {}).get('reason'), 'raw': raw})
         votes = [r['winner'] for r in rounds]
         final = votes[0] if votes[0] == votes[1] and votes[0] in ('base', 'cand') else 'tie'
-        dest.write_text(json.dumps({'host': host, 'case': case, 'chapter': n, 'final': final, 'rounds': rounds},
+        dest.write_text(json.dumps({'host': host, 'case': case, 'chapter': n, 'judge': JUDGE_MODELS[JUDGE],
+                                    'final': final, 'rounds': rounds},
                                    ensure_ascii=False, indent=1), encoding='utf-8')
         print(dest.name, final, flush=True)
 
 
 def main():
+    global JUDGE
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('--judge', choices=sorted(JUDGE_MODELS), default='agy',
+                    help='评委主机；必须与被评正文的写手不同家族')
     sub = ap.add_subparsers(dest='cmd', required=True)
     c = sub.add_parser('coverage')
     c.add_argument('runs', nargs='+')
@@ -162,6 +182,7 @@ def main():
     p.add_argument('--cand', nargs='+', required=True)
     p.add_argument('--out', required=True)
     a = ap.parse_args()
+    JUDGE = a.judge
     if a.cmd == 'coverage':
         coverage(a.runs, Path(a.out), strict=a.strict)
     else:
