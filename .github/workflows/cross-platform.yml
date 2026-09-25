@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          # Node 22.6+ lets test-prose-net-parity execute plugin.ts directly.
+          # Node 22.6+ lets test-opencode-plugin.mjs (via check-opencode-adapter) execute plugin.ts directly.
           node-version: 22
       - uses: actions/setup-python@v5
         with:
