@@ -6,7 +6,8 @@ description: |
 tools: [Read, Glob, Grep, Write, Edit]
 disallowedTools: [Bash]
 model: haiku
-maxTurns: 12
+maxTurns: 20
+# maxTurns: 20 — 覆盖自读原文、读交接、写入、四项 Grep 自查与定点 Edit 修正后再回执。
 # Write/Edit 只许落到 {拆文目录}/_analysis_cache/输入-{批次ID}.md：守卫在 story_hook_cli.js 的
 # analysis-input-guard，经本挂载点只作用于本 agent。改 tools 就同步改 matcher。
 hooks:

@@ -22,7 +22,7 @@ permissions:
   - action: shell
     resource: "*"
     effect: deny
-steps: 12
+steps: 20
 ---
 
 
