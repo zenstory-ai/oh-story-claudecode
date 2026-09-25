@@ -40,7 +40,7 @@ Codex 主机**必须**用独立的 `CODEX_HOME`：目录里只放一个指向 `~
 
 `--tell` 可不给；给时要指向一个外部私有仓库，用到其中的 `detectors/human_ref_check.py`。
 
-Claude Code 主机用隔离 HOME，会话与子 agent 转录都在 `<run>/home/.claude/projects/` 下，`metrics.py` 从那里取 token。Codex 主机用独立 CODEX_HOME（复用登录），token 取自 `--json` 输出的 `turn.completed`。
+Claude Code 主机默认用隔离 HOME，会话与子 agent 转录都在 `<run>/home/.claude/projects/` 下，`metrics.py` 从那里取 token。隔离 HOME 只适合用 `env_files` 传凭据的第三方端点；用本机登录的 Claude 时在 hosts.json 里写 `"real_home": true`：沿用真实 HOME 取凭据，以 `--setting-sources project,local` 挡住用户级设置、插件与 CLAUDE.md，每轮结束把转录复制进运行目录。Codex 主机用独立 CODEX_HOME（复用登录），token 取自 `--json` 输出的 `turn.completed`。
 
 ## 用例
 

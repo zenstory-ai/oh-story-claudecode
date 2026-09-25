@@ -46,14 +46,39 @@ def host_env(cfg, home):
     return env
 
 
+def claude_env(cfg, home):
+    """real_home：凭据跟着真实 HOME（改了 HOME 就是 Not logged in），只能沿用它；
+    用户级设置、插件与 CLAUDE.md 由 --setting-sources 挡在外面，嵌套会话的环境变量去掉。"""
+    if not cfg.get('real_home'):
+        return host_env(cfg, home)
+    env = {k: v for k, v in os.environ.items() if not k.startswith(('CLAUDE', 'OMC_'))}
+    env.update(cfg.get('env', {}))
+    return env
+
+
+def keep_transcripts(sid, home):
+    """real_home 时会话转录落在真实 ~/.claude/projects 下，复制进运行目录，metrics.py 照旧读。"""
+    for main in (Path.home() / '.claude' / 'projects').glob(f'*/{sid}.jsonl'):
+        dest = home / '.claude' / 'projects' / main.parent.name
+        dest.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(main, dest / main.name)
+        if (main.parent / sid).is_dir():
+            shutil.copytree(main.parent / sid, dest / sid, dirs_exist_ok=True)
+
+
 def drive_claude(cfg, proj, home, log, prompt, resume):
     """一轮 Claude Code stream-json 会话；后台子 agent 未结束前保持进程存活。"""
     cmd = [os.path.expanduser(cfg['bin']), '-p', '--input-format', 'stream-json', '--output-format',
            'stream-json', '--verbose', '--permission-mode', 'bypassPermissions']
+    if cfg.get('real_home'):
+        # story-setup 把 hooks 注册在 settings.local.json，只写 project 时 hook 不生效。
+        cmd += ['--setting-sources', 'project,local', '--strict-mcp-config']
+    if cfg.get('model') and cfg['model'] != 'default':
+        cmd += ['--model', cfg['model']]
     if resume:
         cmd += ['--resume', resume]
     err = open(str(log).replace('.jsonl', '.err'), 'w')
-    p = subprocess.Popen(cmd, cwd=proj, env=host_env(cfg, home), stdin=subprocess.PIPE,
+    p = subprocess.Popen(cmd, cwd=proj, env=claude_env(cfg, home), stdin=subprocess.PIPE,
                          stdout=subprocess.PIPE, stderr=err, text=True, encoding='utf-8')
     p.stdin.write(json.dumps({'type': 'user', 'message': {'role': 'user', 'content': prompt}},
                              ensure_ascii=False) + '\n')
@@ -101,6 +126,8 @@ def drive_claude(cfg, proj, home, log, prompt, resume):
             p.kill()
             break
     p.wait(timeout=60)
+    if cfg.get('real_home') and sid:
+        keep_transcripts(sid, home)
     return sid
 
 
