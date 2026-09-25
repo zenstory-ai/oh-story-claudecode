@@ -33,7 +33,7 @@ fi
 
 # 后续 case + grep 在中文路径/正文内容上做匹配。Windows 中文系统若导出 GBK 区域设置，
 # grep 按 GBK 多字节解码 UTF-8 内容会乱。强制 C 区域走字节匹配才稳定（issue #164 同类）。
-# 放在 is_git_commit_command（内嵌 python）之后，避免影响其输入解码。
+# 放在 is_git_commit_command（node 共享核）之后，避免影响其输入解码。
 export LC_ALL=C
 
 ROOT=$(project_root)

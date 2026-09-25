@@ -9,7 +9,7 @@ source "$(dirname "$0")/lib/common.sh"
 # 后续 awk 解析中文伏笔表 + find/grep 中文路径。Windows 中文系统若导出 GBK 区域设置，
 # gawk 会把 UTF-8 状态值按 GBK 多字节解码失败，trim 和 == 比较全乱、每行误报。强制 C
 # 区域走字节匹配（UTF-8 字面量 vs UTF-8 内容字节相等）才稳定（issue #164 同类）。文末的
-# 连续性扫描内嵌 python，但它以 encoding='utf-8' 显式读文件、用 stdout.buffer 写 UTF-8 字节，
+# 连续性扫描走 node 共享核（story_hook_cli.js），node 按 UTF-8 读文件、写 stdout，
 # 不受 LC_ALL=C 影响，故仍可在顶部 export。
 export LC_ALL=C
 
