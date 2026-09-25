@@ -210,17 +210,15 @@ for needle in "${TOXIC_SYNC[@]}"; do
   done
 done
 
-# 欠账门在 Claude bash 侧另有一份前置实现（guard-outline-before-prose.sh：上一章发现 +
-# 首 6 行豁免窗口 + 拦截文案，毒句式扫描本身走共享核 prose-toxic），豁免标记与门文案
-# 必须与 js/py 三处同步。
-GUARD_SH="$REPO_ROOT/skills/story-setup/references/templates/hooks/guard-outline-before-prose.sh"
+# 欠账门的豁免标记与门文案 js↔py 同步。Claude bash 侧前置门（guard-outline-before-prose.sh）
+# 的判定与文案由 test-prose-net-parity.sh D 段按真实写入逐场景锁。
 GATE_SYNC=(
   '去味(：|:)跳过'
   '未清毒句式欠账'
   '<!-- 去味:跳过 --> 后重试'
 )
 for needle in "${GATE_SYNC[@]}"; do
-  for file in "$JS_CORE" "$PY_HOOK" "$GUARD_SH"; do
+  for file in "$JS_CORE" "$PY_HOOK"; do
     if ! grep -Fq -- "$needle" "$file"; then
       echo "FAIL: 欠账门规范串缺失/漂移 — 「${needle}」未出现在 $(basename "$file")"
       toxic_fail=1
@@ -231,4 +229,4 @@ if [ "$toxic_fail" -ne 0 ]; then
   exit 1
 fi
 
-echo "OK: 毒句式正则/常量/文案 js↔py 逐字同步（欠账门标记/文案含 bash 前置门三处同步）"
+echo "OK: 毒句式正则/常量/文案 js↔py 逐字同步（含欠账门标记/文案）"

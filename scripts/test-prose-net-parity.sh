@@ -739,30 +739,44 @@ run_bash_guard_parity() {
   command -v python3 >/dev/null 2>&1 || return 1
   local tmp; tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' RETURN
 
-  # scenario|last_committed|ctx_revision|schema|outline_ch|target_ch|target_exists|拆文库|state
+  # scenario|last_committed|ctx_revision|schema|outline_ch|target_ch|target_exists|拆文库|state|prev
   # state=none 时 last/ctx/schema 无意义。target_exists=1 走续写路径（不判细纲，仍判追踪）。
+  # prev = 上一章（第001章_旧.md）内容，走欠账门：toxic 有毒句式无豁免、marker 首 6 行内标
+  # <!-- 去味:跳过 -->、fullwidth 全角冒号 去味：跳过（两端正则都认 ：|:）、marker7 标记落在第 7 行
+  # （出了豁免窗口，照拦）；- 不建上一章。
   local scenarios="
-nostate|-|-|-|1|1|0|0|none
-nooutline|-|-|-|-|1|0|0|none
-importwindow|-|-|-|-|1|0|1|none
-importstate|0|0|4|1|3|0|1|yes
-valid|0|0|4|1|1|0|0|yes
-skipahead|0|0|4|3|3|0|0|yes
-existing|1|0|4|1|1|1|0|yes
-existing_mismatch|1|9|4|1|1|1|0|yes
-badschema|0|0|3|1|1|0|0|yes
-revisionbackup|5|0|4|3|3|0|0|yes
+nostate|-|-|-|1|1|0|0|none|-
+nooutline|-|-|-|-|1|0|0|none|-
+importwindow|-|-|-|-|1|0|1|none|-
+importstate|0|0|4|1|3|0|1|yes|-
+valid|0|0|4|1|1|0|0|yes|-
+skipahead|0|0|4|3|3|0|0|yes|-
+existing|1|0|4|1|1|1|0|yes|-
+existing_mismatch|1|9|4|1|1|1|0|yes|-
+badschema|0|0|3|1|1|0|0|yes|-
+revisionbackup|5|0|4|3|3|0|0|yes|-
+debt|1|0|4|2|2|0|0|yes|toxic
+debt_marker|1|0|4|2|2|0|0|yes|marker
+debt_fullwidth|1|0|4|2|2|0|0|yes|fullwidth
+debt_marker7|1|0|4|2|2|0|0|yes|marker7
 "
   local out_bash="$tmp/bash.txt" out_js="$tmp/js.txt"
   : > "$out_bash"; : > "$out_js"
 
   local line
-  while IFS='|' read -r name last ctx schema outline target exists lib state; do
+  while IFS='|' read -r name last ctx schema outline target exists lib state prev; do
     [ -n "${name:-}" ] || continue
     local proj="$tmp/$name" book="$tmp/$name/书"
     mkdir -p "$book/大纲" "$book/正文" "$book/追踪"
     [ "$lib" = "1" ] && mkdir -p "$proj/拆文库/书"
     [ "$outline" != "-" ] && printf '# 细纲\n' > "$book/大纲/细纲_第00${outline}章.md"
+    local toxic='声音不大，却带着一股狠劲。'
+    case "$prev" in
+      toxic) printf '%s\n' '# 第1章 旧' "$toxic" > "$book/正文/第001章_旧.md" ;;
+      marker) printf '%s\n' '# 第1章 旧' '<!-- 去味:跳过 -->' "$toxic" > "$book/正文/第001章_旧.md" ;;
+      fullwidth) printf '%s\n' '# 第1章 旧' '<!-- 去味：跳过 -->' "$toxic" > "$book/正文/第001章_旧.md" ;;
+      marker7) printf '%s\n' '# 第1章 旧' '他推门。' '她抬头。' '灯亮了。' '雨停了。' '风起了。' '<!-- 去味:跳过 -->' "$toxic" > "$book/正文/第001章_旧.md" ;;
+    esac
     if [ "$state" = "yes" ]; then
       printf '{"schema_version":%s,"state_revision":0,"last_committed_chapter":%s}\n' "$schema" "$last" \
         > "$book/追踪/_tracking-state.json"
@@ -774,15 +788,16 @@ revisionbackup|5|0|4|3|3|0|0|yes
     # bash 侧：exit 2 = 拦，0 = 放行
     local payload code
     payload=$(python3 -c 'import json,sys;print(json.dumps({"tool_input":{"file_path":sys.argv[1]}}))' "$abs")
-    ( cd "$proj" && CLAUDE_PROJECT_DIR="$proj" CLAUDE_TOOL_INPUT="$payload" bash "$CLAUDE_GUARD" ) >/dev/null 2>&1
+    ( cd "$proj" && CLAUDE_PROJECT_DIR="$proj" CLAUDE_TOOL_INPUT="$payload" bash "$CLAUDE_GUARD" ) >/dev/null 2>"$tmp/$name.bash.err"
     code=$?
     if [ "$code" = 2 ]; then printf '%s :: block\n' "$name" >> "$out_bash"
     else printf '%s :: pass\n' "$name" >> "$out_bash"; fi
 
-    # JS 核侧
-    node - "$CLAUDE_CORE" "$proj" "$abs" "$name" >> "$out_js" <<'JS'
+    # JS 核侧（拦截文案另存，供欠账门场景核对两端给出同一条修法）
+    node - "$CLAUDE_CORE" "$proj" "$abs" "$name" "$tmp/$name.js.err" >> "$out_js" <<'JS'
 const core = require(process.argv[2])
 const reason = core.proseBlockReason(process.argv[3], process.argv[4])
+require("node:fs").writeFileSync(process.argv[6], reason || "")
 console.log(`${process.argv[5]} :: ${reason ? "block" : "pass"}`)
 JS
   done <<< "$scenarios"
@@ -802,7 +817,11 @@ skipahead block
 existing pass
 existing_mismatch block
 badschema block
-revisionbackup pass"
+revisionbackup pass
+debt block
+debt_marker pass
+debt_fullwidth pass
+debt_marker7 block"
   while read -r want_name want_verdict; do
     [ -n "$want_name" ] || continue
     grep -qx "$want_name :: $want_verdict" "$out_bash" || {
@@ -810,6 +829,16 @@ revisionbackup pass"
       return 3
     }
   done <<< "$expect"
+  # 欠账门拦下时两端都得说清是上一章欠账、并给出同一个豁免标记写法（作者照抄才能放行）。
+  local side
+  for name in debt debt_marker7; do
+    for side in bash js; do
+      grep -q '未清毒句式欠账' "$tmp/$name.$side.err" && grep -qF '<!-- 去味:跳过 --> 后重试' "$tmp/$name.$side.err" || {
+        echo "FAIL: 场景 $name 的 $side 拦截文案未指明上一章欠账与豁免标记写法：$(cat "$tmp/$name.$side.err")" >&2
+        return 3
+      }
+    done
+  done
 
   # node 缺席时追踪门必须 fail-open（大纲门仍靠纯 bash 拦住）。
   local nonode="$tmp/nonode"; mkdir -p "$nonode"
@@ -836,7 +865,7 @@ run_bash_guard_parity
 rc_guard=$?
 set -e
 case "$rc_guard" in
-  0) echo "写正文守卫 parity：Claude bash guard == JS core（10 组工程场景：无 state/缺细纲/导入窗口/跳章/续写/派生修订不一致/坏 schema/回炉备份，含 node 缺席 fail-open）。" ;;
+  0) echo "写正文守卫 parity：Claude bash guard == JS core（14 组工程场景：无 state/缺细纲/导入窗口/跳章/续写/派生修订不一致/坏 schema/回炉备份/上一章毒句式欠账与豁免窗口，含 node 缺席 fail-open）。" ;;
   1) echo "写正文守卫 parity：跳过（无 node/python3 运行时）。" ;;
   *) fails=$((fails + 1)) ;;
 esac
