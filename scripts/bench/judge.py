@@ -7,6 +7,8 @@
 
 coverage：每章单独评，评委只看本章细纲与正文，不知道版本；逐条判情节点是否落地、
           列出细纲没授权的新剧情事实。可数，结论不靠打分。
+          --strict：改判「演成场景 / 概括转述 / 缺失」并摘原句——默认口径对 Gemini Flash 太宽，
+          两个版本全是 1.00，看不出关键交锋被写成概括的问题。
 pairwise：同 (主机, 用例, 章号) 的两个版本随机分 A/B，交换顺序各评一次；
           两次一致才算胜负，不一致记平。评委不知道哪份是哪个版本。
 所有原始回复落在 --out，便于复核；重复运行跳过已有结果。
@@ -32,6 +34,25 @@ COVERAGE_PROMPT = """你是网文责编，只核对事实，不评文笔。下�
 只输出一个 JSON 对象，不要任何别的文字：
 {{"beats": [{{"id": "1", "beat": "情节点一句话", "status": "landed|summarized|missing"}}],
   "unauthorized": [{{"fact": "一句话", "quote": "正文原句片段"}}]}}
+
+===== 细纲 =====
+{outline}
+
+===== 正文 =====
+{body}
+"""
+
+SCENE_PROMPT = """你是网文责编，只核对「演没演」，不评文笔。下面是一章的细纲和成稿正文。
+
+把细纲里的情节点逐条列出（优先用「情节点」表的编号），对每条在正文里找到对应段落，判定呈现方式：
+- scene：演成了场景——读者看到逐拍的动作、对话或物件变化，关键交锋用人物的原话呈现；
+- summary：叙述者概括转述——例如「他讲了十分钟证据」「两人争了几句」「她把来龙去脉说了一遍」，
+  或只给结果不给过程；
+- missing：正文里没有。
+每条都要摘一句最能说明判定的正文原句（≤40 字）。宁严勿宽：半场景半概括的，关键交锋被概括就判 summary。
+
+只输出一个 JSON 对象，不要任何别的文字：
+{{"beats": [{{"id": "1", "beat": "情节点一句话", "render": "scene|summary|missing", "quote": "正文原句"}}]}}
 
 ===== 细纲 =====
 {outline}
@@ -82,15 +103,15 @@ def chapters(run):
             yield meta, n, body[0], outline[0]
 
 
-def coverage(runs, out):
+def coverage(runs, out, strict=False):
     out.mkdir(parents=True, exist_ok=True)
     for run in runs:
         for meta, n, body, outline in chapters(run):
             dest = out / f'{Path(run).name}-{n:03d}.json'
             if dest.exists():
                 continue
-            prompt = COVERAGE_PROMPT.format(outline=outline.read_text(encoding='utf-8'),
-                                            body=body.read_text(encoding='utf-8'))
+            prompt = (SCENE_PROMPT if strict else COVERAGE_PROMPT).format(
+                outline=outline.read_text(encoding='utf-8'), body=body.read_text(encoding='utf-8'))
             result, raw = ask(prompt, out)
             dest.write_text(json.dumps({'run': Path(run).name, 'host': meta['host'], 'case': meta['case']['id'],
                                         'pkg': meta['pkg'].get('ref'), 'chapter': n, 'result': result, 'raw': raw},
@@ -135,13 +156,14 @@ def main():
     c = sub.add_parser('coverage')
     c.add_argument('runs', nargs='+')
     c.add_argument('--out', required=True)
+    c.add_argument('--strict', action='store_true', help='逐条判「演成场景 / 概括转述」并摘原句')
     p = sub.add_parser('pairwise')
     p.add_argument('--base', nargs='+', required=True)
     p.add_argument('--cand', nargs='+', required=True)
     p.add_argument('--out', required=True)
     a = ap.parse_args()
     if a.cmd == 'coverage':
-        coverage(a.runs, Path(a.out))
+        coverage(a.runs, Path(a.out), strict=a.strict)
     else:
         pairwise(a.base, a.cand, Path(a.out))
 
