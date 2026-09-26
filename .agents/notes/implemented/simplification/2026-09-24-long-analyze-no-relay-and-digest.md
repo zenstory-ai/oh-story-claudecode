@@ -21,11 +21,11 @@ Related: [2026-09-23-long-analyze-runtime-takeover](2026-09-23-long-analyze-runt
 
 ## Decision
 
-- **派发只给路径**：批次 ID、输入类型、计划的 `source_files`（原文块是逐章 `source_locator`）、`chapter_chars`、输出文件路径、上一批缓存路径。chapter-extractor 自己按行号 Read 原文，自己 Grep 上一批缓存里的 `### 跨批状态`。
+- **派发只给路径，全部照抄计划**：`plan` 每批输出 `batch_id`、`input_kind`、`source_files`（原文块是逐章 `source_locator`）、`chapter_chars`、`min_plot_points`、`input_file`（输出文件）和 `handoff_cache`（交接缓存），派发原样转给子代理，被拒重派时同样整套再给。chapter-extractor 自己按行号 Read 原文，自己 Grep 交接缓存里的 `### 跨批状态`；模板不再要求计划不输出的 `plan_mode`。
 - **子代理自写输入文件**：
   - 模板 `tools` 增加 Write 与 Edit，仍禁 Bash；Edit 用于自查或被拒后只改出错的几行，不整份重写；最终回复只有一行 `BATCH_WRITTEN: 批次ID | 路径 | 各章情节点数`。
   - 主会话不 Read 这份文件，直接 `commit`；被拒时把错误码交回子代理，由它用 Edit 只改出错处。
-  - 交接改为给子代理一个已提交批次的缓存路径，由它自己 Grep `### 跨批状态`。
+  - 交接改为给子代理一个已提交批次的缓存路径，由它自己 Grep `### 跨批状态`；该路径由 `plan` 算出，是本批起章之前结束得最近的已提交批次，主会话不自己挑。
 - **派发方式分三档，Stage 1 后停下询问时由作者选**：
   - 串行：上一批提交再派下一批，交接给紧邻前一批；
   - 有限并行：每轮 3 批，同轮都读本轮开始前最近一个已提交批次的交接，整轮提交再派下一轮；
@@ -37,7 +37,8 @@ Related: [2026-09-23-long-analyze-runtime-takeover](2026-09-23-long-analyze-runt
   - chapter-extractor 的 frontmatter 挂 PreToolUse(Write) hook，调 `story_hook_cli.js analysis-input-guard`。
   - 只放行项目内、所在拆文目录有 `chapter_index.csv` 或 `_progress.md` 的 `_analysis_cache/输入-{RAW|REUSE}-{起章}-{止章}.md`，其余一律 exit 2 阻断并说明原因。
   - 读不到 hook 输入时放行；node 缺席时 hook 命令本身失败，同样不阻断。这两种情况都由提交脚本对文件内容做完整校验兜底。
-- **计划按需输出**：`plan --next N` 只输出前 N 批，`--next 0` 只看进度；两种都保留总数 `remaining_batches`，`summary_gaps` 压成区间。全量计划每批约 540 字符，一本约 49 批的书单次约 2.7 万字符，按「每提交约 5 批确认一次」累计约 12–15 万字符，与聚合阶段读全书观察同一量级。逐批派发改用 `--next 1`，不带参数时输出不变。
+  - OpenCode 没有单 agent 的内联 hook，改用 2.x 原生 edit 路径规则：`sync-opencode.py` 在模板 frontmatter 里认出 `analysis-input-guard`，把 edit 先整条 deny，再放行 `_analysis_cache/输入-{RAW|REUSE}-*.md`（含任意上级目录）。resource 是相对会话目录的路径，`*` 跨目录匹配；`check-opencode-adapter.sh` 独立复刻 2.x `evaluate()` 锁住放行与拒绝的路径，已在 OpenCode 2.0.18 上实测：写批次输入落盘，写 `章节/` 摘要得到 `permission.rejected`。
+- **计划按需输出**：`plan --chapters 起-止` 只规划这一段（作者只拆某一段时用，`remaining_batches` 只数这段）；`plan --next N` 只输出前 N 批，`--next 0` 只看进度；两种都保留总数 `remaining_batches`，`summary_gaps` 压成区间。全量计划每批约 540 字符，一本约 49 批的书单次约 2.7 万字符，按「每提交约 5 批确认一次」累计约 12–15 万字符，与聚合阶段读全书观察同一量级。逐批派发改用 `--next 1`，不带参数时输出不变。
 - **聚合取料走 digest**：`manage_analysis_run.py digest` 是只读子命令，输出 Markdown，两种都可以用 `--chapters` 限定章节窗口。
   - `--part observations`：按章序汇总已提交批次缓存的跨章观察，只认进度表里已完成且缓存完整的批次；旧项目没有状态行时，退回扫描完整缓存。
   - `--part chapters`：从逐章摘要按标签抽字段；`--points brief|full` 给情节点简表（标题｜类型｜基调）或带白描的全文。
@@ -45,7 +46,7 @@ Related: [2026-09-23-long-analyze-runtime-takeover](2026-09-23-long-analyze-runt
 - **输出前机械自查**：生产实跑 15 批被提交脚本退回 3 次，全是模板写了、子代理偶尔漏写的格式——情节点行漏加粗短标题、章级字段漏「涉及人物」、某个情节点漏单独一行「主题标签｜基调」。chapter-extractor 的输出前检查新增第 10 条：写完先用 Grep（count 模式，只看数字）数情节点行、带标题的情节点行、标签行和十个章级字段，对不上就用 Edit 就地补齐，全部对上才回执。自查模式与提交脚本接受的格式由回归测试锁定。
 - **契约配套**：
   - 「已确认别名」写进 `### 跨批状态`，由批次之间自己传递；agent 定义和主线程降级用的 output-templates 同步改。
-  - 情节点「10–20、按字数」只适用于原文块；旧成果补摘要下限 1 个，按旧资料写到的事件拆，不凑数。
+  - 情节点「10–20、按字数」只适用于原文块，下限随章长：`min_plot_points` = 字数÷200 四舍五入、至少 1、至多 10（约 540 字的楔子是 3，1900 字以上仍是 10），上限 30；提交校验与计划用同一个函数。旧成果补摘要下限 1 个，按旧资料写到的事件拆，不凑数。
   - `涉及人物` 与 Stage 4 建档排除群体称呼、无名路人和泛称；短篇拆文改为自带完整的泛称清单。
 - **周边口径**：
   - story-setup 的 Codex/Antigravity 部署规则把 chapter-extractor 移出只读 agent；
@@ -94,7 +95,7 @@ Related: [2026-09-23-long-analyze-runtime-takeover](2026-09-23-long-analyze-runt
 - 聚合阶段按 66 章实测：跨章观察 7.8 万字符，情节点简表和四个常用字段各约 1.9 万字符，合计约为整份缓存 28.8 万字符的四成，而且可以按窗口分次取。
 
 代价：
-- chapter-extractor 有了写权限。在 Claude Code 上由内联 hook 限定路径；Codex/OpenCode/Antigravity 没有这个挂载点，只能靠 agent 指令和提交校验约束。
+- chapter-extractor 有了写权限。Claude Code 上由内联 hook 限定路径，OpenCode 上由 edit 路径规则限定；Codex（agent 只有整体的 `sandbox_mode`，没有按文件放行）和 Antigravity（只有工具清单）没有收窄手段，只能靠 agent 指令和提交校验约束。
 - 已部署项目必须重跑 story-setup 才能拿到可写的 extractor 和守卫，发布时要提升 `agents_version`。
 - 主会话看不到批次内容，抽查质量要另外 Read 摘要。
 - 并行两档的边界接续变弱，Stage 3 跨块合并与 Stage 4 别名归并的工作量随之增加；默认档（作者没选即有限并行）在速度和接续之间折中，需要最稳的作者主动选串行，要最快的主动选第 3 档。

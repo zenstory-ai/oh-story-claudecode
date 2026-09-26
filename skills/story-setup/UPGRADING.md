@@ -2,14 +2,29 @@
 
 ## 当前版本
 
-发布版本 `v0.8.0`。`agents_version` 从上一发布 tag v0.7.11 的 31 增加到 32；已部署项目需更新技能包、重新运行 `/story-setup` 并新开会话，以加载本次完整部署内容。
+发布版本 `v0.8.1`。`agents_version` 从上一发布 tag v0.8.0 的 32 增加到 33；已部署项目需更新技能包、重新运行 `/story-setup` 并新开会话，以加载本次完整部署内容。
 
-- `setup_skill_version: 1.3.0`
-- `agents_version: 32`
+- `setup_skill_version: 1.3.1`
+- `agents_version: 33`
 
-`.story-deployed` 缺失任一字段，或 `agents_version` 缺失 / 非整数 / 小于 `32`，都视为待更新部署。直接重新运行 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或自然语言点名）；不在运行时逐级兼容历史模板。如项目 `agents_version` 大于 `32`，说明本地 story-setup 比项目旧：先更新 oh-story-claudecode，不得用 v32 降级覆盖。历史版本改动见仓库根目录 `CHANGELOG.md`。
+`.story-deployed` 缺失任一字段，或 `agents_version` 缺失 / 非整数 / 小于 `33`，都视为待更新部署。直接重新运行 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或自然语言点名）；不在运行时逐级兼容历史模板。如项目 `agents_version` 大于 `33`，说明本地 story-setup 比项目旧：先更新 oh-story-claudecode，不得用 v33 降级覆盖。历史版本改动见仓库根目录 `CHANGELOG.md`。
 
-### v0.8.0 必须重跑 story-setup
+### v0.8.1 必须重跑 story-setup
+
+各端用户更新技能包后都要在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`），再新开会话：
+
+- 写手、架构师、一致性检查与拆文 agent 模板已改（Claude Code 上写手改用 Opus，续写章字数更稳，消耗额度更快）：新增物三级与「先问作者」统一口径，架构师拿到卷纲模板与九个必填字段，一致性检查的严重度标签改为必须修 / 建议看 / 仅提示。
+- 写正文守卫：细纲是空壳（不计 # 号和空白不到 30 字）时拦下；Claude Code 端也认 `.deslop-whitelist`；标了 `<!-- 去味:跳过 -->` 的章不再因为这行标记本身被判 blocking。
+- 长篇拆文的 `chapter-extractor` 在 OpenCode 上也只许写批次输入文件；Codex、Antigravity 仍靠 agent 指令与提交校验约束。
+- 长篇写后检查需要 Node.js 18+：缺 Node 时 `chapter check` 报 `tool_unavailable`，本章不能提交，装好 Node 后重跑。
+
+### 已在写的项目不用迁移
+
+- 细纲可以新增一行「字数范围：2000-2600」写作者给定的范围；没写就按默认 ±15%。
+- 老单元卡里的「风险等级」照旧认作「契约风险」。
+- 修订已提交的章改为 `tracking_commit.py draft --chapter N`（预填本章完整记录）→ 改草稿 → `storyctl.py chapter commit`。
+
+### v0.8.0 必须重跑 story-setup（历史）
 
 各端用户更新技能包后都要在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`），再新开会话：
 
@@ -22,7 +37,7 @@
 
 - 老卷纲里写在单元卡内的「供给自查」「建纲追加」照常可读；之后排纲，新批次的这两节写进 `大纲/排纲底稿_{单元ID}.md`，不再写进卷纲。
 - `outline_view.py` 默认输出就是写正文要的内容；老卷纲排纲时想一并看旧底稿，加 `--stage outline`。
-- 细纲里的「契约风险」三档名称不变；新细纲只在本章让单元卡风险等级变化时才写它。
+- 细纲里的「契约风险」三档名称不变；新细纲只在本章让单元卡的契约风险变化时才写它。
 - 老细纲写全了阶段位置、结构公式、本章标价等字段照样通过检查，写手照样用；新细纲这些字段需要时再写，不写不拦。
 
 ### v0.7.11 必须重跑 story-setup（历史）
@@ -252,7 +267,7 @@ OpenClaw / Reasonix / generic 三条路径的 skill 副本在项目 `skills/` �
 ## 升级步骤
 
 1. 在项目根目录重新运行 story-setup。
-2. 确认 `.story-deployed` 写入 `agents_version: 32` 与 `setup_skill_version: 1.3.0`。
+2. 确认 `.story-deployed` 写入 `agents_version: 33` 与 `setup_skill_version: 1.3.1`。
 3. 确认目标 CLI 的 agents、hooks/rules 和 reference bundle 都通过安装验证。
 4. 新开会话，使 custom agents 与 hooks 按当前文件重新注册。
 5. **长篇在写项目必做**：检查每本书的 `追踪/_tracking-state.json` 是否存在。不存在就是旧追踪结构，按下方「追踪模型迁移」重建，否则写下一章会被拦。

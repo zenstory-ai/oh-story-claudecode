@@ -12,6 +12,36 @@ compare 链接；小节名使用 Keep a Changelog 的六个英文类别（`Added
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-09-26
+
+> 本版 `agents_version: 33`（v0.8.0 为 32），`setup_skill_version: 1.3.1`。写手（Claude Code 上改用 Opus）、架构师、一致性检查、拆文 agent 与写正文守卫都已更新：更新技能包后，在每个写作项目根重新运行 `/story-setup`（Codex 用 `$story-setup`），再新开会话。长篇写后检查需要 Node.js 18+。升级细节见 [UPGRADING](skills/story-setup/UPGRADING.md)。
+
+v0.8.1 收齐 v0.8 的概念统一，并把几条只写在文字里的机制接成能跑通的链路。
+
+### Fixed
+
+- 标了 `<!-- 去味:跳过 -->` 的章，标记本身被检测器当成两处 blocking 破折号，章节永远提交不了；现在注释不参与扫描，这类章里作者同意保留的 AI 句式降为提示，退化类问题照常要修。
+- 审稿、去 AI 味、短篇三处的作者记忆查询命令缺必填的 `--workspace`，照文档执行直接报错；现在命令可以原样跑，并带上题材与流程。
+- Claude Code 的写后检查与上一章欠账门不认 `.deslop-whitelist`，作者已认可的句子仍会卡住下一章。
+- 细纲检查与章节检查对「字数目标」的写法认法不同（如「约 2300」「2,300」），细纲通过、写完整章后才报错；两边改为同一套写法并由共用样例锁住。
+- 作者给定的字数范围之前不生效，一律按默认 ±15%；现在可写进细纲「字数范围」行或随命令传入。
+- 修订已提交的章时，草稿按新章口径只让填变化，照做会清空本章原有的角色变化、伏笔与下一章承诺；现在修订草稿预填本章完整记录，并改走会重测字数、清理工作目录的提交命令。
+- 审稿把检测器的「建议看」降成了「可以不改」；五份质量清单写着「字数偏离→补足情节点」，与长篇欠字不补的规则相反。
+- 导入反推的短篇小节大纲过不了短篇写作的表头检查，反推的长篇细纲缺三个必填字段。
+- 去 AI 味没有短篇分支，会删掉短篇当卖点的在场审判、火葬场预告与心死式章尾。
+- `/story` 认不出短篇项目。
+- 长篇拆文：情节点下限对几百字的楔子也要求 10 个，现在按章节字数折算；子代理要求的 `plan_mode` 与交接缓存路径改由计划直接给出；「只拆某一段」有了真正的范围参数。
+
+### Changed
+
+- **续写章不再系统性写短**：Claude Code 上的写手改用 Opus。同一批真实写作任务里，Sonnet 写手续写章平均只到目标字数的 71%，三章只有一章首检在范围内；Opus 平均 107%、三章都在范围内，异家族评委配对盲评三章全胜，每章成本基本持平。只改篇幅说明或让写手自测补写都没有效果。Opus 消耗订阅额度比 Sonnet 快。
+- **概念统一**：新增物三级只在长篇 SKILL.md 定义一处，写手与主会话的「先问作者」合成一张处置表（已写的问留不留，没写的问加不加）；架构师拿到卷纲模板与九个必填字段；严重度各处统一读作 必须修 / 建议看 / 仅提示（一致性检查 S1/S2、S3、S4 与 critical/high、medium、low 都有对照）；剧情单元、契约风险、目标情绪、日更批末核对 / 建纲批末复核等叫法各处一致。
+- **契约风险有了出口**：细纲检查校验「契约风险」取值，单元或本章为需补强、契约破坏时，用白话告诉作者。
+- **去 AI 味审查的触发可计数**：检测器每条结果标明是否需要语义判断，章节检查给出需要判断的提示条数，满 3 条才叫审查。
+- **章节检查的结果更明确**：顶层 `status`（可提交 / 字数出带待定 / 有必须修问题 / 正文无效 / 工具不可用）与退出码一一对应；缺 Node 时报「工具不可用」而不是伪装成正文问题；按当前长度收下设了下限（低于目标一半，或超长未压缩过一次，需要作者明确坚持）。
+- **写正文守卫**：细纲是空壳（不计 # 号和空白不到 30 字）时拦下。长篇拆文的批次输入写入限制扩到 OpenCode。
+- 毒句式同步守卫改为逐条比对两端正则全文与标志位，任一端多加一个备选词都会失败。
+
 ## [0.8.0] - 2026-09-25
 
 > 本版 `agents_version: 32`（v0.7.11 为 31），`setup_skill_version: 1.3.0`。narrative-writer、consistency-checker、chapter-extractor 与写正文守卫都已更新：更新技能包后，在每个写作项目根重新运行 `/story-setup`（Codex 用 `$story-setup`），再新开会话。已在写的长篇不用迁移。升级细节见 [UPGRADING](skills/story-setup/UPGRADING.md)。
@@ -1101,7 +1131,8 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 - 初始版本：长篇/短篇写作、拆文、扫榜、去 AI 味、浏览器操控
 - 用 52000+ 本真实数据增强知识库
 
-[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.7.11...v0.8.0
 [0.7.11]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.7.10...v0.7.11
 [0.7.10]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.7.9...v0.7.10

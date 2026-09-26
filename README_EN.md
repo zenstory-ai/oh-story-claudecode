@@ -67,7 +67,7 @@ Install this skill https://github.com/zenstory-ai/oh-story-claudecode
 Then run `/story-setup` from your writing-project root (`$story-setup` in Codex) to deploy hooks / agents / references, **and start a fresh session**. Re-run `/story-setup` after every upgrade.
 
 > Per-host deployment differences, known limits and install troubleshooting (Windows `ENOENT`, Antigravity `agy -p`, leftover directories) are in **[Host deployment and install troubleshooting](docs/hosts_EN.md)**.
-> Latest release **v0.8.0** (2026-09-25); see [CHANGELOG.md](CHANGELOG.md) and [Releases](https://github.com/zenstory-ai/oh-story-claudecode/releases).
+> Latest release **v0.8.1** (2026-09-26); see [CHANGELOG.md](CHANGELOG.md) and [Releases](https://github.com/zenstory-ai/oh-story-claudecode/releases).
 
 ## See what it produces
 
@@ -109,8 +109,8 @@ Full file: [`demo/长篇/.../追踪/上下文.md`](demo/长篇/让你管账号�
 The video above is this exact session. What `/story-long-write 写第21章` produced, and every check on the way:
 
 ```text
-Blueprint       细纲_第021章.md              tracking said "no blueprint for ch.21", so the skill wrote one first: unit L1-03, target emotion, stakes, loop state, a 10-row five-column plot table
-Chapter check   storyctl.py chapter check   2068 chars / target 2300 · internal_pass
+Blueprint       细纲_第021章.md              tracking said "no blueprint for ch.21", so the skill wrote one first: unit L1-03, target emotion, stakes, loop state, a 10-row four-column plot table (plus the optional resolution column)
+Chapter check   storyctl.py chapter check   ready · 2068 chars / target 2300
                   ├ check-ai-patterns.js     0 hits
                   ├ check-degeneration.js    0 hits
                   └ normalize-punctuation    0 hits
@@ -334,7 +334,7 @@ the conversation writes, it does not remember. `追踪/_tracking-state.json` is 
 authority, deriving the context card, foreshadowing view, character states and the
 author-truth / reader-known dual timeline.
 
-**2. Seven specialist agents** — story-architect (Opus, structure), narrative-writer (Sonnet, prose),
+**2. Seven specialist agents** — story-architect (Opus, structure), narrative-writer (Opus, prose),
 consistency-checker (Haiku, continuity), plus character-designer, story-researcher, story-explorer
 and chapter-extractor. Deployed by `/story-setup`; **deploy first, then start a fresh session**.
 
