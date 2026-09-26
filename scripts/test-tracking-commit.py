@@ -571,6 +571,29 @@ class TrackingCommitTests(unittest.TestCase):
         self.run_tool("commit", rebuilt)
         self.assertEqual(self.read_state()["context"]["long_term_constraints"], ["本章新立的约束。"])
 
+    def test_redraft_revision_and_names_are_not_merged_back_silently(self) -> None:
+        self.init()
+        self.run_tool("commit", transaction(1))
+        # 修订草稿：中间可能插进新章并退役条目，旧草稿多出的条目不能自动带回。
+        draft_cmd = [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"]
+        first = subprocess.run(draft_cmd, text=True, capture_output=True, check=False, encoding="utf-8")
+        self.assertEqual(json.loads(first.stdout)["mode"], "revision")
+        draft_path = Path(json.loads(first.stdout)["draft"])
+        state = self.read_state()
+        stale = json.loads(draft_path.read_text(encoding="utf-8"))
+        stale["expected_state_revision"] = state["state_revision"] + 7
+        stale["context"]["long_term_constraints"].append("已被后续章节退役的条目。")
+        stale["context"]["active_character_names"].append("路人乙")
+        draft_path.write_text(json.dumps(stale, ensure_ascii=False), encoding="utf-8")
+        again = subprocess.run(draft_cmd, text=True, capture_output=True, check=False, encoding="utf-8")
+        fill = json.loads(again.stdout)["fill"]
+        rebuilt = json.loads(draft_path.read_text(encoding="utf-8"))
+        self.assertEqual(rebuilt["context"]["long_term_constraints"], state["context"]["long_term_constraints"])
+        self.assertNotIn("路人乙", rebuilt["context"]["active_character_names"])
+        self.assertIn("没有自动带回", fill)
+        self.assertIn("已被后续章节退役的条目。", fill)
+        self.assertIn("在场角色 路人乙", fill)
+
     def test_retired_item_still_in_context_is_rejected(self) -> None:
         self.init()
         document = transaction(1)

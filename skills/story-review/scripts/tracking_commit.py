@@ -1283,13 +1283,20 @@ def draft_transaction(project: Path, chapter: int) -> tuple[dict[str, Any], dict
 
 
 def rebuild_stale_draft(document: dict[str, Any], existing: dict[str, Any], append: bool) -> str:
-    """修订号变了：中间提交过别的事务。以当前状态为底合并旧草稿里本章自己的改动，返回给调用方的说明。
+    """修订号变了：中间提交过别的事务。以当前状态为底，只自动合并确定安全的部分，其余列给调用方核对。
 
-    两份新章草稿之间只可能插进修订事务，修订不能删 context 条目，所以当前 context 覆盖旧底稿：
-    旧草稿里多出来的条目就是本章新增，delta 里声明退役的就是本章删除。单值的卷名无法判断谁新，
-    不自动取舍，列出差异交调用方核对。"""
-    notes = ["修订号已变：context 按当前状态重建，本章已填的 delta、新增与退役的条目"
-             + ("、结尾位置" if append else "") + "已合并"]
+    新章草稿之间只可能插进修订事务，修订不能删约束与风险条目，所以当前约束与风险覆盖旧底稿：
+    旧草稿多出来的就是本章新增，delta 里声明退役的就是本章删除，可以精确合并。
+    修订草稿之间可能插进新章（新章能退役条目），在场角色名修订也能删，都无法判断谁新：
+    取当前状态，差异列出来；只有本章带了快照的新角色名自动加回。"""
+    def items(value: object) -> list[str]:
+        return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
+
+    def norm(item: str) -> str:
+        return " ".join(item.replace("|", "｜").split())
+
+    notes = ["修订号已变：context 按当前状态重建，本章已填的 delta" + ("、新增与退役的约束、结尾位置" if append else "")
+             + "已合并"]
     for key in ("delta", "character_snapshots"):
         if isinstance(existing.get(key), dict):
             document[key] = existing[key]
@@ -1297,17 +1304,31 @@ def rebuild_stale_draft(document: dict[str, Any], existing: dict[str, Any], appe
         document["chapter_title"] = existing["chapter_title"]
     old_context = existing.get("context") if isinstance(existing.get("context"), dict) else {}
     delta = document["delta"] if isinstance(document["delta"], dict) else {}
-    retired = {
-        "long_term_constraints": set(delta.get("retired_context_items") or []),
-        "continuity_risks": set(delta.get("retired_context_items") or []),
-        "active_character_names": set(delta.get("retired_characters") or []),
-    }
-    for key, gone in retired.items():
-        current = document["context"][key]
-        added = [item for item in (old_context.get(key) or []) if item not in current]
-        document["context"][key] = [item for item in current + added if item not in gone]
+    context = document["context"]
+    retired = {norm(item) for item in items(delta.get("retired_context_items"))}
+    left_out: list[str] = []
+    for key in ("long_term_constraints", "continuity_risks"):
+        current = {norm(item) for item in context[key]}
+        extra = [item for item in items(old_context.get(key)) if norm(item) not in current]
+        if append:
+            context[key] = [item for item in context[key] if norm(item) not in retired] + extra
+        else:
+            left_out += extra
+    snapshots = document["character_snapshots"] if isinstance(document["character_snapshots"], dict) else {}
+    names = context["active_character_names"]
+    for name in items(old_context.get("active_character_names")):
+        if name in names:
+            continue
+        if name in snapshots:
+            names.append(name)
+        else:
+            left_out.append(f"在场角色 {name}")
+    names[:] = [name for name in names if name not in set(items(delta.get("retired_characters")))]
+    if left_out:
+        notes.append("草稿里有、当前状态没有的条目没有自动带回（可能已被别的提交退役），本章确实需要就加回："
+                     + "；".join(left_out))
     old_position = old_context.get("position") if isinstance(old_context.get("position"), dict) else {}
-    position = document["context"]["position"]
+    position = context["position"]
     if append:
         for key in ("story_time", "scene"):
             if isinstance(old_position.get(key), str) and old_position[key].strip():
@@ -1317,9 +1338,8 @@ def rebuild_stale_draft(document: dict[str, Any], existing: dict[str, Any], appe
                if key in old_position and old_position[key] != position[key]]
     if differs:
         notes.append("卷信息与当前状态不同，已取当前状态，本章确实换卷就改回（" + "；".join(differs) + "）")
-    if document["character_snapshots"]:
-        notes.append("带过来的角色快照（" + "、".join(document["character_snapshots"]) +
-                     "）可能被中间的提交改过，逐个对照 current_snapshots 重核")
+    if snapshots:
+        notes.append("带过来的角色快照（" + "、".join(snapshots) + "）可能被中间的提交改过，逐个对照 current_snapshots 重核")
     return "；".join(notes)
 
 
