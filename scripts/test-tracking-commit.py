@@ -584,6 +584,7 @@ class TrackingCommitTests(unittest.TestCase):
         stale["expected_state_revision"] = state["state_revision"] + 7
         stale["context"]["long_term_constraints"].append("已被后续章节退役的条目。")
         stale["context"]["active_character_names"].append("路人乙")
+        stale["character_snapshots"] = {"路人乙": {"name": "路人乙"}}  # 后续章节已退役的角色的旧快照
         draft_path.write_text(json.dumps(stale, ensure_ascii=False), encoding="utf-8")
         again = subprocess.run(draft_cmd, text=True, capture_output=True, check=False, encoding="utf-8")
         fill = json.loads(again.stdout)["fill"]
@@ -593,6 +594,8 @@ class TrackingCommitTests(unittest.TestCase):
         self.assertIn("没有自动带回", fill)
         self.assertIn("已被后续章节退役的条目。", fill)
         self.assertIn("在场角色 路人乙", fill)
+        self.assertIn("角色快照 路人乙", fill)
+        self.assertEqual(rebuilt["character_snapshots"], {})
 
     def test_retired_item_still_in_context_is_rejected(self) -> None:
         self.init()

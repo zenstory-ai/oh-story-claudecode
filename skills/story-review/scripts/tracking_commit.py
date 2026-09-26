@@ -1282,7 +1282,8 @@ def draft_transaction(project: Path, chapter: int) -> tuple[dict[str, Any], dict
     return document, snapshots, previous_position if mode == "append" else {}
 
 
-def rebuild_stale_draft(document: dict[str, Any], existing: dict[str, Any], append: bool) -> str:
+def rebuild_stale_draft(document: dict[str, Any], existing: dict[str, Any], append: bool,
+                        current_characters: Any = ()) -> str:
     """修订号变了：中间提交过别的事务。以当前状态为底，只自动合并确定安全的部分，其余列给调用方核对。
 
     新章草稿之间只可能插进修订事务，修订不能删约束与风险条目，所以当前约束与风险覆盖旧底稿：
@@ -1309,7 +1310,11 @@ def rebuild_stale_draft(document: dict[str, Any], existing: dict[str, Any], appe
     left_out: list[str] = []
     for key in ("long_term_constraints", "continuity_risks"):
         current = {norm(item) for item in context[key]}
-        extra = [item for item in items(old_context.get(key)) if norm(item) not in current]
+        extra = []
+        for item in items(old_context.get(key)):
+            if norm(item) not in current:
+                current.add(norm(item))
+                extra.append(item)
         if append:
             context[key] = [item for item in context[key] if norm(item) not in retired] + extra
         else:
@@ -1319,11 +1324,16 @@ def rebuild_stale_draft(document: dict[str, Any], existing: dict[str, Any], appe
     for name in items(old_context.get("active_character_names")):
         if name in names:
             continue
-        if name in snapshots:
+        if append and name in snapshots:
             names.append(name)
         else:
             left_out.append(f"在场角色 {name}")
     names[:] = [name for name in names if name not in set(items(delta.get("retired_characters")))]
+    known = set(current_characters)
+    for name in list(snapshots):
+        if name not in known and name not in names:
+            snapshots.pop(name)
+            left_out.append(f"角色快照 {name}")
     if left_out:
         notes.append("草稿里有、当前状态没有的条目没有自动带回（可能已被别的提交退役），本章确实需要就加回："
                      + "；".join(left_out))
@@ -1379,7 +1389,8 @@ def main() -> int:
                 if existing.get("expected_state_revision") == document["expected_state_revision"]:
                     document, refreshed = existing, "已有草稿且修订号未变，原样保留"
                 else:
-                    refreshed = rebuild_stale_draft(document, existing, bool(previous_position))
+                    refreshed = rebuild_stale_draft(document, existing, bool(previous_position),
+                                                    load_state(args.project)["characters"])
             out.write_text(json.dumps(document, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
             fill = ("只填 delta 里本章的变化；context 其余字段已是当前值，要撤下的长期约束或连贯性风险从 context 删掉并把原文放进 "
                     "delta.retired_context_items（仅 append）；本章有变化的核心角色把下面的当前快照整份改好放进 character_snapshots，"
