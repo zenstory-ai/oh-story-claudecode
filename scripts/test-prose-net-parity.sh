@@ -975,11 +975,11 @@ outline_empty_existing pass"
       return 3
     }
   done <<< "$expect"
-  # 欠账门拦下时两端都得说清是上一章欠账、并给出同一个豁免标记写法（作者照抄才能放行）。
+  # 空细纲拦下时两端都得说清是哪章细纲空了（只比对文件名：Windows 上 bash 给的是绝对路径）。
   local side
   for name in outline_empty outline_heading outline_short29 outline_bomcrlf; do
     for side in bash js; do
-      grep -q '细纲（书/大纲/细纲_第001章.md）是空的' "$tmp/$name.$side.err" || {
+      grep -q '细纲_第001章.md）是空的' "$tmp/$name.$side.err" || {
         echo "FAIL: 场景 $name 的 $side 拦截文案未说明细纲是空的：$(cat "$tmp/$name.$side.err")" >&2
         return 3
       }
