@@ -36,6 +36,22 @@ TOOL_PERMISSIONS = {
     "shell": {"Bash"},
 }
 SUPPORTED_TOOLS = set().union(*TOOL_PERMISSIONS.values())
+# Claude 模板用 frontmatter 内联 hook 调 story_hook_cli.js 的写入守卫限定写入路径；OpenCode 没有
+# 单 agent 的内联 hook，改用 2.x 原生的 edit 路径规则收窄到同一批文件。resource 是相对会话目录的
+# 路径（项目外为绝对路径），* 可跨目录匹配（core/src/file-access.ts resolve、util/wildcard.ts）。
+# 守卫名未登记而 agent 又能写时生成失败，不静默放开整个工作区。
+# `..` 绕不过这些规则：2.x 的 write/edit/patch（含 patch 的 move 目标）都先经 FileAccess.resolve，
+# 它用 path.resolve 做词法归一再取 path.relative 作 resource（core/src/file-access.ts resolvePath/
+# resolve，2.0.18 源码核对），规则匹配的是归一后的路径：`x/_analysis_cache/输入-RAW-1/../../正文/第1章.md`
+# 到匹配时已是 `x/正文/第1章.md`，落在 deny。
+WRITE_GUARD_RE = re.compile(r"story_hook_cli\.js\s+([a-z][a-z0-9-]*-guard)\b")
+WRITE_GUARD_EDIT_RESOURCES = {
+    "analysis-input-guard": tuple(
+        prefix + "_analysis_cache/输入-" + kind + "-*.md"
+        for kind in ("RAW", "REUSE")
+        for prefix in ("", "*/")
+    ),
+}
 
 
 def body_bash_commands(body: str) -> list[str]:
@@ -107,11 +123,38 @@ def parse_frontmatter(content: str) -> tuple[dict, str]:
     return fm, body
 
 
-def convert_claude_to_opencode(fm: dict, body: str) -> dict:
+WRITE_HOOK_MATCHER_RE = re.compile(r"^\s*-?\s*matcher:\s*[\"']?([^\"'\n]*)", re.M)
+
+
+def frontmatter_write_guard(content: str) -> str | None:
+    """Name of the write guard hooked in the agent's frontmatter, if any.
+
+    挂了 Write/Edit 的 PreToolUse hook 却认不出守卫名（命令写法变了）时报错：当成没挂守卫会
+    静默给 agent 放开整个工作区的 edit。
+    """
+    end = content.find("\n---\n", len("---"))
+    frontmatter = content[:end] if content.startswith("---\n") and end > 0 else ""
+    match = WRITE_GUARD_RE.search(frontmatter)
+    if match:
+        return match.group(1)
+    write_hooked = "PreToolUse" in frontmatter and any(
+        {"Write", "Edit", "MultiEdit"} & {tool.strip() for tool in matcher.split("|")}
+        for matcher in WRITE_HOOK_MATCHER_RE.findall(frontmatter)
+    )
+    if write_hooked:
+        raise ValueError(
+            "frontmatter 挂了 Write/Edit 的 PreToolUse hook，但没认出 story_hook_cli.js 的守卫名；"
+            "更新 WRITE_GUARD_RE 与 WRITE_GUARD_EDIT_RESOURCES，不能按未挂守卫放开 edit"
+        )
+    return None
+
+
+def convert_claude_to_opencode(fm: dict, body: str, write_guard: str | None = None) -> dict:
     """Convert Claude Code agent frontmatter to OpenCode format.
 
     `body` 不是可选的：bash 白名单按「正文是否真的要求执行该命令」逐个 agent 授权，
     少传一个正文就等于凭空收紧/放宽权限，所以这里强制调用方交出正文。
+    `write_guard` 是 frontmatter 挂的写入守卫名：可写 agent 的 edit 收窄到该守卫放行的路径。
     """
     result = {}
     name = fm.get("name", "")
@@ -148,6 +191,16 @@ def convert_claude_to_opencode(fm: dict, body: str) -> dict:
             + "、".join(f"`{command}`" for command in mentioned_bash)
             + "；改写正文以使用宿主已提供的工作区和 Read/Glob/Grep，不得开放 shell 例外。"
         )
+    if write_guard and perm.get("edit") == "allow":
+        resources = WRITE_GUARD_EDIT_RESOURCES.get(write_guard)
+        if not resources:
+            raise ValueError(
+                f"{name or '<unnamed>'}: 写入守卫 {write_guard} 没有登记 OpenCode edit 路径规则"
+            )
+        # 先整条 deny 再逐条放行：OpenCode 取最后一条命中规则，末条 resource 不是 * 工具仍可见。
+        perm["edit"] = "deny"
+        for resource in resources:
+            perm[("edit", resource)] = "allow"
     if perm:
         result["permissions"] = perm
 
@@ -201,10 +254,12 @@ def format_frontmatter(fm: dict) -> str:
             # 最后一条命中的规则，列表顺序即优先级，必须按 dict 插入顺序原样输出。
             # 裸 `*` 在 YAML 里是别名标记，必须加引号。
             lines.append("permissions:")
-            for action, effect in value.items():
+            # 键是 action（resource 为 *）或 (action, resource) 二元组。
+            for key, effect in value.items():
+                action, resource = key if isinstance(key, tuple) else (key, "*")
                 action_text = '"*"' if action == "*" else action
                 lines.append(f"  - action: {action_text}")
-                lines.append('    resource: "*"')
+                lines.append(f'    resource: "{resource}"')
                 lines.append(f"    effect: {effect}")
         elif key == "description" and "\n" in value:
             lines.append("description: |")
@@ -300,7 +355,7 @@ def render_agents() -> dict[str, str]:
             raise ValueError(f"{md_file}: missing agent description")
         # 用**源模板正文**（未做 .claude→.opencode 路径替换）推导 bash 白名单：
         # 授权依据是源定义里写没写这条命令，不是生成产物的措辞。
-        new_fm = convert_claude_to_opencode(fm, body)
+        new_fm = convert_claude_to_opencode(fm, body, frontmatter_write_guard(content))
         new_body = replace_claude_paths(body)
         new_body = fix_path_rules_section(new_body)  # 覆盖路径规则段的错误替换
         output = format_frontmatter(new_fm) + new_body

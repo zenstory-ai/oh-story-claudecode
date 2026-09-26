@@ -649,6 +649,32 @@ function extractPatchTargets(patchText) {
 // 未展开的 shell 变量：$VAR / ${VAR} / $(cmd)。与 codex UNEXPANDED_SHELL_VAR 同式。
 const UNEXPANDED_SHELL_VAR = /\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*|\()/
 
+// 「去味:跳过」豁免标记：文件首 6 行内的 `<!-- 去味:跳过 -->`，冒号全角半角都认，注释内可有
+// 空格/Tab；裸写不在注释里的不算。codex py _DESLOP_SKIP_MARKER、bash guard、storyctl DESLOP_SKIP 同一语法。
+const DESLOP_SKIP_MARKER = /<!--[ \t]*去味[ \t]*(：|:)[ \t]*跳过[ \t]*-->/
+function hasDeslopSkipMarker(text) {
+  return DESLOP_SKIP_MARKER.test(text.split(/\r?\n/).slice(0, 6).join("\n"))
+}
+
+// 细纲「实质为空」：去掉文件头 BOM 与每行行首的 Markdown 标题标记（空格/Tab 后接的 #）后，
+// 剩下的非空白字符（空白 = ASCII 空白 + 全角空格）不足 OUTLINE_MIN_CHARS 个码点。标题文字照算
+// （`## 核心事件：…` 这种把内容写在标题行上的细纲是写了东西的）。只量写没写东西，
+// 不查 v0.8 细纲字段——旧书的细纲格式各异，照样放行。读不了（权限/是目录）按非空放行（宁可漏拦）。
+// codex py _outline_is_empty 与 guard-outline-before-prose.sh outline_is_empty 同口径，
+// 由 test-prose-net-parity.sh C/D 段锁 parity。
+const OUTLINE_MIN_CHARS = 30
+function outlineIsEmpty(file) {
+  let text
+  try {
+    text = fs.readFileSync(file, "utf8")
+  } catch {
+    return false
+  }
+  if (text.startsWith("\uFEFF")) text = text.slice(1)
+  const body = text.split("\n").map((line) => line.replace(/^[ \t]*#+/, "")).join("")
+  return Array.from(body.replace(/[ \t\r\n\f\v\u3000]/g, "")).length < OUTLINE_MIN_CHARS
+}
+
 function proseBlockReason(root, absolute) {
   const base = path.basename(absolute)
   const parent = path.basename(path.dirname(absolute))
@@ -678,12 +704,18 @@ function proseBlockReason(root, absolute) {
   const outlineDir = path.join(book, "大纲")
   let found = false
   if (!exists) {
+    let outlines = []
     try {
-      found = fs.readdirSync(outlineDir).some((file) => {
+      outlines = fs.readdirSync(outlineDir).filter((file) => {
         const candidate = file.match(/^细纲_第0*(\d+)章.*\.md$/)
         return candidate && candidate[1] === chapter
-      })
+      }).sort()
     } catch {}
+    found = outlines.length > 0
+    // 同章有多份细纲（补零差异/带标题）时任一份写了内容就放行。
+    if (found && outlines.every((file) => outlineIsEmpty(path.join(outlineDir, file)))) {
+      return `⛔ 写正文被拦截：第 ${chapter} 章的细纲（${safeRelative(root, path.join(outlineDir, outlines[0]))}）是空的（不计 # 号和空白不到 ${OUTLINE_MIN_CHARS} 字）。先按 story-long-write 单章流程把细纲写完整（这章发生什么、主角做什么选择），再写正文。`
+    }
     if (!found) {
       // `cat > "$PROJ/正文/第001章.md"` 这类目标里的 shell 变量守卫展开不了，书目录按字面拼出来
       // 必然找不到细纲。仍然拦（fail closed），但如实说路径没解析出来，不谎报「缺少细纲」。
@@ -719,13 +751,13 @@ function proseBlockReason(root, absolute) {
     if (prevFile) {
       let prevText = null
       try { prevText = fs.readFileSync(prevFile, "utf8") } catch {}
-      if (prevText !== null && !/去味(：|:)跳过/.test(prevText.split(/\r?\n/).slice(0, 6).join("\n"))) {
+      if (prevText !== null && !hasDeslopSkipMarker(prevText)) {
         const hits = toxicPhraseFindings(prevText, loadStyleWhitelist(prevFile)).filter((line) => line.startsWith("第"))
         if (hits.length) {
           const shown = hits.slice(0, 6)
           const more = hits.length - shown.length
           let reason = `⛔ 写正文被拦截：上一章（${path.basename(prevFile)}）有 ${hits.length} 处未清毒句式欠账，先清零再写第 ${chapter} 章；用户显式豁免时在上一章标题行下加 <!-- 去味:跳过 --> 后重试。\n${shown.join("\n")}`
-          if (more > 0) reason += `\n（另有 ${more} 处，完整扫描：node <skill>/scripts/check-ai-patterns.js --check 上一章文件）`
+          if (more > 0) reason += `\n（另有 ${more} 处，${toxicRescanHint(prevFile)}）`
           return reason
         }
       }
@@ -777,6 +809,9 @@ const TOXIC_CLAUSE_BOUNDARY = new Set(Array.from("，,。.！!？?；;：:、…
 const TOXIC_TAG_PARTICLES = new Set(["吗", "吧", "嘛"])
 const TOXIC_AFFIRM_PARTICLES = new Set(["的", "啊", "呀", "呢"])
 const TOXIC_TRAILER_WINDOW = 600
+// 不收 em-dash（check-ai-patterns.js 里它也是 blocking）是有意的：破折号是标点，长篇 chapter check
+// --fix-punctuation / normalize-punctuation.js 会确定性整理，短篇收尾同样先跑标点整理；这张网只推回
+// 需要模型动笔改写的句式。每次写正文都把破折号当硬信号推回只会制造噪声，漏网的仍被 chapter check 拦在提交前。
 const TOXIC_SENTENCE_PATTERNS = [
   [/声音(?:并)?不[大高响亮][^。！？!?\n]{0,16}[却但偏]/g, "voice-contrast", "删「不X…却Y」反差腔，直接写具体效果或动作。"],
   [/(?:没有[^。！？!?\n，,]{1,12}[，,]){2}/g, "negation-parade", "「没有…，没有…」排比删到只剩一个或全删，改写正面在场的细节。"],
@@ -881,7 +916,18 @@ function maskStyleText(text, whitelist) {
 }
 
 
-function toxicPhraseFindings(text, whitelist = []) {
+// 毒句式末行的完整复扫指引：长篇分章正文（{书}/正文/第N章*.md）指 storyctl chapter check——长篇写作
+// 流程只认这一个检查入口；其余（短篇 正文.md、调用方没给路径）指 check-ai-patterns.js。
+// codex py toxic_rescan_hint 同文案，由 test-prose-net-parity.sh C 段锁 parity。
+function toxicRescanHint(absolute) {
+  const match = absolute ? path.basename(absolute).match(/^第0*(\d+)章.*\.md$/) : null
+  if (match && path.basename(path.dirname(absolute)) === "正文") {
+    return `完整检查：{PYTHON} <story-long-write>/scripts/storyctl.py chapter check --project <书目录> --chapter ${match[1]}`
+  }
+  return "完整扫描：node <skill>/scripts/check-ai-patterns.js --check <正文文件>"
+}
+
+function toxicPhraseFindings(text, whitelist = [], rescan = toxicRescanHint("")) {
   const findings = []
   const content = []
   text.split("\n").forEach((raw, index) => {
@@ -909,13 +955,13 @@ function toxicPhraseFindings(text, whitelist = []) {
     const match = masked.match(TOXIC_TRAILER_PATTERN)
     if (match) findings.push(`第${lineNo}行 毒句式[trailer-ending]：『${codePointSlice(match[0], 0, 20)}』——删章尾预告腔，用正在发生的动作或画面收章。`)
     const summary = masked.match(TOXIC_TRAILER_SUMMARY_PATTERN)
-    if (summary) findings.push(`第${lineNo}行 毒句式[trailer-summary]：『${codePointSlice(summary[0], 0, 20)}』——删章尾状态总结句，收束状态是细纲的规划口径，正文落到具体动作、画面或台词上。`)
+    if (summary) findings.push(`第${lineNo}行 毒句式[trailer-summary]：『${codePointSlice(summary[0], 0, 20)}』——删章尾状态总结句，细纲的结尾设定要落成最后的具体动作、画面或台词。`)
   }
-  if (findings.length) findings.push("毒句式是确定性 AI 指纹：本章须清零后再继续。完整扫描：node <skill>/scripts/check-ai-patterns.js --check <正文文件>")
+  if (findings.length) findings.push(`毒句式是确定性 AI 指纹：本章须清零后再继续。${rescan}`)
   return findings
 }
 
-function proseNetFindings(text, whitelist = []) {
+function proseNetFindings(text, whitelist = [], rescan = toxicRescanHint("")) {
   const findings = []
   const content = []
   text.split("\n").forEach((raw, index) => {
@@ -956,8 +1002,8 @@ function proseNetFindings(text, whitelist = []) {
   // 「去味:跳过」豁免与欠账门同判据（文件首 6 行）：标记在场时跳过毒句式推回，
   // 其余网（元信息/占位/复读/截断）照常——否则按拦截提示加标记的那次 Edit 会把
   // 已豁免的毒句式再次当硬信号推回。
-  if (!/去味(：|:)跳过/.test(text.split(/\r?\n/).slice(0, 6).join("\n"))) {
-    findings.push(...toxicPhraseFindings(text, whitelist))
+  if (!hasDeslopSkipMarker(text)) {
+    findings.push(...toxicPhraseFindings(text, whitelist, rescan))
   }
   return findings
 }
@@ -999,7 +1045,7 @@ function proseAfterWrite(root, absolute) {
     const bytes = fs.statSync(absolute).size
     if (bytes < 200) findings.push(`【落盘】正文仅 ${bytes} 字节，疑似未写完/落盘失败（quota/超时中断？），请核对并补写。`)
     const text = fs.readFileSync(absolute, "utf8")
-    findings.push(...proseNetFindings(text, loadStyleWhitelist(absolute)))
+    findings.push(...proseNetFindings(text, loadStyleWhitelist(absolute), toxicRescanHint(absolute)))
   } catch {
     return ""
   }
@@ -1240,4 +1286,6 @@ module.exports = {
   proseNetFindings,
   maskQuotedSpans,
   toxicPhraseFindings,
+  toxicRescanHint,
+  loadStyleWhitelist,
 }

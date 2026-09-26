@@ -141,7 +141,7 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('author_preferences（作者记忆', result.stdout)
         self.assertIn('作者记忆：无相关 active 条目', result.stdout)
-        (self.book / '.story-deployed').write_text('agents_version: 32\n', encoding='utf-8')
+        (self.book / '.story-deployed').write_text('agents_version: 33\n', encoding='utf-8')
         event = {'schema_version': 1, 'event_id': 'e1', 'operation': {'action': 'remember', 'preference': {
             'kind': 'prose_style', 'scope': {'level': 'global', 'value': None}, 'assertion': '对话一律用直角引号',
             'quote': '对话一律用「」', 'source_ref': 'test', 'source': 'explicit_user', 'confidence': 'high',
@@ -156,7 +156,7 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('作者记忆：已注入 1 条', result.stdout)
 
     def test_builder_queries_scoped_author_memory(self):
-        (self.book / '.story-deployed').write_text('agents_version: 32\n', encoding='utf-8')
+        (self.book / '.story-deployed').write_text('agents_version: 33\n', encoding='utf-8')
         self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：都市 · 悬疑（无言情线）\n')
         memory_input = Path(self.tmp.name) / 'memory.json'
         for n, (level, value, assertion) in enumerate([

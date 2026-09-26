@@ -8,6 +8,8 @@ TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
+# 细纲须写了内容（不计 # 号和空白 ≥30 字）写正文守卫才放行；空文件会被当成空细纲拦下。
+write_outline() { printf '%s\n' '# 细纲' '江晨在雨夜推开旧书店的门，发现柜台后坐着失踪三年的师父，两人对视良久。' > "$1"; }
 
 SOURCE="$REPO_ROOT/skills/story-setup/references/zcode/hooks/story_zcode_hook.js"
 SOURCE_CORE="$REPO_ROOT/skills/story-setup/references/zcode/hooks/story_hook_core.js"
@@ -60,11 +62,17 @@ echo "Fixture: $ROOT"
 mkdir -p "$ROOT/book/正文" "$ROOT/book/大纲" "$ROOT/book/设定"
 out="$(run_hook pre-tool-prose-guard '{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"book/正文/第001章_开端.md"}}')"
 assert_denied "$out" "long prose without outline"
-: > "$ROOT/book/大纲/细纲_第1章.md"
+write_outline "$ROOT/book/大纲/细纲_第1章.md"
 out="$(run_hook pre-tool-prose-guard '{"tool_name":"Write","tool_input":{"file_path":"book/正文/第001章_开端.md"}}')"
 assert_denied "$out" "long prose without tracking metadata"
 printf '%s' "$out" | grep -q '_tracking-state.json 缺失' || fail "missing tracking denial did not explain re-import/init: $out"
 write_clean_state "$ROOT/book"
+# 细纲文件在但是空的（只有标题）：照拦，并说清是细纲空了、该补什么。
+printf '%s\n' '# 第1章 细纲' '## 目标情绪' > "$ROOT/book/大纲/细纲_第1章.md"
+out="$(run_hook pre-tool-prose-guard '{"tool_name":"Write","tool_input":{"file_path":"book/正文/第001章_开端.md"}}')"
+assert_denied "$out" "long prose with an empty outline"
+printf '%s' "$out" | grep -q '细纲（book/大纲/细纲_第1章.md）是空的' || fail "empty-outline denial must say the outline is empty: $out"
+write_outline "$ROOT/book/大纲/细纲_第1章.md"
 out="$(run_hook pre-tool-prose-guard '{"tool_name":"Write","tool_input":{"file_path":"book/正文/第001章_开端.md"}}')"
 assert_empty "$out" "long prose with outline"
 
@@ -84,7 +92,7 @@ process.stdout.write(JSON.stringify({
 out="$(run_hook pre-tool-prose-guard "$relative_payload")"
 assert_denied "$out" "relative prose target from hook cwd"
 printf '%s' "$out" | grep -q 'cwd-book/大纲' || fail "relative target was not resolved from hook cwd: $out"
-: > "$ROOT/cwd-book/大纲/细纲_第8章.md"
+write_outline "$ROOT/cwd-book/大纲/细纲_第8章.md"
 out="$(run_hook pre-tool-prose-guard "$relative_payload")"
 assert_denied "$out" "relative prose target without tracking metadata"
 write_clean_state "$ROOT/cwd-book" 7
@@ -133,7 +141,7 @@ mkdir -p "$ROOT/impbook/正文" "$ROOT/拆文库/impbook"
 out="$(run_hook pre-tool-prose-guard '{"tool_name":"Write","tool_input":{"file_path":"impbook/正文/第1章_导入.md"}}')"
 assert_empty "$out" "story-import long migration"
 mkdir -p "$ROOT/impbook/大纲" "$ROOT/impbook/追踪"
-: > "$ROOT/impbook/大纲/细纲_第2章.md"
+write_outline "$ROOT/impbook/大纲/细纲_第2章.md"
 printf '%s\n' '{"schema_version":4,"state_revision":1,"last_committed_chapter":1}' > "$ROOT/impbook/追踪/_tracking-state.json"
 printf '%s\n' '> 状态修订：0' > "$ROOT/impbook/追踪/上下文.md"
 out="$(run_hook pre-tool-prose-guard '{"tool_name":"Write","tool_input":{"file_path":"impbook/正文/第2章_导入后续.md"}}')"
@@ -198,7 +206,7 @@ echo "  OK commit advisory"
 out="$(printf 'not-json' | ZCODE_PROJECT_DIR="$ROOT" node "$HOOK" pre-tool-prose-guard)"
 assert_empty "$out" "malformed input fail-open"
 
-: > "$ROOT/book/大纲/细纲_第8章.md"
+write_outline "$ROOT/book/大纲/细纲_第8章.md"
 write_clean_state "$ROOT/book" 7
 out="$(cd "$TMP_DIR" && printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"book/正文/第8章_自定位.md"}}' | env -u ZCODE_PROJECT_DIR -u CLAUDE_PROJECT_DIR node "$HOOK" pre-tool-prose-guard)"
 assert_empty "$out" "deployed __dirname self-location"

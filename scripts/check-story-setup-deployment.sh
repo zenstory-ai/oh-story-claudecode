@@ -29,6 +29,9 @@ fail() {
   exit 1
 }
 
+# 细纲须写了内容（不计 # 号和空白 ≥30 字）写正文守卫才放行；空文件会被当成空细纲拦下。
+write_outline() { printf '%s\n' '# 细纲' '江晨在雨夜推开旧书店的门，发现柜台后坐着失踪三年的师父，两人对视良久。' > "$1"; }
+
 assert_file() {
   [ -f "$1" ] || fail "required file missing: $1"
 }
@@ -799,7 +802,7 @@ PY
 
 # 长篇授权流：缺细纲拦截 / 有细纲放行 / 章号补零容忍
 [ "$(run_guard 'book/正文/第1章_开端.md')" = "2" ] || fail "guard did not BLOCK long prose when 细纲 missing"
-: > "$guard_root/book/大纲/细纲_第1章.md"
+write_outline "$guard_root/book/大纲/细纲_第1章.md"
 # 细纲齐了还要过追踪检查点（issue #305 起 Claude 侧也有这道门，与另三端同序）。
 # 本节测的是细纲门与路径分类，不是追踪门，所以先落一份有效 state 把追踪这一维固定住。
 # last_committed 取一个大于本节所有用例章号的值：章号已在追踪范围内即跳过顺序校验，
@@ -814,7 +817,7 @@ mv "$guard_root/book/追踪/_tracking-state.json" "$guard_root/book/追踪/_stat
 [ "$(run_guard 'book/正文/第1章_开端.md')" = "2" ] || fail "guard did not BLOCK long prose when tracking state missing"
 mv "$guard_root/book/追踪/_state.bak" "$guard_root/book/追踪/_tracking-state.json"
 [ "$(run_guard 'book/正文/第001章_开端.md')" = "0" ] || fail "guard did not tolerate chapter-number zero padding (第001章 vs 细纲_第1章)"
-: > "$guard_root/book/大纲/细纲_第7章_惊变.md"
+write_outline "$guard_root/book/大纲/细纲_第7章_惊变.md"
 [ "$(run_guard 'book/正文/第7章_x.md')" = "0" ] || fail "guard did not tolerate title-suffixed 细纲 (细纲_第7章_惊变.md)"
 # 短篇授权流：有 设定.md 信号 + 缺小节大纲 -> 拦截；补小节大纲 -> 放行
 : > "$guard_root/short/设定.md"
@@ -853,7 +856,7 @@ PY
   printf '%s' "$var_err" | grep -q '未展开的 shell 变量' || fail "shell-variable target block must say the path was not resolved: $var_err"
 
   # 相对 Bash 目标必须按 hook cwd 解，不得总按项目根；根 book 有第8章细纲，nested/book 没有。
-  : > "$guard_root/book/大纲/细纲_第8章.md"
+  write_outline "$guard_root/book/大纲/细纲_第8章.md"
   mkdir -p "$guard_root/nested/book/正文"
   cwd_payload="$(python3 - "$guard_root/nested" <<'PY'
 import json, sys
@@ -903,7 +906,11 @@ if ! PATH="$nonode_shim:$PATH" node -e "" >/dev/null 2>&1; then
   # 缺细纲 -> 仍须拦截（bash 兜底解析出目标路径，照常 exit 2）
   [ "$(run_guard_nonode 'book/正文/第123章_无纲.md')" = "2" ] \
     || fail "guard fail-OPEN without node (regression #243): 缺细纲写正文必须仍拦截（bash 兜底）"
+  # 空细纲 -> 仍须拦截（空细纲门是纯 bash 字节计数，不依赖 node）
   : > "$guard_root/book/大纲/细纲_第123章.md"
+  [ "$(run_guard_nonode 'book/正文/第123章_无纲.md')" = "2" ] \
+    || fail "guard(no-node) must block long prose when 细纲 is empty (纯 bash 空细纲门)"
+  write_outline "$guard_root/book/大纲/细纲_第123章.md"
   # 有细纲 -> 放行（bash 兜底不误伤）
   [ "$(run_guard_nonode 'book/正文/第123章_无纲.md')" = "0" ] \
     || fail "guard(no-node) wrongly blocked long prose when 细纲 present (bash 兜底)"
@@ -935,7 +942,7 @@ if [ "$resolved_node" = "$brokennode_shim/node" ]; then
   # node 探测通过但 CLI 抽取抛错 -> 缺细纲仍须拦截（bash 兜底解析目标路径）
   [ "$(run_guard_brokennode 'book/正文/第124章_坏node.md')" = "2" ] \
     || fail "guard fail-OPEN with broken node (regression #243): node 在但抽取失败时必须回落 bash 仍拦截"
-  : > "$guard_root/book/大纲/细纲_第124章.md"
+  write_outline "$guard_root/book/大纲/细纲_第124章.md"
   # 有细纲 -> 放行（bash 兜底不误伤）
   [ "$(run_guard_brokennode 'book/正文/第124章_坏node.md')" = "0" ] \
     || fail "guard(broken-node) wrongly blocked long prose when 细纲 present (bash 兜底)"

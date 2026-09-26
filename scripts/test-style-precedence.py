@@ -84,7 +84,7 @@ class StyleTests(unittest.TestCase):
         text = APPROVED + OTHER + '\nTODO\n最后还没'
         self.file.write_text(text, encoding='utf-8')
         self.allow.write_text(APPROVED + '\nTODO\n最后还没\n', encoding='utf-8')
-        expected = pyhook.prose_net_findings(text, pyhook.load_style_whitelist(self.file))
+        expected = pyhook.prose_net_findings(text, pyhook.load_style_whitelist(self.file), pyhook.toxic_rescan_hint(self.file))
         result = self.node('-e', "const fs=require('fs'), h=require(process.argv[1]); console.log(h.proseAfterWrite(process.argv[2],process.argv[3]));", HOOK, self.root, self.file)
         self.assertEqual(result.returncode, 0, result.stderr)
         for finding in expected:
@@ -97,7 +97,8 @@ class StyleTests(unittest.TestCase):
     def test_next_chapter_gate_honors_only_approved_sentence(self):
         for dirname in ['大纲', '追踪']:
             (self.book / dirname).mkdir()
-        (self.book / '大纲/细纲_第002章.md').write_text('已确认细纲', encoding='utf-8')
+        # 细纲须写了内容（不计 # 号和空白 ≥30 字），否则写正文守卫先按空细纲拦下。
+        (self.book / '大纲/细纲_第002章.md').write_text('# 已确认细纲\n她在门口等了一夜，天亮时终于决定不再回头，把钥匙留在了门垫下面。', encoding='utf-8')
         (self.book / '追踪/_tracking-state.json').write_text(json.dumps({'schema_version': 4, 'state_revision': 0, 'last_committed_chapter': 1}), encoding='utf-8')
         (self.book / '追踪/上下文.md').write_text('> 状态修订：0', encoding='utf-8')
         next_file = self.book / '正文/第002章_再见.md'

@@ -8,6 +8,8 @@ TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
+# 细纲须写了内容（不计 # 号和空白 ≥30 字）写正文守卫才放行；空文件会被当成空细纲拦下。
+write_outline() { printf '%s\n' '# 细纲' '江晨在雨夜推开旧书店的门，发现柜台后坐着失踪三年的师父，两人对视良久。' > "$1"; }
 
 HOOKS_SRC="$REPO_ROOT/skills/story-setup/references/codex/hooks"
 HOOK_SRC="$HOOKS_SRC/story_codex_hook.py"
@@ -70,11 +72,17 @@ out="$(run_hook pre-tool-prose-guard '{"tool_name":"Bash","tool_input":{"command
 assert_denied "$out" "prose target behind an unexpanded shell variable"
 printf '%s' "$out" | grep -q '未展开的 shell 变量' || fail "shell-variable target denial must say the path was not resolved: $out"
 if printf '%s' "$out" | grep -q '缺少细纲'; then fail "shell-variable target must not be reported as a missing outline: $out"; fi
-: > "$ROOT/book/大纲/细纲_第1章.md"
+write_outline "$ROOT/book/大纲/细纲_第1章.md"
 out="$(run_hook pre-tool-prose-guard '{"tool_name":"Bash","tool_input":{"command":"cat > book/正文/第001章_开端.md <<EOF\n正文\nEOF"}}')"
 assert_denied "$out" "long prose without tracking metadata"
 printf '%s' "$out" | grep -q '_tracking-state.json 缺失' || fail "missing tracking denial did not explain re-import/init: $out"
 write_clean_state "$ROOT/book"
+# 细纲文件在但是空的（只有标题）：照拦，并说清是细纲空了、该补什么。
+printf '%s\n' '# 第1章 细纲' '## 目标情绪' > "$ROOT/book/大纲/细纲_第1章.md"
+out="$(run_hook pre-tool-prose-guard '{"tool_name":"Bash","tool_input":{"command":"cat > book/正文/第001章_开端.md <<EOF\n正文\nEOF"}}')"
+assert_denied "$out" "long prose with an empty outline"
+printf '%s' "$out" | grep -q '细纲（book/大纲/细纲_第1章.md）是空的' || fail "empty-outline denial must say the outline is empty: $out"
+write_outline "$ROOT/book/大纲/细纲_第1章.md"
 out="$(run_hook pre-tool-prose-guard '{"tool_name":"Bash","tool_input":{"command":"cat > book/正文/第001章_开端.md <<EOF\n正文\nEOF"}}')"
 assert_empty "$out" "long prose with outline"
 
@@ -91,7 +99,7 @@ PY
 out="$(run_hook pre-tool-prose-guard "$relative_payload")"
 assert_denied "$out" "relative prose target from hook cwd"
 printf '%s' "$out" | grep -q 'cwd-book/大纲' || fail "relative target was not resolved from hook cwd: $out"
-: > "$ROOT/cwd-book/大纲/细纲_第8章.md"
+write_outline "$ROOT/cwd-book/大纲/细纲_第8章.md"
 out="$(run_hook pre-tool-prose-guard "$relative_payload")"
 assert_denied "$out" "relative prose target without tracking metadata"
 write_clean_state "$ROOT/cwd-book" 7
@@ -121,7 +129,7 @@ mkdir -p "$ROOT/impbook/正文" "$ROOT/拆文库/impbook"
 out="$(run_hook pre-tool-prose-guard '{"tool_name":"Write","tool_input":{"file_path":"impbook/正文/第1章_导入.md","content":"正文"}}')"
 assert_empty "$out" "story-import long migration"
 mkdir -p "$ROOT/impbook/大纲" "$ROOT/impbook/追踪"
-: > "$ROOT/impbook/大纲/细纲_第2章.md"
+write_outline "$ROOT/impbook/大纲/细纲_第2章.md"
 printf '%s\n' '{"schema_version":4,"state_revision":1,"last_committed_chapter":1}' > "$ROOT/impbook/追踪/_tracking-state.json"
 printf '%s\n' '> 状态修订：0' > "$ROOT/impbook/追踪/上下文.md"
 out="$(run_hook pre-tool-prose-guard '{"tool_name":"Write","tool_input":{"file_path":"impbook/正文/第2章_导入后续.md","content":"正文"}}')"
@@ -319,7 +327,7 @@ echo "  OK cwd-based root resolution"
 # CODEX_PROJECT_DIR (env skipped) and an unrelated cwd, the hook must resolve root from its own
 # .codex/hooks/ location. Discriminating: 细纲 exists at the true root, so a wrong root → deny;
 # only __file__-derived root → allow. (The valid-env tests above let env win and never hit this.)
-: > "$ROOT/book/大纲/细纲_第8章.md"
+write_outline "$ROOT/book/大纲/细纲_第8章.md"
 write_clean_state "$ROOT/book" 7
 out="$(cd "$TMP_DIR" && CODEX_PROJECT_DIR="$TMP_DIR/does-not-exist" python3 "$HOOK" pre-tool-prose-guard <<'JSON'
 {"tool_name":"Write","tool_input":{"file_path":"book/正文/第8章_x.md","content":"x"}}
@@ -357,7 +365,7 @@ echo "  OK non-git deployment launcher root search"
 # (via CODEX_PROJECT_DIR and/or the hook self-locating from __file__) instead of Python falling
 # back to the nested cwd and wrongly denying. This case also exercises Windows (Git Bash MSYS
 # path passed to native Python), which is exactly where naive env/cwd propagation breaks.
-: > "$NON_GIT/book/大纲/细纲_第4章.md"
+write_outline "$NON_GIT/book/大纲/细纲_第4章.md"
 write_clean_state "$NON_GIT/book" 3
 out="$(cd "$NON_GIT/nested/a/b"; unset CODEX_PROJECT_DIR CLAUDE_PROJECT_DIR; printf '{"tool_name":"Write","tool_input":{"file_path":"book/正文/第004章_非Git.md","content":"正文"}}' | eval "$launcher_cmd")"
 assert_empty "$out" "non-git nested cwd + outline present allows (root reaches Python hook)"

@@ -6,6 +6,7 @@ const { loadStyleWhitelist, maskStyleText } = require('./style-whitelist.js');
 const path = require('path');
 
 const USAGE = `Usage: node check-ai-patterns.js [--check] [--json] [--fail-on=blocking|all] <file...>
+       node check-ai-patterns.js --list-review-classes
 
 Detect high-risk AI-flavor prose patterns that need human rewrite:
   - negative setup followed by positive flip in the same sentence
@@ -35,6 +36,8 @@ Book-local .deslop-whitelist literal spans are excluded from style scanning (no 
 Each finding carries severity: blocking by default for generation/deslop cleanup (not-is-comparison / em-dash / voice-contrast / negation-parade / reverse-not-is / trailer-ending / trailer-summary). This is a local style/readability gate, not an AIGC detector score; functional human text can be marked for review instead of hard-edited for a detector.
 或 advisory (period-stutter / long-paragraph / micro-action-tic / stock-reaction-tic / action-list-tic / abstract-summary-tic / cliche-density-tic / metaphor-density-tic / reasoning-chain-tic / system-notice-formality-tic / overcompressed-prose-tic / low-connective-density-tic / quote-emphasis-tic / formulaic-parallelism，是提示，justified 的长推理/氛围段可保留)。
 --fail-on=blocking 只在出现 blocking finding 时退出 1；默认 --fail-on=all 有任何 finding 即退出 1。
+Each finding also carries review: mechanical（表面形态确定、就地改写即可）或 semantic（可能承担叙事功能，需读上下文判断是否保留）；blocking 一律 mechanical。--list-review-classes 输出完整分类表（JSON）。
+HTML comments (<!-- ... -->, e.g. the 去味:跳过 exemption marker) are metadata, not prose, and are never scanned.
 
 The script reports findings only. It never rewrites text, because the safe fix is
 contextual: usually delete the negative setup, write the positive term directly,
@@ -239,7 +242,7 @@ const REVERSE_NOT_IS_PREV_EXCLUDE = new Set([...COMPACT_EITHER_OR_PREV, '还', '
 const TRAILER_ENDING_PATTERN = /没人知道|谁也不知道|谁也没想到|殊不知|(?:这)?才刚刚开(?:始|头)|正(?:朝着|向着)[^。！？!?\n]{0,24}(?:压|涌|袭|逼)(?:了?过去|了?过来|来)|(?<!正式)拉开(?:序幕|帷幕)|即将(?:开始|来临|降临)/g;
 const TRAILER_ENDING_WINDOW_CHARS = 600;
 
-// 章尾状态总结体：把细纲「结尾设定/收束状态」原样写成总结句收章（「这一夜注定无人入眠」
+// 章尾状态总结体：把细纲「结尾设定」原样写成总结句收章（「这一夜注定无人入眠」
 // 「这一切都结束了」「新的人生才刚刚开始」「命运的齿轮」）。与 trailer-ending 共用文末窗口，
 // 区别是它盖章过去、trailer-ending 预告将来；收的都是 banned-words 已按名禁掉的形态。
 // 不收「(这|那)一刻…终于明白」：真人语料里那是正常的认知节拍，短篇第一人称审判句还是卖点
@@ -266,6 +269,56 @@ const QUOTE_EMPHASIS_MIN_HITS = 3;
 const QUOTE_EMPHASIS_MAX_VISIBLE = 4;
 const QUOTE_EMPHASIS_SPEECH_VERB_PATTERN = /[说道问喊答念叫回吼骂写读唱嘀咕]/;
 
+// review 分类：下游按它分流。mechanical = 命中的表面形态本身就是问题，写作端就地改写即可；
+// semantic = 同一形态可能承担叙事功能，要读上下文判断保留还是改（交语义审查）。blocking 只能是
+// mechanical（blocking 的含义就是不需判断、必须清零）。新增 finding type 必须在此登记，否则运行期
+// 直接报错退出（scripts/test-ai-patterns.sh 另从源码抽 type 与本表双向核对）。
+//   type                         review      理由
+//   not-is-comparison            mechanical  固定句式模板「不是A，而是B」，blocking
+//   voice-contrast               mechanical  固定反差模板「声音不大…却」，blocking
+//   negation-parade              mechanical  固定否定排比模板，blocking
+//   reverse-not-is               mechanical  固定反序对比模板「是A，不是B」，blocking
+//   trailer-ending               mechanical  文末窗口固定预告短语，blocking
+//   trailer-summary              mechanical  文末窗口固定总结短语，blocking
+//   em-dash                      mechanical  标点，blocking
+//   long-paragraph               mechanical  段长阈值，断段即可
+//   period-stutter               mechanical  连续短句计数，合句即可
+//   micro-action-tic             mechanical  固定补语「了下/了一下」密度
+//   cliche-density-tic           mechanical  固定禁用词表密度
+//   stock-reaction-tic           semantic    身体反应可能承担物理后果或情绪，要逐处做删除测试
+//   action-list-tic              semantic    打斗/追逐等功能性动作编排可保留
+//   abstract-summary-tic         semantic    作者总结/上帝视角，是否越位要看语境
+//   metaphor-density-tic         semantic    比喻是否服务画面、删哪几个要读上下文
+//   reasoning-chain-tic          semantic    替读者推理的解释链，长推理段可能是正当的
+//   system-notice-formality-tic  semantic    系统/规则文本本就可以公文腔，看体裁功能
+//   overcompressed-prose-tic     semantic    短段过密可能是节奏选择，禁止机械注水
+//   low-connective-density-tic   semantic    同上，连接词补不补要看读感
+//   quote-emphasis-tic           semantic    标语/转述载体的引号是正常写法
+//   formulaic-parallelism        semantic    工整并列可能承担辩解或悬念排除
+const REVIEW_CLASSES = Object.freeze({
+  'not-is-comparison': 'mechanical',
+  'voice-contrast': 'mechanical',
+  'negation-parade': 'mechanical',
+  'reverse-not-is': 'mechanical',
+  'trailer-ending': 'mechanical',
+  'trailer-summary': 'mechanical',
+  'em-dash': 'mechanical',
+  'long-paragraph': 'mechanical',
+  'period-stutter': 'mechanical',
+  'micro-action-tic': 'mechanical',
+  'cliche-density-tic': 'mechanical',
+  'stock-reaction-tic': 'semantic',
+  'action-list-tic': 'semantic',
+  'abstract-summary-tic': 'semantic',
+  'metaphor-density-tic': 'semantic',
+  'reasoning-chain-tic': 'semantic',
+  'system-notice-formality-tic': 'semantic',
+  'overcompressed-prose-tic': 'semantic',
+  'low-connective-density-tic': 'semantic',
+  'quote-emphasis-tic': 'semantic',
+  'formulaic-parallelism': 'semantic',
+});
+
 const options = {
   json: false,
   files: [],
@@ -276,6 +329,9 @@ for (let i = 2; i < process.argv.length; i += 1) {
   const arg = process.argv[i];
   if (arg === '--check') {
     // Accepted for symmetry with normalize-punctuation.js; detection is always check-only.
+  } else if (arg === '--list-review-classes') {
+    process.stdout.write(`${JSON.stringify(REVIEW_CLASSES, null, 2)}\n`);
+    process.exit(0);
   } else if (arg === '--json') {
     options.json = true;
   } else if (arg.startsWith('--fail-on=')) {
@@ -313,7 +369,7 @@ for (const file of options.files) {
   let whitelist;
   try { whitelist = loadStyleWhitelist(fullPath); }
   catch (error) { die(`${file}: unable to read .deslop-whitelist (${error.message})`); }
-  const findings = scanDocument(maskStyleText(input, whitelist)).map((finding) => ({ file, ...finding }));
+  const findings = scanDocument(maskStyleText(input, whitelist)).map((finding) => ({ file, ...finding, review: reviewClass(finding.type) }));
   allFindings.push(...findings);
 }
 
@@ -330,6 +386,15 @@ if (failed) process.exit(2);
 const hasBlocking = allFindings.some((f) => f.severity === 'blocking');
 if (options.failOn === 'blocking' ? hasBlocking : allFindings.length > 0) process.exit(1);
 
+function reviewClass(type) {
+  const review = REVIEW_CLASSES[type];
+  if (!review) {
+    console.error(`internal error: finding type '${type}' has no review class (add it to REVIEW_CLASSES)`);
+    process.exit(2);
+  }
+  return review;
+}
+
 function escapeRegExp(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -344,11 +409,15 @@ function die(message) {
   process.exit(2);
 }
 
-function scanDocument(input) {
+// unclosedOpenings：到文末都没闭合的 `<!--` 位置（"行号:列号"）。未闭合的注释不是注释，
+// 否则一个漏写的 `-->` 会把后面整章藏起来；这些位置按正文扫描，只把 `<!--` 本身抹掉。
+function scanDocument(input, unclosedOpenings = new Set()) {
   const lines = input.split(/\r?\n/);
   const findings = [];
   let fence = null;
   let inFrontMatter = hasYamlFrontMatter(lines);
+  let commentOpen = false;
+  let commentStart = null;
   let block = [];
   const proseLines = [];
 
@@ -375,14 +444,25 @@ function scanDocument(input) {
       continue;
     }
 
-    if (fenceMarker) {
+    if (fenceMarker && !commentOpen) {
       flushBlock();
       fence = fenceMarker;
       continue;
     }
 
-    block.push({ text: line, lineNo: index + 1 });
-    proseLines.push({ text: line, lineNo: index + 1 });
+    // HTML 注释（如 `<!-- 去味:跳过 -->` 豁免标记）是元信息不是正文：注释段等长换成空格
+    // 保列号，整行都是注释的直接跳过；注释可跨行。
+    const masked = maskHtmlComments(line, commentOpen, index, unclosedOpenings);
+    commentOpen = masked.open;
+    if (masked.openedAt !== null) commentStart = masked.openedAt;
+    if (masked.text !== line && !masked.text.trim()) continue;
+
+    block.push({ text: masked.text, lineNo: index + 1 });
+    proseLines.push({ text: masked.text, lineNo: index + 1 });
+  }
+
+  if (commentOpen && commentStart !== null) {
+    return scanDocument(input, new Set([...unclosedOpenings, commentStart]));
   }
 
   flushBlock();
@@ -638,7 +718,7 @@ function findTrailerEnding(proseLines) {
         column: summaryMatch.index + 1,
         type: 'trailer-summary',
         severity: 'blocking',
-        message: '章尾状态总结体：「这一夜注定…/这一切都结束了/新的人生才刚刚开始/命运的齿轮」是把细纲的收束状态原样写成了总结句；收束状态是规划口径，正文落到最后一个具体动作、画面或台词上，别替读者盖章。',
+        message: '章尾状态总结体：「这一夜注定…/这一切都结束了/新的人生才刚刚开始/命运的齿轮」是把细纲的结尾设定原样写成了总结句；结尾设定要落成最后一个具体动作、画面或台词，别替读者盖章。',
         excerpt: compact(text.slice(summaryMatch.index, summaryMatch.index + summaryMatch[0].length)),
       });
     }
@@ -1240,6 +1320,38 @@ function countTerms(text, terms) {
     }
   }
   return count;
+}
+
+// 把行内 HTML 注释（含 `<!--`、`-->` 本身）换成等长空格；openBefore 表示上一行留下未闭合注释。
+// unclosedOpenings 里的 `<!--` 到文末都没闭合：只抹掉这四个字符，后面照常当正文。
+// openedAt 是本行最后一个开始注释的 `<!--` 位置（"行号:列号"），没有则为 null。
+function maskHtmlComments(line, openBefore, lineIndex = 0, unclosedOpenings = new Set()) {
+  let out = '';
+  let open = openBefore;
+  let cursor = 0;
+  let openedAt = null;
+  while (cursor < line.length) {
+    if (open) {
+      const close = line.indexOf('-->', cursor);
+      const end = close === -1 ? line.length : close + 3;
+      out += ' '.repeat(end - cursor);
+      cursor = end;
+      if (close !== -1) open = false;
+      continue;
+    }
+    const start = line.indexOf('<!--', cursor);
+    if (start === -1) {
+      out += line.slice(cursor);
+      break;
+    }
+    out += line.slice(cursor, start) + '    ';
+    cursor = start + 4;
+    const key = `${lineIndex}:${start}`;
+    if (unclosedOpenings.has(key)) continue;
+    open = true;
+    openedAt = key;
+  }
+  return { text: out, open, openedAt };
 }
 
 function parseFenceMarker(trimmedLine) {

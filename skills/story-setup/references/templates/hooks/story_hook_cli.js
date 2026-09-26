@@ -105,15 +105,18 @@ if (command === "extract-target") {
   }
 } else if (command === "prose-net") {
   // 轻量确定性网（含毒句式）。字数只由 storyctl 的公开命令测量，不在 Adapter 内复制。
-  // 读文件失败静默退出（兜底不反噬流程）。
+  // 书级 .deslop-whitelist 与另四端同口径（core.loadStyleWhitelist 按正文所在书目录找）。
+  // 读文件/白名单失败静默退出（兜底不反噬流程，与 core.proseAfterWrite 的降级一致）。
   const absolute = args[0]
   let text
+  let whitelist
   try {
     text = fs.readFileSync(absolute, "utf8")
+    whitelist = core.loadStyleWhitelist(absolute)
   } catch {
     process.exit(0)
   }
-  const out = core.proseNetFindings(text)
+  const out = core.proseNetFindings(text, whitelist, core.toxicRescanHint(absolute))
   if (out.length) process.stdout.write(out.join("\n"))
 } else if (command === "prose-toxic") {
   // 毒句式确定性检测单跑（供 guard 前置门 / 手工复扫调用；prose-net 已含同一组结果）。
@@ -122,7 +125,7 @@ if (command === "extract-target") {
   const absolute = args[0]
   try {
     const text = fs.readFileSync(absolute, "utf8")
-    const out = core.toxicPhraseFindings(text)
+    const out = core.toxicPhraseFindings(text, core.loadStyleWhitelist(absolute), core.toxicRescanHint(absolute))
     if (out.length) process.stdout.write(out.join("\n"))
   } catch {
     process.exit(0)

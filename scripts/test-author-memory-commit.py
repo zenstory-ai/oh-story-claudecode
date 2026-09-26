@@ -1130,14 +1130,14 @@ def main() -> None:
             "\\n作者偏好：{",
         ),
         REPO / "skills/story-deslop/SKILL.md": (
-            "query --kind prose_style --book-root",
+            "query --workspace {工作区} --book-root {书目录} --kind prose_style",
             "\\n作者偏好：{",
         ),
         REPO / "skills/story-review/SKILL.md": (
-            "query --kind delivery --kind interaction --kind prose_style --book-root",
+            "query --workspace {工作区} --book-root {书目录} --kind delivery --kind interaction --kind prose_style",
         ),
         REPO / "skills/story-short-write/SKILL.md": (
-            "query --kind prose_style --kind story_design --book-root",
+            "query --workspace {工作区} --book-root {项目目录} --kind prose_style --kind story_design",
         ),
     }
     for path, required_fragments in injection_contracts.items():

@@ -3,7 +3,8 @@
 # 写「正文」前必须先有对应大纲/细纲，否则阻止（exit 2，BLOCKING）。
 #
 # 拦截三类：
-#   - 长篇 正文/第N章_*.md 首建且缺细纲：要求同书 大纲/细纲_第N章.md 存在
+#   - 长篇 正文/第N章_*.md 首建且缺细纲或细纲是空的：要求同书 大纲/细纲_第N章.md 存在且写了内容
+#     （不计 # 号和空白至少 30 字；不查细纲字段，旧书细纲照样放行）
 #   - 短篇 正文.md 首建且缺大纲：要求同目录 小节大纲.md 存在
 #   - 长篇追踪检查点不成立：state 缺失/schema 不符/续写状态卡修订不一致/首建新章时
 #     上一章事务未提交（判定走共享核，与 opencode/zcode/codex 同一份；见下方该段注释）
@@ -58,6 +59,24 @@ extract_target_bash() {
     fi
   done
   return 1
+}
+
+# 细纲「实质为空」：去掉文件头 BOM 与每行行首的 Markdown 标题标记（空格/Tab 后接的 #）后，标题文字
+# 照算，非空白字符（空白 = ASCII 空白 + 全角空格）不足 30 个码点即为空。与 JS core outlineIsEmpty / codex py
+# _outline_is_empty 同口径（test-prose-net-parity.sh D 段锁 parity）。纯 bash + 字节运算：LC_ALL=C 下
+# 删掉 UTF-8 续字节（0x80-0xBF）后的字节数就是码点数，不依赖任何 UTF-8 区域设置，也不依赖 node。
+# 非普通文件/读不了按非空放行（宁可漏拦不可误伤）。
+OUTLINE_MIN_CHARS=30
+outline_is_empty() {
+  local f="$1" n bom fws tab
+  [ -f "$f" ] && [ -r "$f" ] || return 1
+  bom="$(printf '\357\273\277')"
+  fws="$(printf '\343\200\200')"
+  tab="$(printf '\t')"
+  n="$( { sed -e "1s/^${bom}//" -e "s/^[ ${tab}]*#*//" "$f" || true; } \
+    | sed "s/${fws}//g" | tr -d ' \t\r\n\f\v' | tr -d '\200-\277' | wc -c | tr -d ' ')"
+  case "$n" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$n" -lt "$OUTLINE_MIN_CHARS" ]
 }
 
 TARGET=""
@@ -145,13 +164,24 @@ case "$BASE" in
     if [ -z "$EXISTS" ]; then
       OUTLINE_DIR="$BOOK_DIR/大纲"
       FOUND=""
+      FILLED=""
       if [ -d "$OUTLINE_DIR" ]; then
-        # 容忍补零差异与标题后缀：按整数章号匹配 大纲/细纲_第*章*.md
+        # 容忍补零差异与标题后缀：按整数章号匹配 大纲/细纲_第*章*.md。同章有多份细纲时
+        # 任一份写了内容就放行（与 JS core 同口径）；FOUND 取字典序第一份，供空细纲文案引用。
         for f in "$OUTLINE_DIR"/细纲_第*章*.md; do
           [ -e "$f" ] || continue
           fnum="$(basename "$f" | sed -n 's/^细纲_第0*\([0-9][0-9]*\)章.*/\1/p')"
-          if [ "$fnum" = "$NUM" ]; then FOUND="$f"; break; fi
+          [ "$fnum" = "$NUM" ] || continue
+          [ -n "$FOUND" ] || FOUND="$f"
+          if ! outline_is_empty "$f"; then FILLED=1; break; fi
         done
+      fi
+      if [ -n "$FOUND" ] && [ -z "$FILLED" ]; then
+        # ROOT 是 pwd -P 物理路径，目标路径可能是逻辑路径（macOS /var → /private/var），两种前缀都剥。
+        OUTLINE_REL="${FOUND#"$ROOT"/}"
+        [ -n "${CLAUDE_PROJECT_DIR:-}" ] && OUTLINE_REL="${OUTLINE_REL#"${CLAUDE_PROJECT_DIR%/}"/}"
+        printf '%s\n' "⛔ 写正文被拦截：第 ${NUM} 章的细纲（${OUTLINE_REL}）是空的（不计 # 号和空白不到 ${OUTLINE_MIN_CHARS} 字）。先按 story-long-write 单章流程把细纲写完整（这章发生什么、主角做什么选择），再写正文。" >&2
+        exit 2
       fi
       if [ -z "$FOUND" ]; then
         printf '%s\n' "⛔ 写正文被拦截：第 ${NUM} 章缺少细纲（${OUTLINE_DIR#$ROOT/}/细纲_第$(printf '%03d' "$NUM")章.md）。" >&2
@@ -193,7 +223,7 @@ case "$BASE" in
         pnum="$(basename "$f" | sed -n 's/^第0*\([0-9][0-9]*\)章.*/\1/p')"
         if [ "$pnum" = "$PREV" ]; then PREV_FILE="$f"; break; fi
       done
-      if [ -n "$PREV_FILE" ] && ! head -n 6 "$PREV_FILE" | grep -qE '去味(：|:)跳过'; then
+      if [ -n "$PREV_FILE" ] && ! head -n 6 "$PREV_FILE" | grep -qE '<!--[[:blank:]]*去味[[:blank:]]*(：|:)[[:blank:]]*跳过[[:blank:]]*-->'; then
         TOXIC="$(node "$CLI" prose-toxic "$PREV_FILE" 2>/dev/null || true)"
         if [ -n "$TOXIC" ]; then
           printf '%s\n' "⛔ 写正文被拦截：上一章（$(basename "$PREV_FILE")）有未清毒句式欠账，先清零再写第 ${NUM} 章；用户显式豁免时在上一章标题行下加 <!-- 去味:跳过 --> 后重试。" >&2

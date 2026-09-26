@@ -23,8 +23,8 @@ function readSkill(name) {
 
 const long = readSkill('story-long-write')
 const longLines = long.split(/\r?\n/)
-const longGateLine = longLines.findIndex((line) => line.includes('章节 Reference Gate')) + 1
-assert(longGateLine > 0 && longGateLine <= 20, `long Reference Gate must stay in first screen, got line ${longGateLine}`)
+const longGateLine = longLines.findIndex((line) => line.includes('## 写前必读')) + 1
+assert(longGateLine > 0 && longGateLine <= 20, `long 写前必读 gate must stay in first screen, got line ${longGateLine}`)
 for (const reference of [
   'workflow-setup.md', 'workflow-chapter.md', 'workflow-daily.md', 'workflow-revision.md', 'long-format.md',
   'writing-craft.md', 'long-chapter-quality.md', 'long-chapter-hooks.md', 'long-suspense.md',

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -81,8 +82,12 @@ class FinalChapterFlowTests(unittest.TestCase):
         path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
         return path
 
-    def run_process(self, args: list[str], *, expect: int = 0) -> dict[str, object]:
-        completed = subprocess.run(args, cwd=ROOT, text=True, encoding="utf-8", capture_output=True, check=False)
+    def run_process(
+        self, args: list[str], *, expect: int = 0, env: dict[str, str] | None = None
+    ) -> dict[str, object]:
+        completed = subprocess.run(
+            args, cwd=ROOT, text=True, encoding="utf-8", capture_output=True, check=False, env=env
+        )
         self.assertEqual(completed.returncode, expect, f"stdout:\n{completed.stdout}\nstderr:\n{completed.stderr}")
         lines = completed.stdout.strip().splitlines()
         self.assertTrue(lines, completed.stderr)
@@ -95,24 +100,27 @@ class FinalChapterFlowTests(unittest.TestCase):
         )
 
     def run_chapter(
-        self, command: str, chapter: int, *, document: dict[str, object] | None = None, expect: int = 0
+        self, command: str, chapter: int, *, document: dict[str, object] | None = None, expect: int = 0,
+        extra: list[str] | None = None, env: dict[str, str] | None = None,
     ) -> dict[str, object]:
         args = [
             sys.executable, str(STORYCTL), "chapter", command,
-            "--project", str(self.project), "--chapter", str(chapter),
+            "--project", str(self.project), "--chapter", str(chapter), *(extra or []),
         ]
         if document is not None:
             args.extend(["--input", str(self.write_input(f"chapter-{chapter}", document))])
-        return self.run_process(args, expect=expect)
+        return self.run_process(args, expect=expect, env=env)
 
     def state(self) -> dict[str, object]:
         return json.loads((self.project / "追踪/_tracking-state.json").read_text(encoding="utf-8"))
 
-    def write_contract(self, chapter: int, actual: int, *, target: int = 1000, blocking: bool = False) -> None:
+    def write_contract(
+        self, chapter: int, actual: int, *, target: int = 1000, blocking: bool = False, extra: str = ""
+    ) -> None:
         (self.project / "大纲").mkdir(exist_ok=True)
         (self.project / "正文").mkdir(exist_ok=True)
         (self.project / "大纲" / f"细纲_第{chapter:03d}章.md").write_text(
-            f"- 字数目标：{target} 字\n- 字数口径：visible_chars_v1\n\n"
+            f"- 字数目标：{target} 字\n- 字数口径：visible_chars_v1\n{extra}\n"
             "| # | 情节点（谁做了什么） | 功能标签 | 执行边界 |\n|---|---|---|---|\n"
             "| 1 | 江晨完成一次审核 | 推进 | 不新增支线 |\n",
             encoding="utf-8",
@@ -128,7 +136,8 @@ class FinalChapterFlowTests(unittest.TestCase):
         self.write_contract(1, 1000)
         body = self.project / "正文" / "第001章_测试.md"
         body.write_text(body.read_text(encoding="utf-8").replace("字字字字", "字……字", 1), encoding="utf-8")
-        plain = self.run_chapter("check", 1, expect=2)
+        plain = self.run_chapter("check", 1, expect=1)
+        self.assertEqual(plain["status"], "blocked")
         self.assertEqual(plain["quality"]["status"], "fail")
         self.assertNotIn("punctuation_fixed", plain)
         args = [sys.executable, str(STORYCTL), "chapter", "check", "--project", str(self.project),
@@ -171,6 +180,7 @@ class FinalChapterFlowTests(unittest.TestCase):
             "commit", 2, document=transaction(2, self.state()["state_revision"]), expect=2
         )
         self.assertIn("outside the user band", rejected["message"])
+        self.assertEqual(rejected["error_code"], "LENGTH_OUT_OF_BAND")
         self.assertEqual(self.state()["last_committed_chapter"], 1)
         self.write_contract(2, 801, target=1100)
         accepted = self.run_chapter(
@@ -213,7 +223,8 @@ class FinalChapterFlowTests(unittest.TestCase):
 
         # 4: blocking quality failure cannot commit; after an explicit quality fix, next chapter proceeds.
         self.write_contract(4, 1200, blocking=True)
-        failed = self.run_chapter("check", 4, expect=2)
+        failed = self.run_chapter("check", 4, expect=1)
+        self.assertEqual(failed["status"], "blocked")
         self.assertEqual(failed["quality"]["status"], "fail")
         self.assertEqual(failed["available_actions"], [])
         self.assertIsNone(failed["compression"])
@@ -221,6 +232,7 @@ class FinalChapterFlowTests(unittest.TestCase):
             "commit", 4, document=transaction(4, self.state()["state_revision"]), expect=2
         )
         self.assertIn("blocking quality", blocked["message"])
+        self.assertEqual((blocked["status"], blocked["error_code"]), ("error", "QUALITY_BLOCKED"))
         self.assertEqual(self.state()["last_committed_chapter"], 3)
         self.write_contract(4, 1000)
         self.run_chapter("commit", 4, document=transaction(4, self.state()["state_revision"]))
@@ -230,6 +242,127 @@ class FinalChapterFlowTests(unittest.TestCase):
         self.assertEqual(set(state["wordcount_records"]), {"1", "2", "3", "4"})
         self.assertNotIn("wordcount_events", state)
         self.assertNotIn("wordcount_policy", state)
+
+    def test_author_range_from_outline_or_flags_replaces_the_default_band(self) -> None:
+        # 1080 字对目标 1200：默认 ±12% 内部带（1056 起）会判 internal_pass；作者说 1100-1300 就是欠长。
+        self.write_contract(1, 1080, target=1200, extra="- 字数范围：1100-1300\n")
+        checked = self.run_chapter("check", 1)
+        self.assertEqual(checked["length"]["status"], "under")
+        self.assertEqual(checked["length"]["band_source"], "author")
+        self.assertEqual(checked["status"], "needs_decision")
+        # 命令行给的区间优先于细纲；作者区间内提交，记录带上 author_range，state 仍能通过校验。
+        widened = ["--min-chars", "1000", "--max-chars", "1300"]
+        self.assertEqual(self.run_chapter("check", 1, extra=widened)["status"], "ready")
+        self.run_chapter("commit", 1, document=transaction(1, self.state()["state_revision"]), extra=widened)
+        record = self.state()["wordcount_records"]["1"]
+        self.assertEqual(record["author_range"], {"min": 1000, "max": 1300})
+        self.assertEqual(record["status"], "internal_pass")
+        self.run_process([sys.executable, str(TRACKING), "check", "--project", str(self.project)])
+        # 超长时的删除字数也按作者区间算。
+        self.write_contract(2, 1400, target=1200, extra="- 字数范围：1100-1300\n")
+        over = self.run_chapter("check", 2)
+        self.assertEqual(over["compression"]["remove_to_user_band"], {"min": 100, "max": 300})
+        self.assertEqual(over["compression"]["remove_to_internal_band"], {"min": 100, "max": 300})
+
+    def test_accept_current_length_has_a_floor_and_needs_one_compression_first(self) -> None:
+        self.write_contract(1, 289, target=1000)
+        refused = self.run_chapter(
+            "accept-current-length", 1, document=transaction(1, self.state()["state_revision"]), expect=2
+        )
+        self.assertEqual((refused["status"], refused["error_code"]), ("error", "BELOW_ACCEPT_FLOOR"))
+        self.assertEqual(self.state()["last_committed_chapter"], 0)
+        self.run_chapter(
+            "accept-current-length", 1, document=transaction(1, self.state()["state_revision"]), extra=["--force"]
+        )
+        self.assertEqual(self.state()["wordcount_records"]["1"]["actual"], 289)
+
+        self.write_contract(2, 1400)
+        refused = self.run_chapter(
+            "accept-current-length", 2, document=transaction(2, self.state()["state_revision"]), expect=2
+        )
+        self.assertEqual(refused["error_code"], "COMPRESSION_REQUIRED")
+        self.assertEqual(self.run_chapter("check", 2)["available_actions"][0], "compress-once")
+        # 删一个字不算压缩：基线 1400、作者范围上限 1150，至少要删到差额（250）的一半，即 ≤1275。
+        for token_cut in (1399, 1276):
+            self.write_contract(2, token_cut)
+            refused = self.run_chapter(
+                "accept-current-length", 2, document=transaction(2, self.state()["state_revision"]), expect=2
+            )
+            self.assertEqual(refused["error_code"], "COMPRESSION_REQUIRED", token_cut)
+            self.assertIn("1275", refused["message"])
+        self.write_contract(2, 1270)  # 真压过一次仍超长：现在可以接受。
+        accepted = self.run_chapter(
+            "accept-current-length", 2, document=transaction(2, self.state()["state_revision"])
+        )
+        self.assertTrue(accepted["tracking_committed"])
+        self.assertEqual(accepted["work_dir_removed"], ".story/work/第002章")
+
+    def test_missing_node_is_a_tool_error_not_a_prose_finding(self) -> None:
+        self.write_contract(1, 1000)
+        empty_bin = self.root / "empty-bin"
+        empty_bin.mkdir()
+        env = {**os.environ, "PATH": str(empty_bin)}
+        checked = self.run_chapter("check", 1, expect=3, env=env)
+        self.assertEqual(checked["status"], "tool_unavailable")
+        self.assertEqual(checked["quality"]["status"], "unavailable")
+        self.assertEqual(checked["quality"]["blocking_findings"], [])
+        self.assertIn("Node.js", checked["quality"]["tool_errors"][0]["message"])
+        self.assertEqual(checked["length"]["status"], "internal_pass")
+        refused = self.run_chapter(
+            "commit", 1, document=transaction(1, self.state()["state_revision"]), expect=3, env=env
+        )
+        self.assertEqual((refused["schema"], refused["error_code"]), ("story-chapter-error/v1", "TOOL_UNAVAILABLE"))
+
+    def test_findings_pass_through_and_semantic_advisories_are_counted(self) -> None:
+        # 用桩检测器替身跑真实 storyctl：finding 原样透传，review 缺省按语义类计数。
+        runtime = self.root / "runtime"
+        runtime.mkdir()
+        for name in ("storyctl.py", "wordcount_core.py", "tracking_commit.py"):
+            shutil.copy2(STORYCTL.parent / name, runtime / name)
+        findings = [
+            {"type": "voice", "severity": "advisory", "review": "semantic", "line": 1},
+            {"type": "space", "severity": "advisory", "review": "mechanical", "line": 2},
+            {"type": "legacy", "severity": "advisory", "line": 3},
+        ]
+        (runtime / "check-ai-patterns.js").write_text(
+            f"process.stdout.write(JSON.stringify({{findings: {json.dumps(findings)}}}))\n", encoding="utf-8"
+        )
+        # 退化检测器的 advisory（工程词疑似泄漏）不带 review：它不是 AI 味，不计入触发去 AI 味审查的语义条数。
+        degeneration = [{"type": "meta-leak", "severity": "advisory", "line": 4}]
+        (runtime / "check-degeneration.js").write_text(
+            f"process.stdout.write(JSON.stringify({{findings: {json.dumps(degeneration)}}}))\n", encoding="utf-8"
+        )
+        for name in ("normalize-punctuation.js", "check-outline-copy.js"):
+            (runtime / name).write_text("process.exit(0)\n", encoding="utf-8")
+        self.write_contract(1, 1000)
+        checked = self.run_process([
+            sys.executable, str(runtime / "storyctl.py"), "chapter", "check",
+            "--project", str(self.project), "--chapter", "1",
+        ])
+        self.assertEqual(
+            checked["quality"]["advisories"],
+            [{"source": "ai-pattern", **row} for row in findings]
+            + [{"source": "degeneration", **row, "review": "mechanical"} for row in degeneration],
+        )
+        self.assertEqual(checked["quality"]["semantic_advisories"], 2)
+        self.assertEqual(checked["status"], "ready")
+
+    def test_revision_goes_through_storyctl_and_remeasures_the_body(self) -> None:
+        self.write_contract(1, 1000)
+        self.run_chapter("commit", 1, document=transaction(1, self.state()["state_revision"]))
+        self.write_contract(1, 950)
+        draft = self.run_process([
+            sys.executable, str(TRACKING), "draft", "--project", str(self.project), "--chapter", "1",
+        ])
+        self.assertEqual(draft["mode"], "revision")
+        committed = self.run_process([
+            sys.executable, str(STORYCTL), "chapter", "commit", "--project", str(self.project),
+            "--chapter", "1", "--input", draft["draft"],
+        ])
+        self.assertEqual(committed["mode"], "revision")
+        self.assertEqual(committed["work_dir_removed"], ".story/work/第001章")
+        self.assertEqual(self.state()["wordcount_records"]["1"]["actual"], 950)
+        self.assertIn("第1章完成。", (self.project / "追踪/逐章记录/第001章.md").read_text(encoding="utf-8"))
 
     def test_chapter_work_dir_survives_failure_and_is_removed_after_commit(self) -> None:
         work = self.project / ".story/work/第001章"

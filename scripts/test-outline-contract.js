@@ -192,6 +192,37 @@ try {
   assert.strictEqual(badTarget.status, 1)
   assert(failureIds(badTarget).includes('outline.wordcount-target'))
 
+  // 字数目标与 storyctl 同一语法：常见作者写法都收，取值进 JSON；写成区间不再被静默读成下限。
+  assert.deepStrictEqual(good.report.wordcount, { target: 2300, target_status: 'ok', range: null, range_status: 'missing' })
+  const approxTarget = run(writeCase('target-approx', outline({ fieldValues: { 字数目标: '约 2,300 字（本章偏短）' } })))
+  assert.strictEqual(approxTarget.status, 0, approxTarget.stdout)
+  assert.strictEqual(approxTarget.report.wordcount.target, 2300)
+  const rangeAsTarget = run(writeCase('target-as-range', outline({ fieldValues: { 字数目标: '2000-2600' } })))
+  assert.strictEqual(rangeAsTarget.status, 1)
+  assert.deepStrictEqual(failureIds(rangeAsTarget), ['outline.wordcount-target'])
+  const authorRange = run(writeCase('author-range', outline() + '\n- 字数范围：2000-2600 字\n'))
+  assert.strictEqual(authorRange.status, 0, authorRange.stdout)
+  assert.deepStrictEqual(authorRange.report.wordcount.range, { min: 2000, max: 2600 })
+  const badRange = run(writeCase('author-range-reversed', outline() + '\n- 字数范围：2600-2000\n'))
+  assert.strictEqual(badRange.status, 1)
+  assert.deepStrictEqual(failureIds(badRange), ['outline.wordcount-target'])
+
+  // 契约风险可选；写了就只收三档，并把档位放进 JSON 供审稿与作者汇报取用。
+  assert.deepStrictEqual(good.report.contract_risk, { level: '契约安全', detail: '', status: 'ok' })
+  const reinforce = run(writeCase('risk-reinforce', outline({ fieldValues: { 契约风险: '需补强——补一段交换，让主角付出代价' } })))
+  assert.strictEqual(reinforce.status, 0, reinforce.stdout)
+  assert.deepStrictEqual(reinforce.report.contract_risk, { level: '需补强', detail: '补一段交换，让主角付出代价', status: 'ok' })
+  const badRisk = run(writeCase('risk-invalid', outline({ fieldValues: { 契约风险: '低风险' } })))
+  assert.strictEqual(badRisk.status, 1)
+  assert.deepStrictEqual(failureIds(badRisk), ['outline.contract-risk'])
+  assert.strictEqual(badRisk.report.contract_risk.status, 'invalid')
+  // 旧名「风险等级」按同一字段认。
+  const legacyRisk = run(writeCase('risk-legacy-name', outline().replace('- 契约风险：契约安全', '- 风险等级：契约破坏')))
+  assert.strictEqual(legacyRisk.status, 0, legacyRisk.stdout)
+  assert.strictEqual(legacyRisk.report.contract_risk.level, '契约破坏')
+  const legacyBad = run(writeCase('risk-legacy-invalid', outline().replace('- 契约风险：契约安全', '- 风险等级：高')))
+  assert.deepStrictEqual(failureIds(legacyBad), ['outline.contract-risk'])
+
   const noCaliber = run(writeCase('no-caliber', outline({ fieldValues: { 字数口径: 'chars' } })))
   assert.strictEqual(noCaliber.status, 1)
   assert.deepStrictEqual(failureIds(noCaliber), ['outline.wordcount-target'])

@@ -1296,3 +1296,121 @@ if (ts.length !== 0) throw new Error('裸认知句/时间跳转不应报 trailer
 NODE
 
 echo "trailer-summary (章尾状态总结体) regression tests passed."
+
+# ── HTML 注释不是正文 ──────────────────────────────────────────────────────────
+# 「去味:跳过」豁免标记 `<!-- 去味:跳过 -->` 是正文里的元信息。检测器曾把 `<!--` / `-->`
+# 当成两处 blocking em-dash，storyctl chapter check 因此永远不过、豁免章永远提交不了。
+# 整行注释、行内注释、跨行注释都不参与扫描；注释外的叙述照常检测，列号不漂移。
+FIXTURE_HTML_COMMENT="$TMP_DIR/fixture-html-comment.md"
+printf '%s\n' \
+  '# 第3章 夜路' \
+  '<!-- 去味:跳过 -->' \
+  '<!-- 去味：跳过 -->' \
+  '他推门出去，雨还在下。' \
+  '她把伞递给他。<!-- 作者注：这里--以后再改 -->他没接。' \
+  '<!--' \
+  '多行注释里的破折号——不算，声音不大，却不算。' \
+  '-->' \
+  '他回头看了一眼——门已经关了。' > "$FIXTURE_HTML_COMMENT"
+set +e
+node "$SCRIPT" --json --fail-on=blocking "$FIXTURE_HTML_COMMENT" > "$OUT"
+html_status=$?
+set -e
+node - "$OUT" <<'NODE'
+const fs = require('fs');
+const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const dashes = r.findings.filter((f) => f.type === 'em-dash');
+const onComment = r.findings.filter((f) => [2, 3, 6, 7, 8].includes(f.line) || (f.line === 5 && f.type === 'em-dash'));
+if (onComment.length) throw new Error('HTML 注释内容不应被扫描: ' + JSON.stringify(onComment));
+if (dashes.length !== 1 || dashes[0].line !== 9 || dashes[0].column !== 8) {
+  throw new Error('注释外的破折号仍要报且列号不漂移（第9行第8列）: ' + JSON.stringify(dashes));
+}
+NODE
+[ "$html_status" -eq 1 ] || { echo "FAIL: 注释外仍有破折号，--fail-on=blocking 应退出 1，实际 $html_status" >&2; exit 1; }
+
+# 只有豁免标记与干净正文的章：--fail-on=blocking 必须退出 0（chapter check 能过）。
+FIXTURE_MARKER_ONLY="$TMP_DIR/fixture-marker-only.md"
+printf '%s\n' '# 第3章 夜路' '<!-- 去味:跳过 -->' '' '他推门出去，雨还在下。' '她把伞递给他，他没接。' > "$FIXTURE_MARKER_ONLY"
+set +e
+node "$SCRIPT" --json --fail-on=blocking "$FIXTURE_MARKER_ONLY" > "$OUT"
+marker_status=$?
+set -e
+[ "$marker_status" -eq 0 ] || { echo "FAIL: 只含豁免标记的干净章被判 blocking（exit $marker_status）：$(cat "$OUT")" >&2; exit 1; }
+
+# 漏写 `-->` 的注释到文末都没闭合：不能把后面整章藏起来，按正文扫描（`<!--` 本身不报）。
+FIXTURE_UNCLOSED_COMMENT="$TMP_DIR/fixture-unclosed-comment.md"
+printf '%s\n' '# 第1章' '<!-- 作者备注' '这不是夸奖，而是命令。' '声音不大，却带着狠劲。' '他把门带上。' > "$FIXTURE_UNCLOSED_COMMENT"
+set +e
+node "$SCRIPT" --json --fail-on=blocking "$FIXTURE_UNCLOSED_COMMENT" > "$OUT"
+unclosed_status=$?
+set -e
+node - "$OUT" <<'NODE'
+const fs = require('fs');
+const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const types = r.findings.map((f) => `${f.line}:${f.type}`);
+for (const want of ['3:not-is-comparison', '4:voice-contrast']) {
+  if (!types.includes(want)) throw new Error('未闭合注释之后的正文必须照常扫描，缺 ' + want + ': ' + JSON.stringify(types));
+}
+if (r.findings.some((f) => f.line === 2)) throw new Error('`<!--` 本身不应报: ' + JSON.stringify(types));
+NODE
+[ "$unclosed_status" -eq 1 ] || { echo "FAIL: 未闭合注释藏住了 blocking 句式（exit $unclosed_status）" >&2; exit 1; }
+
+echo "HTML comment (去味:跳过 豁免标记) regression tests passed."
+
+# ── review 分类契约：每条 finding 都带 review=semantic|mechanical ────────────────
+# 下游按 review 分流：mechanical 由写作端直接清，semantic 交语义审查判断是否保留。
+# 源码里出现的每个 finding type 都必须在分类表里（新增规则不许静默漏分类），分类表不许有
+# 源码里不存在的死条目；blocking 规则只能是 mechanical（blocking = 不需判断、必须清零）。
+node "$SCRIPT" --list-review-classes > "$TMP_DIR/review-classes.json"
+node - "$SCRIPT" "$TMP_DIR/review-classes.json" <<'NODE'
+const fs = require('fs');
+const source = fs.readFileSync(process.argv[2], 'utf8');
+const table = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+const emitted = new Set([...source.matchAll(/\btype: '([a-z-]+)'/g)].map((m) => m[1]));
+if (emitted.size < 20) throw new Error('源码里抽到的 finding type 太少，抽取式可能失效: ' + [...emitted]);
+const classified = new Set(Object.keys(table));
+const missing = [...emitted].filter((t) => !classified.has(t));
+const dead = [...classified].filter((t) => !emitted.has(t));
+if (missing.length) throw new Error('这些 finding type 没有 review 分类: ' + missing.join(', '));
+if (dead.length) throw new Error('review 分类表有源码里不存在的类型: ' + dead.join(', '));
+for (const [type, cls] of Object.entries(table)) {
+  if (cls !== 'semantic' && cls !== 'mechanical') throw new Error(`${type} 的 review 值非法: ${cls}`);
+}
+for (const t of ['stock-reaction-tic', 'formulaic-parallelism', 'reasoning-chain-tic', 'abstract-summary-tic']) {
+  if (table[t] !== 'semantic') throw new Error(`${t} 需要语义判断，应为 semantic`);
+}
+for (const t of ['em-dash', 'cliche-density-tic', 'not-is-comparison']) {
+  if (table[t] !== 'mechanical') throw new Error(`${t} 是确定性表面形态，应为 mechanical`);
+}
+NODE
+
+# 运行期：一份多规则 fixture 的每条 finding 都带合法 review，原有字段不变，blocking 全是 mechanical。
+FIXTURE_REVIEW="$TMP_DIR/fixture-review.md"
+{
+  printf '%s\n' '他不是冷漠，而是绝望。' '声音不高，第一句却稳稳压住了整个大厅。' '没有伴奏，没有和声，没有提词器。'
+  printf '%s\n' '是真嗓子，不是修音修出来的。' '他回头看了一眼——门已经关了。'
+  printf '%s\n' '她指尖微微一颤。' '他指节泛白，攥紧了拳头。' '她眼眶发红。' '他喉结滚了滚。' '她抿了下唇。'
+  printf '%s\n' '一。二。三。四。五。六。七。'
+  printf '%s\n' '没人知道，这才刚刚开头。'
+} > "$FIXTURE_REVIEW"
+set +e
+node "$SCRIPT" --json "$FIXTURE_REVIEW" > "$OUT"
+set -e
+node - "$OUT" <<'NODE'
+const fs = require('fs');
+const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+if (r.findings.length < 6) throw new Error('多规则 fixture 命中太少，测试失去意义: ' + JSON.stringify(r.findings));
+const types = new Set(r.findings.map((f) => f.type));
+for (const need of ['not-is-comparison', 'em-dash', 'stock-reaction-tic', 'trailer-ending']) {
+  if (!types.has(need)) throw new Error('fixture 应命中 ' + need + ': ' + [...types]);
+}
+for (const f of r.findings) {
+  for (const key of ['file', 'line', 'column', 'type', 'severity', 'message', 'excerpt']) {
+    if (!(key in f)) throw new Error(`finding 缺原有字段 ${key}: ` + JSON.stringify(f));
+  }
+  if (f.review !== 'semantic' && f.review !== 'mechanical') throw new Error('finding 缺 review 分类: ' + JSON.stringify(f));
+  if (f.severity === 'blocking' && f.review !== 'mechanical') throw new Error('blocking finding 必须是 mechanical: ' + JSON.stringify(f));
+}
+NODE
+
+echo "review classification (semantic/mechanical) contract tests passed."

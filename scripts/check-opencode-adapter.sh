@@ -483,6 +483,76 @@ PY
 
 echo "  OK generated permissions leave each agent exactly its capability tools (2.x whollyDisabled)"
 
+# chapter-extractor 在 Claude 端靠内联 hook（analysis-input-guard）只写批次输入文件；OpenCode 没有
+# 单 agent hook，靠 edit 路径规则收窄。独立复刻 2.x permission.ts evaluate()：取最后一条 action 与
+# resource 都命中的规则；resource 是相对会话目录的路径（file-access.ts resolve）。
+python3 - <<'PY'
+import re
+from pathlib import Path
+
+
+def wildcard_match(value: str, pattern: str) -> bool:
+    escaped = re.sub(r'[.+^${}()|\[\]\\]', r'\\\g<0>', pattern)
+    escaped = escaped.replace('*', '.*').replace('?', '.')
+    return re.match('^' + escaped + '$', value, flags=re.DOTALL) is not None
+
+
+def evaluate(action: str, resource: str, rules) -> str:
+    matched = [rule for rule in rules if wildcard_match(action, rule[0]) and wildcard_match(resource, rule[1])]
+    return matched[-1][2] if matched else 'ask'
+
+
+def rules_of(name: str):
+    text = Path(f'skills/story-setup/references/opencode/agents/{name}.md').read_text(encoding='utf-8')
+    return re.findall(r'^  - action: "?([^"\n]+)"?\n    resource: "?([^"\n]+)"?\n    effect: (\S+)$',
+                      text.split('\n---\n', 1)[0], re.M)
+
+
+extractor = rules_of('chapter-extractor')
+for path in ('拆文库/书/_analysis_cache/输入-RAW-4-6.md', '拆文库/书/_analysis_cache/输入-REUSE-1-3.md',
+             '_analysis_cache/输入-RAW-1-3.md'):
+    assert evaluate('edit', path, extractor) == 'allow', (path, extractor)
+for path in ('拆文库/书/章节/第4章_摘要.md', '拆文库/书/_analysis_cache/批次-RAW-4-6.md',
+             '拆文库/书/_progress.md', 'book/正文/第1章.md', '拆文库/书/_analysis_cache/输入.md'):
+    assert evaluate('edit', path, extractor) == 'deny', (path, extractor)
+for name in ('character-designer', 'narrative-writer', 'story-architect'):
+    assert evaluate('edit', 'book/正文/第1章.md', rules_of(name)) == 'allow', name
+PY
+
+echo "  OK chapter-extractor may only edit _analysis_cache/输入-{RAW|REUSE}-*.md (2.x evaluate)"
+
+# 守卫名解析必须 fail closed：frontmatter 挂了 Write/Edit 的 PreToolUse hook 却认不出守卫名
+# （命令写法变了），生成要报错，不能当成没挂守卫、给 agent 放开整个工作区的 edit。
+python3 - "scripts/sync-opencode.py" <<'PY'
+import importlib.util
+import sys
+
+spec = importlib.util.spec_from_file_location("sync_opencode_guard", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+
+def frontmatter(command: str, matcher: str = "Write|Edit") -> str:
+    return ("---\nname: x\ntools: [Read, Write, Edit]\nhooks:\n  PreToolUse:\n"
+            f"    - matcher: \"{matcher}\"\n      hooks:\n        - type: command\n"
+            f"          command: {command}\n---\n\n正文\n")
+
+known = 'node "$CLAUDE_PROJECT_DIR"/.claude/hooks/story_hook_cli.js analysis-input-guard'
+assert module.frontmatter_write_guard(frontmatter(known)) == "analysis-input-guard"
+for command in ('node "$CLAUDE_PROJECT_DIR/.claude/hooks/story_hook_cli.js" analysis-input-guard',
+                'bash "$CLAUDE_PROJECT_DIR"/.claude/hooks/guard-analysis-input.sh'):
+    for matcher in ("Write|Edit", "Edit", "Write"):
+        try:
+            module.frontmatter_write_guard(frontmatter(command, matcher))
+        except ValueError:
+            continue
+        raise AssertionError(f"unrecognized write-guard hook must fail closed: {matcher} / {command}")
+# 只挂非写入 matcher（如 Bash）的 hook 与没有 hook 的 agent 不受影响。
+assert module.frontmatter_write_guard(frontmatter('bash x.sh', "Bash")) is None
+assert module.frontmatter_write_guard("---\nname: x\ntools: [Read]\n---\n\n正文\n") is None
+PY
+
+echo "  OK unrecognized Write/Edit hook in agent frontmatter fails generation (no silent edit allow)"
+
 # 生成必须幂等：跑两遍产物一致。否则 --check 会在无人改模板时随机报 out-of-sync。
 python3 - "scripts/sync-opencode.py" "$TMP_DIR" <<'PY'
 import contextlib

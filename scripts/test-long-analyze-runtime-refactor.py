@@ -135,11 +135,13 @@ def test_index_existing_supported_forms() -> None:
         require(long_plan["batches"][0]["chapter_range"] == [1, 1], "单章超过字符上限时必须独占一块")
 
 
-def write_source_and_index(root: Path, count: int) -> Path:
+def write_source_and_index(root: Path, count: int, body_chars: dict[int, int] | None = None) -> Path:
+    """Tiny chapters by default; ``body_chars`` pads chosen chapters to a real length."""
     root.mkdir(parents=True, exist_ok=True)
     source = root / "原文" / "原文.txt"
     source.parent.mkdir(parents=True, exist_ok=True)
-    source.write_text("\n".join(f"第{chapter}章 标题{chapter}\n正文{chapter}。" for chapter in range(1, count + 1)), encoding="utf-8")
+    body = {chapter: "字" * (body_chars or {}).get(chapter, 0) or f"正文{chapter}。" for chapter in range(1, count + 1)}
+    source.write_text("\n".join(f"第{chapter}章 标题{chapter}\n{body[chapter]}" for chapter in range(1, count + 1)), encoding="utf-8")
     result = run(INDEX, "--source", source, "--output", root / "chapter_index.csv", "--locator-path", "原文/原文.txt")
     require(result.returncode == 0, result.stdout or result.stderr)
     return source
@@ -155,9 +157,11 @@ def plot_points(chapter: int, count: int, *, tone: str, theme: str) -> str:
     return "\n\n---\n\n".join(points)
 
 
-def compact_output(start: int, end: int, *, tone: str = "期待", theme: str = "陌生主题", points: int = 10) -> str:
+def compact_output(start: int, end: int, *, tone: str = "期待", theme: str = "陌生主题",
+                   points: int | dict[int, int] = 10) -> str:
     blocks = []
     for chapter in range(start, end + 1):
+        count = points.get(chapter, 10) if isinstance(points, dict) else points
         blocks.append(
             f"""<!-- CHAPTER_START:{chapter} -->
 ## 第{chapter}章 标题{chapter}
@@ -174,7 +178,7 @@ def compact_output(start: int, end: int, *, tone: str = "期待", theme: str = "
 **证据**：原文定位词“正文{chapter}”。
 **情节点**：
 
-{plot_points(chapter, points, tone=tone, theme=theme)}
+{plot_points(chapter, count, tone=tone, theme=theme)}
 <!-- CHAPTER_END:{chapter} -->"""
         )
     return "\n\n".join(blocks) + """
@@ -581,7 +585,7 @@ def test_audit_recovery_regressions() -> None:
                 "提交入口必须拒绝超过3章的手工批次")
 
         sparse = area / "情节点不足"
-        write_source_and_index(sparse, 1)
+        write_source_and_index(sparse, 1, body_chars={1: 2400})
         sparse_plan = json.loads(run(MANAGE, "plan", "--root", sparse).stdout)
         sparse_model = area / "sparse.md"
         sparse_model.write_text(compact_output(1, 1, points=1), encoding="utf-8")
@@ -589,7 +593,7 @@ def test_audit_recovery_regressions() -> None:
                             "--range-sha256", sparse_plan["batches"][0]["range_sha256"])
         require(sparse_commit.returncode != 0 and json.loads(sparse_commit.stdout)["error"] == "plot_point_count"
                 and not (sparse / "章节" / "第1章_摘要.md").exists(),
-                "原文批次每章少于10个情节点必须整批拒收且不落盘")
+                "正常长度的原文章少于10个情节点必须整批拒收且不落盘")
 
 
 def test_audit_stage_and_mapping_regressions() -> None:
@@ -1079,6 +1083,82 @@ def test_plan_next_prints_only_upcoming_batches() -> None:
         require(bad.returncode == 2 and json.loads(bad.stdout)["error"] == "invalid_next", "负数必须拒绝")
 
 
+def test_plan_carries_every_dispatch_field() -> None:
+    """Everything the extractor needs per batch comes from plan, including the handoff cache."""
+    template = (ROOT / "skills" / "story-setup" / "references" / "templates" / "agents" / "chapter-extractor.md")
+    require("plan_mode" not in template.read_text(encoding="utf-8"), "extractor 不能要求 plan 不输出的 plan_mode")
+    ops = (ROOT / "skills" / "story-long-analyze" / "references" / "pipeline-ops.md").read_text(encoding="utf-8")
+    dispatch = ops.split("## 4. 执行与提交一个批次", 1)[1].split("子代理把完整输出写进", 1)[0]
+    with tempfile.TemporaryDirectory(prefix="long-plan-dispatch-") as temporary:
+        root = Path(temporary) / "书"
+        write_source_and_index(root, 10)
+        plan = json.loads(run(MANAGE, "plan", "--root", root).stdout)
+        fields = ("batch_id", "input_kind", "source_files", "chapter_chars", "min_plot_points", "input_file", "handoff_cache")
+        for name in fields:
+            require(name in dispatch, f"pipeline-ops 派发清单缺 {name}")
+            require(all(name in batch for batch in plan["batches"]), f"plan 每批必须输出 {name}")
+        first = plan["batches"][0]
+        require(first["input_file"] == "_analysis_cache/输入-RAW-1-3.md", first["input_file"])
+        require(first["handoff_cache"] is None, "还没有已提交批次时不给交接")
+
+        def commit(batch: dict) -> None:
+            start, end = batch["chapter_range"]
+            model = Path(temporary) / "model.md"
+            model.write_text(compact_output(start, end), encoding="utf-8")
+            result = run(MANAGE, "commit", "--root", root, "--input", model, "--batch-id", batch["batch_id"],
+                         "--range-sha256", batch["range_sha256"])
+            require(result.returncode == 0, result.stdout)
+
+        commit(first)
+        nxt = json.loads(run(MANAGE, "plan", "--root", root, "--next", "3").stdout)["batches"]
+        require([b["handoff_cache"] for b in nxt] == ["_analysis_cache/批次-RAW-1-3.md"] * 3,
+                "同一轮都读本批起章之前最近的已提交批次：" + json.dumps(nxt, ensure_ascii=False))
+        commit(next(b for b in nxt if b["batch_id"] == "RAW-7-9"))
+        after = {b["batch_id"]: b["handoff_cache"] for b in json.loads(run(MANAGE, "plan", "--root", root).stdout)["batches"]}
+        require(after == {"RAW-4-6": "_analysis_cache/批次-RAW-1-3.md", "RAW-10-10": "_analysis_cache/批次-RAW-7-9.md"},
+                "乱序提交后各批取起章之前最近的已提交批次：%s" % after)
+
+
+def test_plot_point_floor_scales_with_chapter_length() -> None:
+    """A ~540-char prologue cannot be held to the 10-point floor of a normal chapter."""
+    with tempfile.TemporaryDirectory(prefix="long-plot-floor-") as temporary:
+        root = Path(temporary) / "书"
+        write_source_and_index(root, 2, body_chars={1: 540, 2: 2400})
+        batch = json.loads(run(MANAGE, "plan", "--root", root).stdout)["batches"][0]
+        require(batch["batch_id"] == "RAW-1-2", batch["batch_id"])
+        short_floor, long_floor = batch["min_plot_points"]
+        require(short_floor == max(1, min(10, (batch["chapter_chars"][0] + 100) // 200)) == 3,
+                f"楔子下限按字数÷200：{batch}")
+        require(long_floor == 10, "正常长度章节下限仍是 10")
+        model = Path(temporary) / "model.md"
+
+        def commit(points: dict[int, int]) -> subprocess.CompletedProcess[str]:
+            model.write_text(compact_output(1, 2, points=points), encoding="utf-8")
+            return run(MANAGE, "commit", "--root", root, "--input", model, "--batch-id", "RAW-1-2",
+                       "--range-sha256", batch["range_sha256"])
+
+        for points, label in (({1: 2, 2: 12}, "楔子低于下限"), ({1: 3, 2: 9}, "正常章少于10")):
+            refused = commit(points)
+            require(refused.returncode != 0 and json.loads(refused.stdout)["error"] == "plot_point_count"
+                    and not (root / "章节").exists(), f"{label}必须整批拒收")
+        accepted = commit({1: 3, 2: 12})
+        require(accepted.returncode == 0, "楔子 3 个情节点应当通过：" + accepted.stdout)
+
+
+def test_plan_chapter_window() -> None:
+    with tempfile.TemporaryDirectory(prefix="long-plan-window-") as temporary:
+        root = Path(temporary) / "书"
+        write_source_and_index(root, 20)
+        plan = json.loads(run(MANAGE, "plan", "--root", root, "--chapters", "7-12").stdout)
+        require([b["batch_id"] for b in plan["batches"]] == ["RAW-7-9", "RAW-10-12"], json.dumps(plan["batches"], ensure_ascii=False))
+        require(plan["remaining_batches"] == 2 and plan["chapter_window"] == [7, 12], "窗口只数窗口内的批次")
+        nxt = json.loads(run(MANAGE, "plan", "--root", root, "--chapters", "7-12", "--next", "1").stdout)
+        require([b["batch_id"] for b in nxt["batches"]] == ["RAW-7-9"] and nxt["remaining_batches"] == 2, "窗口可与 --next 同用")
+        for bad in ("12-7", "30-40"):
+            refused = run(MANAGE, "plan", "--root", root, "--chapters", bad)
+            require(refused.returncode == 2 and json.loads(refused.stdout)["error"] == "invalid_chapter_window", bad)
+
+
 def test_extractor_self_check_patterns_match_commit_format() -> None:
     """The Grep self-check in the extractor template must count exactly what commit accepts."""
     template = (ROOT / "skills" / "story-setup" / "references" / "templates" / "agents" / "chapter-extractor.md")
@@ -1175,6 +1255,9 @@ def main() -> int:
     test_extractor_write_guard()
     test_extractor_self_check_patterns_match_commit_format()
     test_plan_next_prints_only_upcoming_batches()
+    test_plan_carries_every_dispatch_field()
+    test_plot_point_floor_scales_with_chapter_length()
+    test_plan_chapter_window()
     print("OK: single-state long-analyze runtime regressions passed")
     return 0
 

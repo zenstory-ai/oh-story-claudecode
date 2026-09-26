@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -124,6 +125,113 @@ class OutlineTargetTests(unittest.TestCase):
             )
 
 
+OUTLINE_CONTRACT = ROOT / "skills/story-long-write/scripts/check-outline-contract.js"
+CALIBER_LINE = "- 字数口径：visible_chars_v1\n"
+# 同一组细纲写法同时喂给 Python（storyctl / wordcount_core）与 JS（check-outline-contract），
+# 两边对「字数目标」「字数范围」的接受与取值必须逐条一致：细纲验收通过的，章节检查不能再拒。
+GRAMMAR_CASES: list[tuple[str, int | None, dict[str, int] | None]] = [
+    ("- 字数目标：2300\n", 2300, None),
+    ("- 字数目标：2300 字\n", 2300, None),
+    ("- 字数目标：2300字\n", 2300, None),
+    ("- 字数目标：约 2300\n", 2300, None),
+    ("- 字数目标：约2300字\n", 2300, None),
+    ("- 字数目标：大约 2300 字\n", 2300, None),
+    ("- 字数目标：2,300\n", 2300, None),
+    ("- 字数目标：2，300 字\n", 2300, None),
+    ("- 字数目标：2300 字（本章偏短）\n", 2300, None),
+    ("- 字数目标：2300字左右\n", 2300, None),
+    ("- **字数目标**：2300 字\n", 2300, None),
+    ("- 字数目标: 2300 字\n", 2300, None),
+    ("字数目标：2300\n", 2300, None),
+    ("- 字数目标：2300 字\n- 字数目标：2300\n", 2300, None),
+    ("- 字数目标：很多字\n", None, None),
+    ("- 字数目标：[待补充]\n", None, None),
+    ("- 字数目标：2000-2600\n", None, None),
+    ("- 字数目标：2300 字，偏短\n", None, None),
+    ("- 字数目标：0\n", None, None),
+    ("- 字数目标：23,00\n", None, None),
+    ("- 字数目标：２３００\n", None, None),
+    ("- 字数目标：2300 字\n- 字数目标：2400 字\n", None, None),
+    ("- 核心事件：无字数\n", None, None),
+    ("- 字数目标：2300 字\n- 字数范围：2000-2600\n", 2300, {"min": 2000, "max": 2600}),
+    ("- 字数目标：2300 字\n- 字数范围：2,000～2,600 字\n", 2300, {"min": 2000, "max": 2600}),
+    ("- 字数目标：2300 字\n- 字数范围：2000 至 2600 字（作者指定）\n", 2300, {"min": 2000, "max": 2600}),
+    ("- 字数目标：2300 字\n- 字数范围：2000字-2600字\n", 2300, {"min": 2000, "max": 2600}),
+    ("- 字数目标：2300 字\n- 字数范围：2600-2000\n", 2300, "invalid"),
+    ("- 字数目标：2300 字\n- 字数范围：约 2000\n", 2300, "invalid"),
+    ("- 字数目标：2300 字\n- 字数范围：2000-2600\n- 字数范围：2100-2500\n", 2300, "invalid"),
+]
+
+
+def python_grammar(text: str) -> dict[str, object]:
+    try:
+        target: object = storyctl.target_from_outline(text)
+    except storyctl.WordcountError:
+        target = None
+    try:
+        author_range: object = storyctl.range_from_outline(text)
+    except storyctl.WordcountError:
+        author_range = "invalid"
+    return {"target": target, "range": author_range}
+
+
+class WordcountGrammarParityTests(unittest.TestCase):
+    def test_outline_contract_and_storyctl_accept_the_same_wordcount_lines(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="wordcount-grammar-") as directory:
+            files = []
+            for index, (lines, _, _) in enumerate(GRAMMAR_CASES):
+                path = Path(directory) / f"细纲_case_{index:02d}.md"
+                path.write_text(lines + CALIBER_LINE, encoding="utf-8")
+                files.append(path)
+            completed = subprocess.run(
+                ["node", str(OUTLINE_CONTRACT), "--json", *map(str, files)],
+                cwd=ROOT, text=True, encoding="utf-8", capture_output=True, check=False,
+            )
+            reports = json.loads(completed.stdout)
+            for (lines, target, author_range), path, report in zip(GRAMMAR_CASES, files, reports):
+                text = path.read_text(encoding="utf-8")
+                python_side = python_grammar(text)
+                js_side = report.get("wordcount")
+                self.assertIsNotNone(js_side, f"outline contract report has no wordcount block: {lines!r}")
+                js_range = js_side["range"] if js_side["range_status"] != "invalid" else "invalid"
+                self.assertEqual(python_side, {"target": target, "range": author_range}, lines)
+                self.assertEqual({"target": js_side["target"], "range": js_range}, python_side, lines)
+                check = next(item for item in report["checks"] if item["id"] == "outline.wordcount-target")
+                self.assertEqual(check["ok"], target is not None and author_range != "invalid", lines)
+
+
+class AuthorRangeTests(unittest.TestCase):
+    def test_author_range_replaces_the_default_band_everywhere(self) -> None:
+        author = {"min": 2000, "max": 2600}
+        # 2000 字：默认 ±12% 内部带（2024 起）判 borderline；作者给了 2000-2600 就是带内。
+        result = storyctl.evaluate_wordcount("字" * 2000, 2300, author_range=author)
+        self.assertEqual(result["status"], "internal_pass")
+        self.assertEqual(result["band_source"], "author")
+        self.assertEqual(result["user_band"], {"min": 2000, "max": 2600, "status": "pass"})
+        self.assertEqual(storyctl.evaluate_wordcount("字" * 1999, 2300, author_range=author)["status"], "under")
+        self.assertEqual(storyctl.evaluate_wordcount("字" * 2601, 2300, author_range=author)["status"], "over")
+        self.assertEqual(storyctl.evaluate_wordcount("字" * 2000, 2300)["band_source"], "default")
+        checkpoint = storyctl.checkpoint_wordcount("字" * 900, 2300, author_range=author)
+        self.assertEqual(checkpoint["remaining_user_range"], {"min": 1100, "max": 1700})
+
+    def test_checkpoint_cli_takes_min_and_max_chars(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="storyctl-range-") as directory:
+            segment = Path(directory) / "前组.md"
+            segment.write_text("# 前组\n" + "字" * 900, encoding="utf-8")
+            completed, result = run_cli(
+                "wordcount", "checkpoint", "--file", str(segment), "--target", "2300",
+                "--min-chars", "2000", "--max-chars", "2600",
+            )
+            self.assertEqual(completed.returncode, 0, completed.stdout)
+            self.assertEqual(result["user_band"], {"min": 2000, "max": 2600})
+            self.assertEqual(result["remaining_user_range"], {"min": 1100, "max": 1700})
+            completed, result = run_cli(
+                "wordcount", "checkpoint", "--file", str(segment), "--target", "2300", "--min-chars", "2000",
+            )
+            self.assertEqual(completed.returncode, 2)
+            self.assertEqual(result["invalid_reason"], "INVALID_ARGUMENT")
+
+
 class CheckpointTests(unittest.TestCase):
     def test_checkpoint_reports_only_current_count_and_remaining_user_range(self) -> None:
         result = storyctl.checkpoint_wordcount("字" * 558, 2200, chapter=28)
@@ -184,6 +292,32 @@ class StoryctlCliTests(unittest.TestCase):
         self.assertEqual(result["schema"], "story-chapter-check/v1")
         self.assertEqual(result["length"]["target"], 1000)
         self.assertEqual(result["length"]["status"], "internal_pass")
+
+    @unittest.skipUnless(shutil.which("node"), "node absent")
+    def test_deslop_skip_marker_exempts_ai_patterns(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="storyctl-deslop-skip-") as directory:
+            root = Path(directory)
+            outline = root / "细纲_第001章.md"
+            outline.write_text("- 字数目标：1000 字\n", encoding="utf-8")
+            body = root / "第001章_测试.md"
+            prose = "他站在门口。声音不大，却让屋里的人都停了手。\n"
+            body.write_text("## 第1章 测试\n" + prose, encoding="utf-8")
+            plain = storyctl.check_blocking_quality(outline, body)
+            self.assertEqual(plain["status"], "fail", plain)
+            # 作者说本章不去味：标题行下的豁免标记让 AI 句式降为提示，章节可以提交。
+            body.write_text("## 第1章 测试\n<!-- 去味:跳过 -->\n" + prose, encoding="utf-8")
+            skipped = storyctl.check_blocking_quality(outline, body)
+            self.assertEqual(skipped["status"], "pass", skipped)
+            self.assertTrue(any(item.get("exempted") for item in skipped["advisories"]), skipped)
+            # 标记语法与 hooks（JS core / codex py / bash guard）同一套：注释内 ASCII 空格/Tab 可有可无，
+            # 冒号全角半角都认；裸写（不在注释里）或用全角空格隔开的都不算豁免。
+            for marker, exempt in (
+                ("<!--去味 ：\t跳过 -->", True),
+                ("去味:跳过", False),
+                ("<!-- 去味\u3000:跳过 -->", False),
+            ):
+                body.write_text("## 第1章 测试\n" + marker + "\n" + prose, encoding="utf-8")
+                self.assertEqual(storyctl.deslop_skipped(body), exempt, marker)
 
     def test_wordcount_measure_returns_actual_without_a_target(self) -> None:
         with tempfile.TemporaryDirectory(prefix="storyctl-measure-") as directory:

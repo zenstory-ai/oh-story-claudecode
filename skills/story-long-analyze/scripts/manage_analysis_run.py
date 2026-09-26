@@ -51,6 +51,7 @@ POINT_ALIASES = {"揭示": "信息揭示", "转折": "转折点", "变化": "状
                  "交谈": "对话", "化解": "解决"}
 MIN_PLOT_POINTS = 10
 MAX_PLOT_POINTS = 30
+CHARS_PER_FLOOR_POINT = 200
 MAX_CHAPTERS = 3
 MAX_CHARS = 25_000
 # Stage 3-6 each run once over complete Stage 2 output; their rows decide 最终状态.
@@ -260,6 +261,17 @@ def write_state(progress: Path, state: Dict[str, Any]) -> bool:
     return True
 
 
+def min_plot_points(chapter_chars: Optional[int]) -> int:
+    """Raw-chapter floor: chars / 200 rounded, at least 1, at most 10 (a ~540-char prologue needs 3)."""
+    if chapter_chars is None:
+        return MIN_PLOT_POINTS
+    return max(1, min(MIN_PLOT_POINTS, (chapter_chars + CHARS_PER_FLOOR_POINT // 2) // CHARS_PER_FLOOR_POINT))
+
+
+def chars_by_chapter(rows: Optional[Sequence[Dict[str, Any]]]) -> Dict[int, int]:
+    return {row["chapter"]: row["char_count"] for row in rows or []}
+
+
 def summary_path(root: Path, chapter: int) -> Path:
     return root / "章节" / ("第%s章_摘要.md" % chapter)
 
@@ -370,7 +382,7 @@ def add_recoverable_caches(root: Path, state: Dict[str, Any],
             if input_kind == "raw-original":
                 if rows is None or current_hash != range_sha256(rows, start, end):
                     continue
-            records = parse_model_output(metadata["model_output"], start, end, input_kind)
+            records = parse_model_output(metadata["model_output"], start, end, input_kind, chars_by_chapter(rows))
             missing = [chapter for chapter in range(start, end + 1) if not summary_path(root, chapter).is_file()]
             if missing and not all(chapter in records for chapter in missing):
                 continue
@@ -419,6 +431,13 @@ def plan_command(args: argparse.Namespace) -> Dict[str, Any]:
         reuse_targets = ((semantic - summaries) | invalid_reuse) - raw_targets
     raw_targets -= cache_covered
     reuse_targets -= cache_covered
+    window = parse_chapter_window(args.chapters)
+    if window:
+        if window[0] > int(expected):
+            raise RunError("invalid_chapter_window", "%s-%s beyond %s chapters" % (window[0], window[1], expected))
+        in_window = set(range(window[0], window[1] + 1))
+        raw_targets &= in_window
+        reuse_targets &= in_window
     if raw_targets and index_rows is None:
         raise RunError("chapter_index_required", "raw-original work remains")
     if index_rows is not None:
@@ -457,6 +476,16 @@ def plan_command(args: argparse.Namespace) -> Dict[str, Any]:
                     selected.append({"input_kind": item["input_kind"], "start": child["end"] + 1, "end": item["end"]})
                 break
 
+    # Handoff = the committed batch that ends nearest before a batch's first chapter.
+    committed = [row for row in state["batches"].values() if completed_batch(root, row, index_rows)]
+
+    def handoff_cache(start: int) -> Optional[str]:
+        before = [row for row in committed if row["end"] < start]
+        if not before:
+            return None
+        row = max(before, key=lambda value: (value["end"], value["start"]))
+        return row.get("cache") or cache_path(root, row["batch_id"]).relative_to(root).as_posix()
+
     batches = []
     raw_reads = 0
     result_reads = 0
@@ -473,12 +502,18 @@ def plan_command(args: argparse.Namespace) -> Dict[str, Any]:
         else:
             sources = sorted(set(preferred_paths.get(str(chapter), "") for chapter in range(item["start"], item["end"] + 1)) - {""})
             result_reads += len(sources)
+        chapter_chars = [index_by_chapter[chapter]["char_count"] for chapter in range(item["start"], item["end"] + 1)] \
+            if item["input_kind"] == "raw-original" else []
         batches.append({
             "batch_id": batch_id, "chapter_range": [item["start"], item["end"]],
             "input_kind": item["input_kind"], "range_sha256": current_range_hash,
             "source_files": sources, "cache": "_analysis_cache/批次-%s.md" % batch_id,
-            "chapter_chars": [index_by_chapter[chapter]["char_count"] for chapter in range(item["start"], item["end"] + 1)]
-            if item["input_kind"] == "raw-original" else [],
+            "chapter_chars": chapter_chars,
+            # Reuse gap summaries have no length to scale by: at least one point each.
+            "min_plot_points": [min_plot_points(chars) for chars in chapter_chars]
+            if chapter_chars else [1] * (item["end"] - item["start"] + 1),
+            "input_file": "_analysis_cache/输入-%s.md" % batch_id,
+            "handoff_cache": handoff_cache(item["start"]),
         })
     required_stages = list(report.get("stage_repairs", []))
     if batches or recoverable_caches:
@@ -495,6 +530,8 @@ def plan_command(args: argparse.Namespace) -> Dict[str, Any]:
         "required_stages": required_stages,
         "state_written": False,
     }
+    if window:
+        payload["chapter_window"] = [window[0], window[1]]
     if args.next is not None:
         if args.next < 0:
             raise RunError("invalid_next", str(args.next))
@@ -582,7 +619,8 @@ def parse_plot_points(body: str, chapter: int, minimum: int) -> List[Dict[str, A
     return points
 
 
-def parse_model_output(text: str, start: int, end: int, input_kind: str) -> Dict[int, Dict[str, Any]]:
+def parse_model_output(text: str, start: int, end: int, input_kind: str,
+                       chapter_chars: Optional[Dict[int, int]] = None) -> Dict[int, Dict[str, Any]]:
     text = normalized(text)
     if "BATCH_ERROR:" in text:
         raise RunError("extractor_reported_error", "model returned BATCH_ERROR")
@@ -594,8 +632,6 @@ def parse_model_output(text: str, start: int, end: int, input_kind: str) -> Dict
         raise RunError("chapter_marker_mismatch", "expected %s; received %s" % (expected_tokens, actual_tokens))
     if actual_tokens and actual_tokens != expected_tokens:
         raise RunError("chapter_marker_mismatch", "expected %s; received %s" % (expected_tokens, actual_tokens))
-    # Projections rebuilt from old results may hold fewer beats than a fresh reading.
-    minimum = MIN_PLOT_POINTS if input_kind == "raw-original" else 1
     records = {}  # type: Dict[int, Dict[str, Any]]
     for match in CHAPTER_BLOCK_RE.finditer(text):
         chapter = int(match.group(1))
@@ -603,6 +639,8 @@ def parse_model_output(text: str, start: int, end: int, input_kind: str) -> Dict
         if not re.search(r"(?m)^##\s+第%s章(?:\s+.*)?$" % chapter, body):
             raise RunError("chapter_schema_incomplete", "chapter %s heading missing" % chapter)
         fields = {name: compact_field(body, name) for name in COMPACT_FIELDS}  # type: Dict[str, Any]
+        # Raw floor scales with chapter length; projections rebuilt from old results need only one beat.
+        minimum = min_plot_points((chapter_chars or {}).get(chapter)) if input_kind == "raw-original" else 1
         fields["情节点"] = parse_plot_points(body, chapter, minimum)
         records[chapter] = fields
     if input_kind == "raw-original" and set(records) != set(range(start, end + 1)):
@@ -706,7 +744,7 @@ def commit_from_cache(root: Path, metadata: Dict[str, Any], cache: Path,
             raise RunError("range_hash_mismatch", batch_id)
     else:
         current_hash = metadata["range_sha256"]
-    records = parse_model_output(metadata["model_output"], start, end, input_kind)
+    records = parse_model_output(metadata["model_output"], start, end, input_kind, chars_by_chapter(index_rows))
     hashes = {row["chapter"]: row["chapter_sha256"] for row in index_rows or []}
     created = []
     kept = []
@@ -741,8 +779,8 @@ def commit_command(args: argparse.Namespace) -> Dict[str, Any]:
     if end - start + 1 > MAX_CHAPTERS:
         raise RunError("batch_too_large", "%s exceeds %s chapters" % (args.batch_id, MAX_CHAPTERS))
     text = args.input.read_text(encoding="utf-8-sig")
-    records = parse_model_output(text, start, end, input_kind)
     index_rows = read_index(root, args.index) if input_kind == "raw-original" or (args.index or root / "chapter_index.csv").is_file() else None
+    records = parse_model_output(text, start, end, input_kind, chars_by_chapter(index_rows))
     if input_kind == "raw-original" and end > start:
         total_chars = sum(row["char_count"] for row in index_rows if start <= row["chapter"] <= end)
         if total_chars > MAX_CHARS:
@@ -1044,6 +1082,7 @@ def build_parser() -> argparse.ArgumentParser:
     plan.add_argument("--intent", choices=("continue", "enhance"), default="continue")
     plan.add_argument("--next", type=int, metavar="N",
                       help="only print the first N batches (0 = counts only); remaining_batches stays total")
+    plan.add_argument("--chapters", help="only plan this chapter window, e.g. 40-80")
     plan.set_defaults(handler=plan_command)
     commit = sub.add_parser("commit", help="validate and atomically commit one batch")
     commit.add_argument("--root", required=True, type=Path)

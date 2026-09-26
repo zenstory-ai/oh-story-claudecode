@@ -94,7 +94,7 @@ fi
 # 内容网走 node 共享核，抓截断/拒绝语/AI 自指/工程词 tier1/紧邻复读/毒句式。
 # 字数只由 storyctl 的公开命令测量，不在 Adapter 内复制，也不受 Node 降级影响。
 NET_MSG="$(node "$CLI" prose-net "$ABS" 2>/dev/null || true)"
-[ -n "$NET_MSG" ] && OUT+="【退化/工程词/毒句式】（硬信号：截断/拒绝语/工程词/毒句式→重写；命中即处理，别留给下一章）${NL}${NET_MSG}${NL}"
+[ -n "$NET_MSG" ] && OUT+="【退化/工程词/毒句式】（硬信号：截断/拒绝语/工程词→重写该段；毒句式→就地改写；命中即处理，别留给下一章）${NL}${NET_MSG}${NL}"
 
 [ -z "$OUT" ] && exit 0
 

@@ -271,7 +271,8 @@ run_case block-patch '[{"name":"patch","arguments":{"patchText":"*** Begin Patch
 [ ! -e "$PROJECT/book/正文/第003章_补丁.md" ] || fail "patch without outline reached disk"
 assert_tool_result block-patch '写正文被拦截：第 3 章缺少细纲'
 
-printf '# 细纲\n' >"$PROJECT/book/大纲/细纲_第1章.md"
+# 细纲须写了内容（不计 # 号和空白 ≥30 字）写正文守卫才放行。
+printf '%s\n' '# 细纲' '江晨在雨夜推开旧书店的门，发现柜台后坐着失踪三年的师父，两人对视良久。' >"$PROJECT/book/大纲/细纲_第1章.md"
 printf '{"schema_version": 4, "state_revision": 0, "last_committed_chapter": 0}\n' >"$PROJECT/book/追踪/_tracking-state.json"
 printf '> 状态修订：0\n' >"$PROJECT/book/追踪/上下文.md"
 CALLS="$(python3 -c 'import json; print(json.dumps([{"name": "write", "arguments": {"path": "book/正文/第001章_开局.md", "content": "街灯一盏盏亮起。" * 30 + "\nTODO 此处待补"}}], ensure_ascii=False))')"

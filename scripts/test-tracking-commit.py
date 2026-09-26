@@ -597,6 +597,120 @@ class TrackingCommitTests(unittest.TestCase):
         self.assertIn("角色快照 路人乙", fill)
         self.assertEqual(rebuilt["character_snapshots"], {})
 
+    def draft(self, chapter: int) -> tuple[dict[str, object], Path]:
+        completed = subprocess.run(
+            [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", str(chapter)],
+            text=True, capture_output=True, check=False, encoding="utf-8")
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        guide = json.loads(completed.stdout)
+        return guide, Path(guide["draft"])
+
+    def test_revision_draft_keeps_commitments_that_contain_the_separator(self) -> None:
+        # 承诺原文带「；」：非最新章的修订草稿从逐章记录读回承诺，不能把一条拆成两条。
+        self.init()
+        commitment = "江晨答应交片；但只交原版，不交删改版。"
+        self.run_tool("commit", transaction(1, next_commitment=commitment))
+        self.run_tool("commit", transaction(2))
+        _, draft_path = self.draft(1)
+        draft = json.loads(draft_path.read_text(encoding="utf-8"))
+        self.assertEqual(draft["delta"]["next_chapter_commitments"], [commitment])
+        # 照预填提交后再读回，仍是同一条（渲染与读回互逆）。
+        self.run_tool("commit", draft)
+        (self.project / ".story/work/第001章/tracking.json").unlink()
+        _, draft_path = self.draft(1)
+        again = json.loads(draft_path.read_text(encoding="utf-8"))
+        self.assertEqual(again["delta"]["next_chapter_commitments"], [commitment])
+
+    def test_revision_draft_without_a_record_does_not_claim_it_prefilled(self) -> None:
+        self.init()
+        self.run_tool("commit", transaction(1))
+        self.run_tool("commit", transaction(2))
+        (self.project / "追踪/逐章记录/第001章.md").unlink()
+        guide, _ = self.draft(1)
+        self.assertEqual(guide["mode"], "revision")
+        self.assertNotIn("已按本章现有逐章记录预填", guide["fill"])
+        self.assertIn("逐章记录缺失", guide["fill"])
+
+    def test_revision_draft_prefills_the_committed_record_so_nothing_is_wiped(self) -> None:
+        self.init()
+        first = transaction(1, character=True, foreshadow=True, timeline=True)
+        first["delta"]["constraints"] = ["原版视频不能再被替换。"]
+        self.run_tool("commit", first)
+        self.run_tool("commit", transaction(2, character=True))
+        record_path = self.project / "追踪/逐章记录/第001章.md"
+        before = record_path.read_text(encoding="utf-8")
+
+        guide, draft_path = self.draft(1)
+        self.assertEqual(guide["mode"], "revision")
+        # 修订的 delta 是本章修订后的完整记录，不是「只填变化」。
+        self.assertNotIn("只填 delta 里本章的变化", guide["fill"])
+        self.assertIn("完整记录", guide["fill"])
+        draft = json.loads(draft_path.read_text(encoding="utf-8"))
+        delta = draft["delta"]
+        self.assertEqual(delta["result"], first["delta"]["result"])
+        self.assertEqual(delta["character_changes"], first["delta"]["character_changes"])
+        self.assertEqual([item["id"] for item in delta["foreshadow_changes"]], ["F027"])
+        self.assertEqual([item["id"] for item in delta["timeline_events"]], ["E010"])
+        self.assertEqual(delta["constraints"], ["原版视频不能再被替换。"])
+        self.assertEqual(delta["next_chapter_commitments"], first["delta"]["next_chapter_commitments"])
+        self.assertIn("江晨", draft["character_snapshots"])
+
+        # 只改修订真正改变的一项，其余照预填提交：逐章记录除结果外逐字不变，check 通过。
+        delta["result"] = "江晨在看片会上保住原版，并当场剪出新预告。"
+        self.run_tool("commit", draft)
+        after = record_path.read_text(encoding="utf-8")
+        self.assertEqual(after, before.replace(first["delta"]["result"], delta["result"]))
+        self.run_tool("check")
+
+    def test_revision_keeps_the_chapter_retirement_log(self) -> None:
+        self.init()
+        constraint = "军方培养江晨的后续安排尚未向读者揭示。"
+        declared = transaction(1)
+        declared["context"]["long_term_constraints"] = []
+        declared["delta"]["retired_context_items"] = [constraint]
+        self.run_tool("commit", declared)
+        _, draft_path = self.draft(1)
+        draft = json.loads(draft_path.read_text(encoding="utf-8"))
+        self.run_tool("commit", draft)
+        record = (self.project / "追踪/逐章记录/第001章.md").read_text(encoding="utf-8")
+        self.assertIn("## 本章退役登记", record)
+        self.assertIn(constraint, record)
+        self.run_tool("check")
+
+    def test_revision_without_remeasuring_a_changed_body_is_rejected(self) -> None:
+        self.init()
+        body = self.write_chapter_contract(1, actual=1000, target=1000)
+        self.run_tool("commit", self.bind_wordcount(transaction(1), resolution="within_user_band"))
+        (self.project / "正文/第001章_测试.md").write_bytes(body.replace("字".encode("utf-8"), "改".encode("utf-8"), 50))
+        before = self.read_state()
+        result = self.run_tool("commit", transaction(1, mode="revision"), expect=2)
+        self.assertIn("storyctl.py chapter commit", result.stderr)
+        self.assertEqual(self.read_state(), before)
+        # 报错说清改的是哪一项，并指向带 storyctl 的写作 skill（story-review / story-import 不带 storyctl）。
+        self.assertIn("第1章正文已改", result.stderr)
+        self.assertIn("story-long-write 的 storyctl.py chapter commit", result.stderr)
+        # 正文没动的纯追踪修订（例如修派生视图）照常可提交。
+        (self.project / "正文/第001章_测试.md").write_bytes(body)
+        self.run_tool("commit", transaction(1, mode="revision"))
+        # 只改字数目标：报「字数目标已改」，不谎报正文已改。
+        outline = self.project / "大纲/细纲_第001章.md"
+        original_outline = outline.read_text(encoding="utf-8")
+        outline.write_text(original_outline.replace("1000 字", "1200 字"), encoding="utf-8")
+        result = self.run_tool("commit", transaction(1, mode="revision"), expect=2)
+        self.assertIn("第1章字数目标已改", result.stderr)
+        self.assertNotIn("正文已改", result.stderr)
+
+    def test_tracking_only_revision_survives_a_later_author_range_line(self) -> None:
+        # 提交时细纲没写「字数范围」（记录无 author_range）；作者事后给细纲补一行范围。正文与目标都没动，
+        # 纯追踪修订不该被当成「正文或字数目标已改」拒掉。
+        self.init()
+        self.write_chapter_contract(1, actual=1000, target=1000)
+        self.run_tool("commit", self.bind_wordcount(transaction(1), resolution="within_user_band"))
+        outline = self.project / "大纲/细纲_第001章.md"
+        outline.write_text(outline.read_text(encoding="utf-8") + "- 字数范围：1500-2000 字\n", encoding="utf-8")
+        self.run_tool("commit", transaction(1, mode="revision"))
+        self.run_tool("check")
+
     def test_retired_item_still_in_context_is_rejected(self) -> None:
         self.init()
         document = transaction(1)

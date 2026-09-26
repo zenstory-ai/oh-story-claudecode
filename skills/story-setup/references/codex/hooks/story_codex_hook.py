@@ -218,6 +218,8 @@ _TOXIC_CLAUSE_BOUNDARY = set("，,。.！!？?；;：:、…—~ \t　")
 _TOXIC_TAG_PARTICLES = ("吗", "吧", "嘛")
 _TOXIC_AFFIRM_PARTICLES = ("的", "啊", "呀", "呢")
 _TOXIC_TRAILER_WINDOW = 600
+# 不收 em-dash 是有意的（与 JS 核同）：破折号是标点，由 chapter check --fix-punctuation /
+# normalize-punctuation.js 确定性整理；这张网只推回需要模型动笔改写的句式。
 _TOXIC_SENTENCE_PATTERNS = [
     (re.compile(r"声音(?:并)?不[大高响亮][^。！？!?\n]{0,16}[却但偏]"), "voice-contrast", "删「不X…却Y」反差腔，直接写具体效果或动作。"),
     (re.compile(r"(?:没有[^。！？!?\n，,]{1,12}[，,]){2}"), "negation-parade", "「没有…，没有…」排比删到只剩一个或全删，改写正面在场的细节。"),
@@ -313,7 +315,17 @@ def mask_style_text(text: str, whitelist: list[str]) -> str:
     return "".join(chars)
 
 
-def toxic_phrase_findings(text: str, whitelist=()) -> list[str]:
+def toxic_rescan_hint(abs_path: Path | None = None) -> str:
+    """毒句式末行的完整复扫指引（与 JS core toxicRescanHint 同文案）：长篇分章正文指 storyctl
+    chapter check，其余（短篇 正文.md、调用方没给路径）指 check-ai-patterns.js。"""
+    if abs_path is not None and abs_path.parent.name == "正文":
+        m = re.match(r"^第0*(\d+)章.*\.md$", abs_path.name)
+        if m:
+            return f"完整检查：{{PYTHON}} <story-long-write>/scripts/storyctl.py chapter check --project <书目录> --chapter {m.group(1)}"
+    return "完整扫描：node <skill>/scripts/check-ai-patterns.js --check <正文文件>"
+
+
+def toxic_phrase_findings(text: str, whitelist=(), rescan: str | None = None) -> list[str]:
     findings: list[str] = []
     content: list[tuple[int, str]] = []
     for i, raw in enumerate(text.split("\n"), 1):
@@ -340,13 +352,22 @@ def toxic_phrase_findings(text: str, whitelist=()) -> list[str]:
             findings.append(f"第{line_no}行 毒句式[trailer-ending]：『{m.group(0)[:20]}』——删章尾预告腔，用正在发生的动作或画面收章。")
         ms = _TOXIC_TRAILER_SUMMARY.search(masked)
         if ms:
-            findings.append(f"第{line_no}行 毒句式[trailer-summary]：『{ms.group(0)[:20]}』——删章尾状态总结句，收束状态是细纲的规划口径，正文落到具体动作、画面或台词上。")
+            findings.append(f"第{line_no}行 毒句式[trailer-summary]：『{ms.group(0)[:20]}』——删章尾状态总结句，细纲的结尾设定要落成最后的具体动作、画面或台词。")
     if findings:
-        findings.append("毒句式是确定性 AI 指纹：本章须清零后再继续。完整扫描：node <skill>/scripts/check-ai-patterns.js --check <正文文件>")
+        findings.append("毒句式是确定性 AI 指纹：本章须清零后再继续。" + (rescan if rescan is not None else toxic_rescan_hint()))
     return findings
 
 
-def prose_net_findings(text: str, whitelist=()) -> list[str]:
+# 「去味:跳过」豁免标记：文件首 6 行内的 `<!-- 去味:跳过 -->`，冒号全角半角都认，注释内可有
+# 空格/Tab；裸写不在注释里的不算。与 JS core DESLOP_SKIP_MARKER、bash guard、storyctl DESLOP_SKIP 同一语法。
+_DESLOP_SKIP_MARKER = re.compile(r"<!--[ \t]*去味[ \t]*(：|:)[ \t]*跳过[ \t]*-->")
+
+
+def _has_deslop_skip_marker(text: str) -> bool:
+    return bool(_DESLOP_SKIP_MARKER.search("\n".join(re.split(r"\r?\n", text)[:6])))
+
+
+def prose_net_findings(text: str, whitelist=(), rescan: str | None = None) -> list[str]:
     findings: list[str] = []
     content: list[tuple[int, str]] = []
     for i, raw in enumerate(text.split("\n"), 1):
@@ -380,8 +401,8 @@ def prose_net_findings(text: str, whitelist=()) -> list[str]:
     # 「去味:跳过」豁免与欠账门同判据（文件首 6 行）：标记在场时跳过毒句式推回，
     # 其余网（元信息/占位/复读/截断）照常——否则按拦截提示加标记的那次 Edit 会把
     # 已豁免的毒句式再次当硬信号推回。
-    if not re.search(r"去味(：|:)跳过", "\n".join(re.split(r"\r?\n", text)[:6])):
-        findings.extend(toxic_phrase_findings(text, whitelist))
+    if not _has_deslop_skip_marker(text):
+        findings.extend(toxic_phrase_findings(text, whitelist, rescan))
     return findings
 
 
@@ -1235,6 +1256,22 @@ def target_paths_from_hook(obj: dict[str, Any]) -> list[Path]:
 # 未展开的 shell 变量：$VAR / ${VAR} / $(cmd)。与 JS core UNEXPANDED_SHELL_VAR 同式。
 UNEXPANDED_SHELL_VAR = re.compile(r"\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*|\()")
 
+# 细纲「实质为空」：与 JS core outlineIsEmpty 同口径（去 BOM 与每行行首的 Markdown 标题标记后，
+# 标题文字照算，非空白字符——ASCII 空白 + 全角空格之外——不足 _OUTLINE_MIN_CHARS 个码点）。只量写没写东西，
+# 不查 v0.8 细纲字段；读不了按非空放行。py↔js 由 test-prose-net-parity.sh C 段锁 parity。
+_OUTLINE_MIN_CHARS = 30
+
+
+def _outline_is_empty(file: Path) -> bool:
+    try:
+        text = file.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    if text.startswith("\ufeff"):
+        text = text[1:]
+    body = "".join(re.sub(r"^[ \t]*#+", "", line) for line in text.split("\n"))
+    return len(re.sub(r"[ \t\r\n\f\v\u3000]", "", body)) < _OUTLINE_MIN_CHARS
+
 
 def prose_block_reason(root: Path, abs_path: Path) -> str | None:
     base = abs_path.name
@@ -1271,12 +1308,21 @@ def prose_block_reason(root: Path, abs_path: Path) -> str | None:
     outline_dir = book_dir / "大纲"
     found = False
     if not exists:
+        outlines: list[Path] = []
         if outline_dir.is_dir():
-            for candidate in outline_dir.iterdir():
-                fm = re.match(r"^细纲_第0*(\d+)章.*\.md$", candidate.name)
-                if fm and fm.group(1) == num:
-                    found = True
-                    break
+            outlines = sorted(
+                (c for c in outline_dir.iterdir()
+                 if (fm := re.match(r"^细纲_第0*(\d+)章.*\.md$", c.name)) and fm.group(1) == num),
+                key=lambda c: c.name,
+            )
+        found = bool(outlines)
+        # 同章有多份细纲（补零差异/带标题）时任一份写了内容就放行（文案与 JS core 逐字一致）。
+        if found and all(_outline_is_empty(c) for c in outlines):
+            return (
+                f"⛔ 写正文被拦截：第 {num} 章的细纲（{safe_rel(root, outlines[0])}）是空的"
+                f"（不计 # 号和空白不到 {_OUTLINE_MIN_CHARS} 字）。先按 story-long-write 单章流程把细纲写完整"
+                "（这章发生什么、主角做什么选择），再写正文。"
+            )
         if not found:
             # 文案与 JS core 逐字一致：shell 变量展不开时仍拦，但如实说路径没解析出来。
             if UNEXPANDED_SHELL_VAR.search(safe_rel(root, abs_path)) and not book_dir.exists():
@@ -1316,7 +1362,7 @@ def prose_block_reason(root: Path, abs_path: Path) -> str | None:
                 prev_text = prev_file.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 prev_text = None
-            if prev_text is not None and not re.search(r"去味(：|:)跳过", "\n".join(re.split(r"\r?\n", prev_text)[:6])):
+            if prev_text is not None and not _has_deslop_skip_marker(prev_text):
                 hits = [ln for ln in toxic_phrase_findings(prev_text, load_style_whitelist(prev_file)) if ln.startswith("第")]
                 if hits:
                     shown = hits[:6]
@@ -1327,7 +1373,7 @@ def prose_block_reason(root: Path, abs_path: Path) -> str | None:
                         + "\n".join(shown)
                     )
                     if more > 0:
-                        reason += f"\n（另有 {more} 处，完整扫描：node <skill>/scripts/check-ai-patterns.js --check 上一章文件）"
+                        reason += f"\n（另有 {more} 处，{toxic_rescan_hint(prev_file)}）"
                     return reason
     return None
 
@@ -1562,7 +1608,7 @@ def stop_event() -> None:
                 text = abs_path.read_text(encoding="utf-8")
             except Exception:
                 continue
-            findings = prose_net_findings(text, load_style_whitelist(abs_path))
+            findings = prose_net_findings(text, load_style_whitelist(abs_path), toxic_rescan_hint(abs_path))
             if findings:
                 blocks.append(f"=== {safe_rel(root, abs_path)} ===\n" + "\n".join(findings))
         if blocks:

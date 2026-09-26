@@ -86,13 +86,21 @@ try {
     "new long prose without an outline"
   );
 
-  fs.writeFileSync("book/大纲/细纲_第1章.md", "# 细纲\n", "utf8");
+  fs.writeFileSync("book/大纲/细纲_第1章.md", "# 细纲\n江晨在雨夜推开旧书店的门，发现柜台后坐着失踪三年的师父，两人对视良久。\n", "utf8");
   await assert.rejects(
     () => before("write", { path: "book/正文/第001章_开局.md" }),
     /_tracking-state\.json 缺失/,
     "long prose with outline but no tracking checkpoint must fail closed"
   );
   writeCleanState("book");
+  // 细纲文件在但只有标题：照拦，文案说清是细纲空了。
+  fs.writeFileSync("book/大纲/细纲_第1章.md", "# 细纲\n## 目标情绪\n", "utf8");
+  await assert.rejects(
+    () => before("write", { path: "book/正文/第001章_开局.md" }),
+    /第 1 章的细纲（book\/大纲\/细纲_第1章\.md）是空的/,
+    "long prose with an empty outline must be blocked"
+  );
+  fs.writeFileSync("book/大纲/细纲_第1章.md", "# 细纲\n江晨在雨夜推开旧书店的门，发现柜台后坐着失踪三年的师父，两人对视良久。\n", "utf8");
   await before("write", { path: "book/正文/第001章_开局.md" });
 
   // 2.x 后台服务一个进程服务多个项目，process.cwd() 不是用户项目：守卫只认 ctx.location。
@@ -138,7 +146,7 @@ try {
     /cwd-book\/大纲/,
     "relative workdir must resolve from the session directory"
   );
-  fs.writeFileSync("cwd-book/大纲/细纲_第8章.md", "# 细纲\n", "utf8");
+  fs.writeFileSync("cwd-book/大纲/细纲_第8章.md", "# 细纲\n江晨在雨夜推开旧书店的门，发现柜台后坐着失踪三年的师父，两人对视良久。\n", "utf8");
   writeCleanState("cwd-book", 7);
   await before("shell", {
     command: "cat draft.md > 正文/第8章_相对.md",
@@ -174,7 +182,7 @@ try {
     () => before("patch", { patchText: addPatch("book/正文/第004章_补丁.md") }),
     "patch must not bypass the outline guard"
   );
-  fs.writeFileSync("book/大纲/细纲_第4章.md", "# 细纲\n", "utf8");
+  fs.writeFileSync("book/大纲/细纲_第4章.md", "# 细纲\n江晨在雨夜推开旧书店的门，发现柜台后坐着失踪三年的师父，两人对视良久。\n", "utf8");
   await before("patch", { patchText: addPatch("book/正文/第004章_补丁.md") });
 
   // *** Move to: 是 patch 的搬家/改名形态，落盘路径是目的地。目标抽取的各形态（Delete+Move、
