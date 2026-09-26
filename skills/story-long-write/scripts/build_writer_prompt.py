@@ -170,7 +170,7 @@ def book_genres(project: Path):
     match = re.search(r"^[ \t]*[-*+]?[ \t]*\**题材(?:类型)?\**[ \t]*[：:](.*)$", text, re.M)
     if not match or "{" in match.group(1):
         return set()
-    return {word.casefold() for word in re.split(r"[\s/·・、，,;；|｜+＋（）()]+", match.group(1)) if word}
+    return {word.casefold() for word in re.split(r"[\W_丨×]+", match.group(1)) if word}
 
 
 def query_author_memory(project: Path):

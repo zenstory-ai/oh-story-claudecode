@@ -546,6 +546,38 @@ class TrackingCommitTests(unittest.TestCase):
         self.run_tool("commit", rebuilt)
         self.assertEqual(self.read_state()["last_committed_chapter"], 1)
 
+    def test_redraft_merge_keeps_the_drafts_own_additions_and_retirements(self) -> None:
+        self.init()
+        (self.project / "大纲").mkdir(exist_ok=True)
+        (self.project / "大纲" / "细纲_第001章.md").write_text("### 第 1 章：看片会\n", encoding="utf-8")
+        draft_cmd = [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"]
+        first = subprocess.run(draft_cmd, text=True, capture_output=True, check=False, encoding="utf-8")
+        draft_path = Path(json.loads(first.stdout)["draft"])
+        state = self.read_state()
+        old = state["context"]["long_term_constraints"][0]
+        stale = json.loads(draft_path.read_text(encoding="utf-8"))
+        stale["expected_state_revision"] = state["state_revision"] + 7
+        stale["context"]["long_term_constraints"] = ["本章新立的约束。"]  # 删旧条目、加新条目
+        stale["delta"]["retired_context_items"] = [old]
+        stale["delta"]["result"] = "江晨保住了原版。"
+        stale["context"]["position"].update({"story_time": "当晚", "scene": "剪辑室", "volume": "旧卷名"})
+        draft_path.write_text(json.dumps(stale, ensure_ascii=False), encoding="utf-8")
+        again = subprocess.run(draft_cmd, text=True, capture_output=True, check=False, encoding="utf-8")
+        guide = json.loads(again.stdout)
+        self.assertIn("卷信息与当前状态不同", guide["fill"])
+        rebuilt = json.loads(draft_path.read_text(encoding="utf-8"))
+        # 本章的新增留下、退役的不回来。
+        self.assertEqual(rebuilt["context"]["long_term_constraints"], ["本章新立的约束。"])
+        self.run_tool("commit", rebuilt)
+        self.assertEqual(self.read_state()["context"]["long_term_constraints"], ["本章新立的约束。"])
+
+    def test_retired_item_still_in_context_is_rejected(self) -> None:
+        self.init()
+        document = transaction(1)
+        document["delta"]["retired_context_items"] = list(document["context"]["long_term_constraints"])
+        result = self.run_tool("commit", document, expect=2)
+        self.assertIn("lists items that are still in context", result.stderr)
+
     def test_all_over_length_fields_are_reported_at_once_in_characters(self) -> None:
         self.init()
         document = transaction(1, foreshadow=True)

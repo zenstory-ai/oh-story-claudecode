@@ -296,20 +296,17 @@ def _both_blank(position: dict[str, Any]) -> bool:
     return all(isinstance(position.get(key), str) and not position[key].strip() for key in ("story_time", "scene"))
 
 
-def _raise_blank_position(label: str) -> str:
-    raise TrackingError(f"{label}.story_time and {label}.scene must not be empty: fill where this chapter ends")
-
-
 def validate_position(value: object, label: str = "context.position") -> dict[str, Any]:
     position = as_mapping(value, label)
     require_known_keys(position, {"volume", "volume_start_chapter", "story_time", "scene"}, label)
+    require(not _both_blank(position),
+            f"{label}.story_time and {label}.scene must not be empty: fill where this chapter ends")
     return {
         "volume": safe_file_component(position.get("volume"), f"{label}.volume"),
         "volume_start_chapter": as_int(
             position.get("volume_start_chapter"), f"{label}.volume_start_chapter", minimum=1
         ),
-        "story_time": clean_text(position.get("story_time"), f"{label}.story_time", max_bytes=240)
-        if not _both_blank(position) else _raise_blank_position(label),
+        "story_time": clean_text(position.get("story_time"), f"{label}.story_time", max_bytes=240),
         "scene": clean_text(position.get("scene"), f"{label}.scene", max_bytes=240),
     }
 
@@ -1040,6 +1037,13 @@ def merge_transaction(state: dict[str, Any], transaction: dict[str, Any]) -> dic
         "a revision must resubmit every current context item; retire them in an append transaction instead: "
         + "；".join(sorted(dropped)),
     )
+    kept = set(next_context["long_term_constraints"]) | set(next_context["continuity_risks"])
+    still_listed = sorted(set(transaction["delta"]["retired_context_items"]) & kept)
+    require(
+        not still_listed,
+        "delta.retired_context_items lists items that are still in context; remove them from context: "
+        + "；".join(still_listed),
+    )
     undeclared = sorted(dropped - set(transaction["delta"]["retired_context_items"]))
     require(
         not undeclared,
@@ -1278,6 +1282,47 @@ def draft_transaction(project: Path, chapter: int) -> tuple[dict[str, Any], dict
     return document, snapshots, previous_position if mode == "append" else {}
 
 
+def rebuild_stale_draft(document: dict[str, Any], existing: dict[str, Any], append: bool) -> str:
+    """修订号变了：中间提交过别的事务。以当前状态为底合并旧草稿里本章自己的改动，返回给调用方的说明。
+
+    两份新章草稿之间只可能插进修订事务，修订不能删 context 条目，所以当前 context 覆盖旧底稿：
+    旧草稿里多出来的条目就是本章新增，delta 里声明退役的就是本章删除。单值的卷名无法判断谁新，
+    不自动取舍，列出差异交调用方核对。"""
+    notes = ["修订号已变：context 按当前状态重建，本章已填的 delta、新增与退役的条目"
+             + ("、结尾位置" if append else "") + "已合并"]
+    for key in ("delta", "character_snapshots"):
+        if isinstance(existing.get(key), dict):
+            document[key] = existing[key]
+    if existing.get("chapter_title"):
+        document["chapter_title"] = existing["chapter_title"]
+    old_context = existing.get("context") if isinstance(existing.get("context"), dict) else {}
+    delta = document["delta"] if isinstance(document["delta"], dict) else {}
+    retired = {
+        "long_term_constraints": set(delta.get("retired_context_items") or []),
+        "continuity_risks": set(delta.get("retired_context_items") or []),
+        "active_character_names": set(delta.get("retired_characters") or []),
+    }
+    for key, gone in retired.items():
+        current = document["context"][key]
+        added = [item for item in (old_context.get(key) or []) if item not in current]
+        document["context"][key] = [item for item in current + added if item not in gone]
+    old_position = old_context.get("position") if isinstance(old_context.get("position"), dict) else {}
+    position = document["context"]["position"]
+    if append:
+        for key in ("story_time", "scene"):
+            if isinstance(old_position.get(key), str) and old_position[key].strip():
+                position[key] = old_position[key]
+    differs = [f"{key}：草稿写的是「{old_position[key]}」，当前状态是「{position[key]}」"
+               for key in ("volume", "volume_start_chapter")
+               if key in old_position and old_position[key] != position[key]]
+    if differs:
+        notes.append("卷信息与当前状态不同，已取当前状态，本章确实换卷就改回（" + "；".join(differs) + "）")
+    if document["character_snapshots"]:
+        notes.append("带过来的角色快照（" + "、".join(document["character_snapshots"]) +
+                     "）可能被中间的提交改过，逐个对照 current_snapshots 重核")
+    return "；".join(notes)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -1314,23 +1359,13 @@ def main() -> int:
                 if existing.get("expected_state_revision") == document["expected_state_revision"]:
                     document, refreshed = existing, "已有草稿且修订号未变，原样保留"
                 else:
-                    for key in ("delta", "character_snapshots"):
-                        if isinstance(existing.get(key), dict):
-                            document[key] = existing[key]
-                    if existing.get("chapter_title"):
-                        document["chapter_title"] = existing["chapter_title"]
-                    old_position = ((existing.get("context") or {}).get("position") or {})
-                    if previous_position:
-                        for key in ("story_time", "scene"):
-                            if isinstance(old_position.get(key), str) and old_position[key].strip():
-                                document["context"]["position"][key] = old_position[key]
-                    refreshed = ("修订号已变：context 按当前状态重建，已填的 delta、角色快照与本章位置保留；"
-                                 "之前从 context 删掉的项要重新删")
+                    refreshed = rebuild_stale_draft(document, existing, bool(previous_position))
             out.write_text(json.dumps(document, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
             fill = ("只填 delta 里本章的变化；context 其余字段已是当前值，要撤下的长期约束或连贯性风险从 context 删掉并把原文放进 "
                     "delta.retired_context_items（仅 append）；本章有变化的核心角色把下面的当前快照整份改好放进 character_snapshots，"
                     "并在 character_changes 写一句变化。不要从脚本源码或 state 文件里另找格式。")
-            if previous_position:
+            blank = not (document["context"]["position"].get("story_time") or document["context"]["position"].get("scene"))
+            if previous_position and blank:
                 fill = ("context.position 的 story_time 与 scene 留空，填本章结束时的故事时间与场景（上一章结束时见 "
                         "previous_position；换卷时连同 volume 与 volume_start_chapter 一起改）。") + fill
             payload = {
