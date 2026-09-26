@@ -16,7 +16,7 @@ compare 链接；小节名使用 Keep a Changelog 的六个英文类别（`Added
 
 > 本版 `agents_version: 32`（v0.7.11 为 31），`setup_skill_version: 1.3.0`。narrative-writer、consistency-checker、chapter-extractor 与写正文守卫都已更新：更新技能包后，在每个写作项目根重新运行 `/story-setup`（Codex 用 `$story-setup`），再新开会话。已在写的长篇不用迁移。升级细节见 [UPGRADING](skills/story-setup/UPGRADING.md)。
 
-v0.8 的主题是瘦身：同一本书、同一批细纲，Codex 上每章耗时从约 18 分钟降到约 11 分钟、累计输入 token 降约 39%；按同一套换家族评委的非劣效门槛，细纲兑现、越界新增、检测器提示与配对盲评都没有变差。
+v0.8 的主题是瘦身：同一本书日更，Claude Code 上每章耗时从约 21 分钟降到约 13 分钟、累计输入 token 降约 36%；Codex 上耗时约 18 → 11 分钟、token 降约 39%。按换家族评委的核对，细纲兑现、越界新增与检测器提示都没有变差；配对盲评样本小，未见稳定差异。
 
 ### Added
 
