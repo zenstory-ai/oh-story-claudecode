@@ -78,7 +78,7 @@
     {
       "path": "skills/story-short-write/references/writing-workflow.md",
       "budget": 4200,
-      "why": "短篇 Phase 2 Reference Gate 的无条件完整读取项"
+      "why": "短篇 Phase 2 写前必读的无条件完整读取项"
     },
     {
       "path": "skills/story-short-write/references/submission-craft.md",
@@ -168,7 +168,7 @@
     {
       "path": "skills/story-long-write/references/workflow-revision.md",
       "budget": 3100,
-      "why": "大修 route Reference Gate 的强制完整读取项 调高：大修后白话汇报模板，字数对比不再报状态码。"
+      "why": "大修 route 写前必读的强制完整读取项 调高：大修后白话汇报模板，字数对比不再报状态码。"
     },
     {
       "path": "skills/story-long-write/references/style-resolution.md",

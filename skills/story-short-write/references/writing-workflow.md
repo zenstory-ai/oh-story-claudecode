@@ -6,7 +6,7 @@
 
 ## Phase 2 设计任务（框架确定后执行）
 
-### 开始前先通过 Reference Gate（逐项检查，不能跳过）
+### 开始前先过「写前必读」（逐项检查，不能跳过）
 
 - 工作流与投稿结构 → 加载 `writing-workflow.md`（本文件）+ `submission-craft.md` ✅/❌
 - 定题材腔调/招式 → 加载一个精确的 `genre-styles/{题材}.md` + `short-craft.md`；冷门题材改用 `genre-writing-formulas.md` ✅/❌

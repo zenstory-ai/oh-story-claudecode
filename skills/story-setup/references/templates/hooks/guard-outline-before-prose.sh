@@ -65,11 +65,14 @@ extract_target_bash() {
 # 照算，非空白字符（空白 = ASCII 空白 + 全角空格）不足 30 个码点即为空。与 JS core outlineIsEmpty / codex py
 # _outline_is_empty 同口径（test-prose-net-parity.sh D 段锁 parity）。纯 bash + 字节运算：LC_ALL=C 下
 # 删掉 UTF-8 续字节（0x80-0xBF）后的字节数就是码点数，不依赖任何 UTF-8 区域设置，也不依赖 node。
-# 非普通文件/读不了按非空放行（宁可漏拦不可误伤）。
+# 非普通文件/读不了/不是合法 UTF-8（GBK 等旧编码）按非空放行（宁可漏拦不可误伤）。
 OUTLINE_MIN_CHARS=30
+# 一行合法 UTF-8 的字节序列（Unicode 表 3-7，拒超长编码与代理区），LC_ALL=C 下逐字节匹配。
+UTF8_LINE=$'^([^\x80-\xff]|[\xc2-\xdf][\x80-\xbf]|\xe0[\xa0-\xbf][\x80-\xbf]|[\xe1-\xec\xee\xef][\x80-\xbf][\x80-\xbf]|\xed[\x80-\x9f][\x80-\xbf]|\xf0[\x90-\xbf][\x80-\xbf][\x80-\xbf]|[\xf1-\xf3][\x80-\xbf][\x80-\xbf][\x80-\xbf]|\xf4[\x80-\x8f][\x80-\xbf][\x80-\xbf])*$'
 outline_is_empty() {
   local f="$1" n bom fws tab
   [ -f "$f" ] && [ -r "$f" ] || return 1
+  if grep -qvaE "$UTF8_LINE" "$f"; then return 1; fi
   bom="$(printf '\357\273\277')"
   fws="$(printf '\343\200\200')"
   tab="$(printf '\t')"

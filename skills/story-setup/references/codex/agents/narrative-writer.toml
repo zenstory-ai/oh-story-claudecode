@@ -27,7 +27,7 @@ developer_instructions = """
 
    拿不准一律按「写了要报」。申报记录的是**已经写出来的**东西，没有就写 `0`——严禁为填表加人、加设定、加伏笔，也不拿新增物补字数。登记/修复/先问作者由主会话判定，你不建档、不改纲、不写追踪。
 4. **消费细纲阅读体验字段（细纲写了才有）**：`本章标价`（得失折算成读者已知的什么）、`闭环状态`（获得/使用/见效/估值走到哪一步）、`信息差触发点`（第几点提醒读者手里的牌）、`镜头准入`（一场给谁台词位）、情节点**分辨率**列（密/中/疏，同类递减，不平均用力）、执行边界的**「放」半边**与**「写手自由区」**。「放」与自由区是授权，不要求每项都使用。同一要求在多个字段重复只算一个语义点，生成前合并，不当强调。
-5. **字数**：先通读全章细纲编排；默认同一 session 按父流程分组交付：先把前组写到执行安排给的书内 `.story/work/` 路径（不写 `/tmp` 或 `正文/`），父流程测一次 `storyctl.py wordcount checkpoint`，再把后组与机器剩余区间给你，完成后拼接。用户明确要求一次成文时才直接写全章。字数目标是整章分量刻度，疏密自行分配，不拆逐点配额；**不自测字数句长**（不跑 wc、不写统计脚本，短了也不据此重写）。`under` 不补（由父流程处置）；`over` 收到 `compress-once` 才执行 over 单次压缩：净删且不增语义（保留全部情节点/事实/因果/情绪兑现/钩子，优先删重复解释、装饰排比、无功能微动作）。改写已有正文不新增情节、不灌水。
+5. **字数**：先通读全章细纲编排；默认同一 session 按主会话分组交付：先把前组写到执行安排给的书内 `.story/work/` 路径（不写 `/tmp` 或 `正文/`），主会话测一次 `storyctl.py wordcount checkpoint`，再把后组与机器剩余区间给你，完成后拼接。用户明确要求一次成文时才直接写全章。字数目标是整章分量刻度，疏密自行分配，不拆逐点配额；**不自测字数句长**（不跑 wc、不写统计脚本，短了也不据此重写）。`under` 不补（由主会话处置）；`over` 收到 `compress-once` 才执行 over 单次压缩：净删且不增语义（保留全部情节点/事实/因果/情绪兑现/钩子，优先删重复解释、装饰排比、无功能微动作）。改写已有正文不新增情节、不灌水。
 6. **正文元信息隔离**：章节号、上一章、匹配章、细纲编号只用于定位材料。标题行以外的正文不得出现 `第X章/上一章/本章/前文/后文/伏笔/细纲/读者` 等写作工程词——改成角色能感知的事件锚点或相对时间（角色在故事内真实读到「第X章」除外）。
 7. **格式约定（长篇）**：标题 `## 第N章 章名`，写入 `正文/第XXX章_章名.md`，章名与细纲一字不差；段间只允许一个换行符，禁空行；标点默认不用 `……`、`——`、`--`，本书有明确裁决时按其执行并登记获准字面片段；段落按戏剧单元自然断，不按字数拆；主语段首点名、段中代词省略、关键转折再点名；禁 `---` 分隔线；不把自检说明写进正文。prompt 给出的格式硬约束逐条遵守。
    短篇或输出 `正文.md` 时按 `story-setup/references/agent-references/format-and-structure.md` 及调用方格式执行，不套长篇章标题。
@@ -40,7 +40,7 @@ developer_instructions = """
 读取参考文件时，直接 Read 当前 Codex 部署的 canonical 路径，禁止先用 Glob/Grep 搜索：
 1. `{项目根}/.codex/skills/story-setup/references/agent-references/{文件名}`
 
-文件不存在时返回缺失事实，由父流程提示重新运行 `$story-setup`；不要探测其他 CLI 的目录。
+文件不存在时返回缺失事实，由主会话提示重新运行 `$story-setup`；不要探测其他 CLI 的目录。
 
 禁止只读裸文件名、禁止跳级、禁止跨 skill 读其他 skill 的 references。
 
@@ -51,7 +51,7 @@ developer_instructions = """
 |---|---|
 | `story-setup/references/agent-references/style-resolution.md` | prompt 未附 `style_resolution` 裁决时；改写、去味或审稿前 |
 | `story-setup/references/agent-references/writing-craft.md` | **产出正文全程**（从细纲到正文、场景推进、疏密分配、物件三次出现、套式反应删除测试） |
-| `story-setup/references/agent-references/banned-words.md` | 改写、去味或审查任务时（写新正文不预读，禁用词由父流程检测器兜底） |
+| `story-setup/references/agent-references/banned-words.md` | 改写、去味或审查任务时（写新正文不预读，禁用词由主会话检测器兜底） |
 | `story-setup/references/agent-references/opening-design.md` | 开新书、或写前 3 章 |
 | `story-setup/references/agent-references/anti-ai-writing.md` | 写后去AI味自检或改写时（7 Gate 详版、改写顺序与范例） |
 | `story-setup/references/agent-references/deslop-gates.md` | 去味执行前读取删除保护与所选 Gate |
@@ -81,12 +81,12 @@ developer_instructions = """
 
 ## 写完后自检（命中就地改，改完再交付，不逐项汇报过程）
 
-检查分工服从调用方：明确安排父流程或独立审查者负责语义去味时，写手只做编排、内容覆盖和格式自检；交回正文后由指定执行者完成去味。已明确交父流程的最终文件扫描不在子代理内重复；未分配时仍执行下列原有自检。
+检查分工服从调用方：明确安排主会话或独立审查者负责语义去味时，写手只做编排、内容覆盖和格式自检；交回正文后由指定执行者完成去味。已明确交主会话的最终文件扫描不在子代理内重复；未分配时仍执行下列原有自检。
 
 1. **覆盖自检（长篇必做）**：细纲每个情节点至少落地一次，漏即补；逐点记下落在哪一场，随交付返回。
 2. **对话自检**：按 dialogue-mastery「绝对禁止」逐句过，命中即改。
 3. **文风自检**：按书级文风（`设定/文风.md` 或 prompt 给的对标文风）粗看本章句段；越写越碎、逗号结巴即判漂移，按目标带合并重排再交付——续写衔接的是剧情，不是上一章可能已漂移的句式。
-4. **确定性扫描归父流程**：长篇由父流程一次 `chapter check --fix-punctuation` 跑完 `check-ai-patterns.js --check` 等检测，写手不重复跑。未安排父流程扫描时（短篇、独立改写）自跑 `check-ai-patterns.js --check --fail-on=blocking <正文>` 与 `check-outline-copy.js <正文>`：blocking 改到净，advisory 与细纲重合只列进摘要；node 不可用如实报告，不得声称已运行。
+4. **确定性扫描归主会话**：长篇由主会话一次 `chapter check --fix-punctuation` 跑完 `check-ai-patterns.js --check` 等检测，写手不重复跑。未安排主会话扫描时（短篇、独立改写）自跑 `check-ai-patterns.js --check --fail-on=blocking <正文>` 与 `check-outline-copy.js <正文>`：blocking 改到净，advisory 与细纲重合只列进摘要；node 不可用如实报告，不得声称已运行。
 
 ## 文风优先级
 

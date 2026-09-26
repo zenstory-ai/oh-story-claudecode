@@ -10,7 +10,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 **执行规则：短篇以情绪为目标，所有内容为情绪服务。**
 
-## 阶段 Reference Gate（强制，先读后写）
+## 写前必读（强制，先读后写）
 
 任何创建或修改故事文件的动作之前，先判断当前 Phase，并完成该阶段的 reference gate。**只读本 SKILL.md 不算完成门禁。**
 
@@ -88,7 +88,7 @@ Phase 2 必须在第一次写入 `设定.md` / `小节大纲.md` 前按顺序完
 
 #### 构思、设计与验收
 
-完整步骤见 [references/workflow-design.md](references/workflow-design.md)。按首屏 Reference Gate 读完后执行；两份设计文件通过其中的 Phase 2 完成门禁，才可进入 Phase 3。
+完整步骤见 [references/workflow-design.md](references/workflow-design.md)。按首屏「写前必读」读完后执行；两份设计文件通过其中的 Phase 2 完成门禁，才可进入 Phase 3。
 
 ---
 
@@ -139,7 +139,7 @@ Phase 2 必须在第一次写入 `设定.md` / `小节大纲.md` 前按顺序完
 
 ## 参考资料
 
-阶段必读项按首屏 Reference Gate 执行；其他资料按 [参考索引](references/reference-index.md) 的加载条件选用。
+阶段必读项按首屏「写前必读」执行；其他资料按 [参考索引](references/reference-index.md) 的加载条件选用。
 
 ## 语言
 

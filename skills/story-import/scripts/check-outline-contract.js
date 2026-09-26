@@ -35,12 +35,14 @@ const CALIBER = 'visible_chars_v1'
 // 可选字段「契约风险」只收三档；值未知可写 [待补充]。旧稿里的「风险等级」按同一字段认（旧名）。
 const CONTRACT_RISK_LEVELS = ['契约安全', '需补强', '契约破坏']
 
-// 「字数目标」「字数范围」的写法语法与 wordcount_core.py 逐字同构（scripts/test-storyctl.py 双跑同一批写法），
-// 细纲验收通过的写法，storyctl chapter check 不能再拒。
+// 「字数目标」「字数范围」「字数口径」的写法语法与 wordcount_core.py 逐字同构（scripts/test-storyctl.py 双跑同一批写法），
+// 细纲验收通过的写法，storyctl chapter check 不能再拒。值里一个数字都没有的目标/范围行是说明文字，不参与取值。
 const NUMBER = '([1-9][0-9]{0,2}(?:[,，][0-9]{3})+|[1-9][0-9]*)'
 const NOTE = '(?:[（(][^（）()]*[）)])?'
 const TARGET_VALUE = new RegExp(`^(?:约|大约)?[ \\t]*${NUMBER}[ \\t]*字?(?:左右)?[ \\t]*${NOTE}$`)
 const RANGE_VALUE = new RegExp(`^${NUMBER}[ \\t]*字?[ \\t]*(?:-|~|～|—|–|－|至|到)[ \\t]*${NUMBER}[ \\t]*字?[ \\t]*${NOTE}$`)
+const METRIC_VALUE = new RegExp(`^([A-Za-z0-9_-]+)[ \\t]*${NOTE}$`)
+const HAS_DIGIT = /[0-9０-９]/
 
 function fieldValues(text, label) {
   const pattern = new RegExp(`^[ \\t>]*(?:[-*+][ \\t]*)?(?:\\*\\*)?${label}(?:\\*\\*)?[ \\t]*[:：][ \\t]*(.*?)[ \\t]*$`, 'gm')
@@ -51,10 +53,11 @@ function fieldValues(text, label) {
   return values
 }
 
+const numericFieldValues = (text, label) => fieldValues(text, label).filter((value) => HAS_DIGIT.test(value))
 const toNumber = (raw) => Number(raw.replace(/[,，]/g, ''))
 
 function parseWordcountTarget(text) {
-  const raw = fieldValues(text, '字数目标')
+  const raw = numericFieldValues(text, '字数目标')
   if (!raw.length) return { status: 'missing', value: null, raw }
   const matches = raw.map((value) => value.match(TARGET_VALUE))
   if (!matches.every(Boolean)) return { status: 'invalid', value: null, raw }
@@ -64,7 +67,7 @@ function parseWordcountTarget(text) {
 }
 
 function parseWordcountRange(text) {
-  const raw = fieldValues(text, '字数范围')
+  const raw = numericFieldValues(text, '字数范围')
   if (!raw.length) return { status: 'missing', value: null, raw }
   const matches = raw.map((value) => value.match(RANGE_VALUE))
   if (!matches.every(Boolean)) return { status: 'invalid', value: null, raw }
@@ -73,6 +76,12 @@ function parseWordcountRange(text) {
   const [min, max] = pairs[0].split('-').map(Number)
   if (min > max) return { status: 'invalid', value: null, raw }
   return { status: 'ok', value: { min, max }, raw }
+}
+
+function parseWordcountCaliber(text) {
+  const raw = fieldValues(text, '字数口径')
+  const matches = raw.map((value) => value.match(METRIC_VALUE))
+  return raw.length > 0 && matches.every(Boolean) && new Set(matches.map((match) => match[1])).size === 1 && matches[0][1] === CALIBER
 }
 
 function parseContractRisk(text) {
@@ -308,7 +317,7 @@ function verify(file, projectRoot = null) {
   const targetParse = parseWordcountTarget(text)
   const rangeParse = parseWordcountRange(text)
   const target = targetParse.value
-  const caliberOk = new RegExp(`字数口径\\s*[：:]\\s*${CALIBER}`).test(text)
+  const caliberOk = parseWordcountCaliber(text)
   const targetLabel = { ok: target, missing: '未识别', invalid: `写法认不出（${targetParse.raw.join('、')}）`, conflict: `多个不同的值（${targetParse.raw.join('、')}）` }[targetParse.status]
   const rangeLabel = rangeParse.status === 'invalid' ? `；字数范围写法不对（${rangeParse.raw.join('、')}）` : (rangeParse.value ? `；字数范围：${rangeParse.value.min}-${rangeParse.value.max}` : '')
   checks.push(makeCheck(

@@ -325,10 +325,46 @@ def toxic_rescan_hint(abs_path: Path | None = None) -> str:
     return "完整扫描：node <skill>/scripts/check-ai-patterns.js --check <正文文件>"
 
 
+def _mask_html_comment_lines(lines: list[str]) -> list[str]:
+    """HTML 注释是元信息不是正文（与 JS core maskHtmlCommentLines、check-ai-patterns.js scanDocument
+    同规则）：注释段换成等长空格，可跨行；到文末都没闭合的 `<!--` 只抹掉这四个字符，后面照常当正文。"""
+    unclosed: set[tuple[int, int]] = set()
+    while True:
+        out: list[str] = []
+        is_open = False
+        opened_at = None
+        for index, line in enumerate(lines):
+            text = ""
+            cursor = 0
+            while cursor < len(line):
+                if is_open:
+                    close = line.find("-->", cursor)
+                    end = len(line) if close == -1 else close + 3
+                    text += " " * (end - cursor)
+                    cursor = end
+                    if close != -1:
+                        is_open = False
+                    continue
+                start = line.find("<!--", cursor)
+                if start == -1:
+                    text += line[cursor:]
+                    break
+                text += line[cursor:start] + "    "
+                cursor = start + 4
+                if (index, start) in unclosed:
+                    continue
+                is_open = True
+                opened_at = (index, start)
+            out.append(text)
+        if not (is_open and opened_at is not None):
+            return out
+        unclosed.add(opened_at)
+
+
 def toxic_phrase_findings(text: str, whitelist=(), rescan: str | None = None) -> list[str]:
     findings: list[str] = []
     content: list[tuple[int, str]] = []
-    for i, raw in enumerate(text.split("\n"), 1):
+    for i, raw in enumerate(_mask_html_comment_lines(text.split("\n")), 1):
         s = raw.strip()
         if _net_is_skippable(s):
             continue
@@ -1258,14 +1294,14 @@ UNEXPANDED_SHELL_VAR = re.compile(r"\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za
 
 # 细纲「实质为空」：与 JS core outlineIsEmpty 同口径（去 BOM 与每行行首的 Markdown 标题标记后，
 # 标题文字照算，非空白字符——ASCII 空白 + 全角空格之外——不足 _OUTLINE_MIN_CHARS 个码点）。只量写没写东西，
-# 不查 v0.8 细纲字段；读不了按非空放行。py↔js 由 test-prose-net-parity.sh C 段锁 parity。
+# 不查 v0.8 细纲字段；读不了或不是合法 UTF-8 按非空放行。py↔js 由 test-prose-net-parity.sh C 段锁 parity。
 _OUTLINE_MIN_CHARS = 30
 
 
 def _outline_is_empty(file: Path) -> bool:
     try:
-        text = file.read_text(encoding="utf-8", errors="replace")
-    except OSError:
+        text = file.read_bytes().decode("utf-8")
+    except (OSError, UnicodeDecodeError):
         return False
     if text.startswith("\ufeff"):
         text = text[1:]

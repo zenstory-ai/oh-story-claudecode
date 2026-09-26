@@ -711,6 +711,20 @@ class TrackingCommitTests(unittest.TestCase):
         self.run_tool("commit", transaction(1, mode="revision"))
         self.run_tool("check")
 
+    def test_tracking_only_revision_survives_a_non_numeric_target_note(self) -> None:
+        # 旧细纲在数字目标旁留了一行「字数目标：按卷规划」式说明：不含数字的行是说明文字，
+        # 已提交章的纯追踪修订照常核对并通过；两个数字值冲突仍拒。
+        self.init()
+        self.write_chapter_contract(1, actual=1000, target=1000)
+        self.run_tool("commit", self.bind_wordcount(transaction(1), resolution="within_user_band"))
+        outline = self.project / "大纲/细纲_第001章.md"
+        original = outline.read_text(encoding="utf-8")
+        outline.write_text(original + "- 字数目标：按卷规划\n", encoding="utf-8")
+        self.run_tool("commit", transaction(1, mode="revision"))
+        outline.write_text(original + "- 字数目标：1200 字\n", encoding="utf-8")
+        result = self.run_tool("commit", transaction(1, mode="revision"), expect=2)
+        self.assertIn("字数记录无法核对", result.stderr)
+
     def test_retired_item_still_in_context_is_rejected(self) -> None:
         self.init()
         document = transaction(1)

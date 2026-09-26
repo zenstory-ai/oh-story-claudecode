@@ -29,7 +29,7 @@ Markdown 只负责给作者和 Agent 阅读，工具不再反向解析 Markdown�
 - `init`：只在 `_tracking-state.json` 不存在时执行，绝不覆盖已初始化项目。
 - `draft`：按当前 state 把逐章事务预填到 `.story/work/第NNN章/tracking.json`（修订号、模式、章名、`context` 四项当前值），并输出各文本字段的字数上限与在场核心角色的当前快照。新章（append）调用方只填 `delta` 与有变化角色的快照；已提交章（revision）的 `delta` 与相关角色快照按该章现有逐章记录预填（伏笔、时间线取当前值），调用方在上面改成修订后的完整记录，不清空重写。
 - 作者字数范围：细纲可写一行 `字数范围：2000-2600`（作者明确给了上下限时）；本轮临时给的范围用 `--min-chars` / `--max-chars`（两者同给，优先于细纲）。`wordcount check` / `checkpoint` 与 `chapter check` / `commit` / `accept-current-length` 都认，给了就同时替代默认 ±12% 内部带与 ±15% 用户带，结果里 `band_source` 为 `author`，提交的字数记录多一项 `author_range`。
-- `wordcount measure` / `wordcount checkpoint`：纯测量入口；不写正文、不写 tracking、不做语义判断。长篇正文只在前组写完后由父流程调用一次 `checkpoint`（见 workflow-chapter 步骤 6），整章长度由 `chapter check` 收口；`remaining_user_range` 按生效区间（作者区间或默认用户带）计算。
+- `wordcount measure` / `wordcount checkpoint`：纯测量入口；不写正文、不写 tracking、不做语义判断。长篇正文只在前组写完后由主会话带 `--project` 调用一次 `checkpoint`（目标与字数范围读细纲，见 workflow-chapter 步骤 6），整章长度由 `chapter check` 收口；`remaining_user_range` 按生效区间（作者区间或默认用户带）计算。
 - `chapter check`：重新读取当前正文与细纲目标，返回确定性长度状态、现有 blocking quality、`state_revision` 和当前可执行动作，不保存 approval。顶层 `status`：`ready`（可提交，exit 0）/ `needs_decision`（长度带外，按 `available_actions` 交作者，exit 0）/ `blocked`（有 blocking 正文问题，exit 1）/ `invalid`（正文为空等，exit 1）/ `tool_unavailable`（找不到 node 或检测脚本，见 `quality.tool_errors`，不是正文问题，exit 3）。参数错误或文件缺失输出 `story-chapter-error/v1`（`status: error`，exit 2）。`under` 不提供自动补写；`over` 额外返回一次净删型 `compress-once` 及回到生效区间所需的删除字数。`quality.semantic_advisories` 是语义类 advisory 条数（检测器标 `review: mechanical` 的不计）。
 - `chapter commit`：再次读取当前文件、重新计数并重跑 blocking quality；只接受生效区间内的章节，把简短字数记录与逐章事务一起原子提交。新章与修订都走它。
 - `chapter accept-current-length`：只接受带外但 quality pass 的章节；接受动作发生时重新读取、重新计数并立即原子提交，不保存可陈旧的历史决议。低于字数目标一半（`BELOW_ACCEPT_FLOOR`），或超长却还没做过那一次压缩（`COMPRESSION_REQUIRED`），都拒绝；作者明确拍板时加 `--force`。
@@ -47,7 +47,7 @@ Markdown 只负责给作者和 Agent 阅读，工具不再反向解析 Markdown�
 
 仅新书或导入初始化时，执行 `init` 前必须完整读取 [tracking-initialization.md](tracking-initialization.md)，按其中原始 JSON 与导入边界构造事务。已有项目续写直接使用下方逐章事务，不重复读初始化示例。
 
-调用方的逐章 JSON 不写 `wordcount`；正式入口 `chapter commit` 或 `chapter accept-current-length` 在提交当下生成并注入。最终 state 只为已提交章节保留 `metric / target / actual / status / resolution / body_sha256`，不保存 MEASURE/RESOLVE 事件、ID 链、policy fingerprint 或独立 chapter state。
+调用方的逐章 JSON 不写 `wordcount`；正式入口 `chapter commit` 或 `chapter accept-current-length` 在提交当下生成并注入。最终 state 只为已提交章节保留 `metric / target / actual / status / resolution / body_sha256`（生效了作者字数范围时另加 `author_range`），不保存 MEASURE/RESOLVE 事件、ID 链、policy fingerprint 或独立 chapter state。
 
 ## 逐章事务
 

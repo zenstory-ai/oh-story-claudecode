@@ -2,7 +2,7 @@
 
 「写一章正文」的完整流程。日更批量由 `workflow-daily.md` 控制批次，每章仍走本文件。项目文件结构、缺失处理和对标权威顺序见 [project-files.md](project-files.md)，首次定位或文件缺失时才读。
 
-**工作目录**：本章临时文件（前组.md、后组.md、writer_prompt.md、tracking.json）只放书目录下 `.story/work/第NNN章/`，不写系统 `/tmp`、`正文/`、`大纲/` 或书根；`chapter commit` / `accept-current-length` 成功后脚本自动删除该目录，失败时保留供重跑。
+**工作目录**：本章临时文件（前组.md、后组.md、writer_prompt.md、tracking.json）只放书目录下 `.story/work/第NNN章/`，不写系统 `/tmp`、`正文/`、`大纲/` 或书根；提交成功后脚本自动删除。
 
 ---
 
@@ -22,7 +22,7 @@
 5. **标题预检**：看核对报告的重名结论；重名或明显重复才按核心事件改名，并同步细纲标题与正文文件名。
 6. **写作准备**：全章细纲先交给写手统筹编排，默认同一 session 按前后两组交付。
    - 按实际叙述顺序在自然转场或因果停顿处分组，不在一句对话或同一动作中间截断；可交错情节点，但不增删批准内容，不拆逐点字数配额。
-   - 写手先把前组写到工作目录 `前组.md`；主会话只调用一次 `storyctl.py wordcount checkpoint --file {segment} --target {目标} --chapter {N}`，把 `actual / remaining_user_range` 连同后组交回同一写手。两组按原文拼接，不回改前组追字数。
+   - 写手先把前组写到工作目录 `前组.md`；主会话只调用一次 `storyctl.py wordcount checkpoint --file {segment} --project {项目根} --chapter {N}`，把 `actual / remaining_user_range` 连同后组交回同一写手。两组按原文拼接，不回改前组追字数。
    - 用户明确要求一次成文时执行安排填「全章」，直接落盘，不跑 checkpoint。批准内容写完即停，不为字数加剧情；实际长度由步骤 8 收口。
    - **正文元信息隔离**：章号、上一章、匹配章、细纲文件只用于定位。标题行以外的正文不得出现第X章、上一章、本章、前文、后文、伏笔、细纲、读者这类工程词，承接前文改成角色能感知的事件锚点或相对时间（「比第一章那三秒开火更疼」→「比那三秒开火更疼」）。例外：角色在故事内真实阅读/讨论「第X章」文本，或真实身为作者/读者。
 7. **正文执行**：确认 narrative-writer 已部署；骨架已由脚本生成，细纲全文、卷纲、续写状态卡都不进 prompt。**主会话填八槽**（搜 `［主会话填］`）：执行安排 ／ 本章意图 ／ 参考技法 ／ 本节速记 ／ 涉及角色 ／ `genre_prose_card` ／ 必读设定 ／ `style_resolution`；外加脚本标出的条件槽：降档不成立时的情绪与节奏召回，作者偏好块里的限定范围记忆（按 author-memory.md 补查本书适用的）。`author_preferences` 由脚本注入（查询失败才成空槽，按 author-memory.md 手动查），只作低优先级倾向。空槽以外一字不改，整份照抄进 Agent prompt。脚本**跑不起来**时读 [writer-prompt-fallback.md](writer-prompt-fallback.md) 手动组装并报 `Fallback: build_writer_prompt -> 手动组装`。agent 交付后主会话核对它只消费了批准情节点；agent 未部署则主会话按同一流程写，新增物按 SKILL.md「新增物三级」自列申报表。
@@ -33,7 +33,7 @@
 9. **检查钩子与爽点**：章尾有往下看的理由（低压/过场章留阶段目标即可）；高压/推进章爽点到位。不达标只修批准内容，修后重跑步骤 8。
 10. **元信息扫描**：按步骤 6 的规则清掉工程词。
 11. **检测结果处理**（管线的选 Gate 与定点改写）：严重度统一读作必须修 / 建议看 / 仅提示（全 skill 依此）——检测器 blocking 与 checker 的 S1/S2 是必须修，advisory 与 S3 是建议看，S4 仅提示。`quality.blocking_findings` 就地改到净；`advisories` 逐条读原文判断，确属问题才改，功能性写法保留，不为归零机械改写。`formulaic-parallelism` 连同台词一起复核；细纲照搬里判定保留的补进细纲「复沓锚句」。禁用词表不整读，拿不准的二级词才查 `references/banned-words.md` 对应条目。改完只重跑步骤 8 复扫，不另安排全篇去味。
-12. **更新追踪**：运行 `{PYTHON} {skill 根}/scripts/tracking_commit.py draft --project {项目根} --chapter {N}`，它把修订号、章名和上下文当前值预填进工作目录 `tracking.json`，并给出在场核心角色的当前快照。只填 `delta` 与留空的本章结尾时间、场景：本章变化的核心角色把快照整份改好放进 `character_snapshots`；撤下的长期约束或风险从 `context` 删掉并把原文列进 `delta.retired_context_items`。不读脚本源码或 state 文件找格式；schema 细节、修订与修复见 [tracking-transaction.md](tracking-transaction.md)，只在出错或 `mode=revision` 时读。带内执行 `storyctl.py chapter commit`，作者接受当前长度执行 `chapter accept-current-length`（不到目标一半、或超字还没压缩过一次会被拒，作者明确坚持才加 `--force`）。报错会一次列全要改的字段，按提示改完重跑同一命令。作者选「这章不要了」时删本章正文与工作目录，不提交。判为「登记」的申报项在这次事务里一并登记；有「先问作者」项时暂停提交与下一章。「本章没写成的」：细纲没给的追加进本单元排纲底稿「建纲追加」，先问作者的走下方处置表。
+12. **更新追踪**：运行 `{PYTHON} {skill 根}/scripts/tracking_commit.py draft --project {项目根} --chapter {N}`，它把修订号、章名和上下文当前值预填进工作目录 `tracking.json`，并给出在场核心角色的当前快照。只填 `delta` 与留空的本章结尾时间、场景：本章变化的核心角色把快照整份改好放进 `character_snapshots`；撤下的长期约束或风险从 `context` 删掉并把原文列进 `delta.retired_context_items`。不读脚本源码或 state 文件找格式；schema 细节、修订与修复见 [tracking-transaction.md](tracking-transaction.md)，只在出错或 `mode=revision` 时读。带内执行 `storyctl.py chapter commit`，作者接受当前长度执行 `chapter accept-current-length`。报错按提示改完重跑同一命令。判为「登记」的申报项在这次事务里一并登记；有「先问作者」项时暂停提交与下一章。「本章没写成的」：细纲没给的追加进本单元排纲底稿「建纲追加」，先问作者的走下方处置表。
 13. **提交后核对**：返回 `tracking_committed: true` 即本章完成。
 
 ## 向作者汇报
@@ -61,7 +61,7 @@
 3. 这章不要了
 ```
 
-作者选 1 → `chapter accept-current-length`；选 2 → 等作者改完细纲/目标后回步骤 8；选 3 → 删本章正文与工作目录，不提交。新增内容需要作者拍板（下方处置表「先问作者」）时：
+不到目标一半时选项 1 不标推荐。作者选 1 → `chapter accept-current-length`；选 2 → 等作者改完细纲/目标后回步骤 8；选 3 → 删本章正文与工作目录，不提交。收下被拒时：`BELOW_ACCEPT_FLOOR` 告诉作者差多少字，问补写还是就要这个长度；`COMPRESSION_REQUIRED` 先按 `compress-once` 删一次。作者知道原因仍坚持才加 `--force`。新增内容需要作者拍板（下方处置表「先问作者」）时：
 
 <!-- author-report -->
 ```md
@@ -83,7 +83,7 @@
 
 ## 字数测量权威
 
-细纲 `字数目标` + `visible_chars_v1`，默认范围 ±15%；**作者给了范围就写进细纲「字数范围：2000-2600」行，或传 `--min-chars` / `--max-chars`**（传参优先）。缺目标先补细纲。出带处置见步骤 8。
+细纲 `字数目标` + `visible_chars_v1`，默认范围 ±15%；**作者给了范围就写进细纲「字数范围：2000-2600」行**；`--min-chars` / `--max-chars` 只作临时覆盖。缺目标先补细纲。出带处置见步骤 8。
 
 ---
 

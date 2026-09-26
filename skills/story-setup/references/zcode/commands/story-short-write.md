@@ -1,5 +1,5 @@
 ---
-description: 短篇网文写作，从情绪目标、反转和小节大纲到正文。
+description: 短篇网文写作，从目标情绪、反转和小节大纲到正文。
 skills: story-short-write
 ---
 

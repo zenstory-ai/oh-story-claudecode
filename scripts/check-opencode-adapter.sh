@@ -509,8 +509,9 @@ def rules_of(name: str):
 
 
 extractor = rules_of('chapter-extractor')
+# * 在 2.x Wildcard.match 里编成 .*（s 旗标），可跨多层目录（本机 opencode 二进制内 Wildcard.match 核对过）。
 for path in ('拆文库/书/_analysis_cache/输入-RAW-4-6.md', '拆文库/书/_analysis_cache/输入-REUSE-1-3.md',
-             '_analysis_cache/输入-RAW-1-3.md'):
+             '_analysis_cache/输入-RAW-1-3.md', '作品/拆文库/书/_analysis_cache/输入-RAW-7-9.md'):
     assert evaluate('edit', path, extractor) == 'allow', (path, extractor)
 for path in ('拆文库/书/章节/第4章_摘要.md', '拆文库/书/_analysis_cache/批次-RAW-4-6.md',
              '拆文库/书/_progress.md', 'book/正文/第1章.md', '拆文库/书/_analysis_cache/输入.md'):
@@ -546,6 +547,19 @@ for command in ('node "$CLAUDE_PROJECT_DIR/.claude/hooks/story_hook_cli.js" anal
         except ValueError:
             continue
         raise AssertionError(f"unrecognized write-guard hook must fail closed: {matcher} / {command}")
+# CRLF 模板照样认出守卫名；认不出时同样 fail closed，不因 `\n---\n` 找不到而当成没挂 hook。
+assert module.frontmatter_write_guard(frontmatter(known).replace("\n", "\r\n")) == "analysis-input-guard"
+unknown = 'bash "$CLAUDE_PROJECT_DIR"/.claude/hooks/guard-analysis-input.sh'
+# matcher 写成 `*`/留空/整段不写都覆盖 Write/Edit；CRLF 下同理。
+cases = [frontmatter(unknown, "*"), frontmatter(unknown, ""), frontmatter(unknown).replace("\r\n", "\n").replace("\n", "\r\n"),
+         frontmatter(unknown, "*").replace("\n", "\r\n"),
+         frontmatter(unknown).replace('    - matcher: "Write|Edit"\n', "    -\n")]
+for text in cases:
+    try:
+        module.frontmatter_write_guard(text)
+    except ValueError:
+        continue
+    raise AssertionError(f"write hook with wildcard/CRLF matcher must fail closed: {text!r}")
 # 只挂非写入 matcher（如 Bash）的 hook 与没有 hook 的 agent 不受影响。
 assert module.frontmatter_write_guard(frontmatter('bash x.sh', "Bash")) is None
 assert module.frontmatter_write_guard("---\nname: x\ntools: [Read]\n---\n\n正文\n") is None

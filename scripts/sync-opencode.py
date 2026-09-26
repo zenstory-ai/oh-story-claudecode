@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # 只读 agent 若出现这种指令，生成直接失败：OpenCode shell.ts 只检查 command 的直接父节点，
 # 即使“完整命令字面量”白名单也会被 `( command ) > 正文.md` 的 subshell 外层重定向绕过。
 BODY_COMMAND_RE = re.compile(r"(?:执行|运行|跑) `([^`]+)`")
-# 委派给别人跑的不算本 agent 的 shell 步骤（「由父流程提示重新运行 X」「提示调用方在主会话跑 X」）。
+# 委派给别人跑的不算本 agent 的 shell 步骤（「由主会话提示重新运行 X」「提示调用方在主会话跑 X」）。
 # 只在同一行出现委派主语时豁免，避免把「自己跑」写成委派句式蒙混过关。
 BODY_DELEGATION_RE = re.compile(r"(调用方|父流程|主会话|用户|由.{0,6}提示)")
 CAPABILITY_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
@@ -130,17 +130,19 @@ def frontmatter_write_guard(content: str) -> str | None:
     """Name of the write guard hooked in the agent's frontmatter, if any.
 
     挂了 Write/Edit 的 PreToolUse hook 却认不出守卫名（命令写法变了）时报错：当成没挂守卫会
-    静默给 agent 放开整个工作区的 edit。
+    静默给 agent 放开整个工作区的 edit。CRLF 模板先归一；matcher 写 `*`、留空或整段不写都算覆盖写工具。
     """
+    content = content.replace("\r\n", "\n")
     end = content.find("\n---\n", len("---"))
     frontmatter = content[:end] if content.startswith("---\n") and end > 0 else ""
     match = WRITE_GUARD_RE.search(frontmatter)
     if match:
         return match.group(1)
-    write_hooked = "PreToolUse" in frontmatter and any(
-        {"Write", "Edit", "MultiEdit"} & {tool.strip() for tool in matcher.split("|")}
-        for matcher in WRITE_HOOK_MATCHER_RE.findall(frontmatter)
-    )
+    matchers = WRITE_HOOK_MATCHER_RE.findall(frontmatter)
+    write_hooked = "PreToolUse" in frontmatter and (not matchers or any(
+        {"Write", "Edit", "MultiEdit", "*", ".*", ""} & {tool.strip() for tool in matcher.split("|")}
+        for matcher in matchers
+    ))
     if write_hooked:
         raise ValueError(
             "frontmatter 挂了 Write/Edit 的 PreToolUse hook，但没认出 story_hook_cli.js 的守卫名；"
@@ -309,7 +311,7 @@ def fix_path_rules_section(body: str) -> str:
         r"读取参考文件时，直接 Read 当前 OpenCode 部署的 canonical 路径，禁止先用 Glob/Grep 搜索：\n"
         r"1. `{项目根}/skills/story-setup/references/agent-references/{文件名}`\n"
         r"\n"
-        r"文件不存在时返回缺失事实，由父流程提示重新运行 `/story-setup`；不要探测其他 CLI 的目录。"
+        r"文件不存在时返回缺失事实，由主会话提示重新运行 `/story-setup`；不要探测其他 CLI 的目录。"
     )
 
     new_body, count = re.subn(pattern, replacement, body, flags=re.DOTALL)

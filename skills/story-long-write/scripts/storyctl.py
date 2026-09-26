@@ -103,17 +103,22 @@ def _remove_chapter_work_dir(project: Path, chapter: int) -> str | None:
     return "/".join((*WORK_ROOT, path.name))
 
 
-def _project_files(project: Path, chapter: int) -> tuple[Path, Path, int, dict[str, int] | None]:
-    return read_project_chapter(project, chapter)
+def _project_files(
+    project: Path, chapter: int, author_range: Any = None,
+) -> tuple[Path, Path, int, dict[str, int] | None]:
+    return read_project_chapter(project, chapter, author_range)
 
 
-def _json_findings(output: str) -> list[dict[str, Any]]:
+def _json_findings(output: str) -> list[dict[str, Any]] | None:
+    """检测器 --json 输出里的 findings；输出不是预期 JSON 时返回 None（按工具故障处理，不当作无问题）。"""
     try:
-        value = json.loads(output or "{}")
+        value = json.loads(output)
     except json.JSONDecodeError:
-        return []
-    findings = value.get("findings", []) if isinstance(value, dict) else []
-    return findings if isinstance(findings, list) else []
+        return None
+    findings = value.get("findings") if isinstance(value, dict) else None
+    if not isinstance(findings, list) or not all(isinstance(row, dict) for row in findings):
+        return None
+    return findings
 
 
 NODE_REQUIRED = (
@@ -172,6 +177,10 @@ def check_blocking_quality(outline: Path, body: Path) -> dict[str, Any]:
             text=True, encoding="utf-8", capture_output=True, check=False,
         )
         findings = _json_findings(completed.stdout)
+        if findings is None or completed.returncode not in {0, 1}:
+            tool_errors.append({"type": "TOOL_ERROR", "tool": script, "source": name,
+                                "message": completed.stderr.strip() or f"{script} exited {completed.returncode} without JSON findings"})
+            continue
         for finding in findings:
             row = {"source": name, **finding}
             if name == "degeneration":
@@ -182,9 +191,6 @@ def check_blocking_quality(outline: Path, body: Path) -> dict[str, Any]:
                 advisories.append({**row, "severity": "advisory", "exempted": "去味:跳过"})
                 continue
             (blocking if finding.get("severity") == "blocking" else advisories).append(row)
-        if completed.returncode not in {0, 1}:
-            tool_errors.append({"type": "TOOL_ERROR", "tool": script, "source": name,
-                                "message": completed.stderr.strip()})
 
     punctuation = root / "normalize-punctuation.js"
     if not punctuation.is_file():
@@ -195,10 +201,13 @@ def check_blocking_quality(outline: Path, body: Path) -> dict[str, Any]:
             [node, str(punctuation), "--check", str(body)],
             text=True, encoding="utf-8", capture_output=True, check=False,
         )
-        if completed.returncode != 0:
+        if completed.returncode == 1:
             blocking.append(
                 {"type": "PUNCTUATION_NOT_NORMALIZED", "message": (completed.stdout or completed.stderr).strip()}
             )
+        elif completed.returncode != 0:
+            tool_errors.append({"type": "TOOL_ERROR", "tool": punctuation.name,
+                                "message": completed.stderr.strip() or f"exited {completed.returncode}"})
 
     outline_copy = root / "check-outline-copy.js"
     if not outline_copy.is_file():
@@ -265,8 +274,7 @@ def _record_over_baseline(project: Path, chapter: int, body_path: Path, actual: 
 
 
 def chapter_check(project: Path, chapter: int, author_range: Any = None) -> dict[str, Any]:
-    outline, body_path, target, outline_range = _project_files(project, chapter)
-    effective_range = normalize_author_range(author_range) if author_range is not None else outline_range
+    outline, body_path, target, effective_range = _project_files(project, chapter, author_range)
     try:
         body = body_path.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as exc:
@@ -313,13 +321,13 @@ def chapter_check(project: Path, chapter: int, author_range: Any = None) -> dict
     }
 
 
-def fix_punctuation(project: Path, chapter: int) -> bool:
+def fix_punctuation(project: Path, chapter: int, author_range: Any = None) -> bool:
     """Run the deterministic punctuation normalizer on the chapter body in place.
 
     Folding it into `chapter check --fix-punctuation` lets the parent flow close a
     chapter with one call instead of running each cleanup script separately.
     """
-    _, body, _, _ = _project_files(project, chapter)
+    _, body, _, _ = _project_files(project, chapter, author_range)
     node = shutil.which("node")
     script = Path(__file__).with_name("normalize-punctuation.js")
     if node is None or not script.is_file():
@@ -330,7 +338,9 @@ def fix_punctuation(project: Path, chapter: int) -> bool:
     return body.read_bytes() != before
 
 
-def _require_acceptable_length(project: Path, chapter: int, checked: dict[str, Any], *, force: bool) -> None:
+def _require_acceptable_length(
+    project: Path, chapter: int, checked: dict[str, Any], *, force: bool, author_range: Any = None,
+) -> None:
     """接受当前长度的两道底线：欠长不低于目标一半；超长先做过一次净删压缩（删掉原稿到作者范围上限
     差额的至少一半）。作者明确拍板用 --force 越过。"""
     if force:
@@ -348,7 +358,7 @@ def _require_acceptable_length(project: Path, chapter: int, checked: dict[str, A
             baseline = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, UnicodeError, json.JSONDecodeError):
             baseline = None
-        _, body_path, _, _ = _project_files(project, chapter)
+        _, body_path, _, _ = _project_files(project, chapter, author_range)
         valid = isinstance(baseline, dict) and isinstance(baseline.get("actual"), int)
         # 压缩要真删：至少删掉原稿到作者字数范围上限差额的一半（至少 1 字），删一两个字不算做过。
         ceiling = None
@@ -386,7 +396,7 @@ def chapter_commit(
     in_user_band = length_status in {"internal_pass", "borderline"}
     if accept_current_length:
         require(length_status in {"under", "over"}, "accept-current-length requires a valid out-of-band chapter")
-        _require_acceptable_length(project, chapter, checked, force=force)
+        _require_acceptable_length(project, chapter, checked, force=force, author_range=author_range)
         resolution = "accepted_current_length"
     else:
         if not in_user_band:
@@ -427,8 +437,11 @@ def _build_parser() -> StructuredArgumentParser:
         subparser.add_argument("--chapter")
         subparser.add_argument("--case-id")
         if command != "measure":
-            subparser.add_argument("--target", required=True)
+            subparser.add_argument("--target", required=command == "check")
             _add_range_arguments(subparser)
+        if command == "checkpoint":
+            subparser.add_argument("--project", type=Path,
+                                   help="书目录：与 --chapter 一起从细纲读字数目标（未给 --target 时）和「字数范围」")
     chapter = commands.add_parser("chapter")
     chapter_commands = chapter.add_subparsers(dest="chapter_command", required=True)
     for command in ("check", "commit", "accept-current-length"):
@@ -479,9 +492,24 @@ def _wordcount_command(args: argparse.Namespace, author_range: dict[str, int] | 
     if args.wordcount_command == "measure":
         result = measure_wordcount(body, chapter=args.chapter, case_id=args.case_id)
     elif args.wordcount_command == "checkpoint":
+        target = args.target
+        if args.project is not None:
+            # 与 chapter check 同一优先级：命令行上下限 > 细纲「字数范围」 > 默认带。
+            try:
+                chapter = int(args.chapter or "")
+                _, outline = read_chapter_outline(args.project, chapter)
+                if target is None:
+                    target = target_from_outline(outline)
+                author_range = effective_author_range(outline, author_range)
+            except (ValueError, WordcountError):
+                _json_line(invalid_wordcount_result("INVALID_OUTLINE", chapter=args.chapter, case_id=args.case_id))
+                return 2
+        if target is None:
+            _json_line(invalid_wordcount_result("INVALID_ARGUMENT", chapter=args.chapter, case_id="--target or --project is required"))
+            return 2
         try:
             result = checkpoint_wordcount(
-                body, args.target, chapter=args.chapter, case_id=args.case_id, author_range=author_range,
+                body, target, chapter=args.chapter, case_id=args.case_id, author_range=author_range,
             )
         except WordcountError:
             result = invalid_wordcount_result("INVALID_TARGET", chapter=args.chapter, case_id=args.case_id)
@@ -509,7 +537,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _wordcount_command(args, author_range)
     try:
         if args.chapter_command == "check":
-            fixed = fix_punctuation(args.project, args.chapter) if args.fix_punctuation else None
+            fixed = fix_punctuation(args.project, args.chapter, author_range) if args.fix_punctuation else None
             result = chapter_check(args.project, args.chapter, author_range)
             if fixed is not None:
                 result["punctuation_fixed"] = fixed

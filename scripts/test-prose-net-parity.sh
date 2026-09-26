@@ -116,6 +116,11 @@ run_functional() {
   "toxic_exempt_spaced_ok": "# 第1章\n<!--去味 ： 跳过\t-->\n没有伴奏，没有和声，没有提词器。",
   "toxic_exempt_bare_blocked": "# 第1章\n去味:跳过\n没有伴奏，没有和声，没有提词器。",
   "toxic_exempt_other_nets": "# 第1章\n<!-- 去味:跳过 -->\n没有伴奏，没有和声，没有提词器。\n按照本章细纲的情节点他该出场了。",
+  "toxic_comment_ok": "他推开门。\n\n<!-- 备注：声音不大，却让人心里一紧 -->\n他走了进去。",
+  "toxic_comment_multiline_ok": "他推开门。\n<!-- 备注\n声音不高，却稳稳压住了整个大厅。\n-->\n他走了进去。",
+  "toxic_comment_inline": "他推开门。<!-- 备注 -->声音不高，却稳稳压住了整个大厅。",
+  "toxic_comment_unclosed": "他推开门。\n<!-- 备注没闭合\n声音不高，却稳稳压住了整个大厅。",
+  "toxic_comment_unclosed_after_closed": "<!-- 备注 -->\n他推开门。\n<!-- 没闭合 <!-- 也没闭合\n声音不高，却稳稳压住了整个大厅。",
   "toxic_astral_window_ok": "没人知道他练了多少年。\n“第1排😀😀😀😀😀😀😀😀😀😀”\n“第2排😀😀😀😀😀😀😀😀😀😀”\n“第3排😀😀😀😀😀😀😀😀😀😀”\n“第4排😀😀😀😀😀😀😀😀😀😀”\n“第5排😀😀😀😀😀😀😀😀😀😀”\n“第6排😀😀😀😀😀😀😀😀😀😀”\n“第7排😀😀😀😀😀😀😀😀😀😀”\n“第8排😀😀😀😀😀😀😀😀😀😀”\n“第9排😀😀😀😀😀😀😀😀😀😀”\n“第10排😀😀😀😀😀😀😀😀😀😀”\n“第11排😀😀😀😀😀😀😀😀😀😀”\n“第12排😀😀😀😀😀😀😀😀😀😀”\n“第13排😀😀😀😀😀😀😀😀😀😀”\n“第14排😀😀😀😀😀😀😀😀😀😀”\n“第15排😀😀😀😀😀😀😀😀😀😀”\n“第16排😀😀😀😀😀😀😀😀😀😀”\n“第17排😀😀😀😀😀😀😀😀😀😀”\n“第18排😀😀😀😀😀😀😀😀😀😀”\n“第19排😀😀😀😀😀😀😀😀😀😀”\n“第20排😀😀😀😀😀😀😀😀😀😀”\n“第21排😀😀😀😀😀😀😀😀😀😀”\n“第22排😀😀😀😀😀😀😀😀😀😀”\n“第23排😀😀😀😀😀😀😀😀😀😀”\n“第24排😀😀😀😀😀😀😀😀😀😀”\n“第25排😀😀😀😀😀😀😀😀😀😀”\n“第26排😀😀😀😀😀😀😀😀😀😀”\n“第27排😀😀😀😀😀😀😀😀😀😀”\n“第28排😀😀😀😀😀😀😀😀😀😀”\n“第29排😀😀😀😀😀😀😀😀😀😀”\n“第30排😀😀😀😀😀😀😀😀😀😀”",
   "toxic_trailer_window_ok": "没人知道他练了多少年。\n江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。\n他把琴盖合上，起了身。"
 }
@@ -250,6 +255,25 @@ PY
   grep -q '^toxic_exempt_bare_blocked | .*毒句式' "$tmp/py.txt" || { echo "FAIL: 裸写的「去味:跳过」（不在 HTML 注释里）被当成豁免" >&2; return 3; }
   grep -q '^toxic_exempt_other_nets | 第4行 工程词泄漏' "$tmp/py.txt" || { echo "FAIL: 豁免标记不应连带关掉毒句式以外的网（工程词漏检）" >&2; return 3; }
   grep '^toxic_exempt_other_nets' "$tmp/py.txt" | grep -q '毒句式' && { echo "FAIL: 豁免标记在场时毒句式仍被推回" >&2; return 3; }
+  # HTML 注释（作者备注、豁免标记）不是正文：与 check-ai-patterns.js 同规则屏蔽，可跨行；到文末都没
+  # 闭合的 `<!--` 不算注释（漏写 `-->` 不能藏住后文）。此前 hook 不屏蔽，备注里的句式被当欠账硬拦，
+  # 而 chapter check 用的检测器返回空，两道门口径分叉。
+  for name in toxic_comment_ok toxic_comment_multiline_ok; do
+    grep -q "^$name | $" "$tmp/py.txt" || { echo "FAIL: $name HTML 注释里的句式被写后网当毒句式（检测器不扫注释）" >&2; return 3; }
+  done
+  grep -q '^toxic_comment_inline | 第1行 毒句式\[voice-contrast\]' "$tmp/py.txt" || { echo "FAIL: 行内注释之后的正文毒句式漏检" >&2; return 3; }
+  for name in toxic_comment_unclosed toxic_comment_unclosed_after_closed; do
+    grep -q "^$name | 第[34]行 毒句式\[voice-contrast\]" "$tmp/py.txt" || { echo "FAIL: $name 未闭合的 <!-- 把后文藏起来了" >&2; return 3; }
+  done
+  # 与检测器逐 fixture 对齐：hook 报不报 voice-contrast == check-ai-patterns.js 报不报。
+  local detector="$ROOT/skills/story-long-write/scripts/check-ai-patterns.js" cname hook_hit det_hit
+  for cname in toxic_comment_ok toxic_comment_multiline_ok toxic_comment_inline toxic_comment_unclosed toxic_comment_unclosed_after_closed; do
+    node -e 'const fx=require(process.argv[1]);require("fs").writeFileSync(process.argv[2],fx[process.argv[3]])' "$tmp/fixtures.json" "$tmp/$cname.md" "$cname"
+    hook_hit=0; grep "^$cname |" "$tmp/py.txt" | grep -q 'voice-contrast' && hook_hit=1
+    det_hit=0; node "$detector" --json "$tmp/$cname.md" </dev/null > "$tmp/$cname.json" || true
+    grep -q '"voice-contrast"' "$tmp/$cname.json" && det_hit=1
+    [ "$hook_hit" = "$det_hit" ] || { echo "FAIL: $cname 写后网（${hook_hit}）与 check-ai-patterns.js（${det_hit}）对 HTML 注释口径不一致" >&2; return 3; }
+  done
   grep -q '^toxic_astral_window_ok | $' "$tmp/py.txt" || { echo "FAIL: 引号内 emoji 的占位长度未按 UTF-16 码元对齐，trailer 窗口切点漂移" >&2; return 3; }
   grep -q '^toxic_quote_codename_ok | $' "$tmp/py.txt" || { echo "FAIL: 引号占位替 trailer-summary 的句末 [。！] 伪造终止符（占位字符落进了规则接受位）" >&2; return 3; }
 
@@ -595,7 +619,7 @@ JS
   # 标题行的文字也算内容（只去掉行首 #）：`# 第1章 细纲` 计 5 字，正文再补 24/25 字凑成 29/30。
   local body29='他推门进屋看见师父坐在柜台后面他推门进屋看见师父'
   local body30='他推门进屋看见师父坐在柜台后面他推门进屋看见师父坐'
-  for book in oe_zero oe_heading oe_bomcrlf oe_29 oe_30 oe_dup oe_headcontent; do
+  for book in oe_zero oe_heading oe_bomcrlf oe_29 oe_30 oe_dup oe_headcontent oe_gbk; do
     mkdir -p "$blk/$book/正文" "$blk/$book/大纲" "$blk/$book/追踪"
     printf '%s\n' '{"schema_version":4,"state_revision":0,"last_committed_chapter":0}' > "$blk/$book/追踪/_tracking-state.json"
     printf '%s\n' '> 状态修订：0' > "$blk/$book/追踪/上下文.md"
@@ -614,13 +638,15 @@ JS
   printf '%s\n' '# 第1章 细纲' "$body30" > "$blk/oe_dup/大纲/细纲_第1章_开端.md"
   # 内容写在标题行上（`## 核心事件：…`）的细纲是写了东西的，不能按「只有标题」拦。
   printf '%s\n' '# 第1章' '## 核心事件：江晨雨夜推门发现失踪三年的师父坐在柜台后' '## 主角选择：留下' > "$blk/oe_headcontent/大纲/细纲_第001章.md"
+  # 不是合法 UTF-8 的细纲（GBK 旧稿）按非空放行，与 bash guard 同口径。
+  python3 -c 'import sys;open(sys.argv[1],"wb").write("第二天他就回来了，大家都说他变了，只是没人问".encode("gbk")+b"\n")' "$blk/oe_gbk/大纲/细纲_第001章.md"
 
   python3 - "$CODEX" "$blk" > "$tmp/bpy.txt" <<'PY'
 import importlib.util, sys
 from pathlib import Path
 spec = importlib.util.spec_from_file_location("ch", sys.argv[1]); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 root = Path(sys.argv[2])
-for rel in ["long/正文/第1章_起.md", "long/正文/第2章_承.md", "short/正文.md", "short2/正文.md", "long2/正文/第2章_新.md", "long3/正文/第2章_新.md", "long4/正文/第2章_新.md", "long5/正文/第2章_新.md", "long6/正文/第2章_新.md", "bare/正文/第1章_起.md", "$PROJ/正文/第001章_x.md", "$(pwd)/book/正文/第001章_y.md", "long7/正文/第2章_新.md", "long8/正文/第2章_新.md", "long9/正文/第2章_新.md", "oe_zero/正文/第001章_a.md", "oe_heading/正文/第001章_a.md", "oe_bomcrlf/正文/第001章_a.md", "oe_29/正文/第001章_a.md", "oe_30/正文/第001章_a.md", "oe_dup/正文/第001章_a.md", "oe_headcontent/正文/第001章_a.md"]:
+for rel in ["long/正文/第1章_起.md", "long/正文/第2章_承.md", "short/正文.md", "short2/正文.md", "long2/正文/第2章_新.md", "long3/正文/第2章_新.md", "long4/正文/第2章_新.md", "long5/正文/第2章_新.md", "long6/正文/第2章_新.md", "bare/正文/第1章_起.md", "$PROJ/正文/第001章_x.md", "$(pwd)/book/正文/第001章_y.md", "long7/正文/第2章_新.md", "long8/正文/第2章_新.md", "long9/正文/第2章_新.md", "oe_zero/正文/第001章_a.md", "oe_heading/正文/第001章_a.md", "oe_bomcrlf/正文/第001章_a.md", "oe_29/正文/第001章_a.md", "oe_30/正文/第001章_a.md", "oe_dup/正文/第001章_a.md", "oe_headcontent/正文/第001章_a.md", "oe_gbk/正文/第001章_a.md"]:
     reason = m.prose_block_reason(root, root / rel)
     sys.stdout.buffer.write((f"{rel} :: {reason if reason else '-'}\n").encode("utf-8"))
 PY
@@ -628,7 +654,7 @@ PY
 const path = require("node:path")
 const core = require(process.argv[2])
 const root = process.argv[3]
-for (const rel of ["long/正文/第1章_起.md", "long/正文/第2章_承.md", "short/正文.md", "short2/正文.md", "long2/正文/第2章_新.md", "long3/正文/第2章_新.md", "long4/正文/第2章_新.md", "long5/正文/第2章_新.md", "long6/正文/第2章_新.md", "bare/正文/第1章_起.md", "$PROJ/正文/第001章_x.md", "$(pwd)/book/正文/第001章_y.md", "long7/正文/第2章_新.md", "long8/正文/第2章_新.md", "long9/正文/第2章_新.md", "oe_zero/正文/第001章_a.md", "oe_heading/正文/第001章_a.md", "oe_bomcrlf/正文/第001章_a.md", "oe_29/正文/第001章_a.md", "oe_30/正文/第001章_a.md", "oe_dup/正文/第001章_a.md", "oe_headcontent/正文/第001章_a.md"]) {
+for (const rel of ["long/正文/第1章_起.md", "long/正文/第2章_承.md", "short/正文.md", "short2/正文.md", "long2/正文/第2章_新.md", "long3/正文/第2章_新.md", "long4/正文/第2章_新.md", "long5/正文/第2章_新.md", "long6/正文/第2章_新.md", "bare/正文/第1章_起.md", "$PROJ/正文/第001章_x.md", "$(pwd)/book/正文/第001章_y.md", "long7/正文/第2章_新.md", "long8/正文/第2章_新.md", "long9/正文/第2章_新.md", "oe_zero/正文/第001章_a.md", "oe_heading/正文/第001章_a.md", "oe_bomcrlf/正文/第001章_a.md", "oe_29/正文/第001章_a.md", "oe_30/正文/第001章_a.md", "oe_dup/正文/第001章_a.md", "oe_headcontent/正文/第001章_a.md", "oe_gbk/正文/第001章_a.md"]) {
   const reason = core.proseBlockReason(root, path.join(root, rel))
   console.log(`${rel} :: ${reason || "-"}`)
 }
@@ -664,7 +690,7 @@ JS
   grep -qF 'long7/正文/第2章_新.md :: ⛔' "$tmp/bpy.txt" \
     && grep -qF '另有 2 处，完整检查：{PYTHON} <story-long-write>/scripts/storyctl.py chapter check --project <书目录> --chapter 1）' "$tmp/bpy.txt" \
     || { echo "FAIL: 欠账门「另有 N 处」未指向上一章的 chapter check：$(grep -A8 '^long7/' "$tmp/bpy.txt")" >&2; return 3; }
-  for want in oe_30 oe_dup oe_headcontent; do
+  for want in oe_30 oe_dup oe_headcontent oe_gbk; do
     grep -q "^$want/正文/第001章_a.md :: -" "$tmp/bpy.txt" \
       || { echo "FAIL: 写了内容的细纲场景 ${want} 被误拦：$(grep "^$want/" "$tmp/bpy.txt")" >&2; return 3; }
   done
@@ -845,6 +871,7 @@ outline_exact30|0|0|4|1|1|0|0|yes|-|exact30
 outline_bomcrlf|0|0|4|1|1|0|0|yes|-|bomcrlf
 outline_dup|0|0|4|1|1|0|0|yes|-|dup
 outline_headcontent|0|0|4|1|1|0|0|yes|-|headcontent
+outline_gbk|0|0|4|1|1|0|0|yes|-|gbk
 outline_empty_existing|1|0|4|1|1|1|0|yes|-|empty
 "
   local out_bash="$tmp/bash.txt" out_js="$tmp/js.txt"
@@ -869,6 +896,8 @@ outline_empty_existing|1|0|4|1|1|1|0|yes|-|empty
         bomcrlf) printf '\357\273\277# 细纲\r\n\343\200\200\r\n\t\r\n' > "$ofile" ;;
         dup) : > "$ofile"; printf '%s\n' '# 细纲' "$o30" > "$book/大纲/细纲_第${outline}章_标题.md" ;;
         headcontent) printf '%s\n' '# 第1章' '## 核心事件：江晨雨夜推门发现失踪三年的师父坐在柜台后' '## 主角选择：留下' > "$ofile" ;;
+        # 22 字 GBK 细纲：不是合法 UTF-8，各端解码计数口径不同（bash 按字节计 27 会拦、JS/py 按替换符计 35 会放），统一按非空放行。
+        gbk) python3 -c 'import sys;open(sys.argv[1],"wb").write("第二天他就回来了，大家都说他变了，只是没人问".encode("gbk")+b"\n")' "$ofile" ;;
       esac
     fi
     local toxic='声音不大，却带着一股狠劲。'
@@ -937,6 +966,7 @@ outline_exact30 pass
 outline_bomcrlf block
 outline_dup pass
 outline_headcontent pass
+outline_gbk pass
 outline_empty_existing pass"
   while read -r want_name want_verdict; do
     [ -n "$want_name" ] || continue
@@ -985,7 +1015,7 @@ run_uncored_parity
 rc_uncored=$?
 set -e
 case "$rc_uncored" in
-  0) echo "未归核面 parity：codex python == JS core（staged warnings 大小写变体/文案 + 大纲阻断 22 组判定含空细纲各形态与标题行写内容/复扫指引/毒句式欠账门/无脚手架 fail-closed/文案逐字相等）。" ;;
+  0) echo "未归核面 parity：codex python == JS core（staged warnings 大小写变体/文案 + 大纲阻断 23 组判定含空细纲各形态（含非 UTF-8）与标题行写内容/复扫指引/毒句式欠账门/无脚手架 fail-closed/文案逐字相等）。" ;;
   1) echo "未归核面 parity：跳过（无 node/python3/git 运行时）。" ;;
   *) fails=$((fails + 1)) ;;
 esac
@@ -995,7 +1025,7 @@ run_bash_guard_parity
 rc_guard=$?
 set -e
 case "$rc_guard" in
-  0) echo "写正文守卫 parity：Claude bash guard == JS core（25 组工程场景：无 state/缺细纲/空细纲各形态/导入窗口/跳章/续写/派生修订不一致/坏 schema/回炉备份/上一章毒句式欠账、豁免标记语法与窗口、书级白名单，含 node 缺席时追踪门 fail-open、空细纲门照拦）。" ;;
+  0) echo "写正文守卫 parity：Claude bash guard == JS core（26 组工程场景：无 state/缺细纲/空细纲各形态（含 GBK 细纲）/导入窗口/跳章/续写/派生修订不一致/坏 schema/回炉备份/上一章毒句式欠账、豁免标记语法与窗口、书级白名单，含 node 缺席时追踪门 fail-open、空细纲门照拦）。" ;;
   1) echo "写正文守卫 parity：跳过（无 node/python3 运行时）。" ;;
   *) fails=$((fails + 1)) ;;
 esac

@@ -659,14 +659,17 @@ function hasDeslopSkipMarker(text) {
 // 细纲「实质为空」：去掉文件头 BOM 与每行行首的 Markdown 标题标记（空格/Tab 后接的 #）后，
 // 剩下的非空白字符（空白 = ASCII 空白 + 全角空格）不足 OUTLINE_MIN_CHARS 个码点。标题文字照算
 // （`## 核心事件：…` 这种把内容写在标题行上的细纲是写了东西的）。只量写没写东西，
-// 不查 v0.8 细纲字段——旧书的细纲格式各异，照样放行。读不了（权限/是目录）按非空放行（宁可漏拦）。
+// 不查 v0.8 细纲字段——旧书的细纲格式各异，照样放行。读不了（权限/是目录）或不是合法 UTF-8
+// （GBK 等旧编码，各端解码计数口径不同）都按非空放行（宁可漏拦）。
 // codex py _outline_is_empty 与 guard-outline-before-prose.sh outline_is_empty 同口径，
 // 由 test-prose-net-parity.sh C/D 段锁 parity。
 const OUTLINE_MIN_CHARS = 30
 function outlineIsEmpty(file) {
   let text
   try {
-    text = fs.readFileSync(file, "utf8")
+    const bytes = fs.readFileSync(file)
+    text = bytes.toString("utf8")
+    if (!Buffer.from(text, "utf8").equals(bytes)) return false
   } catch {
     return false
   }
@@ -927,10 +930,50 @@ function toxicRescanHint(absolute) {
   return "完整扫描：node <skill>/scripts/check-ai-patterns.js --check <正文文件>"
 }
 
+// HTML 注释（如 `<!-- 去味:跳过 -->`、作者备注）是元信息不是正文，与 check-ai-patterns.js scanDocument
+// 同规则：注释段（含 `<!--`、`-->`）换成等长（按码点）空格，可跨行；到文末都没闭合的 `<!--` 不算注释，
+// 只抹掉这四个字符、后面照常当正文（漏写 `-->` 不能把后面整章藏起来）。codex py _mask_html_comment_lines 同构。
+function maskHtmlCommentLines(lines) {
+  const unclosed = new Set()
+  for (;;) {
+    const out = []
+    let open = false
+    let openedAt = null
+    lines.forEach((line, index) => {
+      let text = ""
+      let cursor = 0
+      while (cursor < line.length) {
+        if (open) {
+          const close = line.indexOf("-->", cursor)
+          const end = close === -1 ? line.length : close + 3
+          text += " ".repeat(Array.from(line.slice(cursor, end)).length)
+          cursor = end
+          if (close !== -1) open = false
+          continue
+        }
+        const start = line.indexOf("<!--", cursor)
+        if (start === -1) {
+          text += line.slice(cursor)
+          break
+        }
+        text += line.slice(cursor, start) + "    "
+        cursor = start + 4
+        const key = `${index}:${start}`
+        if (unclosed.has(key)) continue
+        open = true
+        openedAt = key
+      }
+      out.push(text)
+    })
+    if (!(open && openedAt !== null)) return out
+    unclosed.add(openedAt)
+  }
+}
+
 function toxicPhraseFindings(text, whitelist = [], rescan = toxicRescanHint("")) {
   const findings = []
   const content = []
-  text.split("\n").forEach((raw, index) => {
+  maskHtmlCommentLines(text.split("\n")).forEach((raw, index) => {
     const line = raw.trim()
     if (skippableLine(line)) return
     const masked = maskQuotedSpans(maskStyleText(line, whitelist))
