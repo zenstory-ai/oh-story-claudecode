@@ -21,22 +21,23 @@ Markdown 只负责给作者和 Agent 阅读，工具不再反向解析 Markdown�
 {PYTHON} {当前 skill 根}/scripts/tracking_commit.py init   --project {书项目根} --input {书项目根}/.story/work/init.json
 {PYTHON} {当前 skill 根}/scripts/tracking_commit.py check  --project {书项目根}
 {PYTHON} {当前 skill 根}/scripts/tracking_commit.py draft  --project {书项目根} --chapter {N}
-{PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter check   --project {书项目根} --chapter {N}
+{PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter check   --project {书项目根} --chapter {N} [--min-chars {下限} --max-chars {上限}]
 {PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter commit  --project {书项目根} --chapter {N} --input {书项目根}/.story/work/第{NNN}章/tracking.json
 {PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter accept-current-length --project {书项目根} --chapter {N} --input {书项目根}/.story/work/第{NNN}章/tracking.json
 ```
 
 - `init`：只在 `_tracking-state.json` 不存在时执行，绝不覆盖已初始化项目。
-- `draft`：按当前 state 把逐章事务预填到 `.story/work/第NNN章/tracking.json`（修订号、模式、章名、`context` 四项当前值），并输出各文本字段的字数上限与在场核心角色的当前快照；调用方只填 `delta` 与有变化角色的快照。
-- `wordcount measure` / `wordcount checkpoint`：纯测量入口；不写正文、不写 tracking、不做语义判断。长篇正文只在前组写完后由父流程调用一次 `checkpoint`（见 workflow-chapter 步骤 6），整章长度由 `chapter check` 收口。
-- `chapter check`：重新读取当前正文与细纲目标，返回确定性长度状态、现有 blocking quality、`state_revision` 和当前可执行动作，不保存 approval。`under` 不提供自动补写；`over` 额外返回一次净删型 `compress-once` 及回到内部区间或作者给定区间所需的删除字数。
-- `chapter commit`：再次读取当前文件、重新计数并重跑 blocking quality；只接受用户带内章节，把简短字数记录与逐章事务一起原子提交。
-- `chapter accept-current-length`：只接受带外但 quality pass 的章节；接受动作发生时重新读取、重新计数并立即原子提交，不保存可陈旧的历史决议。
+- `draft`：按当前 state 把逐章事务预填到 `.story/work/第NNN章/tracking.json`（修订号、模式、章名、`context` 四项当前值），并输出各文本字段的字数上限与在场核心角色的当前快照。新章（append）调用方只填 `delta` 与有变化角色的快照；已提交章（revision）的 `delta` 与相关角色快照按该章现有逐章记录预填（伏笔、时间线取当前值），调用方在上面改成修订后的完整记录，不清空重写。
+- 作者字数范围：细纲可写一行 `字数范围：2000-2600`（作者明确给了上下限时）；本轮临时给的范围用 `--min-chars` / `--max-chars`（两者同给，优先于细纲）。`wordcount check` / `checkpoint` 与 `chapter check` / `commit` / `accept-current-length` 都认，给了就同时替代默认 ±12% 内部带与 ±15% 用户带，结果里 `band_source` 为 `author`，提交的字数记录多一项 `author_range`。
+- `wordcount measure` / `wordcount checkpoint`：纯测量入口；不写正文、不写 tracking、不做语义判断。长篇正文只在前组写完后由父流程调用一次 `checkpoint`（见 workflow-chapter 步骤 6），整章长度由 `chapter check` 收口；`remaining_user_range` 按生效区间（作者区间或默认用户带）计算。
+- `chapter check`：重新读取当前正文与细纲目标，返回确定性长度状态、现有 blocking quality、`state_revision` 和当前可执行动作，不保存 approval。顶层 `status`：`ready`（可提交，exit 0）/ `needs_decision`（长度带外，按 `available_actions` 交作者，exit 0）/ `blocked`（有 blocking 正文问题，exit 1）/ `invalid`（正文为空等，exit 1）/ `tool_unavailable`（找不到 node 或检测脚本，见 `quality.tool_errors`，不是正文问题，exit 3）。参数错误或文件缺失输出 `story-chapter-error/v1`（`status: error`，exit 2）。`under` 不提供自动补写；`over` 额外返回一次净删型 `compress-once` 及回到生效区间所需的删除字数。`quality.semantic_advisories` 是语义类 advisory 条数（检测器标 `review: mechanical` 的不计）。
+- `chapter commit`：再次读取当前文件、重新计数并重跑 blocking quality；只接受生效区间内的章节，把简短字数记录与逐章事务一起原子提交。新章与修订都走它。
+- `chapter accept-current-length`：只接受带外但 quality pass 的章节；接受动作发生时重新读取、重新计数并立即原子提交，不保存可陈旧的历史决议。低于字数目标一半（`BELOW_ACCEPT_FLOOR`），或超长却还没做过那一次压缩（`COMPRESSION_REQUIRED`），都拒绝；作者明确拍板时加 `--force`。
 - `check`：严格验证 state schema、逐章记录连续性/规范名/体积、固定 7 栏、角色快照硬上限、派生文件集合，以及所有派生视图与 state 的逐字一致性。
 
 每本书由 `追踪/.tracking-commit.lock` 串行写事务，`expected_state_revision` 再拒绝基于旧状态构造的 stale transaction。两个不同事务并发时至多一个修订成功。字数记录也在锁内对当前正文和目标重新验证，正文或目标变化会让预先构造的记录直接失败。
 
-事务 JSON 是临时输入，不是项目产物：只写在书目录 `.story/work/` 下（逐章事务放 `.story/work/第NNN章/tracking.json`），不写系统 `/tmp`、书根、`大纲/` 或 `正文/`；成功前必须保留，提交成功后即可删除（`storyctl.py chapter commit` / `accept-current-length` 成功时自动删除该章目录；直接调用 `tracking_commit.py commit` 时由调用方删除）——之后 `check` 失败按下文提交 `mode=revision` 新事务修复，不需要原事务。若文件写入失败，`_tracking-state.json` 尚未推进；修正环境后直接重跑**同一份** `commit`。append 重跑只接受内容完全相同的既有逐章记录，不维护 `dirty/pending/repair` 状态机。
+事务 JSON 是临时输入，不是项目产物：只写在书目录 `.story/work/` 下（逐章事务放 `.story/work/第NNN章/tracking.json`），不写系统 `/tmp`、书根、`大纲/` 或 `正文/`；成功前必须保留，提交成功后即可删除（`storyctl.py chapter commit` / `accept-current-length` 成功时自动删除该章目录；直接调用 `tracking_commit.py commit` 时由调用方删除。已有字数记录的章节正文或目标改过后，`tracking_commit.py commit` 拒绝修订事务，须走 `storyctl.py chapter commit`）——之后 `check` 失败按下文提交 `mode=revision` 新事务修复，不需要原事务。若文件写入失败，`_tracking-state.json` 尚未推进；修正环境后直接重跑**同一份** `commit`。append 重跑只接受内容完全相同的既有逐章记录，不维护 `dirty/pending/repair` 状态机。
 
 校验失败与写入失败处理方式不同：校验失败（字段非法、退役结构、容量超限）要按报错改事务本身，重跑同一份结果不变。派生视图被手改或外部改动导致 `check` 报 `derived view differs from _tracking-state.json` 时，重新提交**该章**的 `mode=revision` 事务让工具整份重建，`expected_state_revision` 取 `追踪/_tracking-state.json` 的 `state_revision` 字段——`check` 失败时只往 stderr 打 ERROR，不输出 JSON；不手改派生文件，也不删 `_tracking-state.json` 重来。手写出的逐章记录会让同章 `append` 永久报 `chapter delta N already exists with different content`——删掉那个手写文件后重跑原事务即可。
 
@@ -126,7 +127,7 @@ Markdown 只负责给作者和 Agent 阅读，工具不再反向解析 Markdown�
 - 两类退役都只能在 `mode=append` 提交。退役表示「从此刻起离开当前状态」，而修订事务的逐章记录属于被改写的旧章，落在那里会谎报退役发生的章节；`mode=revision` 必须原样重交当前全部上下文条目，需要退役就放到下一次 append。
 - `伏笔.md` 只呈现已经埋设过的当前状态。未来规划仍留在大纲。
 - `timeline_events.action` 可为 `upsert/delete`。`未揭示` 的 `reveal_chapter` 必须为 `null`；部分/完全揭示只能填写已经发生的实际章节。
-- `mode=revision` 时，逐章记录必须重算为修订后该章仍然成立的完整连续性记录；当前角色、伏笔、时间线和上下文则提交受影响对象截至最新已写章的当前值。
+- `mode=revision` 时，逐章记录必须重算为修订后该章仍然成立的完整连续性记录（用 `draft` 预填的草稿改，漏写的项会从记录里消失，工具在 stderr 警告被清空的栏目；原有的退役登记原样保留）；当前角色、伏笔、时间线和上下文则提交受影响对象截至最新已写章的当前值。
 - 修订导入截止章内的正文时，会新增或覆盖该章的逐章记录；`imported_through_chapter` 不变。
 
 ## 续写状态卡固定格式

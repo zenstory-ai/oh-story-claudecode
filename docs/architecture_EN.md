@@ -12,7 +12,7 @@ Writing skills internally coordinate 7 specialized agents:
 |:------|:------|:-----|
 | **story-architect** | Opus | Story architecture — genre positioning, outline structure, hook/twist design, emotion arcs |
 | **character-designer** | Sonnet | Character design — profiles, voice, motivation chains, dialogue writing |
-| **narrative-writer** | Sonnet | Narrative writer — prose writing, de-AI-ify, format compliance |
+| **narrative-writer** | Opus | Narrative writer — prose writing, de-AI-ify, format compliance |
 | **consistency-checker** | Haiku | Consistency check — fact conflict scanning, foreshadowing tracking, S1-S4 grading reports |
 | **story-researcher** | Sonnet | Research — CDP search + full-text extraction, multi-source cross-verification, structured reference files |
 | **story-explorer** | Haiku | Story query — read-only character/foreshadowing/setting/progress lookup, quick context loading |

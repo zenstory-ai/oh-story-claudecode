@@ -14,7 +14,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > Agent 兼容性：只检查当前运行时的 canonical 目录：Claude `.claude/agents/{agent}.md`、OpenCode `.opencode/agents/{agent}.md`、Codex `.codex/agents/{agent}.toml`、Antigravity `.agents/agents/agent-name/agent.md`（`agent-name` 为目标 agent 名），不得因其他端文件存在而误判。Codex 使用同名 `agent_type`；Antigravity 使用 `invoke_subagent` + `TypeName`。对应运行时未暴露 custom-agent registry / `invoke_subagent` 或返回未知 agent 时，必须降级 solo/direct。检测到 `.zcode/` 时同样直接 solo/direct，因为 ZCode 3.3.4 不执行项目 custom agents；报告 `Fallback: project custom agents unavailable -> solo`。Claude 用 `subagent_type`；OpenCode 用 `subagent` 工具的 `agent` 参数。
 >
-> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 32` 不一致时（标记缺失、字段缺失/非整数、小于或大于 32）**照常按文件存在性检查并 spawn**，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 32）` 并提示重新运行 `/story-setup` 后新开会话；大于 32 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct，报告 `Fallback: ... -> solo`。
+> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 33` 不一致时（标记缺失、字段缺失/非整数、小于或大于 33）**照常按文件存在性检查并 spawn**，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 33）` 并提示重新运行 `/story-setup` 后新开会话；大于 33 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct，报告 `Fallback: ... -> solo`。
 
 ## 核心原则
 
@@ -102,7 +102,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 在进入 Phase 2 之前，先检测项目是否已部署 story-setup 基础设施：
 
 - 先读取 `.story-deployed` 并执行顶部 Spawn 版本门禁；旧版 `chapter-extractor` 文件即使仍在磁盘上也不可复用。
-- 只有 `agents_version: 32` 通过后，才在当前运行时的 canonical 目录检查 Phase 2 `chapter-extractor`：Claude/OpenCode/Antigravity 为同名 Markdown，Codex 为同名 TOML。
+- 只有 `agents_version: 33` 通过后，才在当前运行时的 canonical 目录检查 Phase 2 `chapter-extractor`：Claude/OpenCode/Antigravity 为同名 Markdown，Codex 为同名 TOML。
 - 如果 `.story-deployed` 的 `target_cli` 包含 `zcode`，项目 agents 缺失是 ZCode 3.3.4 的预期状态：不要提示重复部署，直接以串行 solo/direct 进入分析并报告 fallback。
 
 **部署标记缺失、版本无效/过期，或当前端的 agent 不可用，且不是已部署 ZCode 项目时**，这样问用户：
@@ -110,7 +110,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 > 「这个项目还没装好写作环境。装好后由专门的分析助手逐段拆书，主对话不会被整本书塞满；不装也能导，只是全部在主对话里做，慢一些，结果一样完整。你想：1. 先装环境（推荐）：运行 `/story-setup`，装完再说"导入" 2. 直接导入，慢一点也行」
 
 1. **先去 setup**：暂停导入，运行 `/story-setup`，部署完成后重新触发 `/story-import`；
-2. **继续导入**：Phase 2 降级为主线程串行处理（长篇逐章摘要由主线程自己写，速度较慢，但产物完整）。
+2. **继续导入**：Phase 2 降级为主会话串行处理（长篇逐章摘要由主会话自己写，速度较慢，但产物完整）。
 
 用户选择记入上下文，Phase 2 据此决定是否派 chapter-extractor。有子代理时，导入属自动续跑，按 story-long-analyze 的「有限并行」档派发（每轮 3 批）；用户明确要求时改用串行或不限批次顺序。
 
@@ -147,7 +147,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 - 措辞示例（全新）：启动深度分析时声明「以『完整拆解、一次跑完、不要停下询问』模式拆解本书，确保 Stage 2-6 全部产出」。
 - 措辞示例（旧成果）：声明「先复用并校验现有成果，只补当前导入缺失的章节或分析，不覆盖用户原成果」。
 - **兜底**：若全新导入实际仍停在 Stage 1，story-import 自动选择继续；若旧成果任务停靠，则按已登记的缺失范围继续，不能扩大成全书重跑。
-- 环境检测（Phase 1）发现未部署 chapter-extractor agent 且用户选择「继续导入」时，Stage 2 由主线程按相同连续章节块契约串行处理，不能退回每章一次独立调用；产物仍完整，仅速度变慢。
+- 环境检测（Phase 1）发现未部署 chapter-extractor agent 且用户选择「继续导入」时，Stage 2 由主会话按相同连续章节块契约串行处理，不能退回每章一次独立调用；产物仍完整，仅速度变慢。
 
 #### 短篇：单一全量管道
 
@@ -222,7 +222,7 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 |------|------|------|------|----------|
 | 0 | 概要与机械索引 | 原始文本 | 概要.md + `chapter_index.csv` | 章节结构、定位、源 hash 与解析器版本记录完成 |
 | 1 | 黄金三章 | 前 3 章原文 | 第1章_深度拆解.md / 第2章_深度拆解.md / 第3章_深度拆解.md → **停靠产出快速预览.md**（导入场景自动续跑，不停下询问） | 3 章拆解完成 |
-| 2 | 连续章节块提取 | 待处理连续原文、旧成果与跨块状态 | 同次产出 `章节/第N章_摘要.md`（含情节点序列）和 `_analysis_cache/批次-*.md`；每批最多 3 章，长章缩到 1-2 章；每章 10-20 个情节点，长章最多 30 | 可用正文覆盖完整，摘要数与可用章节数一致 |
+| 2 | 连续章节块提取 | 待处理连续原文、旧成果与跨块状态 | 同次产出 `章节/第N章_摘要.md`（含情节点序列）和 `_analysis_cache/批次-*.md`；每批最多 3 章，长章缩到 1-2 章；每章情节点按字数折算（约每 200 字一个，至少 1 个；足章 10-20 个），长章最多 30 | 可用正文覆盖完整，摘要数与可用章节数一致 |
 | 3 | 聚合分析 | 批次观察、必要逐章事实与可复用旧资料 | `剧情/*.md` + `剧情/README.md` + `剧情/故事线.md` + **`剧情/节奏.md` + `剧情/情绪模块.md`**。在现有资料中补强因果链、客观事件/多次披露、信息差、事件/情绪/篇幅三维节奏及机制成立条件 | 质量检查通过 |
 | 4 | 设定+关系 | 批次观察、阶段 3 归一实体与必要逐章事实 | 设定/*.md + 角色/*.md + 人物关系图。关系记录方向、触发、双方得失、阶段状态和证据 | 设定和关系提取完成 |
 | 5 | 汇总报告 | 全部权威底层结果 | `拆文报告.md`：一份可独立阅读的人类主报告，嵌入可用人物关系图，不重新阅读全文 | 报告生成完成 |
@@ -355,9 +355,12 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 - 核心事件：{从摘要中提取}
 - 字数目标：{storyctl 返回的 actual} 字
 - 字数口径：visible_chars_v1
-- 目标情绪：{从章节基调/情绪曲线提取；未知写 [待补充]}
+- 单元ID/位置：{反推卷纲里本章所属剧情单元ID；单元内第几拍，判断不出写 [待补充]}
+- 目标情绪：{前状态→后状态，从基调与状态变化归纳，不只写一个情绪词；必须写实际内容}
+- 主角目标/关键选择：{原文里主角本章要什么、做了什么判断或选择；必须写实际内容}
 - 章首钩子：[待补充]
 - 爽点：{从情节点推断；无明确证据写 [待补充]}
+- 本章禁止提前释放：无
 
 #### 内容概括（五段式）
 - 起因：{从情节点归纳；未知写 [待补充]}
@@ -387,11 +390,11 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 - 行动成本（可无）/收益归属：{有证据才写；行动成本可无、不硬造；未知写 [待补充]}
 
 #### 结尾设定和钩子
-- 结尾设定：{原文收束落在什么动作或画面；未解决问题；下一章推动力；未知写 [待补充]}
+- 结尾设定：{原文落到最后的具体动作或画面；未解决问题；下一章推动力；未知写 [待补充]}
 - 章尾钩子：[待补充]
 ```
 
-> 钩子、人物关系变化、辅线/感情线、行动成本/收益归属等无法由原文摘要稳定判断的字段统一标 `[待补充]`；story-import 只反推有证据的蓝图，不为补齐字段编造关系或副线。
+> 钩子、人物关系变化、辅线/感情线、行动成本/收益归属等无法由原文摘要稳定判断的字段统一标 `[待补充]`；story-import 只反推有证据的蓝图，不为补齐字段编造关系或副线。已写成的历史章「本章禁止提前释放」写「无」；目标情绪与主角目标/关键选择不接受 `[待补充]`。每批细纲写完运行 `node scripts/check-outline-contract.js --json <细纲路径...>`，exit 1 时只按报告补缺的字段或小节。
 
 #### Step 7：追踪文件生成
 
@@ -491,7 +494,7 @@ story-short-analyze 的拆解管道（Stage 2-6）本身**无 Stage 1 停靠点*
 
 #### Step 3：小节大纲生成
 
-从 `情节节点.md` 的功能分段反推 `{标题}/小节大纲.md`，按开头段/铺垫段/升级段/反转段/结尾段映射；短篇只做轻量蓝图：每节写 `结构段/五段功能`、主事件、一个或多个真实推进、目标情绪、人物/关系变化、因果/逻辑链、结尾承接/小钩子。相关情节点可由同一动作链或对话同时兑现，不为凑数量拆成多个子事件。钩子或关系无法判断时标 `[待补充]`，不套用长篇完整章节蓝图。
+从 `情节节点.md` 的功能分段反推 `{标题}/小节大纲.md`，按开头段/铺垫段/升级段/反转段/结尾段映射，用 story-short-write 的固定 12 列表格（`结构段/五段功能 | 主事件 | 情节推进 | 情绪 | 人物/关系变化 | 因果/逻辑链 | 读者新获知什么 | 结尾承接/钩子 | 伏笔/物件 | 场景形态 | 对白作用 | 目标字数`），每节一行，填法见 [references/structure-mapping-short.md](references/structure-mapping-short.md)「小节大纲表格」。相关情节点可由同一动作链或对话同时兑现，不为凑数量拆成多个子事件。原文判断不出的格子写 `[待补充]`，不套用长篇完整章节蓝图。
 
 #### Step 4：外部对标引用视图（可选）
 

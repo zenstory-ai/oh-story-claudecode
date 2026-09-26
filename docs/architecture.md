@@ -13,7 +13,7 @@ Oh Story 把长篇写作拆成「文件系统当记忆 + 专业 Agent 分工 + �
 |:------|:-----|:-----|
 | **story-architect** | Opus | 故事架构 · 题材定位、大纲结构、钩子/反转设计、情绪弧线 |
 | **character-designer** | Sonnet | 角色设计 · 角色档案、语言风格、动机链、对话创作 |
-| **narrative-writer** | Sonnet | 叙事写手 · 正文写作、去AI味、格式合规 |
+| **narrative-writer** | Opus | 叙事写手 · 正文写作、去AI味、格式合规 |
 | **consistency-checker** | Haiku | 一致性检查 · 事实冲突扫描、伏笔追踪、S1-S4 分级报告 |
 | **story-researcher** | Sonnet | 资料研究 · CDP 搜索+正文提取、多源交叉验证、结构化参考文件输出 |
 | **story-explorer** | Haiku | 故事查询 · 角色/伏笔/设定/进度只读查询，日更上下文快速加载 |

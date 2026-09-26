@@ -108,7 +108,7 @@
 
 ```bash
 for PYBIN in python3 python py; do "$PYBIN" -c "" 2>/dev/null && break; done
-"$PYBIN" -c "from pathlib import Path; print(len(Path('正文.md').read_text(encoding='utf-8')))"
+"$PYBIN" -c "from pathlib import Path; print(len(''.join(Path('正文.md').read_text(encoding='utf-8').split())))"
 ```
 
 各节分布（按小节标记切开，逐节报非空白字符数）：

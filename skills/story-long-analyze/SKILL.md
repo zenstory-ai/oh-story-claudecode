@@ -12,7 +12,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > Agent 兼容性：只检查当前运行时 canonical 目录。运行时不支持项目 agent 或找不到文件时降级 solo/direct，并报告 `Fallback: project custom agents unavailable -> solo`。ZCode 3.3.4 不提供项目 custom agents，直接按此规则降级，不扫描其他 CLI 的 agent 目录。
 >
-> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 32` 不一致时（标记缺失、字段缺失/非整数、小于或大于 32）照常按文件存在性检查并 spawn，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 32）` 并提示重新运行 `/story-setup` 后新开会话；大于 32 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct。
+> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 33` 不一致时（标记缺失、字段缺失/非整数、小于或大于 33）照常按文件存在性检查并 spawn，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 33）` 并提示重新运行 `/story-setup` 后新开会话；大于 33 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有 agent 文件缺失、或运行时不暴露 custom agent 时才降级 solo/direct。
 
 ## 分析边界
 
@@ -95,14 +95,14 @@ chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locato
 "{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" plan --root "{拆文目录}" --intent continue
 ```
 
-用户明确增强改为 `--intent enhance`。逐批派发加 `--next 1` 只取下一批，确认进度用 `--next 0`。计划不落盘，批次 ID 固定为 `RAW-{起章}-{止章}` 或 `REUSE-{起章}-{止章}`。计划与提交都拒绝超过 3 章或 25,000 字符的非单章原文块；同一章不能出现在两个原文块。计划原文读取数为 0 时不得派发原文任务。
+用户明确增强改为 `--intent enhance`。逐批派发加 `--next 1` 只取下一批，确认进度用 `--next 0`；作者只拆某一段时加 `--chapters 起-止`。计划不落盘，批次 ID 固定为 `RAW-{起章}-{止章}` 或 `REUSE-{起章}-{止章}`。计划与提交都拒绝超过 3 章或 25,000 字符的非单章原文块；同一章不能出现在两个原文块。计划原文读取数为 0 时不得派发原文任务。
 
 ### 两种互斥输入
 
 - `raw-original`：只按索引读取计划范围，一次产生紧凑逐章事实和跨章观察；
 - `existing-results`：只读 `source_files` 列出的摘要或黄金三章，不得打开原文。完整旧项目增强只产批次观察；本批含摘要缺口时必须为每章生成紧凑章块。
 
-`chapter-extractor` 输出字段为：概要、因果、关键行动、局面结果、涉及人物、信息变化、状态变化、三维节奏、章尾钩子、证据，以及情节点列表（原文块每章 10–20 个、长章最多 30 个，格式见 output-templates）。不得另做章节卡表。派发只给 `source_locator`、字数、输出文件路径和上一批缓存路径：子代理自己读原文、把完整结果写进 `_analysis_cache/输入-{批次ID}.md`，只回一行回执；主会话不转贴原文、不读这份输入，直接提交（细则见 pipeline-ops「执行与提交一个批次」）。
+`chapter-extractor` 输出字段为：概要、因果、关键行动、局面结果、涉及人物、信息变化、状态变化、三维节奏、章尾钩子、证据，以及情节点列表（原文块每章一般 10–20 个、最多 30 个，下限按字数算，楔子这类短章只要几个，格式见 output-templates）。不得另做章节卡表。派发只照抄计划里这一批的 `source_files`、`chapter_chars`、`min_plot_points`、`input_file` 和 `handoff_cache`：子代理自己读原文、把完整结果写进 `_analysis_cache/输入-{批次ID}.md`，只回一行回执；主会话不转贴原文、不读这份输入，直接提交（细则见 pipeline-ops「执行与提交一个批次」）。
 
 提交：
 
@@ -110,7 +110,7 @@ chapter,source_chapter,volume,title,start_line,end_line,char_count,source_locato
 "{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" commit --root "{拆文目录}" --input "{拆文目录}/_analysis_cache/输入-RAW-4-6.md" --batch-id "RAW-4-6" --range-sha256 "{plan 输出值}" --source-file "{plan 来源}"
 ```
 
-提交脚本先完整校验（原文块每章情节点不足 10 或超过 30 即整批拒收），再按“缓存 → 缺失摘要 → `_progress.md`”写入。摘要投影逐个情节点固定主题、基调和类型枚举，映射不上时主题/基调写“其他”；保留“关键事件”“情节点”“涉及”“基调”等旧消费者字段。任何已有摘要均不覆盖，结果里的 `kept_existing_summary_chapters` 列出被保留的章。
+提交脚本先完整校验（原文块每章情节点少于该章 `min_plot_points` 或超过 30 即整批拒收），再按“缓存 → 缺失摘要 → `_progress.md`”写入。摘要投影逐个情节点固定主题、基调和类型枚举，映射不上时主题/基调写“其他”；保留“关键事件”“情节点”“涉及”“基调”等旧消费者字段。任何已有摘要均不覆盖，结果里的 `kept_existing_summary_chapters` 列出被保留的章。
 
 ### 拆分与恢复
 

@@ -2,7 +2,7 @@
 
 #### Agent 调用：story-architect
 
-构思阶段，如果项目已部署 story-architect agent（查找顺序见 [SKILL.md](../SKILL.md)），可 spawn `Agent(subagent_type: "story-architect", prompt: "项目目录：{dir}\n任务类型：短篇构思\n查询参数：{情绪目标+题材方向}")` 辅助框架设计。如 agent 不可用，由主线程直接执行。
+构思阶段，如果项目已部署 story-architect agent（查找顺序见 [SKILL.md](../SKILL.md)），可 spawn `Agent(subagent_type: "story-architect", prompt: "项目目录：{dir}\n任务类型：短篇构思\n查询参数：{目标情绪+题材方向}")` 辅助框架设计。如 agent 不可用，由主会话直接执行。
 
 帮用户确定短篇的核心框架：
 
@@ -13,7 +13,7 @@
 - 标题（暂定）：{}
 - 目标字数：{} 字（短篇通常 8000-20000 字）
 - 目标平台：{知乎盐选 / 小程序 / 番茄短篇}（三选一）
-- 情绪目标：{读者读完的感受}
+- 目标情绪：{读者读完的感受}
 
 ### 一句话梗概
 {主角 + 困境 + 反转 + 情绪落点}
@@ -75,4 +75,4 @@
 
 #### Agent 调用：character-designer
 
-设计任务完成后，如果项目已部署 character-designer agent（查找顺序见 [SKILL.md](../SKILL.md)），可 spawn `Agent(subagent_type: "character-designer", prompt: "项目目录：{dir}\n任务类型：角色设定\n查询参数：{人设速写+关系}")` 辅助角色设定和语言风格档案。如 agent 不可用，由主线程直接执行。
+设计任务完成后，如果项目已部署 character-designer agent（查找顺序见 [SKILL.md](../SKILL.md)），可 spawn `Agent(subagent_type: "character-designer", prompt: "项目目录：{dir}\n任务类型：角色设定\n查询参数：{人设速写+关系}")` 辅助角色设定和语言风格档案。如 agent 不可用，由主会话直接执行。

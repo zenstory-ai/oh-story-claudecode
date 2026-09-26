@@ -38,7 +38,7 @@
 | 情绪弧线 | `references/emotional-arc-design.md` |
 | 契约/终局储备/剧情单元契约四问 | `references/reader-contract-and-progression.md` |
 | 反转设计 | `references/long-reversal.md` |
-| 细纲结构验收 | `scripts/check-outline-contract.js`（新建/补建后跑，只判字段与表结构） |
+| 细纲结构检查 | `scripts/check-outline-contract.js`（新建/补建后跑，只判字段与表结构） |
 
 ### Phase 4：正文写作
 
