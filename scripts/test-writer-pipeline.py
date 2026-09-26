@@ -157,11 +157,12 @@ class PipelineTests(unittest.TestCase):
 
     def test_builder_queries_scoped_author_memory(self):
         (self.book / '.story-deployed').write_text('agents_version: 32\n', encoding='utf-8')
-        self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：都市 · 悬疑\n')
+        self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：都市 · 悬疑（无言情线）\n')
         memory_input = Path(self.tmp.name) / 'memory.json'
         for n, (level, value, assertion) in enumerate([
                 ('genre', '悬疑', '悬疑线索先埋后揭'), ('workflow', '长篇', '长篇每章结尾留钩子'),
-                ('genre', '仙侠', '仙侠用古风称谓'), ('workflow', '交稿', '交稿前先报字数')], 1):
+                ('genre', '仙侠', '仙侠用古风称谓'), ('workflow', '交稿', '交稿前先报字数'),
+                ('genre', '言情', '言情线慢热')], 1):
             event = {'schema_version': 1, 'event_id': f's{n}', 'operation': {'action': 'remember', 'preference': {
                 'kind': 'prose_style', 'scope': {'level': level, 'value': value}, 'assertion': assertion,
                 'quote': assertion, 'source_ref': 'test', 'source': 'explicit_user', 'confidence': 'high',
@@ -177,7 +178,8 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('长篇每章结尾留钩子', result.stdout)
         self.assertNotIn('仙侠用古风称谓', result.stdout)
         # 判断不了的限定取值不静默丢弃，留给主会话。
-        self.assertIn('另有限定范围的作者记忆未代查（题材：仙侠；流程：交稿）', result.stdout)
+        self.assertNotIn('言情线慢热', result.stdout)  # 「无言情线」不是言情题材
+        self.assertIn('另有限定范围的作者记忆未代查（题材：仙侠、言情；流程：交稿）', result.stdout)
 
     def test_bare_out_archives_into_book_work_dir(self):
         result = self.call('build_writer_prompt.py', '--project', self.book, '--chapter', 1, '--out')

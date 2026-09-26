@@ -64,7 +64,7 @@ SCENE_PROMPT = """你是网文责编，只核对「演没演」，不评文笔�
 {body}
 """
 
-PAIRWISE_PROMPT = """你是番茄小说的资深编辑。下面是同一份细纲写出的两版第 {chapter} 章正文（A 与 B），
+PAIRWISE_PROMPT = """你是番茄小说的资深编辑。下面是{source}写出的两版第 {chapter} 章正文（A 与 B），
 来源未知。请站在追更读者的角度判断哪一版更好看：更想往下读、人物更像活人、场面更具体、
 更不像 AI 写的。只看成品，不因长短本身加减分。
 
@@ -118,7 +118,7 @@ def coverage(runs, out, strict=False):
     out.mkdir(parents=True, exist_ok=True)
     for run in runs:
         for meta, n, body, outline in chapters(run):
-            dest = out / f'{Path(run).name}-{n:03d}.json'
+            dest = out / f'{Path(run).name}-{n:03d}-{JUDGE}.json'
             if dest.exists():
                 continue
             prompt = (SCENE_PROMPT if strict else COVERAGE_PROMPT).format(
@@ -141,7 +141,7 @@ def pairwise(base_runs, cand_runs, out):
     for (host, case, n), pair in sorted(index.items()):
         if len(pair) != 2:
             continue
-        dest = out / f'{host}-{case}-{n:03d}.json'
+        dest = out / f'{host}-{case}-{n:03d}-{JUDGE}.json'
         if dest.exists():
             continue
         seed = int(hashlib.sha256(f'{host}{case}{n}'.encode()).hexdigest(), 16)
@@ -152,10 +152,12 @@ def pairwise(base_runs, cand_runs, out):
         rounds = []
         for a, b in ((first, second), (second, first)):
             if outlines['base'] == outlines['cand']:
-                outline = '===== 细纲 =====\n' + outlines['base']
+                source, outline = '同一份细纲', '===== 细纲 =====\n' + outlines['base']
             else:
+                source = '各自细纲（同一段剧情、分别补写）'
                 outline = '===== A 的细纲 =====\n%s\n\n===== B 的细纲 =====\n%s' % (outlines[a], outlines[b])
-            result, raw = ask(PAIRWISE_PROMPT.format(chapter=n, outline=outline, a=texts[a], b=texts[b]), out)
+            result, raw = ask(PAIRWISE_PROMPT.format(source=source, chapter=n, outline=outline, a=texts[a], b=texts[b]),
+                              out)
             w = (result or {}).get('winner')
             rounds.append({'A': a, 'B': b, 'winner': {'A': a, 'B': b}.get(w, 'tie' if w == 'tie' else None),
                            'reason': (result or {}).get('reason'), 'raw': raw})

@@ -151,20 +151,26 @@ def scoped_memory_values(workspace: Path):
     state = read_text(workspace / ".story" / "作者记忆" / "_author-memory-state.json")
     try:
         items = (json.loads(state) if state else {}).get("items") or {}
-    except ValueError:
+        items = list(items.values())
+    except (ValueError, AttributeError, TypeError):
         return values
-    for item in items.values():
-        scope = item.get("scope") or {}
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        scope = item.get("scope") if isinstance(item.get("scope"), dict) else {}
         if (item.get("status") == "active" and item.get("kind") in MEMORY_KINDS
                 and scope.get("level") in values and scope.get("value")):
             values[scope["level"]].add(scope["value"])
     return values
 
 
-def book_genre_line(project: Path):
+def book_genres(project: Path):
+    """「题材类型」行按分隔符切成词；未填的模板占位（{…}）不算。"""
     text = read_text(project / "设定" / "题材定位.md") or ""
     match = re.search(r"^[ \t]*[-*+]?[ \t]*\**题材(?:类型)?\**[ \t]*[：:](.*)$", text, re.M)
-    return match.group(1).casefold() if match else ""
+    if not match or "{" in match.group(1):
+        return set()
+    return {word.casefold() for word in re.split(r"[\s/·・、，,;；|｜+＋（）()]+", match.group(1)) if word}
 
 
 def query_author_memory(project: Path):
@@ -180,8 +186,8 @@ def query_author_memory(project: Path):
     if not script.is_file():
         return None, [], {}, "author_memory_commit.py 缺失"
     scoped = scoped_memory_values(workspace)
-    genre_line = book_genre_line(project)
-    genres = sorted(v for v in scoped["genre"] if genre_line and v.casefold() in genre_line) or [None]
+    book = book_genres(project)
+    genres = sorted(v for v in scoped["genre"] if v.casefold() in book) or [None]
     workflows = sorted(v for v in scoped["workflow"] if v.casefold() in {w.casefold() for w in LONG_WRITE_WORKFLOWS})
     skipped = {"genre": sorted(v for v in scoped["genre"] if v not in genres),
                "workflow": sorted(v for v in scoped["workflow"] if v not in workflows)}
@@ -207,6 +213,7 @@ def query_author_memory(project: Path):
                     seen.add(item.get("id"))
                     items.append(item)
             omitted += [i for i in result.get("omitted_ids") or [] if i not in omitted and i not in seen]
+    omitted = [i for i in omitted if i not in seen]
     return items, omitted, {k: v for k, v in skipped.items() if v}, None
 
 

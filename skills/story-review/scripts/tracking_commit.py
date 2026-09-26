@@ -292,6 +292,14 @@ def archive_retired_tracking_paths(tracking: Path) -> list[str]:
     return retired
 
 
+def _both_blank(position: dict[str, Any]) -> bool:
+    return all(isinstance(position.get(key), str) and not position[key].strip() for key in ("story_time", "scene"))
+
+
+def _raise_blank_position(label: str) -> str:
+    raise TrackingError(f"{label}.story_time and {label}.scene must not be empty: fill where this chapter ends")
+
+
 def validate_position(value: object, label: str = "context.position") -> dict[str, Any]:
     position = as_mapping(value, label)
     require_known_keys(position, {"volume", "volume_start_chapter", "story_time", "scene"}, label)
@@ -300,7 +308,8 @@ def validate_position(value: object, label: str = "context.position") -> dict[st
         "volume_start_chapter": as_int(
             position.get("volume_start_chapter"), f"{label}.volume_start_chapter", minimum=1
         ),
-        "story_time": clean_text(position.get("story_time"), f"{label}.story_time", max_bytes=240),
+        "story_time": clean_text(position.get("story_time"), f"{label}.story_time", max_bytes=240)
+        if not _both_blank(position) else _raise_blank_position(label),
         "scene": clean_text(position.get("scene"), f"{label}.scene", max_bytes=240),
     }
 
@@ -1294,15 +1303,29 @@ def main() -> int:
             document, snapshots, previous_position = draft_transaction(args.project, args.chapter)
             out = args.out or args.project / ".story" / "work" / f"第{args.chapter:03d}章" / "tracking.json"
             out.parent.mkdir(parents=True, exist_ok=True)
-            refreshed = False
+            refreshed = ""
             if out.exists() and not args.force:
-                # 修订号过期后重跑 draft 是常见动作：只刷新修订号，不冲掉已经填好的变化。
+                # 重跑 draft 不冲掉已经填好的变化。修订号变了说明中间提交过别的事务：context 按当前
+                # 状态重建（沿用旧 context 会把那次变更整份覆盖回去），只带过本章自己填的部分。
                 existing = read_json(out)
                 require(isinstance(existing, dict) and existing.get("chapter") == document["chapter"]
                         and existing.get("mode") == document["mode"],
                         f"{out} already holds a draft for a different chapter or mode; pass --force to replace it")
-                existing["expected_state_revision"] = document["expected_state_revision"]
-                document, refreshed = existing, True
+                if existing.get("expected_state_revision") == document["expected_state_revision"]:
+                    document, refreshed = existing, "已有草稿且修订号未变，原样保留"
+                else:
+                    for key in ("delta", "character_snapshots"):
+                        if isinstance(existing.get(key), dict):
+                            document[key] = existing[key]
+                    if existing.get("chapter_title"):
+                        document["chapter_title"] = existing["chapter_title"]
+                    old_position = ((existing.get("context") or {}).get("position") or {})
+                    if previous_position:
+                        for key in ("story_time", "scene"):
+                            if isinstance(old_position.get(key), str) and old_position[key].strip():
+                                document["context"]["position"][key] = old_position[key]
+                    refreshed = ("修订号已变：context 按当前状态重建，已填的 delta、角色快照与本章位置保留；"
+                                 "之前从 context 删掉的项要重新删")
             out.write_text(json.dumps(document, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
             fill = ("只填 delta 里本章的变化；context 其余字段已是当前值，要撤下的长期约束或连贯性风险从 context 删掉并把原文放进 "
                     "delta.retired_context_items（仅 append）；本章有变化的核心角色把下面的当前快照整份改好放进 character_snapshots，"
@@ -1314,7 +1337,7 @@ def main() -> int:
                 "draft": str(out),
                 "mode": document["mode"],
                 "expected_state_revision": document["expected_state_revision"],
-                "fill": ("已有草稿，只刷新了修订号，已填内容保留；要从头生成加 --force。" if refreshed else "") + fill,
+                "fill": (f"{refreshed}；要从头生成加 --force。" if refreshed else "") + fill,
                 "limits_chars": DRAFT_LIMITS,
                 "current_snapshots": snapshots,
             }

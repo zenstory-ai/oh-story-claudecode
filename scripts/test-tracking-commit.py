@@ -512,12 +512,39 @@ class TrackingCommitTests(unittest.TestCase):
             [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"],
             text=True, capture_output=True, check=False, encoding="utf-8")
         self.assertEqual(again.returncode, 0, again.stderr)
-        self.assertIn("只刷新了修订号", json.loads(again.stdout)["fill"])
+        self.assertIn("原样保留", json.loads(again.stdout)["fill"])
         draft = json.loads(draft_path.read_text(encoding="utf-8"))
         self.assertEqual(draft["delta"]["result"], "江晨在看片会上保住了原版。")
         self.run_tool("commit", draft)
         self.assertEqual(self.read_state()["last_committed_chapter"], 1)
         self.assertEqual(self.read_state()["context"]["position"]["scene"], "剪辑室")
+
+    def test_redraft_with_stale_revision_rebuilds_context_and_keeps_filled_parts(self) -> None:
+        self.init()
+        (self.project / "大纲").mkdir(exist_ok=True)
+        (self.project / "大纲" / "细纲_第001章.md").write_text("### 第 1 章：看片会\n", encoding="utf-8")
+        draft_cmd = [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"]
+        first = subprocess.run(draft_cmd, text=True, capture_output=True, check=False, encoding="utf-8")
+        draft_path = Path(json.loads(first.stdout)["draft"])
+        state = self.read_state()
+        # 过期草稿：中间别的事务改过 state 后，旧草稿的修订号与 context 都是旧的。
+        stale = json.loads(draft_path.read_text(encoding="utf-8"))
+        stale["expected_state_revision"] = state["state_revision"] + 7
+        stale["context"]["position"]["volume"] = "旧卷名"
+        stale["delta"]["result"] = "江晨保住了原版。"
+        stale["context"]["position"].update({"story_time": "当晚", "scene": "剪辑室"})
+        draft_path.write_text(json.dumps(stale, ensure_ascii=False), encoding="utf-8")
+        again = subprocess.run(draft_cmd, text=True, capture_output=True, check=False, encoding="utf-8")
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertIn("context 按当前状态重建", json.loads(again.stdout)["fill"])
+        rebuilt = json.loads(draft_path.read_text(encoding="utf-8"))
+        self.assertEqual(rebuilt["expected_state_revision"], state["state_revision"])
+        self.assertEqual(rebuilt["context"]["position"]["volume"], state["context"]["position"]["volume"])
+        self.assertEqual(rebuilt["delta"]["result"], "江晨保住了原版。")
+        self.assertEqual((rebuilt["context"]["position"]["story_time"], rebuilt["context"]["position"]["scene"]),
+                         ("当晚", "剪辑室"))
+        self.run_tool("commit", rebuilt)
+        self.assertEqual(self.read_state()["last_committed_chapter"], 1)
 
     def test_all_over_length_fields_are_reported_at_once_in_characters(self) -> None:
         self.init()
