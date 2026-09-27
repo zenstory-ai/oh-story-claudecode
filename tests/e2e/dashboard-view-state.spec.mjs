@@ -122,6 +122,23 @@ test("禁用 localStorage 时仍能使用文件链接和行号", async ({ page }
   expect(errors).toEqual([]);
 });
 
+test("明暗默认跟随系统，手动切换后刷新仍保留", async ({ page }) => {
+  const scheme = () => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme);
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/");
+  await expect.poll(scheme).toBe("dark");
+
+  await page.locator("#themeButton").click();
+  await expect.poll(scheme).toBe("light");
+  await page.reload();
+  await expect.poll(scheme).toBe("light");
+
+  await page.locator("#themeButton").click();
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.reload();
+  await expect.poll(scheme).toBe("dark");
+});
+
 test("@mobile 行号随中文长段、空行和滚动对齐，预览保留源文件行号", async ({ page }, testInfo) => {
   const errors = [];
   page.on("console", (message) => {

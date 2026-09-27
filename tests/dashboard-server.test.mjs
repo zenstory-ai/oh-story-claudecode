@@ -430,9 +430,10 @@ describe("HTTP API", () => {
     assert.match(page.headers.get("content-type"), /^text\/html/);
     const html = await page.text();
     const assetPaths = [...html.matchAll(/(?:href|src)="(\/[^"]+)"/g)].map((match) => match[1]);
-    assert.deepEqual(assetPaths.sort(), ["/app.js", "/styles.css"]);
+    assert.deepEqual(assetPaths.sort(), ["/app.js", "/styles.css", "/tokens.css"]);
 
     for (const [assetPath, contentType] of [
+      ["/tokens.css", /^text\/css/],
       ["/styles.css", /^text\/css/],
       ["/app.js", /javascript/],
     ]) {

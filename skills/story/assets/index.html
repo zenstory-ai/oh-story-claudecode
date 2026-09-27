@@ -3,9 +3,11 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="light">
-    <meta name="theme-color" content="#f7f8fa">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#faf5ea" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#081431" media="(prefers-color-scheme: dark)">
     <title>OH STORY · 本地写作工作台</title>
+    <link rel="stylesheet" href="/tokens.css">
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
@@ -14,10 +16,10 @@
     <div class="app-shell">
       <header class="masthead">
         <div class="brand-lockup" aria-label="OH STORY 本地写作工作台">
-          <span class="brand-seal" aria-hidden="true">OH</span>
+          <span class="brand-seal" aria-hidden="true">文</span>
           <span class="brand-copy">
             <strong>OH STORY</strong>
-            <small>WRITING DESK</small>
+            <small>写作台</small>
           </span>
         </div>
 
@@ -45,6 +47,15 @@
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M20 6v5h-5"></path>
               <path d="M18.2 15.7A7 7 0 1 1 19 9.3L20 11"></path>
+            </svg>
+          </button>
+          <button id="themeButton" class="icon-button theme-button" type="button" title="切换明暗" aria-label="切换明暗">
+            <svg class="theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10Z"></path>
+            </svg>
+            <svg class="theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="4"></circle>
+              <path d="M12 2.5v2M12 19.5v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2.5 12h2M19.5 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"></path>
             </svg>
           </button>
         </div>
@@ -79,7 +90,7 @@
             </svg>
             <span class="sr-only">搜索文件名</span>
             <input id="treeSearch" type="search" autocomplete="off" placeholder="搜索文件、角色或章节">
-            <kbd>⌘ K</kbd>
+            <kbd>⌘K</kbd>
           </label>
 
           <div id="treePanel" class="tree-panel" role="tabpanel" aria-labelledby="librariesTab">
@@ -98,17 +109,19 @@
 
         <section id="editorPanel" class="editor-panel" aria-labelledby="editorTitle">
           <div id="editorEmpty" class="editor-empty">
-            <div class="empty-folio" aria-hidden="true">
-              <svg viewBox="0 0 48 48">
-                <path d="M12 7h19l6 6v28H12z"></path>
-                <path d="M31 7v7h6M18 21h13M18 27h13M18 33h9"></path>
-              </svg>
-            </div>
-            <h2>选择一份文稿开始工作</h2>
-            <p>从左侧打开 Markdown、TXT 或配置文本，直接阅读、校订并保存。</p>
-            <div class="empty-shortcuts">
-              <span><kbd>⌘ K</kbd> 搜索</span>
-              <span><kbd>⌘ S</kbd> 保存</span>
+            <div class="empty-card">
+              <div class="empty-folio" aria-hidden="true">
+                <svg viewBox="0 0 48 48">
+                  <path d="M12 7h19l6 6v28H12z"></path>
+                  <path d="M31 7v7h6M18 21h13M18 27h13M18 33h9"></path>
+                </svg>
+              </div>
+              <h2>选择一份文稿开始工作</h2>
+              <p>从左侧打开 Markdown、TXT 或配置文本，直接阅读、校订并保存。</p>
+              <div class="empty-shortcuts">
+                <span><kbd>⌘K</kbd> 搜索</span>
+                <span><kbd>⌘S</kbd> 保存</span>
+              </div>
             </div>
           </div>
 
@@ -184,7 +197,7 @@
                     <path d="M8 4v6h8V4M8 20v-6h8v6"></path>
                   </svg>
                   <span>保存</span>
-                  <kbd>⌘ S</kbd>
+                  <kbd>⌘S</kbd>
                 </button>
               </div>
             </footer>

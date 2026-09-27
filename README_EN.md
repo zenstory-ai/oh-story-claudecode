@@ -321,8 +321,8 @@ Natural language also triggers: `帮我开书` ("help me start writing") → `st
 
 Run `/story dashboard` (`$story dashboard` in Codex) to open the local writing desk. Browse
 deconstruction libraries and long/short project trees, then search, preview Markdown, edit text,
-save with conflict protection, or confirm a file deletion. It listens only on `127.0.0.1` and never
-uploads story content.
+save with conflict protection, or confirm a file deletion. The top bar switches between light and
+dark themes. It listens only on `127.0.0.1` and never uploads story content.
 
 ## How it works
 

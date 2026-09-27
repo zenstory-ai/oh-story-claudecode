@@ -309,7 +309,8 @@ flowchart LR
 ### Story Dashboard
 
 运行 `/story dashboard`（Codex 用 `$story dashboard`）打开本地写作工作台，浏览拆文库与
-长/短篇项目文件树，并完成搜索、Markdown 预览、文本编辑、冲突保护保存和确认删除。
+长/短篇项目文件树，并完成搜索、Markdown 预览、文本编辑、冲突保护保存和确认删除；
+顶栏可切换浅色、深色。
 服务仅监听 `127.0.0.1`，小说内容不会上传。
 
 ## 工作原理

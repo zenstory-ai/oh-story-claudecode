@@ -1,0 +1,139 @@
+/*
+ * ZenStory design tokens — shared with the sibling ZenStory dashboard.
+ * styles.css reads colours, fonts, radii and shadows only through these
+ * variables, so this file can be swapped for the shared copy as a whole.
+ *
+ * Brand: navy rounded square, cream glyph, cyan spark.
+ * Light: warm paper tinted from brand cream, ink down to brand navy.
+ * Dark: navy-based surfaces with cream text.
+ * Theme: follows the system; :root[data-theme] forces light or dark.
+ */
+:root {
+  color-scheme: light;
+
+  /* brand */
+  --zs-brand-navy: #081431;
+  --zs-brand-cream: #f7edd8;
+  --zs-brand-cyan: #22d3ee;
+  --zs-seal-edge: rgba(247, 237, 216, 0);
+
+  /* surfaces */
+  --zs-bg: #faf5ea;
+  --zs-surface: #fdfbf5;
+  --zs-surface-2: #f2ebdc;
+  --zs-surface-3: #e9e0cd;
+  --zs-paper: #fefcf8;
+  --zs-line: #e7dfcf;
+  --zs-line-strong: #cfc5b1;
+
+  /* ink */
+  --zs-ink-900: #081431;
+  --zs-ink-700: #3f475a;
+  --zs-ink-500: #5f6472;
+  --zs-ink-400: #6e717b;
+  --zs-ink-300: #a3a29d;
+
+  /* accent: brand cyan, deepened on paper for contrast */
+  --zs-accent: #0891b2;
+  --zs-accent-ink: #0e7490;
+  --zs-accent-wash: rgba(34, 211, 238, 0.13);
+  --zs-focus: #0891b2;
+  --zs-selection: rgba(34, 211, 238, 0.24);
+
+  /* semantic */
+  --zs-ok: #2e7a4c;
+  --zs-ok-wash: rgba(46, 122, 76, 0.1);
+  --zs-warn: #9a6410;
+  --zs-warn-wash: rgba(190, 128, 20, 0.13);
+  --zs-danger: #b3302a;
+  --zs-danger-wash: rgba(179, 48, 42, 0.09);
+  --zs-on-danger: #fffdf8;
+
+  /* type */
+  --zs-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    "Segoe UI", system-ui, sans-serif;
+  --zs-serif: "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", Georgia, serif;
+  --zs-mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  /* shape */
+  --zs-radius-xs: 4px;
+  --zs-radius-sm: 6px;
+  --zs-radius-ctl: 8px;
+  --zs-radius-md: 10px;
+  --zs-radius-lg: 14px;
+  --zs-radius-pill: 999px;
+
+  /* elevation */
+  --zs-shadow-sm: 0 1px 2px rgba(8, 20, 49, 0.1);
+  --zs-shadow: 0 1px 2px rgba(8, 20, 49, 0.05), 0 4px 16px rgba(8, 20, 49, 0.06);
+  --zs-shadow-lg: 0 12px 48px rgba(8, 20, 49, 0.18);
+  --zs-scrim: rgba(8, 20, 49, 0.32);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --zs-seal-edge: rgba(247, 237, 216, 0.22);
+    --zs-bg: #081431;
+    --zs-surface: #0d1a3a;
+    --zs-surface-2: #15254d;
+    --zs-surface-3: #1d2f5a;
+    --zs-paper: #0b1735;
+    --zs-line: #1c2a4f;
+    --zs-line-strong: #33436c;
+    --zs-ink-900: #f7edd8;
+    --zs-ink-700: #d5cebf;
+    --zs-ink-500: #a7a5a3;
+    --zs-ink-400: #8a8c93;
+    --zs-ink-300: #5c6682;
+    --zs-accent: #22d3ee;
+    --zs-accent-ink: #67e8f9;
+    --zs-accent-wash: rgba(34, 211, 238, 0.14);
+    --zs-focus: #22d3ee;
+    --zs-selection: rgba(34, 211, 238, 0.3);
+    --zs-ok: #6fbf8e;
+    --zs-ok-wash: rgba(111, 191, 142, 0.12);
+    --zs-warn: #e0ad55;
+    --zs-warn-wash: rgba(224, 173, 85, 0.13);
+    --zs-danger: #ec7a70;
+    --zs-danger-wash: rgba(236, 122, 112, 0.12);
+    --zs-on-danger: #081431;
+    --zs-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --zs-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
+    --zs-shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.5);
+    --zs-scrim: rgba(2, 6, 18, 0.6);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --zs-seal-edge: rgba(247, 237, 216, 0.22);
+  --zs-bg: #081431;
+  --zs-surface: #0d1a3a;
+  --zs-surface-2: #15254d;
+  --zs-surface-3: #1d2f5a;
+  --zs-paper: #0b1735;
+  --zs-line: #1c2a4f;
+  --zs-line-strong: #33436c;
+  --zs-ink-900: #f7edd8;
+  --zs-ink-700: #d5cebf;
+  --zs-ink-500: #a7a5a3;
+  --zs-ink-400: #8a8c93;
+  --zs-ink-300: #5c6682;
+  --zs-accent: #22d3ee;
+  --zs-accent-ink: #67e8f9;
+  --zs-accent-wash: rgba(34, 211, 238, 0.14);
+  --zs-focus: #22d3ee;
+  --zs-selection: rgba(34, 211, 238, 0.3);
+  --zs-ok: #6fbf8e;
+  --zs-ok-wash: rgba(111, 191, 142, 0.12);
+  --zs-warn: #e0ad55;
+  --zs-warn-wash: rgba(224, 173, 85, 0.13);
+  --zs-danger: #ec7a70;
+  --zs-danger-wash: rgba(236, 122, 112, 0.12);
+  --zs-on-danger: #081431;
+  --zs-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --zs-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
+  --zs-shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.5);
+  --zs-scrim: rgba(2, 6, 18, 0.6);
+}

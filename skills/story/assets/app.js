@@ -1,3 +1,28 @@
+// 明暗主题只是这台浏览器的阅读偏好：没选过就跟随系统，点过就记住。
+const THEME_KEY = "story_dashboard_theme";
+const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
+let themeChoice = null;
+try {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === "light" || saved === "dark") themeChoice = saved;
+} catch {}
+
+function effectiveTheme() {
+  return themeChoice || (systemDark.matches ? "dark" : "light");
+}
+
+function applyTheme() {
+  if (themeChoice) document.documentElement.dataset.theme = themeChoice;
+  else delete document.documentElement.dataset.theme;
+  const button = document.querySelector("#themeButton");
+  if (!button) return;
+  const label = effectiveTheme() === "dark" ? "切换到浅色" : "切换到深色";
+  button.title = label;
+  button.setAttribute("aria-label", label);
+}
+
+applyTheme();
+
 const state = {
   workspace: null,
   activeView: "libraries",
@@ -36,6 +61,7 @@ const elements = {
   treeLoading: document.querySelector("#treeLoading"),
   fileTree: document.querySelector("#fileTree"),
   refreshButton: document.querySelector("#refreshButton"),
+  themeButton: document.querySelector("#themeButton"),
   mobileBackButton: document.querySelector("#mobileBackButton"),
   editorEmpty: document.querySelector("#editorEmpty"),
   editorWorkspace: document.querySelector("#editorWorkspace"),
@@ -1035,6 +1061,16 @@ elements.treeSearch.addEventListener("keydown", (event) => {
 });
 
 elements.refreshButton.addEventListener("click", () => loadWorkspace({ announce: true }));
+
+elements.themeButton.addEventListener("click", () => {
+  themeChoice = effectiveTheme() === "dark" ? "light" : "dark";
+  try {
+    localStorage.setItem(THEME_KEY, themeChoice);
+  } catch {}
+  applyTheme();
+});
+
+systemDark.addEventListener("change", applyTheme);
 elements.mobileBackButton.addEventListener("click", () => {
   document.body.classList.remove("document-open");
   window.requestAnimationFrame(() => elements.treeSearch.focus());
