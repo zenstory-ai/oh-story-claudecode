@@ -73,7 +73,7 @@ summary:focus-visible {
   top: 8px;
   left: 8px;
   padding: 6px 10px;
-  color: var(--zs-bg);
+  color: var(--zs-on-ink);
   background: var(--zs-ink-900);
   border-radius: var(--zs-radius-sm);
   transform: translateY(-160%);
@@ -131,31 +131,6 @@ kbd {
   align-self: stretch;
   gap: 12px;
   padding: 0 20px;
-}
-
-.brand-seal {
-  position: relative;
-  width: 30px;
-  height: 30px;
-  display: grid;
-  flex: none;
-  place-items: center;
-  color: var(--zs-brand-cream);
-  background: var(--zs-brand-navy);
-  border-radius: 7px;
-  box-shadow: inset 0 0 0 1px var(--zs-seal-edge);
-  font: 700 16px/1 var(--zs-serif);
-}
-
-.brand-seal::after {
-  content: "";
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 8px;
-  height: 8px;
-  background: var(--zs-brand-cyan);
-  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
 }
 
 .brand-copy {
@@ -1185,7 +1160,7 @@ kbd {
   align-items: center;
   gap: 6px;
   padding: 0 8px 0 11px;
-  color: var(--zs-bg);
+  color: var(--zs-on-ink);
   background: var(--zs-ink-900);
   border: 1px solid var(--zs-ink-900);
   border-radius: var(--zs-radius-ctl);
@@ -1239,7 +1214,7 @@ kbd {
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  color: var(--zs-bg);
+  color: var(--zs-on-ink);
   background: var(--zs-ink-900);
   border-radius: var(--zs-radius-md);
   box-shadow: var(--zs-shadow-lg);

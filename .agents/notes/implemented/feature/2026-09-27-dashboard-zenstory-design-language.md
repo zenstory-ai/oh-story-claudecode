@@ -9,9 +9,9 @@ Status: implemented
 ## Decision
 
 - **只换视觉，不动信息架构**：拆文库 / 写作项目两个页签、文件树、搜索框、编辑 / 预览、保存与状态栏、冲突对话框的结构和行为都不变；元素 id、`data-*` 状态和键盘操作保持原样。
-- **设计变量独立成 `skills/story/assets/tokens.css`**，变量名统一 `--zs-*`，与兄弟项目共用同一份文件：品牌三色 `--zs-brand-navy #081431`、`--zs-brand-cream #F7EDD8`、`--zs-brand-cyan #22D3EE`；纸面 `--zs-bg / --zs-surface / --zs-surface-2 / --zs-surface-3 / --zs-paper / --zs-line / --zs-line-strong` 由品牌米色往浅处调出；文字 `--zs-ink-900`（即品牌藏青）到 `--zs-ink-300`；强调 `--zs-accent / --zs-accent-ink / --zs-accent-wash / --zs-focus / --zs-selection`；语义色 `--zs-ok / --zs-warn / --zs-danger` 及各自 `-wash`；字体 `--zs-sans / --zs-serif / --zs-mono`；圆角 `--zs-radius-xs/sm/ctl/md/lg/pill`；阴影 `--zs-shadow-sm / --zs-shadow / --zs-shadow-lg / --zs-scrim`。深色一套值同时挂在 `prefers-color-scheme: dark`（未强制浅色时）和 `:root[data-theme="dark"]` 下：藏青底、米色字。`styles.css` 里颜色、字体、圆角、阴影只通过 `var(--zs-…)` 取值，没有裸色值和字体栈，整份 `tokens.css` 可以直接换成兄弟项目的定稿再验证。
+- **设计变量独立成 `skills/story/assets/tokens.css`**，变量名统一 `--zs-*`，文件与兄弟项目短剧创作台的 `tokens.css` 逐字节相同：品牌三色 `--zs-brand-navy #081431`、`--zs-brand-cream #F7EDD8`、`--zs-brand-cyan #22D3EE`；纸面 `--zs-bg`（页面底）、`--zs-paper`（铺在页面上的稿纸）、`--zs-surface / -2 / -3`、`--zs-line / --zs-line-strong`，由品牌米色往浅处调出；文字 `--zs-ink-900`（即品牌藏青）到 `--zs-ink-300`，墨色底上的字用 `--zs-on-ink`；强调 `--zs-accent / -ink / -wash / --zs-focus / --zs-selection`；提示下一步用的 `--zs-signal` 系列；语义色 `--zs-ok / --zs-warn / --zs-danger` 及各自 `-wash`；另有字体、字号、字重、间距、圆角、阴影、焦点环、动效时长、顶栏与页签高度，以及序数色阶、深色面板等兄弟项目用到的变量。深色一套值同时挂在 `prefers-color-scheme: dark`（未强制浅色时）和 `:root[data-theme="dark"]` 下：藏青底、米色字。`styles.css` 里颜色、字体、圆角、阴影只通过 `var(--zs-…)` 取值，没有裸色值和字体栈；页面框架（顶栏、侧栏、文稿头、状态栏）用 `--zs-bg`，编辑区与预览用 `--zs-paper`；保存按钮、提示条、跳转链接这类墨色底上的字用 `--zs-on-ink`。间距、字号、动效变量本工作台暂未引用。
 - **强调色是青色，只用在少数地方**：焦点环、当前页签下划线、当前文件行、行号当前行、光标。浅色纸面上品牌青 `#22D3EE` 对比度只有约 1.7:1，达不到非文字元素 3:1，浅色的 `--zs-accent` 用加深的 `#0891B2`（约 3.4:1），需要当文字的地方用 `--zs-accent-ink #0E7490`；深色直接用品牌青。主按钮（保存）按 v2 用墨色底、纸色字，不用强调色。成功 / 留意 / 危险保留原有语义色。
-- **字标**：藏青圆角方块、米色宋体「文」字、右上角一颗青色四角星（CSS `clip-path` 画出），旁边仍写 OH STORY 和「写作台」。选「文」而不是「书」：工作台打开的是文稿、网文正文和拆文报告，不只是成书；也和短剧创作台的「场」一样是一个单字。
+- **字标**：藏青圆角方块、米色宋体「文」字、右上角一颗青色四角星（CSS `clip-path` 画出），样式是 `tokens.css` 里共用的 `.zs-mark` 类，页面只写这个类和字；旁边仍写 OH STORY 和「写作台」。选「文」而不是「书」：工作台打开的是文稿、网文正文和拆文报告，不只是成书；也和短剧创作台的「场」一样是一个单字。
 - **字体与密度**：界面用系统无衬线；文稿标题、空状态标题、冲突对话框标题、编辑区与预览正文用系统宋体栈（Songti SC / STSong / Noto Serif CJK SC / Source Han Serif SC，最后退到 Georgia / serif），不下载任何网络字体。正文 17px / 1.9；界面小字从 10–12px 提到 12–14px；顶栏 56px，页签 48px。
 - **组件**：顶栏去掉分隔竖线，只留底部细线；图标按钮 34px 细边框；搜索框改成 v2 的 ⌘K 触发器样式（细边框、底边加厚的按键提示），仍留在侧栏里筛选文件树；页签照 v2 阶段栏做：灰色标签、计数不加底色、当前项深色字加 2px 下划线；连接状态做成带状态点的小标签；编辑 / 预览是 v2 的分段控件；空状态是虚线边框卡片；提示条是墨色底圆角浮条，前面用状态点区分成功与失败。
 - **明暗切换**：顶栏刷新按钮旁加 `#themeButton`。没点过就跟随系统；点过以后把 `light` / `dark` 存进本机浏览器的 `localStorage`（键 `story_dashboard_theme`），刷新后照用，读写失败时只在本页生效。图标由 CSS 按当前主题在月亮 / 太阳之间切换，按钮的可读名称随之写成「切换到深色 / 浅色」。
@@ -36,4 +36,4 @@ Status: implemented
 
 ## Verification
 
-`npm run test:dashboard`（27 项）；Playwright 端到端 24 项（用本机 Chrome 通道跑；新增「明暗默认跟随系统，手动切换后刷新仍保留」，去掉保存那一行时它会失败）；1440×900 浅色、深色截图与 390×844 手机截图目检；`styles.css` 里搜不到裸色值和字体栈。
+`npm run test:dashboard`（27 项）；Playwright 端到端 24 项（用本机 Chrome 通道、关掉录像跑；新增「明暗默认跟随系统，手动切换后刷新仍保留」，去掉保存那一行时它会失败）；1440×900 浅色、深色截图与 390×844 手机截图目检；`styles.css` 里搜不到裸色值和字体栈；换上兄弟项目定稿的 `tokens.css` 后，页面引用的每个 `--zs-` 名都在新文件里有定义，浅色截图与换之前逐像素对比只有字标圆角（7px 改为 8px）处几十个像素不同。

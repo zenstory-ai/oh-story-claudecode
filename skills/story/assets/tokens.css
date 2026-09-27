@@ -1,13 +1,22 @@
 /*
- * ZenStory design tokens — shared with the sibling ZenStory dashboard.
- * styles.css reads colours, fonts, radii and shadows only through these
- * variables, so this file can be swapped for the shared copy as a whole.
+ * ZenStory design tokens, shared by the ZenStory dashboards.
  *
- * Brand: navy rounded square, cream glyph, cyan spark.
- * Light: warm paper tinted from brand cream, ink down to brand navy.
+ * Every colour, type family and size, spacing step, radius, shadow, focus ring
+ * and motion duration lives here; component stylesheets only reference these
+ * names, so the same file drops into any ZenStory project as a whole.
+ *
+ * Brand: the official mark, a navy rounded square with a cream glyph and a
+ * cyan spark.
+ * Light: warm paper tinted from the brand cream, ink down to the brand navy.
  * Dark: navy-based surfaces with cream text.
+ * Accent: the brand cyan, used sparingly (focus, the current place, progress).
+ * On paper it is deepened for contrast: #0891B2 for rings and fills, #0E7490
+ * for text. Dark mode uses the brand cyan itself.
+ * Signal: vermilion, for what needs doing next and what must change.
+ * Status colours always travel with an icon and a word, never alone.
  * Theme: follows the system; :root[data-theme] forces light or dark.
  */
+
 :root {
   color-scheme: light;
 
@@ -17,7 +26,7 @@
   --zs-brand-cyan: #22d3ee;
   --zs-seal-edge: rgba(247, 237, 216, 0);
 
-  /* surfaces */
+  /* surfaces: --zs-bg is the page, --zs-paper a sheet laid on it */
   --zs-bg: #faf5ea;
   --zs-surface: #fdfbf5;
   --zs-surface-2: #f2ebdc;
@@ -26,12 +35,13 @@
   --zs-line: #e7dfcf;
   --zs-line-strong: #cfc5b1;
 
-  /* ink */
+  /* ink: the darkest step is the brand navy */
   --zs-ink-900: #081431;
   --zs-ink-700: #3f475a;
   --zs-ink-500: #5f6472;
   --zs-ink-400: #6e717b;
   --zs-ink-300: #a3a29d;
+  --zs-on-ink: #fbf7ee;
 
   /* accent: brand cyan, deepened on paper for contrast */
   --zs-accent: #0891b2;
@@ -39,6 +49,11 @@
   --zs-accent-wash: rgba(34, 211, 238, 0.13);
   --zs-focus: #0891b2;
   --zs-selection: rgba(34, 211, 238, 0.24);
+
+  /* signal: the next step and what must change */
+  --zs-signal: #c2412b;
+  --zs-signal-ink: #a8361f;
+  --zs-signal-wash: rgba(194, 65, 43, 0.09);
 
   /* semantic */
   --zs-ok: #2e7a4c;
@@ -48,12 +63,73 @@
   --zs-danger: #b3302a;
   --zs-danger-wash: rgba(179, 48, 42, 0.09);
   --zs-on-danger: #fffdf8;
+  --zs-voice: #2b5a8a;
+  --zs-voice-wash: rgba(80, 140, 200, 0.15);
+
+  /* an ordinal ramp: one hue, first step to last = light to dark */
+  --zs-ramp-1: #8faacb;
+  --zs-ramp-2: #7797c0;
+  --zs-ramp-3: #557cab;
+  --zs-ramp-4: #36648f;
+  --zs-ramp-5: #214b74;
+  --zs-ramp-6: #13304e;
+  --zs-ramp-ink-1: #081431;
+  --zs-ramp-ink-2: #081431;
+  --zs-ramp-ink-3: #ffffff;
+  --zs-ramp-ink-4: #ffffff;
+  --zs-ramp-ink-5: #ffffff;
+  --zs-ramp-ink-6: #ffffff;
+
+  /* on-screen panels and media frames stay dark in both themes */
+  --zs-panel: #0b1633;
+  --zs-panel-ink: #e8f1f8;
+  --zs-panel-edge: rgba(255, 255, 255, 0.32);
+  --zs-media: #000000;
+  --zs-media-scrim: rgba(0, 0, 0, 0.62);
+  --zs-media-ink: #ffffff;
+  --zs-scrim: rgba(8, 20, 49, 0.32);
 
   /* type */
   --zs-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
     "Segoe UI", system-ui, sans-serif;
   --zs-serif: "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", Georgia, serif;
   --zs-mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  --zs-text-10: 10.5px;
+  --zs-text-11: 11.5px;
+  --zs-text-12: 12.5px;
+  --zs-text-13: 13.5px;
+  --zs-text-14: 14px;
+  --zs-text-15: 15px;
+  --zs-text-16: 16px;
+  --zs-text-17: 17px;
+  --zs-text-20: 20px;
+  --zs-text-22: 22px;
+  --zs-text-24: 24px;
+  --zs-text-28: 28px;
+  --zs-text-34: 34px;
+  --zs-weight-regular: 400;
+  --zs-weight-medium: 550;
+  --zs-weight-semibold: 600;
+  --zs-weight-bold: 650;
+  --zs-weight-heavy: 700;
+
+  /* spacing: a 4px grid with half steps */
+  --zs-space-0: 2px;
+  --zs-space-1: 4px;
+  --zs-space-1h: 6px;
+  --zs-space-2: 8px;
+  --zs-space-2h: 10px;
+  --zs-space-3: 12px;
+  --zs-space-3h: 14px;
+  --zs-space-4: 16px;
+  --zs-space-4h: 18px;
+  --zs-space-5: 20px;
+  --zs-space-6: 24px;
+  --zs-space-7: 28px;
+  --zs-space-8: 32px;
+  --zs-space-10: 40px;
+  --zs-space-12: 48px;
+  --zs-space-16: 64px;
 
   /* shape */
   --zs-radius-xs: 4px;
@@ -67,7 +143,22 @@
   --zs-shadow-sm: 0 1px 2px rgba(8, 20, 49, 0.1);
   --zs-shadow: 0 1px 2px rgba(8, 20, 49, 0.05), 0 4px 16px rgba(8, 20, 49, 0.06);
   --zs-shadow-lg: 0 12px 48px rgba(8, 20, 49, 0.18);
-  --zs-scrim: rgba(8, 20, 49, 0.32);
+  --zs-shadow-inset: 0 1px 2px rgba(8, 20, 49, 0.12);
+
+  /* focus */
+  --zs-focus-width: 2px;
+  --zs-focus-offset: 2px;
+  --zs-focus-ring: 0 0 0 2px var(--zs-bg), 0 0 0 4px var(--zs-focus);
+
+  /* motion */
+  --zs-duration-fast: 120ms;
+  --zs-duration: 200ms;
+  --zs-duration-slow: 1200ms;
+  --zs-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  /* chrome */
+  --zs-topbar-height: 56px;
+  --zs-tabbar-height: 48px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -86,11 +177,15 @@
     --zs-ink-500: #a7a5a3;
     --zs-ink-400: #8a8c93;
     --zs-ink-300: #5c6682;
+    --zs-on-ink: #081431;
     --zs-accent: #22d3ee;
     --zs-accent-ink: #67e8f9;
     --zs-accent-wash: rgba(34, 211, 238, 0.14);
     --zs-focus: #22d3ee;
     --zs-selection: rgba(34, 211, 238, 0.3);
+    --zs-signal: #e5694c;
+    --zs-signal-ink: #f08467;
+    --zs-signal-wash: rgba(229, 105, 76, 0.13);
     --zs-ok: #6fbf8e;
     --zs-ok-wash: rgba(111, 191, 142, 0.12);
     --zs-warn: #e0ad55;
@@ -98,9 +193,25 @@
     --zs-danger: #ec7a70;
     --zs-danger-wash: rgba(236, 122, 112, 0.12);
     --zs-on-danger: #081431;
+    --zs-voice: #8fb6e0;
+    --zs-voice-wash: rgba(80, 140, 200, 0.2);
+    --zs-ramp-1: #35557a;
+    --zs-ramp-2: #40689b;
+    --zs-ramp-3: #5580b4;
+    --zs-ramp-4: #76a0d0;
+    --zs-ramp-5: #a0bfe3;
+    --zs-ramp-6: #d0e1f4;
+    --zs-ramp-ink-1: #ffffff;
+    --zs-ramp-ink-2: #ffffff;
+    --zs-ramp-ink-3: #ffffff;
+    --zs-ramp-ink-4: #081431;
+    --zs-ramp-ink-5: #081431;
+    --zs-ramp-ink-6: #081431;
+    --zs-panel: #050c20;
     --zs-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
     --zs-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
     --zs-shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.5);
+    --zs-shadow-inset: 0 1px 2px rgba(0, 0, 0, 0.4);
     --zs-scrim: rgba(2, 6, 18, 0.6);
   }
 }
@@ -120,11 +231,15 @@
   --zs-ink-500: #a7a5a3;
   --zs-ink-400: #8a8c93;
   --zs-ink-300: #5c6682;
+  --zs-on-ink: #081431;
   --zs-accent: #22d3ee;
   --zs-accent-ink: #67e8f9;
   --zs-accent-wash: rgba(34, 211, 238, 0.14);
   --zs-focus: #22d3ee;
   --zs-selection: rgba(34, 211, 238, 0.3);
+  --zs-signal: #e5694c;
+  --zs-signal-ink: #f08467;
+  --zs-signal-wash: rgba(229, 105, 76, 0.13);
   --zs-ok: #6fbf8e;
   --zs-ok-wash: rgba(111, 191, 142, 0.12);
   --zs-warn: #e0ad55;
@@ -132,8 +247,62 @@
   --zs-danger: #ec7a70;
   --zs-danger-wash: rgba(236, 122, 112, 0.12);
   --zs-on-danger: #081431;
+  --zs-voice: #8fb6e0;
+  --zs-voice-wash: rgba(80, 140, 200, 0.2);
+  --zs-ramp-1: #35557a;
+  --zs-ramp-2: #40689b;
+  --zs-ramp-3: #5580b4;
+  --zs-ramp-4: #76a0d0;
+  --zs-ramp-5: #a0bfe3;
+  --zs-ramp-6: #d0e1f4;
+  --zs-ramp-ink-1: #ffffff;
+  --zs-ramp-ink-2: #ffffff;
+  --zs-ramp-ink-3: #ffffff;
+  --zs-ramp-ink-4: #081431;
+  --zs-ramp-ink-5: #081431;
+  --zs-ramp-ink-6: #081431;
+  --zs-panel: #050c20;
   --zs-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
   --zs-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
   --zs-shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.5);
+  --zs-shadow-inset: 0 1px 2px rgba(0, 0, 0, 0.4);
   --zs-scrim: rgba(2, 6, 18, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --zs-duration-fast: 0ms;
+    --zs-duration: 0ms;
+    --zs-duration-slow: 0ms;
+  }
+}
+
+/*
+ * The brand mark: a navy rounded square, a cream glyph, and a small cyan
+ * four-point spark at the top right, as in the official mark. The glyph is
+ * the element's text, so each product sets its own character.
+ */
+.zs-mark {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--zs-radius-ctl);
+  background: var(--zs-brand-navy);
+  color: var(--zs-brand-cream);
+  font: 700 16px/1 var(--zs-serif);
+  text-decoration: none;
+  box-shadow: inset 0 0 0 1px var(--zs-seal-edge);
+}
+.zs-mark::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
+  background: var(--zs-brand-cyan);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
 }
