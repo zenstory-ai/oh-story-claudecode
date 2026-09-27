@@ -12,6 +12,12 @@ compare 链接；小节名使用 Keep a Changelog 的六个英文类别（`Added
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-09-27
+
+> 只改了工作台，技能正文、`agents_version` 与助手模板都没变：更新技能包即可。
+
+v0.8.4 给本地工作台换上和短剧创作台同一套 ZenStory 设计，并新增深色。
+
 ### Added
 
 - **工作台可以切换深色**：顶栏新增明暗切换按钮，默认跟随系统；手动选过之后，这台浏览器会记住。
@@ -1213,7 +1219,8 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 - 初始版本：长篇/短篇写作、拆文、扫榜、去 AI 味、浏览器操控
 - 用 52000+ 本真实数据增强知识库
 
-[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.8.3...HEAD
+[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.8.4...HEAD
+[0.8.4]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.8.0...v0.8.1
