@@ -1,0 +1,3 @@
+curl_cffi==0.15.0
+pycryptodome==3.17
+kdl==0.2.21

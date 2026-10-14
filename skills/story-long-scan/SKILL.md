@@ -54,10 +54,12 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 #### 脚本采集模式
 
 1. 只读所选平台那一份：[起点](references/platform-qidian.md) / [番茄](references/platform-fanqie.md) / [七猫](references/platform-qimao.md) / [晋江](references/platform-jjwxc.md) / [刺猬猫](references/platform-ciweimao.md)。里面有榜单网址、命令、字段、默认组合、故障排查和该平台的分析维度；需要浏览器态的平台先 `/browser-cdp` 启动 Chrome。
-2. 每次扫榜新建输出目录 `扫榜/{YYYYMMDD}/`（同日再扫加 `-2`），存本次榜单，不往旧目录追加（聚合会混进旧榜）；文件名 `{平台}{榜单}_{YYYYMMDD}.md`。脚本已做清洗和质量标注。
-3. 聚合：`node scripts/aggregate-rank.js {输出目录} --out {输出目录}/扫榜聚合.md`（小平台加 `--sparse 10`）。**主会话只读这份聚合**，不整份读原始榜单：题材分布、本数占比、热度与字数中位、标签热词、书名常见词、多榜重合、每题材前 3 本代表作。
-4. 看聚合的「采集情况」：标了问题（书名没解出来、没采到、只有书单）的榜单按平台参考排查重采；重采不了就在报告里说明结论不含它。同方向不到 15 本（小平台 10 本）标「少」，等同 `[数据稀疏]`。
-5. 要看原始条目（开篇卖点、新人设、新桥段）时按需抽样：`node scripts/aggregate-rank.js {输出目录} --sample {题材/标签/书名词} --n 5`，一次一个方向。
+2. 起点、番茄、刺猬猫、晋江的排行榜在本技能目录执行 `python3 bridge/rankmin_cli.py`。默认榜、字段口径、依赖和失败处理见各平台参考的「协议采集」。任一榜失败则退出码 2，stdout 里已经写出的文件照常保留，不要打开网页榜、library 页或作品页去补这一榜。`--self-test` 不联网。
+3. 书库新书（起点、番茄、七猫）和七猫排行榜仍用 `scripts/{平台}-rank-scraper.js`，命令见平台参考，不进 rankmin。
+4. 每次扫榜新建输出目录 `扫榜/{YYYYMMDD}/`（同日再扫加 `-2`），存本次榜单，不往旧目录追加（聚合会混进旧榜）；文件名 `{平台}{榜单}_{YYYYMMDD}.md`。脚本已做清洗和质量标注。
+5. 聚合：`node scripts/aggregate-rank.js {输出目录} --out {输出目录}/扫榜聚合.md`（小平台加 `--sparse 10`）。**主会话只读这份聚合**，不整份读原始榜单：题材分布、本数占比、热度与字数中位、标签热词、书名常见词、多榜重合、每题材前 3 本代表作。
+6. 看聚合的「采集情况」：标了问题（书名没解出来、没采到、只有书单）的榜单按平台参考排查重采；重采不了就在报告里说明结论不含它。同方向不到 15 本（小平台 10 本）标「少」，等同 `[数据稀疏]`。
+7. 要看原始条目（开篇卖点、新人设、新桥段）时按需抽样：`node scripts/aggregate-rank.js {输出目录} --sample {题材/标签/书名词} --n 5`，一次一个方向。
 
 #### 其他数据来源
 
@@ -177,8 +179,9 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | [references/genre-trends.md](references/genre-trends.md) | 查看题材趋势候选、切入约束和样本校验规则时 |
 | [references/publishing-guide.md](references/publishing-guide.md) | 平台适配+推荐机制校验+数据指标+简介设计 |
 | 五份平台参考（链接见「脚本采集模式」第 1 步） | 「确定数据来源」：只读所选平台那份——榜单网址、命令、字段、故障排查、平台分析维度 |
+| [bridge/rankmin_cli.py](bridge/rankmin_cli.py) | 起点、番茄、刺猬猫、晋江的排行榜。`--self-test` 不联网。有榜失败则退出码 2，已写出的文件保留 |
 | [scripts/aggregate-rank.js](scripts/aggregate-rank.js) | 把输出目录里的原始榜单聚合成短表（`--out` 落盘，`--sample` 抽原始条目，`--json` 机读），主会话只读它 |
-| [scripts/cdp-utils.js](scripts/cdp-utils.js) 与各平台采集脚本 | CDP 公共工具与各平台采集脚本（`{平台}-rank-scraper.js`），命令见所选平台参考 |
+| [scripts/cdp-utils.js](scripts/cdp-utils.js) 与各平台采集脚本 | 书库新书与七猫排行榜仍走 `{平台}-rank-scraper.js`，命令见所选平台参考 |
 
 ---
 

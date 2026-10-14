@@ -1,6 +1,14 @@
 # 番茄：采集与分析
 
-作者选了番茄才读本文。番茄列表页有字体反爬，须先用 `/browser-cdp` 启动 Chrome，再由脚本从详情页（内嵌 JSON `bookName`/`author`/`abstract`/`categoryV2` + `<title>` + og:meta）多策略解码书名、作者、题材、标签、简介。
+作者选了番茄才读本文。分类榜优先走下面的协议采集，不启动 Chrome。全题材阅读榜和书库「最热」仍走原脚本：列表页有字体反爬，须先用 `/browser-cdp` 启动 Chrome，再由脚本从详情页（内嵌 JSON `bookName`/`author`/`abstract`/`categoryV2` + `<title>` + og:meta）多策略解码书名、作者、题材、标签、简介。
+
+## 协议采集
+
+```bash
+python3 bridge/rankmin_cli.py --out {输出目录} --limit 20 --fanqie male-hot-xifangqihuan,male-newbook-xifangqihuan,female-hot-gufengshiqing,female-newbook-gufengshiqing
+```
+
+默认是这四个分类，不是全题材阅读榜，也不是书库。`hot` 是分类热门，`newbook` 是分类最新。要看正在起量的新书，把 `male-rising-<题材>`、`female-rising-<题材>` 加在同一条 `--fanqie` 后面：只留连载且纯数字字数严格小于 300000 的书。标签只取简介里成对的【】，没有就不写。依赖是 `bridge/requirements.txt` 里的 `curl_cffi`。任一榜失败退出码 2，已经写出的文件保留。
 
 ## 榜单与命令
 

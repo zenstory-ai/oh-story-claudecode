@@ -1,6 +1,14 @@
 # 刺猬猫：采集与分析
 
-作者选了刺猬猫才读本文。需先用 `/browser-cdp` 启动 Chrome。rank-index 单页展示全部榜单，脚本按文本解析，按书名归一回填作品页链接，带连通性自检与空结果重试。
+作者选了刺猬猫才读本文。排行榜优先走下面的协议采集，不启动 Chrome，不下章节。原网页脚本仍可用：需先用 `/browser-cdp` 启动 Chrome。rank-index 单页展示全部榜单，脚本按文本解析，按书名归一回填作品页链接，带连通性自检与空结果重试。
+
+## 协议采集
+
+```bash
+python3 bridge/rankmin_cli.py --out {输出目录} --limit 20 --ciweimao fans_value:week,favor:week,tsukkomi:week,yp_new:month
+```
+
+没有账号环境变量时，客户端自己注册游客。会话默认写在 `~/.oh-story/ciweimao-guest.json`，用 `CIWEIMAO_STATE` 改路径。出口用 `CIWEIMAO_PROXY_URL`，或 `KDL_SECRET_ID` / `KDL_SECRET_KEY`；密钥文件默认目录是 `~/.oh-story/ciweimao/`。不要把会话或代理地址写进报告。依赖见 `bridge/requirements.txt`：`curl_cffi`、`pycryptodome`，走快代理时再加 `kdl`。任一榜失败退出码 2，已经写出的文件保留。榜单值写 `[待补]` 时不要改去作品页补。
 
 ## 榜单与命令
 

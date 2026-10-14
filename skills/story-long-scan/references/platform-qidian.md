@@ -1,6 +1,16 @@
 # 起点：采集与分析
 
-作者选了起点才读本文。默认不需要 Chrome：脚本先读 `https://m.qidian.com` 移动端 SSR pageContext，移动端不可用时才回退 CDP/PC 页面，文件头 `抓取方式` 标 `mobile-ssr` 或 `cdp-pc`。书库新书除外：只能走 Chrome，先 `/browser-cdp`，开之前告诉作者。
+作者选了起点才读本文。排行榜优先走下面的协议采集，不启动 Chrome。原脚本仍可用：先读 `https://m.qidian.com` 移动端 SSR pageContext，移动端不可用时才回退 CDP/PC 页面，文件头 `抓取方式` 标 `mobile-ssr` 或 `cdp-pc`。书库新书除外：只能走 Chrome，先 `/browser-cdp`，开之前告诉作者。
+
+## 协议采集
+
+男频移动榜走本技能 `bridge/rankmin_cli.py`，不进详情页，不保存原始 HTML。依赖只有 Python 标准库。
+
+```bash
+python3 bridge/rankmin_cli.py --out {输出目录} --limit 20 --qidian yuepiao,hotsales,readindex
+```
+
+这一路的热度是「榜单值」，不写总推荐、签约和收费模式。女生精选和女生月票在请求前失败，报 unavailable，结论不含这两条。不要把 `sanjiang`、`collect` 写进这条命令。任一榜失败退出码 2，已经写出的文件保留，不要打开网页去补。书库新书不在这条命令里。
 
 ## 榜单与命令
 
