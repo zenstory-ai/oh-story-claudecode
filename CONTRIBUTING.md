@@ -87,14 +87,14 @@ PR 自动运行 `.github/workflows/cross-platform.yml`。static-check job 跑以
 - `python3 scripts/test-scan-aggregate.py` — 扫榜聚合脚本的解析、去重、分布与抽样行为回归
 - `scripts/check-story-setup-deployment.sh` — story-setup 部署完整性
 - `python3 scripts/test-plugin-packaging.py` — 通过公开 CLI 对 catalog/manifest 做黑盒变异回归
-- `scripts/check-claude-adapter.sh` — Claude marketplace、根 plugin manifest 与 13 个 skill 自动发现检查；可选真实 CLI 生命周期
+- `scripts/check-claude-adapter.sh` — Claude marketplace、根 plugin manifest 与 14 个 skill 自动发现检查；可选真实 CLI 生命周期
 - `scripts/check-opencode-adapter.sh` — OpenCode adapter 同步、commands/agents 结构与 plugin 真实行为检查
 - `scripts/check-openclaw-skills.sh` — OpenClaw 单行 frontmatter、`metadata.openclaw` 与可选真实 CLI 发现检查
 - `scripts/check-codex-adapter.sh` — Codex repo skills symlink、custom-agent TOML、hook 生成确定性与 launcher 契约
 - `scripts/test-codex-hooks.sh` — Codex hooks 合成事件测试
 - `scripts/check-antigravity-adapter.sh` — Antigravity 项目 Skills 物化、Markdown agents、Always-On Rule、named-group Hooks 与合并/行为回归
 - `node scripts/test-antigravity-hooks.mjs` — Antigravity 官方 Hook I/O、artifact 桥接和 Stop 单次续跑测试
-- `scripts/check-zcode-adapter.sh` — ZCode plugin/marketplace、13 Skills/Commands、受支持 Hook 事件与部署锚点检查
+- `scripts/check-zcode-adapter.sh` — ZCode plugin/marketplace、14 Skills/Commands、受支持 Hook 事件与部署锚点检查
 - `scripts/test-zcode-hooks.sh` — ZCode 严格 JSON Hook 契约、正文守卫、连续性与跨平台 Node runner 测试
 - `python3 scripts/test-storyctl.py` — `visible_chars_v1` 计数、双层区间、结构化 CLI 与 demo 同口径证据的运行时行为回归
 - 采集脚本 `node --check` 语法校验
@@ -278,7 +278,7 @@ bash scripts/test-opencode-cli-e2e.sh  # 可选：需要本机已安装 OpenCode
 1. 将 `templates/agents/` 下的 Claude Code agent 转换为 opencode 格式，写入 `opencode/agents/`
 2. 将 `CLAUDE.md.tmpl` 复制到 `opencode/AGENTS.md.tmpl`，替换 `.claude/` 路径引用
 3. 输出同步结果摘要
-4. 可选真实 CLI e2e 在临时项目里验证 13 个 skills / slash commands、7 个 agents、`story-hooks.ts` 插件状态为 active，并用 mock 模型在真实运行时验证写正文守卫、写后兜底与压缩前注入
+4. 可选真实 CLI e2e 在临时项目里验证 14 个 skills / slash commands、7 个 agents、`story-hooks.ts` 插件状态为 active，并用 mock 模型在真实运行时验证写正文守卫、写后兜底与压缩前注入
 
 ### CI 检测
 
@@ -368,7 +368,7 @@ node scripts/test-antigravity-hooks.mjs
 
 ZCode 采用「原生 plugin + `story-setup` workspace 部署」双入口：
 
-- `.zcode-plugin/plugin.json` 与根 `marketplace.json` 以同名同版本的单一 `oh-story` bundle 暴露 13 Skills、13 Commands 和 ZCode Hooks；catalog 自身名保持 `oh-story-zcode`，条目的插件版本必须与 `skills/story/VERSION` 同步。
+- `.zcode-plugin/plugin.json` 与根 `marketplace.json` 以同名同版本的单一 `oh-story` bundle 暴露 14 Skills、14 Commands 和 ZCode Hooks；catalog 自身名保持 `oh-story-zcode`，条目的插件版本必须与 `skills/story/VERSION` 同步。
 - `skills/story-setup/references/zcode/` 是 workspace 部署模板，包含 `AGENTS.md.tmpl`、Commands、`config.json.patch` 与无第三方依赖的 Node Hook runner。
 - ZCode 3.3.4 只支持 `SessionStart`、`UserPromptSubmit`、`PreToolUse`、`PermissionRequest`、`PostToolUse`、`PostToolUseFailure`、`Stop`。不要复制 Claude 的 `PreCompact`、`PostCompact`、`SessionEnd`、`SubagentStop` 或 `Notification`。
 - Hook stdout 为空表示放行；只要非空就必须满足严格 JSON schema。诊断只写 stderr，异常 fail-open；优先使用 `process` + `node`，不要引入 shell/Python launcher 的跨平台分支。
@@ -389,8 +389,8 @@ bash scripts/test-prose-net-parity.sh
 Reasonix（DeepSeek-Reasonix CLI）当前支持 skills + 原生 plugin manifest + skills-only 的项目级 `story-setup` 部署；hooks 与 custom agents 留待后续阶段（涉及专业 Agent 的 Skill 走 solo/direct fallback）：
 
 - 根 `reasonix-plugin.json` 是 plugin manifest；`version` 必须与 `skills/story/VERSION` 同步（`check-reasonix-adapter.sh` 守卫）。
-- Reasonix 原生扫描项目 skill root（`.agents/skills` 等，指向 `skills/` 的 symlink，与 Codex 共用）发现 13 个 skill。
-- `story-setup` 的 `target_cli=reasonix` 走 skills-only 部署：复制 13 个 skill 到项目 `skills/`、写入 `references/reasonix/AGENTS.md.tmpl`，不部署 hooks/agents（与 OpenClaw / generic 同构，由 `check-story-setup-deployment.sh` 守卫）。改动 Reasonix 部署路径或模板时同步该守卫。
+- Reasonix 原生扫描项目 skill root（`.agents/skills` 等，指向 `skills/` 的 symlink，与 Codex 共用）发现 14 个 skill。
+- `story-setup` 的 `target_cli=reasonix` 走 skills-only 部署：复制 14 个 skill 到项目 `skills/`、写入 `references/reasonix/AGENTS.md.tmpl`，不部署 hooks/agents（与 OpenClaw / generic 同构，由 `check-story-setup-deployment.sh` 守卫）。改动 Reasonix 部署路径或模板时同步该守卫。
 - 真实 CLI 校验 `reasonix doctor capabilities` 不在 CI 内，发版前可手动跑。
 
 ### Reasonix 检查步骤

@@ -78,9 +78,13 @@ def has_custom_style(text):
 def find_chapter_file(directory: Path, chapter: int, prefix: str):
     if not directory.is_dir():
         return None
-    pattern = re.compile(rf"^{prefix}第0*{chapter}章.*\.md$")
-    for entry in sorted(directory.iterdir()):
-        if entry.is_file() and pattern.match(entry.name) and "_原稿_" not in entry.name:
+    pattern = re.compile(rf"^{re.escape(prefix) if prefix else ''}第0*{chapter}章.*\.md$")
+    # 正文按卷归档在子目录（正文/第N卷_卷名/第N章：章题.md），顶层找不到时递归查找
+    for entry in sorted(
+        (child for child in directory.rglob("*.md") if child.is_file()),
+        key=lambda p: str(p),
+    ):
+        if pattern.match(entry.name) and "_原稿_" not in entry.name:
             return entry
     return None
 

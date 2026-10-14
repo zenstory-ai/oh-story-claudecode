@@ -38,7 +38,7 @@
 ## What it is
 
 Oh Story covers the whole web-fiction pipeline, long-form and short: **chart scanning → deconstructing bestsellers → outline and prose → de-AI editing → cover art**.
-It installs as 13 skills into the coding agent you already use; the writing model is that agent's model. No GPU, no separate model setup.
+It installs as 14 skills into the coding agent you already use; the writing model is that agent's model. No GPU, no separate model setup.
 
 - **The file system is the memory** — settings, outlines, prose and continuity tracking are maintained as separate files. A several-hundred-chapter novel does not lean on conversation memory, and context compaction does not lose your foreshadowing.
 - **Deterministic checks and gates** — writing prose without a chapter blueprint is blocked; after each write, truncation, engineering vocabulary and common AI phrasing are scanned automatically. 7 specialist agents, 8 hooks and 100+ methodology files load on demand.
@@ -305,7 +305,7 @@ flowchart LR
 | `story-short-write` | `/story-short-write` | Short-form writing — emotion design, twist crafting, polish & delivery |
 | `story-deslop` | `/story-deslop` | De-AI-ify — detect and remove AI writing traces |
 
-**Advanced**: benchmark deconstruction, trend scans, importing drafts, multi-perspective review and covers, when you need them.
+**Advanced**: benchmark deconstruction, trend scans, importing drafts, multi-perspective review, publishing details and covers, when you need them.
 
 | Skill | Trigger | Description |
 |:------|:--------|:------------|
@@ -315,12 +315,13 @@ flowchart LR
 | `story-short-scan` | `/story-short-scan` | Short-form trend scan — Zhihu Yanyan/Fanqie short-form trending data |
 | `story-import` | `/story-import` | Reverse import — parse existing novels into standard project structure |
 | `story-review` | `/story-review` | Multi-perspective review — 4-agent adversarial review + Fanqie/Qidian/Zhihu scoring rubrics |
-| `story-cover` | `/story-cover` | Cover generation — title/genre analysis + GPT-Image-2 via Codex included usage or API fallback |
+| `story-publish-details` | `/story-publish-details` | Platform book-entry details — reuse writing-project facts for titles, synopses and tags; Fanqie source version 2026-10-08 |
+| `story-cover` | `/story-cover` | Cover prompts or images — image generation uses GPT-Image-2 via Codex included usage or API fallback |
 | `browser-cdp` | `/browser-cdp` | Browser control — CDP protocol for scraping with reusable login sessions |
 
 > `story-deslop` uses local prose linting: blocking applies only to deterministic style/punctuation issues, while other findings require read-through judgment; external detectors such as Zhuque are self-check references, not replacements for human review.
 
-Natural language also triggers: `帮我开书` ("help me start writing") → `story-long-write`, `这篇太AI了` ("this is too AI-ish") → `story-deslop`, `把我的书导进来` ("import my book") → `story-import`, `打开工作台` ("open the dashboard") → `story dashboard`, `记住我的写作习惯` ("remember my writing habits") → `story` author memory, `沈栀现在什么状态` ("what's Shen Zhi's current status") → `story-explorer`.
+Natural language also triggers: `帮我开书` ("help me start a book") → first clarify story planning versus platform book entry, `整理番茄发布资料` ("prepare Fanqie book details") → `story-publish-details`, `这篇太AI了` ("this is too AI-ish") → `story-deslop`, `把我的书导进来` ("import my book") → `story-import`, `打开工作台` ("open the dashboard") → `story dashboard`, `记住我的写作习惯` ("remember my writing habits") → `story` author memory, `沈栀现在什么状态` ("what's Shen Zhi's current status") → `story-explorer`.
 
 ### Story Dashboard
 
@@ -365,7 +366,7 @@ I built this skill pack to help me through a job-hunting transition :joy:, and I
 
 ### Does it work in Codex, Google Antigravity or OpenCode, or only in Claude Code?
 
-oh-story-claudecode ships adapters for Claude Code, Google Antigravity, OpenCode, ZCode, OpenClaw, Codex CLI and Reasonix. Codex discovers the 13 skills by scanning `.agents/skills` in the repo and invokes them with `$story-setup`; in Antigravity run `story-setup` via `/skills` or natural language; it detects the current host (`target_cli=antigravity`) on its own. OpenCode needs 2.x, since 1.x cannot load the prose-guard plugin. Any Web AI or agent environment that can read project files can use the generic skills path.
+oh-story-claudecode ships adapters for Claude Code, Google Antigravity, OpenCode, ZCode, OpenClaw, Codex CLI and Reasonix. Codex discovers the 14 skills by scanning `.agents/skills` in the repo and invokes them with `$story-setup`; in Antigravity run `story-setup` via `/skills` or natural language; it detects the current host (`target_cli=antigravity`) on its own. OpenCode needs 2.x, since 1.x cannot load the prose-guard plugin. Any Web AI or agent environment that can read project files can use the generic skills path.
 
 ### Do I need a GPU or to host a model?
 

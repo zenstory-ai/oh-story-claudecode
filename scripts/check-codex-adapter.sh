@@ -105,7 +105,7 @@ echo "  OK Windows encoding safety (UTF-8 stdio + file reads)"
 target="$(readlink .agents/skills)"
 [ "$target" = "../skills" ] || fail ".agents/skills symlink target must be relative '../skills', got '$target'"
 skill_count="$(find skills -maxdepth 2 -name SKILL.md | wc -l | tr -d ' ')"
-[ "$skill_count" = "13" ] || fail "expected 13 skills, found $skill_count"
+[ "$skill_count" = "14" ] || fail "expected 14 skills, found $skill_count"
 for skill in skills/*/SKILL.md; do
   name="$(basename "$(dirname "$skill")")"
   assert_file ".agents/skills/$name/SKILL.md"

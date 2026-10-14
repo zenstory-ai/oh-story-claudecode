@@ -278,7 +278,7 @@ def _chapter_number_from_name(name: str, *, outline: bool) -> int | None:
     # 改稿流程把原文备份为 第N章_章名_原稿_{日期}.md，与 hooks 一样不把它当本章正文。
     if not outline and "_原稿_" in name:
         return None
-    pattern = r"^细纲_第0*(\d+)章.*\.md$" if outline else r"^第0*(\d+)章(?:[_\- 　].*)?\.md$"
+    pattern = r"^细纲_第0*(\d+)章.*\.md$" if outline else r"^第0*(\d+)章(?:[：:._\- 　].*)?\.md$"
     match = re.match(pattern, name)
     return int(match.group(1)) if match else None
 
@@ -286,9 +286,11 @@ def _chapter_number_from_name(name: str, *, outline: bool) -> int | None:
 def find_chapter_file(directory: Path, chapter: int, *, outline: bool) -> Path:
     require(isinstance(chapter, int) and not isinstance(chapter, bool) and chapter >= 1, "chapter must be >= 1")
     require(directory.is_dir(), f"chapter directory is missing: {directory}")
+    # 正文按卷归档在子目录（正文/第N卷_卷名/第N章：章题.md），顶层找不到时递归查找
     matches = sorted(
-        path for path in directory.iterdir()
-        if path.is_file() and _chapter_number_from_name(path.name, outline=outline) == chapter
+        (child for child in directory.rglob("*.md")
+         if child.is_file() and _chapter_number_from_name(child.name, outline=outline) == chapter),
+        key=lambda p: str(p),
     )
     label = "outline" if outline else "body"
     require(len(matches) == 1, f"chapter {chapter} must have exactly one {label} file")

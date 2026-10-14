@@ -490,7 +490,7 @@ assert_grep '你现在用的是.*要一起装上吗' "$SKILL_FILE" "story-setup 
 # 判断不出宿主时，项目里的宿主标记只是上次装给谁，不等于这次在哪个软件里。
 assert_no_grep '恰好只有一个宿主的标记就用它' "$SKILL_FILE" "story-setup must not silently treat a lone project marker as the current host"
 assert_grep '这次还是它吗' "$SKILL_FILE" "story-setup must confirm a lone project marker with the author"
-# metadata.openclaw 在 13 个 skill 上全都有，拿它判定会把 reasonix / generic 项目误认成 OpenClaw。
+# metadata.openclaw 在 14 个 skill 上全都有，拿它判定会把 reasonix / generic 项目误认成 OpenClaw。
 assert_no_grep '中的 `metadata\.openclaw`' "$SKILL_FILE" "story-setup must not detect OpenClaw from the skills bundle it deploys itself"
 assert_grep '不作 OpenClaw 信号' "$SKILL_FILE" "story-setup must explain why metadata.openclaw is not a detection signal"
 # skills-only 三端只能靠各自 AGENTS.md 的标题行区分；SKILL.md 引用的标记必须在模板里真的存在。

@@ -49,7 +49,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
    - `.reasonix/`、`reasonix-plugin.json`、`REASONIX.md`，或 `AGENTS.md` 中的 Reasonix 段（标题行含 `网文写作工具集（Reasonix）`）→ `target_cli = reasonix`
    - `AGENTS.md` 中的通用段（标题行含 `网文写作工具集（通用 Agent / Web AI）`）→ `target_cli = generic`
 
-   > 后三类只认各端**互斥**的标记：`skills/*/SKILL.md` 的 `metadata.openclaw` 不作 OpenClaw 信号（13 个 skill 都带，三条 skills-only 路径部署出的 `skills/` 一样）；`.agents/skills/` 由 Antigravity、Codex 与 Reasonix 共用，也不单独作准。
+   > 后三类只认各端**互斥**的标记：`skills/*/SKILL.md` 的 `metadata.openclaw` 不作 OpenClaw 信号（14 个 skill 都带，三条 skills-only 路径部署出的 `skills/` 一样）；`.agents/skills/` 由 Antigravity、Codex 与 Reasonix 共用，也不单独作准。
 6. 定下 `target_cli`：
    - 第 4 步定出了当前宿主 → `target_cli` 就是它。项目里另有其他宿主的标记时，用 AskUserQuestion 问一句白话：「这个文件夹之前也给 {其他宿主名} 装过写作工具，这次要一起更新吗？」选项：「只装 {当前宿主名}（推荐）」「一起更新」。作者一开始就说要装多个时照办。
    - 定不出、项目标记恰好只有一个宿主 → AskUserQuestion 问「上次是给 {宿主名} 装的，这次还是它吗？」，是就用它，不是按下一条问。

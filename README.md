@@ -35,7 +35,7 @@
 ## 这是什么
 
 Oh Story 覆盖长篇与短篇网络小说的全流程：**扫榜选材 → 拆解爆款 → 搭大纲写正文 → 去AI味 → 生成封面图**。
-它以 13 个 skill 的形式装进你已经在用的编程 Agent，写作用的模型就是该 Agent 的模型，不需要 GPU，也不需要另外配模型。
+它以 14 个 skill 的形式装进你已经在用的编程 Agent，写作用的模型就是该 Agent 的模型，不需要 GPU，也不需要另外配模型。
 
 - **用文件系统当记忆** — 设定、大纲、正文、追踪各自独立维护。几百章的长篇不靠对话记忆硬撑，压缩上下文也不会丢伏笔。
 - **确定性检查与门禁** — 写正文前没有细纲会被拦下；写完自动扫截断、工程词和常见 AI 句式。7 个专业 Agent、8 个自动化 hook、100+ 份写作方法论按需加载。
@@ -288,7 +288,7 @@ flowchart LR
 | `story-short-write` | `/story-short-write` `/写短篇` | 短篇写作 · 情绪设计、反转构思、精修出稿 |
 | `story-deslop` | `/story-deslop` `/去AI味` | 去AI味 · 检测并清除 AI 写作痕迹 |
 
-**进阶**：拆对标书、扫榜、导入旧稿、多视角审稿、封面，需要时再用。
+**进阶**：拆对标书、扫榜、导入旧稿、多视角审稿、发布资料、封面，需要时再用。
 
 | Skill | 触发 | 说明 |
 |:------|:-----|:-----|
@@ -298,13 +298,15 @@ flowchart LR
 | `story-short-scan` | `/story-short-scan` `/短篇扫榜` | 短篇扫榜 · 知乎盐言/番茄短篇风口数据 |
 | `story-import` | `/story-import` `/导入小说` | 逆向导入 · 将已有小说反向解析为标准项目结构 |
 | `story-review` | `/story-review` `/审查` | 多视角审查 · 4 Agent 多视角审稿 + 番茄/起点/知乎评分标准 |
-| `story-cover` | `/story-cover` `/封面` | 封面生成 · 书名题材分析 + GPT-Image-2（Codex 内置用量 / API 回退） |
+| `story-publish-details` | `/story-publish-details` | 发布平台书籍资料 · 复用写作工程整理书名、简介、标签；番茄资料版本 2026-10-08 |
+| `story-cover` | `/story-cover` `/封面` | 封面提示词或成图 · 成图调用 GPT-Image-2（Codex 内置用量 / API 回退） |
 | `browser-cdp` | `/browser-cdp` | 浏览器操控 · CDP 协议复用登录态抓取数据 |
 
 > `story-deslop` 的本地检查是写作 lint：blocking 只限确定性句式/标点问题，其他提示按读感判断；朱雀等外部检测只作自测参考，不替代人工读感。
 
 自然语言同样触发：
-- 「帮我开书」→ `story-long-write`
+- 「帮我开书」→ 先确认是规划故事还是填写平台建书资料
+- 「整理番茄发布资料」→ `story-publish-details`
 - 「这篇太 AI 了」→ `story-deslop`
 - 「把我的书导进来」→ `story-import`
 - 「打开工作台」→ `story dashboard`（本机浏览拆文库与写作项目，可轻量编辑）
@@ -350,7 +352,7 @@ consistency-checker（Haiku，一致性）、character-designer、story-research
 
 ### 能在 Codex、Google Antigravity、OpenCode 里用吗，还是只支持 Claude Code？
 
-oh-story-claudecode 内置适配 Claude Code、Google Antigravity、OpenCode、ZCode、OpenClaw、Codex CLI 和 Reasonix。Codex 会直接扫描仓库内 `.agents/skills` 发现 13 个 skill，用 `$story-setup` 调用；Antigravity 用 `/skills` 或自然语言运行 `story-setup`，它会自动识别当前宿主（`target_cli=antigravity`）；OpenCode 需要 2.x，1.x 加载不了写正文守卫插件；能读取项目文件的 Web AI / Agent 环境也可以按通用 skills 路径使用。
+oh-story-claudecode 内置适配 Claude Code、Google Antigravity、OpenCode、ZCode、OpenClaw、Codex CLI 和 Reasonix。Codex 会直接扫描仓库内 `.agents/skills` 发现 14 个 skill，用 `$story-setup` 调用；Antigravity 用 `/skills` 或自然语言运行 `story-setup`，它会自动识别当前宿主（`target_cli=antigravity`）；OpenCode 需要 2.x，1.x 加载不了写正文守卫插件；能读取项目文件的 Web AI / Agent 环境也可以按通用 skills 路径使用。
 
 ### 需要 GPU 或自己部署模型吗？
 

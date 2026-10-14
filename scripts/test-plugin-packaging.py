@@ -22,6 +22,7 @@ SKILLS = (
     "story-long-analyze",
     "story-long-scan",
     "story-long-write",
+    "story-publish-details",
     "story-review",
     "story-setup",
     "story-short-analyze",

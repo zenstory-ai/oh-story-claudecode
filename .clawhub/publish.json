@@ -476,6 +476,37 @@
         "storytelling"
       ],
       "version": "1.1.22"
+    },
+    {
+      "categories": [
+        "creative",
+        "agents",
+        "knowledge"
+      ],
+      "displayName": "story-publish-details：发布平台书籍资料",
+      "disposition": "excluded",
+      "excludeReason": "Fork-local skill extension; publisher identity and publication rights have not been reviewed.",
+      "include": [
+        "**/*"
+      ],
+      "maintainer": "a-big-fish",
+      "path": "skills/story-publish-details",
+      "publisher": "a-big-fish",
+      "rebuildOn": [],
+      "rights": {
+        "evidence": "User-provided local extension; external publication not requested.",
+        "status": "unconfirmed"
+      },
+      "runtimeDependsOn": [],
+      "slug": "story-publish-details",
+      "supportedRuntimes": [],
+      "topics": [
+        "writing",
+        "fiction",
+        "chinese",
+        "storytelling"
+      ],
+      "version": "1.0.0"
     }
   ]
 }

@@ -31,14 +31,14 @@
 | `check-agent-notes.py` + `test-agent-notes.py` | `.agents/notes/` 决策笔记的目录布局（状态/分类/日期文件名）、`Status` 与目录一致、必需小节（Problem / Decision 或 Proposal / Alternatives considered / Consequences）、禁止手工索引；test 用临时目录逐类违规回归 | CI；新增或移动笔记后 |
 | `check-author-reports.py` | `<!-- author-report -->` 标记的作者报告模板里不许出现工程黑话：内部字段/状态名、脚本名、flag、snake/kebab 标识符、S1–S4、Gate、裸编号；块尾一行「技术备注：」豁免；登记文件（含长篇规划/单章/日更/大修模板）的报告块不得少于登记数量；`--self-test` 自带正反例 | CI；改报告模板后 |
 | `check-plugin-packaging.py` | Claude/ZCode 两个 catalog 与两个原生 manifest 的单 bundle 身份、版本、默认组件发现和 13 个根 Skills | CI；改 plugin packaging 后 |
-| `check-claude-adapter.sh` | Claude marketplace、根 plugin manifest 与 13 个 skill 自动发现；可选真实 CLI 生命周期 | CI（静态）；`CLAUDE_REAL_CHECK=1`（真实 CLI） |
+| `check-claude-adapter.sh` | Claude marketplace、根 plugin manifest 与 14 个 skill 自动发现；可选真实 CLI 生命周期 | CI（静态）；`CLAUDE_REAL_CHECK=1`（真实 CLI） |
 | `check-opencode-adapter.sh` | OpenCode 2.x 适配层同步 + commands/agents 结构 + 生成权限的 2.x 裁决矩阵 + plugin 行为回归 | CI + sync CI（调 sync-opencode.py） |
 | `check-openclaw-skills.sh` | OpenClaw AgentSkills/frontmatter 兼容性 | CI |
 | `check-codex-adapter.sh` | Codex 适配层：repo skills symlink、agent TOML、hooks 与跨平台 launcher | CI（调 generate-codex-agents.py 验生成确定性） |
 | `test-agent-permissions.py` | 工具白名单、禁止优先、空列表/继承和不支持声明回归；`--opencode` 用真实 OpenCode 2.x + mock 模型验证每个 agent 实际拿到的工具与允许/拒绝执行 | CI；CLI compatibility 跑真实 OpenCode |
 | `check-antigravity-adapter.sh` | Antigravity 2.0 适配层：项目 Skills、生成 Agents、Always-On Rule、named-group Hooks 与行为回归 | CI（调 generator、merge 与 hook tests） |
 | `check-zcode-adapter.sh` | ZCode plugin/marketplace、Skills/Commands/Hooks 与部署锚点 | CI |
-| `check-reasonix-adapter.sh` | Reasonix plugin manifest（schema、13 Skills、版本与 skills/story/VERSION 同步） | CI |
+| `check-reasonix-adapter.sh` | Reasonix plugin manifest（schema、14 Skills、版本与 skills/story/VERSION 同步） | CI |
 
 `python scripts/test-style-precedence.py` 验证书级表达豁免在深扫、标点整理、写后和下一章门禁中一致生效，且不跨书、不豁免同一行其他问题或结构错误。
 
@@ -72,7 +72,7 @@
 | `test-scan-aggregate.py` | 扫榜聚合 `aggregate-rank.js`：七个平台采集格式与手动榜单的题材/热度口径/字数分桶/标签解析、同书跨榜去重、采集问题上浮、样本不足标注、抽样取回原文、跳过非榜单文件、700 条级输入压到五分之一以下、没有热度的书库新书不拖掉平台热度口径 | Linux / Windows / macOS CI |
 | `test-scan-runtime-policy.py` | 变异验证 scan/browser 静态策略不会被无关或死代码关键词骗过 | CI；改 `check-scan-runtime-policy.sh` 后 |
 | `test-opencode-plugin.mjs` | 以 2.x `setup(ctx)` 直接执行 OpenCode TypeScript plugin，验大纲守卫、Shell 绕过、写后检查、compaction 注入与 `ctx.location` 定位 | 被 `check-opencode-adapter.sh` 调用 |
-| `test-codex-cli-e2e.sh` | 隔离 HOME 后用真实 Codex CLI 检查 repo 13 个 skill 的发现结果 | CLI compatibility CI；需已安装 `codex` |
+| `test-codex-cli-e2e.sh` | 隔离 HOME 后用真实 Codex CLI 检查 repo 14 个 skill 的发现结果 | CLI compatibility CI；需已安装 `codex` |
 | `test-zcode-hooks.sh` | ZCode 严格 JSON Hook、正文守卫与连续性回归 | CI |
 | `test-antigravity-hooks.mjs` | Antigravity 实际注册命令的 shell/字面 argv 兼容性（空格与中文项目路径）、Hook I/O、正文守卫、artifact 桥接与 Stop 单次续跑 | CI（Linux/Windows/macOS） |
 | `test-antigravity-hook-merge.py` | `.agents/hooks.json` 顶层 `oh-story` 管理组替换、用户组保留与幂等回归 | 被 `check-antigravity-adapter.sh` 调用 |

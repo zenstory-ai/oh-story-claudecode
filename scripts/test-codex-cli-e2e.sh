@@ -6,7 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-EXPECTED_COUNT=13
+EXPECTED_COUNT=14
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/ohstory-codex-e2e.XXXXXX")"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 

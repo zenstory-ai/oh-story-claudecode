@@ -25,6 +25,7 @@ EXPECTED_SKILLS = frozenset(
         "story-long-analyze",
         "story-long-scan",
         "story-long-write",
+        "story-publish-details",
         "story-review",
         "story-setup",
         "story-short-analyze",
@@ -115,7 +116,7 @@ def discover_skills(root: Path, findings: list[Finding]) -> list[str]:
             findings,
             "root-skills",
             "skills",
-            f"expected the 13 root skills; missing={missing}, unexpected={unexpected}",
+            f"expected the {len(EXPECTED_SKILLS)} root skills; missing={missing}, unexpected={unexpected}",
         )
     return skills
 

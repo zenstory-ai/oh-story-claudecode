@@ -1,14 +1,17 @@
 ---
 name: story-cover
 version: 1.0.0
-description: "小说封面生成。根据书名、作者名自动分析题材风格，调用 GPT-Image-2 生成含标题和署名的专业级网文封面；Codex CLI 优先使用内置 ImageGen，无需单独 API Key。触发方式：/story-cover、/封面、「帮我做个封面」「生成封面图」「做个小说封面」「封面设计」。"
+description: "小说封面生成与提示词设计。根据书名、作者名和题材构建封面提示词；用户只要提示词时不生图，要求封面图时调用 GPT-Image-2，Codex CLI 优先使用内置 ImageGen。触发方式：/story-cover、/封面、「帮我做个封面」「生成封面图」「封面提示词」「封面设计」。"
 metadata: {"openclaw":{"requires":{"env":["GPT_IMAGE_API_KEY"],"bins":["curl","jq","base64"]},"primaryEnv":"GPT_IMAGE_API_KEY","source":"https://github.com/zenstory-ai/oh-story-claudecode"}}
 ---
 # story-cover：小说封面生成
 
-你是小说封面设计师。根据书名和题材，调用 GPT-Image-2 一次性生成包含书名和作者名的完整封面。
+你是小说封面设计师。根据书名和题材提供封面提示词；作者要求成图时，再调用 GPT-Image-2 生成包含书名和作者名的完整封面。
 
 **核心原则：封面是读者的第一印象，一眼传达题材和氛围。**
+
+用户只要求提示词，或 `story-publish-details` 以“仅提示词”模式调用时，完成 Step 1-3 后交付完整提示词，跳过生图、保存和上传尺寸导出。只有用户要求封面图时才进入 Step 4-6；“仅提示词”不需要生图工具、API Key 或输出目录。
+OpenClaw 仍按上述元信息中的 Key 和命令门槛发现本 skill；仅提示词流程本身不调用这些依赖。
 
 ---
 
@@ -26,7 +29,7 @@ metadata: {"openclaw":{"requires":{"env":["GPT_IMAGE_API_KEY"],"bins":["curl","j
 | `GPT_IMAGE_MODEL` | | `gpt-image-2` | 仅在测试新模型时覆盖 |
 | `GPT_IMAGE_SIZE` | | `1024x1536` | API 回退的目标比例提示（番茄 3:4→`768x1024`，默认 2:3→`1024x1536`）。官方 gpt-image-2 认任意 16 倍数尺寸（比例≤3:1），但**很多中转代理会忽略 size、按预设返回约 2:3**（已实测）——平台尺寸不靠它，由「导出平台上传尺寸」步骤兜底 |
 | `UPLOAD_SIZE` | | — | 平台固定上传像素（番茄 `600x800`）；设置后由「导出平台上传尺寸」步骤居中裁剪+缩放出上传版（不变形、不依赖出图尺寸） |
-| `BOOK_DIR` | ✅ | — | 输出目录，建议 `./covers/<书名>` |
+| `BOOK_DIR` | 生图时必填 | — | 输出目录，建议 `./covers/<书名>`；仅提示词时不用 |
 | `REF_IMAGE` | | — | 参考图本地路径或 URL；内置通路先把图片载入会话，API 回退走 `images/edits` 图生图 |
 
 ---
@@ -35,7 +38,7 @@ metadata: {"openclaw":{"requires":{"env":["GPT_IMAGE_API_KEY"],"bins":["curl","j
 
 ### Step 1：收集信息
 
-必填：书名、作者名（笔名）、目标平台、输出目录 `BOOK_DIR`（建议 `./covers/<书名>`；API 回退用环境变量，内置通路直接使用当前任务值）。问作者时说「封面存在哪？默认 `./covers/<书名>`」，不把变量名当问题抛给作者
+必填：书名、作者名（笔名）、目标平台。生图时还需输出目录 `BOOK_DIR`（建议 `./covers/<书名>`；API 回退用环境变量，内置通路直接使用当前任务值）。仅提示词时不问输出目录。问作者时说「封面存在哪？默认 `./covers/<书名>`」，不把变量名当问题抛给作者
 选填：参考图 `REF_IMAGE`（本地路径或 URL，设置后切换到图生图）、风格偏好、尺寸
 
 > **书名和笔名是封面必需信息**：缺任一必须先用 AskUserQuestion 问用户补全，不得编造或留空。
@@ -50,6 +53,8 @@ metadata: {"openclaw":{"requires":{"env":["GPT_IMAGE_API_KEY"],"bins":["curl","j
 内置通路把目标比例写进提示词；API 回退再 `export GPT_IMAGE_SIZE`（很多代理会忽略、返回约 2:3）。平台有固定上传像素时设置 `UPLOAD_SIZE`（番茄 `600x800`）。**平台尺寸最终由「导出平台上传尺寸」步骤居中裁剪+缩放保证，不依赖实际出图尺寸。** 平台与题材风格见 [references/cover-styles.md](references/cover-styles.md)。
 
 ### Step 2：题材判定
+
+仅提示词模式收到作者已确认的题材时直接采用；没有题材依据时先问，不用默认题材代填。生图模式按下方规则判定。
 
 扫描书名（必要时简介）中的关键词，对照 [references/cover-styles.md](references/cover-styles.md) 的「题材推断规则」表选定题材。
 
@@ -134,6 +139,8 @@ Author name '{作者名}' at bottom center in [作者名字体风格 — 从上�
 [色彩指令]. [光效指令].
 Professional book cover, high detail digital painting, portrait [平台比例：番茄=3:4，默认=2:3] ratio, keep title and author name inside the central safe area away from edges (inner ~85%), no watermark
 ```
+
+仅提示词模式交付 1-3 个完整可用的提示词方案，注明所用的已确认书名、笔名、平台和题材；任何待确认的画面细节只写成可选方向，不编造为小说事实。此处结束，不执行 Step 4-6。
 
 #### 提示词技巧（实测验证）
 

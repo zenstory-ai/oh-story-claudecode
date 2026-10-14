@@ -23,7 +23,7 @@ if [ "${CLAUDE_REAL_CHECK:-0}" = "1" ]; then
   echo "  Claude: $(claude --version)"
 
   # A directory with both manifests is validated as a marketplace by Claude.
-  # Validate the real plugin separately so its 13 default-discovered SKILL.md
+  # Validate the real plugin separately so its 14 default-discovered SKILL.md
   # files are parsed, rather than substituting a synthetic component manifest.
   cp "$REPO_ROOT/.claude-plugin/plugin.json" "$TMP_DIR/plugin/.claude-plugin/plugin.json"
   cp -R "$REPO_ROOT/skills" "$TMP_DIR/plugin/skills"

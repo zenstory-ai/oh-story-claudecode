@@ -11,7 +11,7 @@ if [ -z "$REPO_ROOT" ]; then
 fi
 
 SKILLS_DIR="$REPO_ROOT/skills"
-EXPECTED_COUNT=13
+EXPECTED_COUNT=14
 
 echo "OpenClaw skills check"
 echo "====================="

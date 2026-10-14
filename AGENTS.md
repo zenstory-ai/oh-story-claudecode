@@ -4,7 +4,7 @@
 
 ## 这个仓库是什么
 
-一个网文写作 skill 套件：13 个 skill（`skills/<name>/SKILL.md` + `references/`），加上面向 Claude Code、Codex、OpenCode、OpenClaw、Antigravity、ZCode、Reasonix 七个编程 Agent（宿主）的适配层。产品是写在 Markdown 里的写作方法与工作流契约，不是运行时程序。`scripts/` 下是仓库自己的守卫、测试和代码生成脚本（索引见 [scripts/README.md](scripts/README.md)），不是 skill 运行时脚本。
+一个网文写作 skill 套件：14 个 skill（`skills/<name>/SKILL.md` + `references/`），加上面向 Claude Code、Codex、OpenCode、OpenClaw、Antigravity、ZCode、Reasonix 七个编程 Agent（宿主）的适配层。产品是写在 Markdown 里的写作方法与工作流契约，不是运行时程序。`scripts/` 下是仓库自己的守卫、测试和代码生成脚本（索引见 [scripts/README.md](scripts/README.md)），不是 skill 运行时脚本。
 
 ## 改动前必须知道的规矩
 
