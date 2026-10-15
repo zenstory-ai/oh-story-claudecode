@@ -1,6 +1,6 @@
 # 写作技法：可执行指令集
 
-> 写作全程参考。对话怎么写见 dialogue-mastery.md，开篇设计见 opening-design.md，章节格式按长篇 long-format.md 或短篇 format-and-structure.md。
+> 写作全程参考。对话怎么写见 dialogue-mastery.md，开篇设计见 opening-design.md，章节格式按长篇 long-format.md 或短篇 format-and-structure.md。场面与句子表面的计数规则在 story-long-write/references/scene-grammar.md 与 prose-surface.md，写完按其中命令跑检查器。
 
 ---
 

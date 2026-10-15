@@ -22,8 +22,8 @@
     },
     {
       "path": "skills/story-long-write/references/workflow-chapter.md",
-      "budget": 6550,
-      "why": "每章组装与质量流程；原 (a)-(g) 迁入 benchmark-recall，合计路径继续计入。 调高：新增「向作者汇报」四个白话模板（写完一章／字数不在范围／新增内容要拍板／停下）与书内工作目录 .story/work/ 约定；原先字数问法直接把 storyctl 动作名交给作者，临时文件无落点导致 /tmp 撞车和正文目录污染。 v0.8 收紧：单章/日更工作流改为短手册（组装脚本代查作者记忆、追踪事务 draft 预填、收尾检测一次调用），锁住精简。 v0.8.2：写手分组交付细节迁到 agent-calls；契约不过就地改法、缺文件停下修、主会话自己写时去味按检测器逐条提示改写进本文件，不再借读 reader-contract / project-files / deslop-gates。 恢复（+90）：主会话自己写正文也分两组、前组测一次 checkpoint、后组按剩余区间收——Wave 1 改成一次写完整章后，solo A/B 首检 3 例 demo 第 22 章有 2 例超带。 e2e（写第1章）：作者定了不对标时写前召回怎么走（原来三处都要求缺对标就停）；设定档案由主会话直接改、追踪事务不写设定。 e2e（继续写）：无对标看脚本降档行即可、补复沓锚句不算改大纲、新进场核心角色建快照、追踪体积超目标只提醒。 v0.8.3：缺文件的修法移到 stop-and-fix。 新书首章先初始化追踪一句留在正文流程（它和写作同一次调用）。 主会话自己写时写完查三类检测器抓不住的 AI 腔（对比试写里去掉写前去味预读后这三类变多）；删掉与入口重复的字数口径句。"
+      "budget": 6600,
+      "why": "每章组装与质量流程；原 (a)-(g) 迁入 benchmark-recall，合计路径继续计入。 调高：新增「向作者汇报」四个白话模板（写完一章／字数不在范围／新增内容要拍板／停下）与书内工作目录 .story/work/ 约定；原先字数问法直接把 storyctl 动作名交给作者，临时文件无落点导致 /tmp 撞车和正文目录污染。 v0.8 收紧：单章/日更工作流改为短手册（组装脚本代查作者记忆、追踪事务 draft 预填、收尾检测一次调用），锁住精简。 v0.8.2：写手分组交付细节迁到 agent-calls；契约不过就地改法、缺文件停下修、主会话自己写时去味按检测器逐条提示改写进本文件，不再借读 reader-contract / project-files / deslop-gates。 恢复（+90）：主会话自己写正文也分两组、前组测一次 checkpoint、后组按剩余区间收——Wave 1 改成一次写完整章后，solo A/B 首检 3 例 demo 第 22 章有 2 例超带。 e2e（写第1章）：作者定了不对标时写前召回怎么走（原来三处都要求缺对标就停）；设定档案由主会话直接改、追踪事务不写设定。 e2e（继续写）：无对标看脚本降档行即可、补复沓锚句不算改大纲、新进场核心角色建快照、追踪体积超目标只提醒。 v0.8.3：缺文件的修法移到 stop-and-fix。 新书首章先初始化追踪一句留在正文流程（它和写作同一次调用）。 主会话自己写时写完查三类检测器抓不住的 AI 腔（对比试写里去掉写前去味预读后这三类变多）；删掉与入口重复的字数口径句。 +50：正文检查只点名冷文件 scene-grammar.md、prose-surface.md，规则全文不进本章流程。"
     },
     {
       "path": "skills/story-long-write/references/workflow-setup.md",
@@ -47,8 +47,8 @@
     },
     {
       "path": "skills/story-long-write/references/writing-craft.md",
-      "budget": 10250,
-      "why": "每章写作技法：场景交织、疏密、人物立场和收益刻度；质检用功能删除测试。 句子怎么连（+约 110）：作者读实测稿觉得电报体、句式不像中文；对照七猫人类语料，差在逗号罗列动作（2-3 倍）、「没A也没B」否定排比（3-14 倍）、对话语气词约一半。删感知素材库与物件类型速查腾出位置。"
+      "budget": 10280,
+      "why": "每章写作技法：场景交织、疏密、人物立场和收益刻度；质检用功能删除测试。 句子怎么连（+约 110）：作者读实测稿觉得电报体、句式不像中文；对照七猫人类语料，差在逗号罗列动作（2-3 倍）、「没A也没B」否定排比（3-14 倍）、对话语气词约一半。删感知素材库与物件类型速查腾出位置。 +30：场面与句子表面规则留在冷文件，这里只加一句指针。"
     },
     {
       "path": "skills/story-long-write/references/anti-ai-writing.md",
@@ -285,14 +285,14 @@
         {
           "label": "常规",
           "files": [],
-          "budget": 21650
+          "budget": 21681
         },
         {
           "label": "召回全量",
           "files": [
             "skills/story-long-write/references/benchmark-recall.md"
           ],
-          "budget": 24100
+          "budget": 24129
         },
         {
           "label": "新书首章：生成题材正文提示卡（两张最大的卡）",
@@ -301,7 +301,7 @@
             "skills/story-long-write/references/genre-prose-cards/都市脑洞.md",
             "skills/story-long-write/references/tracking-initialization.md"
           ],
-          "budget": 24950
+          "budget": 24981
         },
         {
           "label": "缺文件停下修（本轮不写，不与写作叠加）",
@@ -309,11 +309,11 @@
             "skills/story-long-write/references/stop-and-fix.md",
             "skills/story-long-write/references/project-files.md"
           ],
-          "budget": 27050
+          "budget": 27082
         }
       ],
       "stacking": {
-        "budget": 27400,
+        "budget": 27429,
         "slots": [
           [
             "召回全量"
@@ -323,7 +323,7 @@
           ]
         ]
       },
-      "why": "v0.8.2：只计无条件读取；本章技法由写手读、主会话不读（只在 prompt 填类别）。召回全量与新书首章生成题材卡可叠加；契约不过按步骤 9 的改法就地改，不读 reference；缺文件停下修、本轮不写。派子代理的 prompt 在 agent-calls.md。 v0.8.3：缺文件、追踪对不上时的修法移到 stop-and-fix（只在停下修时读，计入该分支）；日更删掉与正文流程重复的常见问题表。 v0.8.3：新书首章会先读 tracking-initialization 初始化追踪，此前漏登，补进新书首章分支。"
+      "why": "v0.8.2：只计无条件读取；本章技法由写手读、主会话不读（只在 prompt 填类别）。召回全量与新书首章生成题材卡可叠加；契约不过按步骤 9 的改法就地改，不读 reference；缺文件停下修、本轮不写。派子代理的 prompt 在 agent-calls.md。 v0.8.3：缺文件、追踪对不上时的修法移到 stop-and-fix（只在停下修时读，计入该分支）；日更删掉与正文流程重复的常见问题表。 v0.8.3：新书首章会先读 tracking-initialization 初始化追踪，此前漏登，补进新书首章分支。 正文流程加一句冷文件指针（scene-grammar.md、prose-surface.md），规则全文不进热路径，分支预算抬到实测用量。"
     },
     {
       "label": "写手写正文（narrative-writer 每次调用）",
@@ -344,7 +344,7 @@
           "files": [
             "skills/story-setup/references/agent-references/opening-design.md"
           ],
-          "budget": 27750
+          "budget": 27772
         },
         {
           "label": "本章技法·打脸",
@@ -365,14 +365,14 @@
           "files": [
             "skills/story-setup/references/agent-references/long-emotional-methods.md"
           ],
-          "budget": 26650
+          "budget": 26665
         },
         {
           "label": "本章技法·悬疑",
           "files": [
             "skills/story-setup/references/agent-references/long-suspense.md"
           ],
-          "budget": 28550
+          "budget": 28577
         },
         {
           "label": "本章技法·日常",
@@ -382,9 +382,9 @@
           "budget": 26300
         }
       ],
-      "why": "v0.8.2：写一章时读写作技法、情绪落到纸面（弧线规划留给排纲）、对话；本章技法由写手按 prompt 类别自己读一份；前三章加读开篇设计。",
+      "why": "v0.8.2：写一章时读写作技法、情绪落到纸面（弧线规划留给排纲）、对话；本章技法由写手按 prompt 类别自己读一份；前三章加读开篇设计。 writing-craft 开头加一句冷文件指针，场面与句子表面的规则全文不进这次调用，分支预算抬到实测用量。",
       "stacking": {
-        "budget": 33900,
+        "budget": 33919,
         "slots": [
           [
             "前三章"
@@ -871,14 +871,14 @@
         {
           "label": "常规",
           "files": [],
-          "budget": 25800
+          "budget": 25913
         },
         {
           "label": "召回全量",
           "files": [
             "skills/story-long-write/references/benchmark-recall.md"
           ],
-          "budget": 28250
+          "budget": 28361
         },
         {
           "label": "新书首章：生成题材正文提示卡（两张最大的卡）",
@@ -887,7 +887,7 @@
             "skills/story-long-write/references/genre-prose-cards/都市脑洞.md",
             "skills/story-long-write/references/tracking-initialization.md"
           ],
-          "budget": 29100
+          "budget": 29213
         },
         {
           "label": "缺文件停下修（本轮不写，不与写作叠加）",
@@ -895,7 +895,7 @@
             "skills/story-long-write/references/stop-and-fix.md",
             "skills/story-long-write/references/project-files.md"
           ],
-          "budget": 31200
+          "budget": 31314
         },
         {
           "label": "本章技法·打脸",
@@ -957,7 +957,7 @@
           ]
         ]
       },
-      "why": "v0.8.2：主会话自己写正文，与写手读同一套技法（writing-craft + long-format）。本章技法只读「决策路由」和它指向的那一节，日更一批只读一份；召回全量（无自定义文风的书几乎每章都走）、新书首章生成题材卡与本章技法会在同一次调用里叠加，登记进 stacking；契约不过按 workflow-chapter 步骤 9 的改法就地改、去味兜底按检测器逐条提示改，都不再读 reference；缺文件停下修、本轮不写，不与写作叠加。 v0.8.3：缺文件、追踪对不上时的修法移到 stop-and-fix（只在停下修时读，计入该分支）；日更删掉与正文流程重复的常见问题表。 v0.8.3：新书首章会先读 tracking-initialization 初始化追踪，此前漏登，补进新书首章分支。"
+      "why": "v0.8.2：主会话自己写正文，与写手读同一套技法（writing-craft + long-format）。本章技法只读「决策路由」和它指向的那一节，日更一批只读一份；召回全量（无自定义文风的书几乎每章都走）、新书首章生成题材卡与本章技法会在同一次调用里叠加，登记进 stacking；契约不过按 workflow-chapter 步骤 9 的改法就地改、去味兜底按检测器逐条提示改，都不再读 reference；缺文件停下修、本轮不写，不与写作叠加。 v0.8.3：缺文件、追踪对不上时的修法移到 stop-and-fix（只在停下修时读，计入该分支）；日更删掉与正文流程重复的常见问题表。 v0.8.3：新书首章会先读 tracking-initialization 初始化追踪，此前漏登，补进新书首章分支。 workflow-chapter 与 writing-craft 各加一句冷文件指针，场面与句子表面规则全文不进热路径，分支预算抬到实测用量。"
     },
     {
       "label": "长篇日更 direct/solo（主会话自己写正文）",
@@ -973,14 +973,14 @@
         {
           "label": "常规",
           "files": [],
-          "budget": 29150
+          "budget": 29283
         },
         {
           "label": "召回全量",
           "files": [
             "skills/story-long-write/references/benchmark-recall.md"
           ],
-          "budget": 31600
+          "budget": 31731
         },
         {
           "label": "缺文件停下修（本轮不写，不与写作叠加）",
@@ -988,7 +988,7 @@
             "skills/story-long-write/references/stop-and-fix.md",
             "skills/story-long-write/references/project-files.md"
           ],
-          "budget": 34550
+          "budget": 34684
         },
         {
           "label": "本章技法·打脸",
@@ -1047,7 +1047,7 @@
           ]
         ]
       },
-      "why": "v0.8.2：主会话自己写正文，与写手读同一套技法（writing-craft + long-format）。本章技法只读「决策路由」和它指向的那一节，日更一批只读一份；召回全量（无自定义文风的书几乎每章都走）、新书首章生成题材卡与本章技法会在同一次调用里叠加，登记进 stacking；契约不过按 workflow-chapter 步骤 9 的改法就地改、去味兜底按检测器逐条提示改，都不再读 reference；缺文件停下修、本轮不写，不与写作叠加。 日更项目已有正文与题材卡，不计新书首章。 v0.8.3：缺文件、追踪对不上时的修法移到 stop-and-fix（只在停下修时读，计入该分支）；日更删掉与正文流程重复的常见问题表。"
+      "why": "v0.8.2：主会话自己写正文，与写手读同一套技法（writing-craft + long-format）。本章技法只读「决策路由」和它指向的那一节，日更一批只读一份；召回全量（无自定义文风的书几乎每章都走）、新书首章生成题材卡与本章技法会在同一次调用里叠加，登记进 stacking；契约不过按 workflow-chapter 步骤 9 的改法就地改、去味兜底按检测器逐条提示改，都不再读 reference；缺文件停下修、本轮不写，不与写作叠加。 日更项目已有正文与题材卡，不计新书首章。 v0.8.3：缺文件、追踪对不上时的修法移到 stop-and-fix（只在停下修时读，计入该分支）；日更删掉与正文流程重复的常见问题表。 workflow-chapter 与 writing-craft 各加一句冷文件指针，场面与句子表面规则全文不进热路径，分支预算抬到实测用量。"
     },
     {
       "label": "长篇大修 direct/solo（主会话自己写正文）",
@@ -1062,14 +1062,14 @@
         {
           "label": "常规",
           "files": [],
-          "budget": 22400
+          "budget": 22407
         },
         {
           "label": "追踪提交报错",
           "files": [
             "skills/story-long-write/references/tracking-transaction.md"
           ],
-          "budget": 30100
+          "budget": 30126
         },
         {
           "label": "本章技法·打脸",
@@ -1128,7 +1128,7 @@
           ]
         ]
       },
-      "why": "v0.8.2：主会话自己改稿；不再读整份单章流程，字数出带与缺 Node 的处置已写进 workflow-revision；追踪协议只在报错时读，可与本章技法叠加。"
+      "why": "v0.8.2：主会话自己改稿；不再读整份单章流程，字数出带与缺 Node 的处置已写进 workflow-revision；追踪协议只在报错时读，可与本章技法叠加。 writing-craft 加一句冷文件指针，场面与句子表面规则全文不进热路径，分支预算抬到实测用量。"
     },
     {
       "label": "短篇构思（Phase 1–2，主会话）",
