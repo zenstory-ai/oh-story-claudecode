@@ -148,6 +148,36 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('召回降档：成立', result.stdout)
         self.assertNotIn('以上是 prompt 正文', prompt)
 
+    def test_builder_prompt_keeps_semantic_metaphor_fallback(self):
+        # 普通比较的语义复核写进生成 prompt；书级文风和 style_resolution 仍在，不钉每千字上限。
+        (self.book / '.story-deployed').write_text('agents_version: 34\n', encoding='utf-8')
+        event = {'schema_version': 1, 'event_id': 'e-metaphor', 'operation': {'action': 'remember', 'preference': {
+            'kind': 'prose_style', 'scope': {'level': 'book', 'value': self.book.name},
+            'assertion': '叙述少用装饰性比较', 'quote': '这本书少用装饰性比较', 'source_ref': 'test',
+            'source': 'explicit_user', 'confidence': 'high', 'importance': 'high', 'status': 'active',
+            'reason': '作者明确要求', 'conflicts_with': [],
+            }}}
+        memory_input = Path(self.tmp.name) / 'memory.json'
+        memory_input.write_text(json.dumps(event, ensure_ascii=False), encoding='utf-8')
+        recorded = self.call('author_memory_commit.py', 'record', '--workspace', self.book,
+                             '--book-root', self.book, '--input', memory_input)
+        self.assertEqual(recorded.returncode, 0, recorded.stdout + recorded.stderr)
+        result = self.build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        prompt = result.stdout.split('=' * 60, 1)[0]
+        self.assertIn('本体与喻体共享当场能看见的具体属性', prompt)
+        self.assertIn('带出人物或场景信息', prompt)
+        self.assertIn('不是只装饰声音、外貌或情绪', prompt)
+        self.assertIn('动作、物件、声音或后果', prompt)
+        self.assertIn('不设每千字上限', prompt)
+        self.assertIn('书级权威文风', prompt)
+        self.assertIn('叙述少用装饰性比较', prompt)
+        self.assertIn('——— style_resolution ———', prompt)
+        self.assertNotIn('每千字不超过', prompt)
+        guide = (SCRIPTS.parent / 'references' / 'anti-ai-writing.md').read_text(encoding='utf-8')
+        self.assertIn('.deslop-whitelist', guide)
+        self.assertIn('style_resolution', guide)
+
     def test_builder_injects_author_memory_query(self):
         result = self.build()
         self.assertEqual(result.returncode, 0, result.stderr)

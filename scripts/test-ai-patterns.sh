@@ -560,7 +560,9 @@ printf '%s\n' \
   '周砚的声音像是老旧电梯里的报站声，卡在喉咙口。' \
   '公告牌上的红字如同钉子，一颗一颗往墙上扎。' \
   '孩子的哭声像从楼缝里漏出来的风，细得让人背后发凉。' \
-  '胸牌亮起来，像一块透明的旧手机屏。' > "$FIXTURE_METAPHOR"
+  '胸牌亮起来，像一块透明的旧手机屏。' \
+  '老哈克的声音像砂纸磨过木头，一句一句往外挤。' \
+  '他佝偻的后背像一张被风吹得快散架的旧弓。' > "$FIXTURE_METAPHOR"
 set +e
 node "$SCRIPT" --json "$FIXTURE_METAPHOR" > "$OUT"
 set -e
@@ -570,6 +572,10 @@ const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const md = r.findings.filter((f) => f.type === 'metaphor-density-tic');
 if (md.length !== 1) throw new Error('高密度比喻应报 1 处 metaphor-density-tic: ' + JSON.stringify(r.findings));
 if (md[0].severity !== 'advisory') throw new Error('metaphor-density-tic 应为 advisory');
+if (md[0].review !== 'semantic') throw new Error('metaphor-density-tic 应为 semantic advisory: ' + JSON.stringify(md[0]));
+if (/不超过\s*\d|不得超过|每千字不超过/.test(md[0].message)) {
+  throw new Error('metaphor-density-tic 不应写成每千字硬上限: ' + md[0].message);
+}
 if (!md[0].excerpt.includes('路灯像') || !md[0].excerpt.includes('玻璃好像')) {
   throw new Error('metaphor-density-tic excerpt 应包含比喻样本: ' + JSON.stringify(md[0]));
 }

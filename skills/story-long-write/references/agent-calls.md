@@ -6,7 +6,7 @@
 
 全章细纲交给写手统筹编排，默认同一 session 按前后两组交付：按实际叙述顺序在自然转场或因果停顿处分组，不在一句对话或同一动作中间截断，可交错情节点但不增删批准内容、不拆逐点字数配额；写手先把前组写到工作目录 `前组.md`，主会话只调用一次 `storyctl.py wordcount checkpoint --file {segment} --project {项目根} --chapter {N}`，把 `actual / remaining_user_range` 连同后组交回同一写手，两组按原文拼接，不回改前组追字数。作者明确要求一次成文时执行安排填「全章」，直接落盘，不跑 checkpoint。
 
-组装脚本的输出（`====` 以上）就是 prompt 骨架。**主会话填九槽**（搜 `［主会话填］`）：执行安排 ／ 本章意图 ／ 作者本轮要求 ／ 本章技法（只填类别，写手自己读）／ 本节速记 ／ 涉及角色（列名字，角色卡写手自己读）／ `genre_prose_card` ／ 必读设定 ／ `style_resolution`；外加脚本标出的条件槽（降档不成立时的情绪与节奏召回；作者偏好限定范围记忆，适用时带 `--genre`／`--workflow` 跑 SKILL.md「核心方法」的 query 命令补查）。`author_preferences` 由脚本注入，只作低优先级倾向。空槽以外一字不改，整份照抄进 Agent prompt。脚本**跑不起来**时读 [writer-prompt-fallback.md](writer-prompt-fallback.md) 手动组装并报 `Fallback: build_writer_prompt -> 手动组装`。
+组装脚本的输出（`====` 以上）就是 prompt 骨架。**主会话填九槽**（搜 `［主会话填］`）：执行安排 ／ 本章意图 ／ 作者本轮要求 ／ 本章技法（只填类别）／ 本节速记 ／ 涉及角色（列名字）／ `genre_prose_card` ／ 必读设定 ／ `style_resolution`；外加脚本标出的条件槽（降档不成立的情绪与节奏；限定范围记忆适用时补查）。`author_preferences` 由脚本注入，只作低优先级倾向。空槽以外一字不改，整份照抄进 Agent prompt。比喻语义复核照抄：共享当场可见属性、带出人物或场景、且不单装饰声音外貌情绪才留，否则改成动作、物件、声音或后果；服从文风与 style_resolution。脚本**跑不起来**时读 [writer-prompt-fallback.md](writer-prompt-fallback.md) 手动组装，报 `Fallback: build_writer_prompt -> 手动组装`。
 
 ## story-architect：定设定、出卷纲、出一批细纲（换新上下文）
 
