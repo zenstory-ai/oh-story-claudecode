@@ -33,6 +33,8 @@ function projectRoot(directory: string): string {
       cwd: directory,
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
+      // Windows: without this, git flashes a console window as the plugin loads.
+      windowsHide: true,
     }).trim()
   } catch {
     return directory
@@ -64,6 +66,8 @@ function tryGit(root: string, args: string): string {
       cwd: root,
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
+      // Windows: without this, git flashes a console window as the plugin loads.
+      windowsHide: true,
     }).trim()
   } catch {
     return ""

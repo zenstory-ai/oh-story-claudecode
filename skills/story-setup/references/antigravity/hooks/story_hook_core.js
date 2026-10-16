@@ -1277,6 +1277,8 @@ function stagedMarkdownWarnings(root) {
     output = spawnSync("git", ["-C", root, "-c", "core.quotepath=false", "diff", "--cached", "--relative", "--name-only", "--diff-filter=ACM", "-z", "--", "."], {
       encoding: "buffer",
       stdio: ["ignore", "pipe", "ignore"],
+      // Windows: without this, git flashes a console window every time the hook runs.
+      windowsHide: true,
     })
     if (output.status !== 0 || !output.stdout) return ""
   } catch {
