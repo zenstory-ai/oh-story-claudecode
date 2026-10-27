@@ -125,6 +125,7 @@ esac
 
 BASE="$(basename "$ABS")"
 PARENT="$(basename "$(dirname "$ABS")")"
+case "$BASE" in *_原稿_*) exit 0 ;; esac
 
 case "$BASE" in
   正文.md)

@@ -114,6 +114,15 @@ try {
   assert.strictEqual(hollowGoal.status, 1)
   assert(failureIds(hollowGoal).includes('outline.intent-fields-substantive'))
 
+  for (const field of ['目标情绪', '主角目标/关键选择']) {
+    for (const [index, [value, newline]] of [['', '\n'], [' \t ', '\r\n'], ['`[待补充]`', '\n']].entries()) {
+      const text = outline({ fieldValues: { [field]: value } }).replace(/\n/g, newline)
+      const empty = run(writeCase(`empty-intent-${field.replace('/', '-')}-${index}`, text))
+      assert.strictEqual(empty.status, 1, empty.stdout + empty.stderr)
+      assert(failureIds(empty).includes('outline.intent-fields-substantive'))
+    }
+  }
+
   // ……但其余字段仍按契约允许 [待补充]，不能因此判失败。
   const hollowOther = run(writeCase('hollow-other', outline({
     fieldValues: { 契约风险: '[待补充]', 章节定位: '[待补充]', '单元ID/位置': '[待补充]' },
@@ -145,6 +154,31 @@ try {
   })))
   assert.strictEqual(threeCol.status, 1)
   assert.deepStrictEqual(failureIds(threeCol), ['outline.plotpoint-table'])
+
+  const eventHeader = '| # | 情节点 | 功能标签 | 执行边界（禁＋放） |\n|---|---|---|---|'
+  for (const [name, table] of [
+    ['empty', eventHeader],
+    ['missing-cell', `${eventHeader}\n| 1 | 江晨接到邀约 | 铺垫 |`],
+    ['mixed-widths', `${eventHeader}\n| 1 | 邀约 | 铺垫 |\n| 2 | 推过铁盒 | 高潮 | 放：允许当场开口 |`],
+    ['unrelated-table', `${eventHeader}\n\n#### 另一张表\n${eventHeader}\n| 1 | 无关记录 | 铺垫 | 放：允许开口 |`],
+  ]) {
+    const malformed = run(writeCase(`plot-rows-${name}`, outline({ plotTable: table })))
+    assert.strictEqual(malformed.status, 1, malformed.stdout + malformed.stderr)
+    assert(failureIds(malformed).includes('outline.plotpoint-table'))
+  }
+
+  for (const [index, event] of ['核对 A\\|B ', '核对路径 A\\\\'].entries()) {
+    const escaped = run(writeCase(`plot-escaped-pipe-${index}`, outline({
+      plotTable: `${eventHeader}\n| 1 | ${event}| 发现 | 放：允许当场对账 |`,
+    })))
+    assert.strictEqual(escaped.status, 0, escaped.stdout + escaped.stderr)
+  }
+
+  const unrelatedRelease = run(writeCase('plot-release-outside-table', outline({
+    plotTable: `${eventHeader}\n| 1 | 江晨接到邀约 | 铺垫 | 禁：不提铁盒。放：无 |\n\n#### 另一张表\n${eventHeader}\n| 1 | 无关记录 | 铺垫 | 放：允许当场开口 |`,
+  })))
+  assert.strictEqual(unrelatedRelease.status, 1, unrelatedRelease.stdout + unrelatedRelease.stderr)
+  assert(failureIds(unrelatedRelease).includes('outline.plotpoint-release'))
 
   // 加「分辨率」列之前的四列旧表仍然收——既有项目的细纲不因模板加列而失效。
   const legacyFourCol = run(writeCase('plot-legacy-four-col', outline({

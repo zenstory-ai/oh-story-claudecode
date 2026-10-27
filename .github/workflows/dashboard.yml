@@ -3,17 +3,6 @@ name: Story Dashboard
 on:
   push:
     branches: [main]
-    paths:
-      - "demo/**"
-      - "skills/story/SKILL.md"
-      - "skills/story/assets/**"
-      - "skills/story/scripts/dashboard-server.mjs"
-      - "tests/**"
-      - "README.md"
-      - "package.json"
-      - "package-lock.json"
-      - "playwright.config.mjs"
-      - ".github/workflows/dashboard.yml"
   pull_request:
     paths:
       - "demo/**"
@@ -26,6 +15,7 @@ on:
       - "package-lock.json"
       - "playwright.config.mjs"
       - ".github/workflows/dashboard.yml"
+      - ".release/policy.json"
 
 permissions:
   contents: read

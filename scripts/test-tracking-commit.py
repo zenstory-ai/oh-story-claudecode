@@ -390,6 +390,70 @@ class TrackingCommitTests(unittest.TestCase):
         self.assertEqual(self.read_state()["state_revision"], 1)
         self.run_tool("check")
 
+    def test_failed_revision_restores_history_before_another_commit(self) -> None:
+        self.init()
+        self.run_tool("commit", transaction(1, character=True))
+        self.run_tool("commit", transaction(2, character=True))
+        record = self.project / "追踪/逐章记录/第001章.md"
+        original = record.read_bytes().replace(b"\n", b"\r\n")
+        record.write_bytes(original)
+        authority = (self.project / "追踪/_tracking-state.json").read_bytes()
+        revision = transaction(1, mode="revision", character=True)
+        revision["expected_state_revision"] = 2
+        revision["delta"]["result"] = "未提交的变化"
+        revision["delta"]["character_changes"][0]["change"] = "未提交的变化"
+        revision["character_snapshots"]["江晨"]["state"] = "未提交的变化"
+        obstacle = self.project / "追踪/伏笔.md"
+        obstacle.unlink()
+        obstacle.mkdir()
+
+        self.run_tool("commit", revision, expect=2)
+
+        self.assertEqual((self.project / "追踪/_tracking-state.json").read_bytes(), authority)
+        self.assertEqual(record.read_bytes(), original)
+        obstacle.rmdir()
+        self.run_tool("commit", transaction(3))
+        self.run_tool("check")
+        self.run_tool("commit", revision, expect=2)
+        _, draft_path = self.draft(1)
+        draft = json.loads(draft_path.read_text(encoding="utf-8"))
+        self.assertEqual(draft["delta"]["result"], transaction(1)["delta"]["result"])
+        self.assertNotIn("未提交的变化", json.dumps(draft, ensure_ascii=False))
+
+    def test_state_write_failure_restores_the_previous_revision_record(self) -> None:
+        self.init()
+        self.run_tool("commit", transaction(1))
+        record = self.project / "追踪/逐章记录/第001章.md"
+        original = record.read_bytes()
+        module = load_tool_module()
+        write = module.atomic_write_text
+
+        def fail_on_state(path: Path, payload: str) -> None:
+            if path.name == "_tracking-state.json":
+                raise OSError("injected authority-write failure")
+            write(path, payload)
+
+        module.atomic_write_text = fail_on_state
+        revision = transaction(1, mode="revision")
+        revision["expected_state_revision"] = 1
+        revision["delta"]["result"] = "未提交的结果"
+        with self.assertRaises(OSError):
+            module.apply_transaction(self.project, revision)
+        self.assertEqual(record.read_bytes(), original)
+        self.assertEqual(self.read_state()["state_revision"], 1)
+
+    def test_failed_imported_revision_removes_its_uncommitted_overlay(self) -> None:
+        self.init(last_chapter=2)
+        obstacle = self.project / "追踪/伏笔.md"
+        obstacle.unlink()
+        obstacle.mkdir()
+        self.run_tool("commit", transaction(1, mode="revision"), expect=2)
+        self.assertFalse((self.project / "追踪/逐章记录/第001章.md").exists())
+        self.assertEqual(self.read_state()["state_revision"], 0)
+        obstacle.rmdir()
+        self.run_tool("commit", transaction(3))
+        self.run_tool("check")
+
     def test_stale_revision_cannot_overwrite_newer_state(self) -> None:
         self.init()
         self.run_tool("commit", transaction(1, foreshadow=True, timeline=True))
@@ -748,6 +812,124 @@ class TrackingCommitTests(unittest.TestCase):
         self.assertEqual(after, before.replace(first["delta"]["result"], delta["result"]))
         self.run_tool("check")
 
+    def test_revision_draft_preserves_separator_names_and_snapshots(self) -> None:
+        self.init()
+        names = ["Alice｜Alias", "Bea｜核心｜Alias", "Guest｜临时｜Alias", "Eve|Alias",
+                 "Plain", "Plain｜核心｜alive"]
+        core = [names[index] for index in (0, 1, 3, 4, 5)]
+        first = transaction(1)
+        first["delta"]["character_changes"] = [
+            {"name": name, "change": "alive｜核心｜additional detail"} for name in names
+        ]
+        first["character_snapshots"] = {name: snapshot(state="alive") for name in core}
+        first["context"]["active_character_names"] = core
+        self.run_tool("commit", first)
+        expected_changes = [
+            {**item, "name": item["name"].replace("|", "｜")}
+            for item in first["delta"]["character_changes"]
+        ]
+        expected_core = {name.replace("|", "｜") for name in core}
+        record = self.project / "追踪/逐章记录/第001章.md"
+        original = record.read_bytes()
+
+        _, draft_path = self.draft(1)
+        draft = json.loads(draft_path.read_text(encoding="utf-8"))
+        self.assertEqual(draft["delta"]["character_changes"], expected_changes)
+        self.assertEqual(set(draft["character_snapshots"]), expected_core)
+        self.run_tool("commit", draft)
+        self.run_tool("check")
+        self.assertEqual(record.read_bytes(), original)
+        self.assertEqual(set(self.read_state()["characters"]), expected_core)
+        draft_path.unlink()
+        _, draft_path = self.draft(1)
+        again = json.loads(draft_path.read_text(encoding="utf-8"))
+        self.assertEqual(again["delta"]["character_changes"], expected_changes)
+        self.assertEqual(set(again["character_snapshots"]), expected_core)
+
+    def write_existing_character_rows(self, rows: list[str]) -> None:
+        path = self.project / "追踪/逐章记录/第001章.md"
+        before, _, tail = path.read_text(encoding="utf-8").partition("## 角色变化\n")
+        _, _, after = tail.partition("\n## ")
+        path.write_text(before + "## 角色变化\n" + "\n".join(f"- {row}" for row in rows)
+                        + "\n\n## " + after, encoding="utf-8")
+
+    def test_revision_draft_reads_separator_name_from_existing_record(self) -> None:
+        self.init()
+        first = transaction(1)
+        name = "Bea｜核心｜Alias"
+        first["delta"]["character_changes"] = [{"name": name, "change": "alive"}]
+        first["character_snapshots"] = {name: snapshot(state="alive")}
+        first["context"]["active_character_names"] = [name]
+        self.run_tool("commit", first)
+        self.write_existing_character_rows([f"{name}｜核心｜alive"])
+        _, draft_path = self.draft(1)
+        draft = json.loads(draft_path.read_text(encoding="utf-8"))
+        self.assertEqual(draft["delta"]["character_changes"], first["delta"]["character_changes"])
+        self.assertEqual(draft["character_snapshots"], first["character_snapshots"])
+        self.run_tool("commit", draft)
+        self.run_tool("check")
+        draft_path.unlink()
+        _, draft_path = self.draft(1)
+        again = json.loads(draft_path.read_text(encoding="utf-8"))
+        self.assertEqual(again["delta"]["character_changes"], first["delta"]["character_changes"])
+        self.assertEqual(again["character_snapshots"], first["character_snapshots"])
+
+    def test_ambiguous_existing_record_preserves_history_authority_and_pending_draft(self) -> None:
+        self.init()
+        names = ["Bea", "Bea｜核心｜Alias"]
+        first = transaction(1)
+        first["delta"]["character_changes"] = [{"name": name, "change": "alive"} for name in names]
+        first["character_snapshots"] = {name: snapshot(state="alive") for name in names}
+        first["context"]["active_character_names"] = names
+        self.run_tool("commit", first)
+        self.write_existing_character_rows(["Bea｜核心｜Alias｜核心｜alive"])
+        pending = transaction(1, mode="revision")
+        pending["expected_state_revision"] = 1
+        pending["delta"]["result"] = "作者尚未提交的修改"
+        draft_path = self.project / ".story/work/第001章/tracking.json"
+        draft_path.parent.mkdir(parents=True, exist_ok=True)
+        draft_path.write_text(json.dumps(pending, ensure_ascii=False), encoding="utf-8")
+        before = {path.relative_to(self.project): path.read_bytes()
+                  for path in self.project.rglob("*") if path.is_file()}
+
+        result = subprocess.run(
+            [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"],
+            text=True, capture_output=True, encoding="utf-8",
+        )
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("ambiguous character", result.stderr)
+        self.assertEqual(before, {path.relative_to(self.project): path.read_bytes()
+                                  for path in self.project.rglob("*") if path.is_file()})
+
+    def test_ambiguous_unknown_character_record_does_not_create_a_draft(self) -> None:
+        self.init()
+        first = transaction(1)
+        first["delta"]["character_changes"] = [{"name": "Guest｜临时｜Alias", "change": "alive"}]
+        self.run_tool("commit", first)
+        self.write_existing_character_rows(["Guest｜临时｜Alias｜临时｜alive"])
+        result = subprocess.run(
+            [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"],
+            text=True, capture_output=True, encoding="utf-8",
+        )
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("ambiguous character", result.stderr)
+        self.assertFalse((self.project / ".story/work/第001章/tracking.json").exists())
+
+    def test_escaped_existing_temporary_name_migrates_without_guessing(self) -> None:
+        self.init()
+        first = transaction(1)
+        first["delta"]["character_changes"] = [
+            {"name": "Guest｜临时｜Alias", "change": "alive｜核心｜additional detail"}
+        ]
+        self.run_tool("commit", first)
+        self.write_existing_character_rows([r"Guest\｜临时\｜Alias｜临时｜alive｜核心｜additional detail"])
+        _, draft_path = self.draft(1)
+        draft = json.loads(draft_path.read_text(encoding="utf-8"))
+        self.assertEqual(draft["delta"]["character_changes"], first["delta"]["character_changes"])
+        self.assertEqual(draft["character_snapshots"], {})
+        self.run_tool("commit", draft)
+        self.run_tool("check")
+
     def test_revision_keeps_the_chapter_retirement_log(self) -> None:
         self.init()
         constraint = "军方培养江晨的后续安排尚未向读者揭示。"
@@ -845,18 +1027,32 @@ class TrackingCommitTests(unittest.TestCase):
 
     def test_init_archives_a_pre_transaction_tracking_directory(self) -> None:
         tracking = self.project / "追踪"
-        tracking.mkdir()
-        (tracking / "角色状态.md").write_text("# 旧角色状态\n", encoding="utf-8")
-        (tracking / "时间线.md").write_text("# 旧时间线\n", encoding="utf-8")
-        (tracking / "_tracking-meta.json").write_text("{}\n", encoding="utf-8")
+        old_files = {
+            "角色状态.md": b"# old characters\n",
+            "时间线.md": b"# old timeline\n",
+            "_tracking-meta.json": b"{}\n",
+            "伏笔.md": "# 旧伏笔\r\nF001 仅在旧稿里的线索\r\n".encode("utf-8"),
+            "上下文.md": b"\xef\xbb\xbf# old context\r\n",
+            "角色状态/旧角色.md": b"# original character\n",
+            "时间线/作者真相.md": b"# original facts\n",
+            "时间线/读者已知.md": b"# original revelations\n",
+            "逐章记录/第001章.md": b"# original chapter record\n",
+            "作者备忘.txt": b"private original notes\n",
+        }
+        for relative, payload in old_files.items():
+            path = tracking / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(payload)
 
-        result = self.run_tool("init", initial_document())
-        self.assertIn("_旧追踪存档", result.stderr)
+        self.run_tool("init", initial_document(last_chapter=1))
+
         archive = tracking / "_旧追踪存档"
-        self.assertEqual((archive / "角色状态.md").read_text(encoding="utf-8"), "# 旧角色状态\n")
-        self.assertEqual((archive / "时间线.md").read_text(encoding="utf-8"), "# 旧时间线\n")
+        for relative, payload in old_files.items():
+            self.assertEqual((archive / relative).read_bytes(), payload, relative)
+        self.assertFalse((archive / ".tracking-commit.lock").exists())
         self.assertFalse((tracking / "角色状态.md").exists())
-        self.assertTrue((tracking / "角色状态").is_dir())
+        self.assertFalse((tracking / "角色状态/旧角色.md").exists())
+        self.assertFalse((tracking / "逐章记录/第001章.md").exists())
         self.run_tool("check")
 
     def test_failed_init_leaves_the_old_tracking_directory_untouched(self) -> None:
@@ -947,7 +1143,6 @@ class TrackingCommitTests(unittest.TestCase):
         self.run_tool("commit", farewell)
 
         record = (self.project / "追踪/逐章记录/第002章.md").read_text(encoding="utf-8")
-        self.assertIn("江晨｜核心｜在最终一战中阵亡，彻底退场", record)
         self.assertIn("角色状态：江晨", record)
         self.assertNotIn("江晨", self.read_state()["characters"])
         self.run_tool("check")

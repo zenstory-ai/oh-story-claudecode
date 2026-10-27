@@ -17,6 +17,8 @@ import argparse
 import copy
 import hashlib
 import json
+import time
+from functools import wraps
 import os
 import stat
 import sys
@@ -1328,6 +1330,44 @@ def store_fields(store: Store) -> dict[str, Any]:
     return fields
 
 
+def memory_locked(command):
+    """Lock physical workspace/book roots before any state read or layout repair."""
+    @wraps(command)
+    def locked(workspace: Path, book_root: Path | None, *args, **kwargs):
+        require(workspace.is_dir(), f"workspace does not exist: {workspace}")
+        is_single_root(workspace, book_root)  # Reject a mistaken workspace before creating a lock.
+        # A migration touches both stores. Fixed ordering also protects shared book roots.
+        roots = {os.path.normcase(str(workspace.resolve())): workspace.resolve()}
+        if book_root is not None and book_root.is_dir():
+            roots[os.path.normcase(str(book_root.resolve()))] = book_root.resolve()
+        held = []
+        try:
+            for _, root in sorted(roots.items()):
+                path = root / ".author-memory.lock"
+                deadline = time.monotonic() + 10.0
+                while True:
+                    try:
+                        descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+                        break
+                    except FileExistsError:
+                        require(
+                            time.monotonic() < deadline,
+                            f"author-memory lock is busy or stale: {path}; retry, or remove it "
+                            "after confirming no author-memory command is running",
+                        )
+                        time.sleep(0.05)
+                held.append((descriptor, path))
+                os.write(descriptor, f"pid={os.getpid()}\n".encode("ascii"))
+                os.fsync(descriptor)
+            return command(workspace, book_root, *args, **kwargs)
+        finally:
+            for descriptor, path in reversed(held):
+                os.close(descriptor)
+                path.unlink(missing_ok=True)
+    return locked
+
+
+@memory_locked
 def command_init(workspace: Path, book_root: Path | None, book: str | None) -> dict[str, Any]:
     prepare_workspace(workspace, book_root)
     store = book_store(workspace, book_root, book) if book_root is not None else project_store(workspace)
@@ -1338,6 +1378,7 @@ def command_init(workspace: Path, book_root: Path | None, book: str | None) -> d
     return {"ok": True, "command": "init", "revision": state["state_revision"], **store_fields(store)}
 
 
+@memory_locked
 def command_commit(workspace: Path, book_root: Path | None, book: str | None, input_path: Path) -> dict[str, Any]:
     prepare_workspace(workspace, book_root)
     transaction = normalize_transaction(read_json(input_path))
@@ -1363,6 +1404,7 @@ def command_commit(workspace: Path, book_root: Path | None, book: str | None, in
     }
 
 
+@memory_locked
 def command_record(workspace: Path, book_root: Path | None, book: str | None, input_path: Path) -> dict[str, Any]:
     prepare_workspace(workspace, book_root)
     event = normalize_record_event(read_json(input_path))
@@ -1402,6 +1444,7 @@ def command_record(workspace: Path, book_root: Path | None, book: str | None, in
     }
 
 
+@memory_locked
 def command_query(
     workspace: Path,
     book_root: Path | None,
@@ -1447,6 +1490,7 @@ def check_store(store: Store) -> dict[str, Any]:
     return {"revision": state["state_revision"], "counts": counts}
 
 
+@memory_locked
 def command_check(workspace: Path, book_root: Path | None, book: str | None) -> dict[str, Any]:
     prepare_workspace(workspace, book_root)
     project = project_store(workspace)
@@ -1506,6 +1550,7 @@ def apply_single(state: dict[str, Any], transaction_id: str, digest: str, mutate
     return seal_transaction(updated, transaction_id, digest, summaries, store=store)
 
 
+@memory_locked
 def command_migrate(workspace: Path, book_root: Path | None, book: str | None) -> dict[str, Any]:
     """把项目级 store 里某本书的存量 book 条目搬进该书目录的书级 store。
 

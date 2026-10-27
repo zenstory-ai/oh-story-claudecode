@@ -4,6 +4,7 @@
 const fs = require('fs');
 const { loadStyleWhitelist, styleSpans } = require('./style-whitelist.js');
 const path = require('path');
+const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 
 const USAGE = `Usage: node normalize-punctuation.js [--check] [--quote-mode keep|ascii|yan] <file...>
 
@@ -12,6 +13,7 @@ Normalize正文 punctuation deterministically:
   - remove markdown divider lines (---) from正文
   - preserve pause punctuation covered by book-local .deslop-whitelist literals
   - keep quote style by default; convert quotes only when explicitly requested
+  - accept UTF-8 only; invalid bytes are rejected without writing
 `;
 
 const options = {
@@ -56,7 +58,7 @@ for (const file of options.files) {
   const fullPath = path.resolve(file);
   let input;
   try {
-    input = fs.readFileSync(fullPath, 'utf8');
+    input = decoder.decode(fs.readFileSync(fullPath));
   } catch (error) {
     failed = true;
     console.error(`${file}: unable to read (${error.message})`);

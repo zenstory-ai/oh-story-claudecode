@@ -944,14 +944,16 @@ async function deleteFile() {
         expectedVersion: file.version,
       }),
     });
-    state.activeFile = null;
-    state.originalContent = "";
-    elements.editorInput.value = "";
-    elements.editorWorkspace.hidden = true;
-    elements.editorEmpty.hidden = false;
-    document.body.classList.remove("document-open");
-    setDirty(false);
-    syncViewState();
+    if (state.activeFile === file) {
+      state.activeFile = null;
+      state.originalContent = "";
+      elements.editorInput.value = "";
+      elements.editorWorkspace.hidden = true;
+      elements.editorEmpty.hidden = false;
+      document.body.classList.remove("document-open");
+      setDirty(false);
+      syncViewState();
+    }
     await loadWorkspace();
     showToast(`已删除《${file.name}》`);
   } catch (error) {

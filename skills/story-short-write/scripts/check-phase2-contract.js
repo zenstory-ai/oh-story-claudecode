@@ -37,10 +37,18 @@ const LEGACY_OUTLINE_HEADERS = new Map([
   [10, '对话密度'],
 ])
 
-const FUNCTION_TAG = /\{(?:对话|冲突|伏笔|回忆|发现|递进)\}/
+const FUNCTION_TAG = /\{(?:对话|冲突|伏笔|回忆|发现|递进)\}/g
+const TEMPLATE_PLACEHOLDER = /\{[^}]*\}|\[待补充\]/
 
 function cleanCell(value) {
   return value.replace(/\*\*/g, '').replace(/`/g, '').trim()
+}
+
+function readSettingFields(text) {
+  return text.split(/\r?\n/).map((line, index) => {
+    const match = cleanCell(line).match(/^(?:[-*+]\s*)?([^：:]+?)\s*[：:]\s*(.*)$/)
+    return match ? { line: index + 1, name: match[1].trim(), value: match[2].trim() } : null
+  }).filter(Boolean)
 }
 
 function parseTableLine(line) {
@@ -98,8 +106,10 @@ function verify(projectDir) {
 
   const settings = settingsRead.text
   const outline = outlineRead.text
+  const fields = readSettingFields(settings)
+  const fieldValue = (name) => fields.find((entry) => entry.name === name)?.value || ''
 
-  const platformMatch = settings.match(/目标平台\s*[：:]\s*(知乎(?:盐言|盐选)?|盐[言选]|七猫(?:短篇)?|黑岩|红果|小程序|点众|番茄(?:短篇)?|未定)/)
+  const platformMatch = fieldValue('目标平台').match(/^(知乎(?:盐言|盐选)?|盐[言选]|七猫(?:短篇)?|黑岩|红果|小程序|点众|番茄(?:短篇)?|未定)/)
   checks.push(makeCheck(
     'phase2.platform-declared',
     Boolean(platformMatch),
@@ -110,7 +120,7 @@ function verify(projectDir) {
     '只在 设定.md 的基本信息或 Phase 2 设计校验区补目标平台。'
   ))
 
-  const genreMatch = settings.match(/(?:题材参考|题材包)\s*[：:]\s*`?(references\/(?:genre-styles\/[^`\s|]+\.md|genre-writing-formulas\.md))`?/)
+  const genreMatch = (fieldValue('题材参考') || fieldValue('题材包')).match(/^(references\/(?:genre-styles\/[^`\s|]+\.md|genre-writing-formulas\.md))/)
   let genreEvidence = '未找到题材参考路径'
   let genreOk = false
   if (genreMatch) {
@@ -129,10 +139,8 @@ function verify(projectDir) {
     '只补题材参考路径与从该参考选出的 2-3 个核心招式，不重写故事框架。'
   ))
 
-  const movesMatch = settings.match(/核心招式\s*[：:]\s*([^\n]+)/)
-  const moves = movesMatch
-    ? movesMatch[1].split(/[；;]|\s\/\s/).map((item) => item.trim()).filter(Boolean)
-    : []
+  const moves = fieldValue('核心招式').split(/[；;]|\s\/\s/)
+    .map((item) => item.trim()).filter(Boolean)
   checks.push(makeCheck(
     'phase2.genre-moves-declared',
     moves.length >= 2 && moves.length <= 3,
@@ -143,31 +151,34 @@ function verify(projectDir) {
     '只补或收敛核心招式字段到 2-3 个，并保持已选题材参考不变。'
   ))
 
-  const villainSkipped = /反派(?:设计)?\s*[：:]\s*(?:无|不适用)\s*[（(][^)）]+[)）]/.test(settings)
+  const skipReason = (fieldValue('反派设计') || fieldValue('反派')).match(/^(?:无|不适用)\s*[（(][ \t]*([^)）]+)[)）]/)
+  const villainSkipped = Boolean(skipReason && skipReason[1].trim() && !TEMPLATE_PLACEHOLDER.test(skipReason[1]))
   const villainFields = ['身份', '动机', '作恶方式', '致命弱点', '报应']
-  const missingVillainFields = villainFields.filter((field) => !new RegExp(`(?:^|\\n)\\s*[-*]?\\s*${field}\\s*[：:]`, 'm').test(settings))
+  const missingVillainFields = villainFields.filter((field) => {
+    const value = fieldValue(field)
+    return !value || TEMPLATE_PLACEHOLDER.test(value)
+  })
   const villainOk = villainSkipped || missingVillainFields.length === 0
   checks.push(makeCheck(
     'phase2.villain-contract',
     villainOk,
     '设定.md',
-    villainSkipped ? '已明确反派不适用' : (villainOk ? '反派五字段齐全' : `缺字段：${missingVillainFields.join('、')}`),
+    villainSkipped ? '已明确反派不适用' : (villainOk ? '反派五字段齐全' : `缺失或未填写：${missingVillainFields.join('、')}`),
     '无反派时写“反派设计：不适用（原因）”；有反派时填写身份、动机、作恶方式、致命弱点、报应',
     ['references/villain-and-reveal.md'],
     '只补反派缺失字段；若确无反派，改为带原因的不适用声明。'
   ))
 
-  const placeholderFields = ['题材参考', '核心招式', '反派设计', '反转类型', '反转位置', '付费点', '目标平台', '目标字数']
-  const placeholderLines = settings.split(/\r?\n/)
-    .map((line, index) => ({ line: index + 1, text: line }))
-    .filter((entry) => placeholderFields.some((field) => entry.text.includes(`${field}：`) || entry.text.includes(`${field}:`)))
-    .filter((entry) => /\{[^}]*\}/.test(entry.text))
+  const placeholderFields = ['题材参考', '题材包', '核心招式', '反派设计', '反派', '反转类型', '反转位置', '付费点', '目标平台', '目标字数', ...villainFields]
+  const placeholderLines = fields
+    .filter((entry) => placeholderFields.includes(entry.name))
+    .filter((entry) => TEMPLATE_PLACEHOLDER.test(entry.value))
   checks.push(makeCheck(
     'phase2.no-template-placeholders',
     placeholderLines.length === 0,
     '设定.md',
-    placeholderLines.length ? `仍是模板占位符的行：${placeholderLines.map((entry) => entry.line).join('、')}` : '契约字段没有未填写的 {} 占位符',
-    'Phase 2 契约字段写实际设计内容，不保留 {} 模板占位符',
+    placeholderLines.length ? `仍是模板占位符的行：${placeholderLines.map((entry) => entry.line).join('、')}` : '契约字段没有未填写的占位符',
+    'Phase 2 契约字段写实际设计内容，不保留 {} 或 [待补充] 占位符',
     ['references/workflow-design.md'],
     '只把报告行的占位符替换成本篇的实际设计，不重写其他字段。'
   ))
@@ -227,7 +238,10 @@ function verify(projectDir) {
   const progressionRows = rows.filter((item) => item.cells.length === OUTLINE_HEADERS.length)
   for (const row of progressionRows) {
     const progression = row.cells[2].split(/\s*(?:->|→)\s*/).filter(Boolean)
-    if (progression.length < 1 || progression.some((item) => !FUNCTION_TAG.test(item))) {
+    if (progression.length < 1 || progression.some((item) => {
+      const action = item.replace(FUNCTION_TAG, '')
+      return action === item || action.replace(/[\s、，,。；;：:]/g, '').length === 0
+    })) {
       progressionFailures.push(row.line)
     }
   }
@@ -246,7 +260,7 @@ function verify(projectDir) {
   ))
 
   // 「约 1-1.3 万」「1.1万字」这类写法先换成整数再解析。
-  const targetLine = (settings.match(/目标字数\s*[：:][^\n]*/) || [''])[0]
+  const targetLine = ('目标字数：' + fieldValue('目标字数'))
     .replace(/(\d+(?:\.\d+)?)\s*((?:[-–—~～]|到|至)\s*)(\d+(?:\.\d+)?)\s*万/g,
       (_, a, sep, b) => `${Math.round(Number(a) * 10000)}${sep}${Math.round(Number(b) * 10000)}`)
     .replace(/(\d+(?:\.\d+)?)\s*万/g, (_, a) => String(Math.round(Number(a) * 10000)))
@@ -257,10 +271,10 @@ function verify(projectDir) {
   const targetHigh = targetMatch && targetMatch[2] !== undefined ? toNumber(targetMatch[2]) : targetLow
   const statedTarget = targetLow
   const rowTargets = progressionRows.map((row) => {
-    const match = row.cells[11].match(/([\d,，]+)/)
-    return match ? Number(match[1].replace(/[,，]/g, '')) : null
+    const match = row.cells[11].match(/^(?:约|大约)?\s*([1-9][0-9]{0,2}(?:[,，][0-9]{3})+|[1-9][0-9]*)\s*字?(?:左右)?\s*(?:[（(][^（）()]*[）)])?$/)
+    return match ? toNumber(match[1]) : null
   })
-  const targetSum = rowTargets.every((value) => Number.isFinite(value))
+  const targetSum = rowTargets.every((value) => Number.isSafeInteger(value) && value > 0)
     ? rowTargets.reduce((sum, value) => sum + value, 0)
     : null
   const isRange = targetHigh !== null && targetHigh !== targetLow
@@ -273,15 +287,15 @@ function verify(projectDir) {
     'phase2.target-word-sum',
     targetOk,
     '设定.md、小节大纲.md',
-    `设定目标：${statedTarget === null ? '未识别' : (isRange ? `${targetLow}-${targetHigh}` : statedTarget)}；大纲合计：${targetSum === null ? '有非数字目标字数' : targetSum}`,
-    '设定.md 的目标字数为 1000-200000 的正整数或区间（用户明确范围优先，未指定时用所选平台的投稿区间，未定平台用 8000-12000）；大纲每行目标字数可解析，写区间时合计落在区间内，写单值时误差不超过 5%',
+    `设定目标：${statedTarget === null ? '未识别' : (isRange ? `${targetLow}-${targetHigh}` : statedTarget)}；大纲合计：${targetSum === null ? '有无效的逐节目标字数' : targetSum}`,
+    '设定.md 的目标字数为 1000-200000 的正整数或区间（用户明确范围优先，未指定时用所选平台的投稿区间，未定平台用 8000-12000）；大纲每行目标字数须完整写成正整数，写区间时合计落在区间内，写单值时误差不超过 5%',
     ['references/workflow-design.md', 'references/submission-craft.md'],
     '只修目标字数字段或各节“目标字数”单元格，使合计匹配；不要用增删剧情绕过数字错误。'
   ))
 
-  const reversalMatch = settings.match(/反转位置\s*[：:]\s*第?\s*(\d+)\s*节?\s*(?:÷|\/)\s*(?:共|全文)?\s*(\d+)\s*节?\s*=\s*(\d+(?:\.\d+)?)\s*%/)
-  const noReversal = /反转类型\s*[：:]\s*无反转/.test(settings) &&
-    /反转位置\s*[：:]\s*不适用\s*[（(][^)）]+[)）]/.test(settings)
+  const reversalMatch = fieldValue('反转位置').match(/^第?\s*(\d+)\s*节?\s*(?:÷|\/)\s*(?:共|全文)?\s*(\d+)\s*节?\s*=\s*(\d+(?:\.\d+)?)\s*%/)
+  const noReversal = /^无反转/.test(fieldValue('反转类型')) &&
+    /^不适用\s*[（(][^)）]+[)）]/.test(fieldValue('反转位置'))
   let reversalOk = false
   let reversalEvidence = '未找到“反转位置：第 X 节 ÷ 共 Y 节 = Z%”'
   if (noReversal) {
@@ -306,7 +320,7 @@ function verify(projectDir) {
     '只修正反转位置计算或对应节次；位置质量按 short-reversal.md 的误判决策与揭示后果功能链判断，不为跨过固定百分比而搬节。'
   ))
 
-  const paywallMatch = settings.match(/付费点\s*[：:]\s*第?\s*(\d+)\s*节末/)
+  const paywallMatch = fieldValue('付费点').match(/^第?\s*(\d+)\s*节末/)
   const paywallSection = paywallMatch ? Number(paywallMatch[1]) : null
   const paywallRows = rows
     .map((row, index) => ({ section: index + 1, hook: row.cells[7] || '' }))

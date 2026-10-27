@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from "node:child_process";
+import { isUtf8 } from "node:buffer";
 import { realpathSync } from "node:fs";
 import { createServer } from "node:http";
 import {
@@ -604,6 +605,18 @@ function sendJson(response, status, payload) {
   response.end(body);
 }
 
+async function readUtf8File(path) {
+  const bytes = await readFile(path);
+  if (!isUtf8(bytes)) {
+    throw new DashboardError(
+      415,
+      "unsupported_encoding",
+      "文件不是有效的 UTF-8，无法安全编辑。请保留原稿，明确转换为 UTF-8 后再打开。",
+    );
+  }
+  return bytes.toString("utf8");
+}
+
 async function readWorkspaceFile(root, requestedPath) {
   const { absolutePath, info } = await resolveWorkspacePath(root, requestedPath, {
     editableOnly: true,
@@ -611,7 +624,7 @@ async function readWorkspaceFile(root, requestedPath) {
   if (info.size > MAX_FILE_BYTES) {
     throw new DashboardError(413, "file_too_large", "文件超过 2 MiB，无法在 Dashboard 中打开");
   }
-  const content = await readFile(absolutePath, "utf8");
+  const content = await readUtf8File(absolutePath);
   return {
     path: toPosixPath(relative(await existingRealRoot(root), absolutePath)),
     name: basename(absolutePath),
@@ -667,7 +680,7 @@ async function saveWorkspaceFile(root, payload) {
       }
       throw error;
     }
-    const currentContent = await readFile(current.absolutePath, "utf8");
+    const currentContent = await readUtf8File(current.absolutePath);
     if (fileVersion(currentContent) !== payload.expectedVersion) {
       throw new DashboardError(
         409,
@@ -709,7 +722,7 @@ async function deleteWorkspaceFile(root, payload) {
       }
       throw error;
     }
-    const currentContent = await readFile(current.absolutePath, "utf8");
+    const currentContent = await readUtf8File(current.absolutePath);
     if (fileVersion(currentContent) !== payload.expectedVersion) {
       throw new DashboardError(
         409,

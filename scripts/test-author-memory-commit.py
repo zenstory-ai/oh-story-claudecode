@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -489,6 +490,99 @@ def assert_other_store_failure_is_nonfatal(temporary: Path, input_path: Path) ->
     )), "--book-root", str(book_root)).stdout)
     assert book_written["item_ids"] == ["BP002"] and any("项目级 store 读取失败" in warning for warning in book_written["warnings"])
     assert state(book_root)["state_revision"] == 2
+
+
+def assert_concurrent_writes(temporary: Path) -> None:
+    """Pause one real command after its read; a second must not read stale state."""
+    worker = """
+import importlib.util, sys, time
+from pathlib import Path
+spec = importlib.util.spec_from_file_location("memory_worker", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+started, loaded, release = map(Path, sys.argv[2:5])
+original_load = module.load_state
+first = True
+def paused_load(store):
+    global first
+    state = original_load(store)
+    if first:
+        first = False
+        loaded.touch()
+        deadline = time.monotonic() + 10
+        while not release.exists():
+            if time.monotonic() >= deadline:
+                raise RuntimeError("concurrency fixture timed out")
+            time.sleep(0.01)
+    return state
+module.load_state = paused_load
+sys.argv = [sys.argv[1], *sys.argv[5:]]
+started.touch()
+raise SystemExit(module.main())
+"""
+
+    def await_file(path: Path) -> None:
+        deadline = time.monotonic() + 10
+        while not path.exists():
+            assert time.monotonic() < deadline, f"worker did not reach {path.name}"
+            time.sleep(0.01)
+
+    for command, book_level in itertools.product(("commit", "record"), (False, True)):
+        workspace = temporary / f"concurrent-{command}-{book_level}"
+        book_root = workspace / "长篇" / "并发书"
+        book_root.mkdir(parents=True)
+        location = ("--workspace", str(workspace))
+        if book_level:
+            location += ("--book-root", str(book_root))
+        run("init", *location)
+        processes = []
+        release = workspace / "release"
+        try:
+            for index in range(2):
+                pref = preference(
+                    f"并发偏好{index}", f"记住偏好{index}",
+                    scope_level="book" if book_level else "global",
+                    scope_value="并发书" if book_level else None,
+                )
+                operation = {"action": "remember", "preference": pref}
+                document = (transaction(f"tx-{index}", 0, [operation]) if command == "commit"
+                            else event(f"event-{index}", operation))
+                input_path = workspace / f"input-{index}.json"
+                write_json(input_path, document)
+                started, loaded = workspace / f"started-{index}", workspace / f"loaded-{index}"
+                process = subprocess.Popen(
+                    [sys.executable, "-B", "-c", worker, str(TOOL), str(started), str(loaded),
+                     str(release), command, *location, "--input", str(input_path)],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8",
+                )
+                processes.append(process)
+                await_file(started)
+                if index == 0:
+                    await_file(loaded)
+            # First writer holds revision 0. A concurrent command must wait before reading.
+            deadline = time.monotonic() + 0.3
+            while time.monotonic() < deadline:
+                assert not (workspace / "loaded-1").exists(), "concurrent command read uncommitted state"
+                time.sleep(0.01)
+            release.touch()
+            outputs = [process.communicate(timeout=15) for process in processes]
+            current = state(book_root if book_level else workspace)
+            if command == "commit":
+                assert [process.returncode for process in processes] == [0, 2], outputs
+                assert "stale state revision" in outputs[1][1]
+                assert current["state_revision"] == 1 and set(current["applied_transactions"]) == {"tx-0"}
+            else:
+                assert [process.returncode for process in processes] == [0, 0], outputs
+                assert current["state_revision"] == 2
+                assert set(current["applied_transactions"]) == {"record:event-0", "record:event-1"}
+                assert {item["assertion"] for item in current["items"].values()} == {"并发偏好0", "并发偏好1"}
+            run("check", *location)
+        finally:
+            release.touch()
+            for process in processes:
+                if process.poll() is None:
+                    process.kill()
+                process.communicate(timeout=5)
 
 
 def main() -> None:
@@ -1155,6 +1249,7 @@ def main() -> None:
         assert_book_dir_is_not_single_root(Path(temporary), input_path)
         assert_single_root_case_insensitive_path(Path(temporary), input_path)
         assert_other_store_failure_is_nonfatal(Path(temporary), input_path)
+        assert_concurrent_writes(Path(temporary))
         assert_no_false_negatives()
         assert_omitted_follow_priority_and_lines_fit()
         assert_slice_weight_uses_rendered_lines()

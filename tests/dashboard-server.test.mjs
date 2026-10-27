@@ -525,6 +525,48 @@ describe("HTTP API", () => {
     assert.equal(await readFile(resolve(root, filePath), "utf8"), "修改后的正文");
   });
 
+  test("rejects non-UTF-8 files without replacing or deleting their bytes", async () => {
+    const root = await createWorkspace();
+    const baseUrl = await startServer(root);
+    const filePath = "长篇/示例书/正文/第001章.md";
+    const url = `${baseUrl}/api/file?path=${encodeURIComponent(filePath)}`;
+    const loaded = await fetch(url).then((response) => response.json());
+    for (const bytes of [
+      Buffer.from([0xd6, 0xd0, 0xce, 0xc4]), // GBK: 中文
+      Buffer.from([0xff, 0xfe, 0x2d, 0x4e]), // UTF-16LE with BOM
+      Buffer.from([0xe4, 0xb8]), // truncated UTF-8
+    ]) {
+      await writeFile(resolve(root, filePath), bytes);
+      for (const method of ["GET", "PUT", "DELETE"]) {
+        const options = method === "GET" ? {} : {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: filePath, content: "不能覆盖原稿", expectedVersion: loaded.version }),
+        };
+        const response = await fetch(method === "GET" ? url : `${baseUrl}/api/file`, options);
+        assert.equal(response.status, 415, `${method} must reject unsupported encoding`);
+        assert.equal((await response.json()).error.code, "unsupported_encoding");
+        assert.deepEqual(await readFile(resolve(root, filePath)), bytes);
+      }
+    }
+  });
+
+  test("preserves valid UTF-8 BOM and literal replacement characters on a no-op save", async () => {
+    const root = await createWorkspace();
+    const baseUrl = await startServer(root);
+    const filePath = "长篇/示例书/正文/第001章.md";
+    const bytes = Buffer.from("\ufeff原稿里确实写了�。\r\n", "utf8");
+    await writeFile(resolve(root, filePath), bytes);
+    const loaded = await fetch(`${baseUrl}/api/file?path=${encodeURIComponent(filePath)}`).then((response) => response.json());
+    const saved = await fetch(`${baseUrl}/api/file`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: filePath, content: loaded.content, expectedVersion: loaded.version }),
+    });
+    assert.equal(saved.status, 200);
+    assert.deepEqual(await readFile(resolve(root, filePath)), bytes);
+  });
+
   test("returns 409 instead of overwriting an externally changed file", async () => {
     const root = await createWorkspace();
     const baseUrl = await startServer(root);

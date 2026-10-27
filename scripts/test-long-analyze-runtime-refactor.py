@@ -1239,6 +1239,104 @@ def test_invalid_root_exits_nonzero() -> None:
             require(run(MANAGE, *args).returncode != 0, f"错误 root 必须非零退出：{args[0]}")
 
 
+def test_rebuilt_index_invalidates_readers() -> None:
+    with tempfile.TemporaryDirectory(prefix="long-reader-freshness-") as temporary:
+        root = Path(temporary)
+        source = write_source_and_index(root, 1)
+        plan = json.loads(run(MANAGE, "plan", "--root", root).stdout)
+        model = root / "input.md"
+        model.write_text(compact_output(1, 1), encoding="utf-8")
+        committed = run(MANAGE, "commit", "--root", root, "--input", model,
+                        "--batch-id", "RAW-1-1", "--range-sha256", plan["batches"][0]["range_sha256"])
+        require(committed.returncode == 0, committed.stdout or committed.stderr)
+        for name in ("章节/第1章_深度拆解.md", "快速预览.md", "剧情/情绪模块.md", "剧情/节奏.md",
+                     "角色/人物.md", "设定/世界观/背景.md", "拆文报告.md", "文风.md"):
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("有效产物", encoding="utf-8")
+        for stage in ("stage3", "stage4", "stage5", "stage6", "stage1", "stage2"):
+            marked = run(MANAGE, "mark-stage", "--root", root, "--stage", stage)
+            require(marked.returncode == 0, marked.stdout or marked.stderr)
+        require(json.loads(run(INSPECT, "--root", root).stdout)["recommended_path"] == "direct_use",
+                "未改原文的完整项目仍可直接使用")
+        require("因果连续" in run(MANAGE, "digest", "--root", root, "--part", "observations").stdout,
+                "有效批次的观察必须可读")
+        source.write_text(source.read_text(encoding="utf-8").replace("正文1。", "正文1发生改变。"), encoding="utf-8")
+        rebuilt = run(INDEX, "--source", source, "--output", root / "chapter_index.csv",
+                      "--locator-path", "原文/原文.txt", "--rebuild")
+        require(rebuilt.returncode == 0, rebuilt.stdout or rebuilt.stderr)
+        snapshot = {path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()}
+        report = json.loads(run(INSPECT, "--root", root, "--compact").stdout)
+        require(report["recommended_path"] == "continue_partial" and not report["full_result_available"],
+                "索引已变化的受管项目不能再 direct_use：" + str(report))
+        pending = json.loads(run(MANAGE, "plan", "--root", root).stdout)
+        require([batch["batch_id"] for batch in pending["batches"]] == ["RAW-1-1"], "旧批次必须重新规划")
+        digest = run(MANAGE, "digest", "--root", root, "--part", "observations")
+        require(digest.returncode == 2 and json.loads(digest.stdout)["error"] == "digest_nothing_found",
+                "受管旧缓存不能进入观察汇总：" + digest.stdout)
+        require(snapshot == {path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()},
+                "检查、规划、digest 不得改写进度、摘要或任何项目文件")
+        (root / "_progress.md").unlink()
+        fallback = run(MANAGE, "digest", "--root", root, "--part", "observations")
+        require(fallback.returncode == 2 and json.loads(fallback.stdout)["error"] == "digest_nothing_found",
+                "没有状态行的扫描兜底也不能复活旧 RAW 缓存")
+        (root / "_analysis_cache/批次-RAW-1-1.md").unlink()
+        model.write_text(reuse_output(1, 1), encoding="utf-8")
+        reused = run(MANAGE, "commit", "--root", root, "--input", model, "--batch-id", "REUSE-1-1")
+        require(reused.returncode == 0, reused.stdout or reused.stderr)
+        (root / "_progress.md").unlink()
+        (root / "chapter_index.csv").unlink()
+        legacy_reuse = run(MANAGE, "digest", "--root", root, "--part", "observations")
+        require(legacy_reuse.returncode == 0 and "仅从已有拆文成果" in legacy_reuse.stdout,
+                "无索引的旧 REUSE 缓存仍可读")
+
+
+def test_replacement_batches_clear_only_fully_covered_history() -> None:
+    with tempfile.TemporaryDirectory(prefix="long-replacement-coverage-") as temporary:
+        root = Path(temporary)
+        source = write_source_and_index(root, 3)
+        model = root / "input.md"
+
+        def commit_window(start: int, end: int) -> None:
+            plan = json.loads(run(MANAGE, "plan", "--root", root,
+                                  "--chapters", f"{start}-{end}").stdout)
+            batch = plan["batches"][0]
+            model.write_text(compact_output(start, end), encoding="utf-8")
+            committed = run(MANAGE, "commit", "--root", root, "--input", model,
+                            "--batch-id", batch["batch_id"],
+                            "--range-sha256", batch["range_sha256"])
+            require(committed.returncode == 0, committed.stdout or committed.stderr)
+
+        commit_window(1, 1)
+        commit_window(2, 3)
+        source.write_text(source.read_text(encoding="utf-8").replace("正文", "改写正文"), encoding="utf-8")
+        rebuilt = build_index(root, "--rebuild")
+        require(rebuilt.returncode == 0, rebuilt.stdout or rebuilt.stderr)
+        commit_window(1, 2)
+        partial = json.loads(run(INSPECT, "--root", root, "--compact").stdout)
+        require(partial["invalid_raw_batches"] == ["RAW-2-3"],
+                "仅部分被新批次覆盖的旧范围仍须重读：" + str(partial))
+        commit_window(3, 3)
+
+        for name in ("章节/第1章_深度拆解.md", "章节/第2章_深度拆解.md", "章节/第3章_深度拆解.md",
+                     "快速预览.md", "剧情/情绪模块.md", "剧情/节奏.md", "角色/人物.md",
+                     "设定/世界观/背景.md", "拆文报告.md", "文风.md"):
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("有效产物", encoding="utf-8")
+        for stage in ("stage3", "stage4", "stage5", "stage6", "stage1", "stage2"):
+            marked = run(MANAGE, "mark-stage", "--root", root, "--stage", stage)
+            require(marked.returncode == 0, marked.stdout or marked.stderr)
+        repair = run(MANAGE, "repair-progress", "--root", root)
+        require(repair.returncode == 0, repair.stdout or repair.stderr)
+        plan = json.loads(run(MANAGE, "plan", "--root", root).stdout)
+        report = json.loads(run(INSPECT, "--root", root, "--compact").stdout)
+        require(plan["remaining_batches"] == 0 and plan["required_stages"] == [], str(plan))
+        require(report["invalid_raw_batches"] == [] and report["full_result_available"]
+                and report["recommended_path"] == "direct_use",
+                "已被有效批次完整替代的旧范围不能阻止复用：" + str(report))
+
+
 def main() -> int:
     test_index_contract()
     test_invalid_root_exits_nonzero()
@@ -1258,6 +1356,8 @@ def main() -> int:
     test_relation_chart_font_choice()
     test_relation_chart_mermaid_edge_cases()
     test_digest_reads_observations_and_fields_without_whole_caches()
+    test_rebuilt_index_invalidates_readers()
+    test_replacement_batches_clear_only_fully_covered_history()
     test_extractor_write_guard()
     test_extractor_self_check_patterns_match_commit_format()
     test_plan_next_prints_only_upcoming_batches()

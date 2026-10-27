@@ -56,6 +56,7 @@ esac
 
 BASE="$(basename "$ABS")"
 PARENT="$(basename "$(dirname "$ABS")")"
+case "$BASE" in *_原稿_*) exit 0 ;; esac
 
 # 只对「正文」文件兜底，绝不碰代码/细纲/设定/大纲等非正文文件：
 #   - 短篇：{书}/正文.md，且同目录有 设定.md（真短篇工程信号，排除 docs/正文.md 之类）

@@ -218,11 +218,15 @@ def check_blocking_quality(outline: Path, body: Path) -> dict[str, Any]:
             [node, str(outline_copy), "--outline", str(outline), str(body)],
             text=True, encoding="utf-8", capture_output=True, check=False,
         )
-        if completed.returncode != 0:
+        if completed.returncode == 1:
             advisories.append(
                 {"source": "outline-copy", "type": "OUTLINE_COPY_REVIEW", "review": "semantic",
                  "message": completed.stdout.strip()}
             )
+        elif completed.returncode != 0:
+            tool_errors.append({"type": "TOOL_ERROR", "tool": outline_copy.name,
+                                "source": "outline-copy",
+                                "message": completed.stderr.strip() or f"exited {completed.returncode}"})
     return {
         "status": "unavailable" if tool_errors else ("fail" if blocking else "pass"),
         "blocking_findings": blocking,

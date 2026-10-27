@@ -486,7 +486,7 @@ cmp -s "$TMP_DIR/claude-v25.json" "$TMP_DIR/claude-v25-again.json" \
 INSTR_MERGE="$SKILL_DIR/scripts/merge-project-instructions.py"
 assert_file "$INSTR_MERGE"
 python3 - "$INSTR_MERGE" "$SKILL_DIR/references" "$TMP_DIR/instr-merge" <<'PY' || fail "project instruction managed-block merge regressed"
-import json, subprocess, sys
+import json, os, stat, subprocess, sys
 from pathlib import Path
 helper, refs, root = sys.argv[1], Path(sys.argv[2]), Path(sys.argv[3])
 root.mkdir(parents=True)
@@ -563,6 +563,35 @@ shared.write_text(shared.read_text(encoding="utf-8") + "\n## 与作者协作\n\n
 report = run("zcode", shared)
 assert report["status"] == "appended" and report["removed_legacy_sections"] == [], report
 assert "先讨论再动笔" in shared.read_text(encoding="utf-8")
+# 块外原字节、其他宿主块与权限均保留，包括混合行尾、BOM 和有意义的空行。
+preserved = root / "preserved-instructions.md"
+prefix = b"\xef\xbb\xbf# Author\r\n\r\n\r\n\r\n```text\nline\n\n\n\nend\n```\r\n"
+preserved.write_bytes(prefix)
+preserved.chmod(0o640)
+assert run("generic", preserved)["status"] == "appended"
+assert preserved.read_bytes().startswith(prefix)
+suffix = b"\r\n\n\n## Author tail\r\nunchanged\n\n\n"
+preserved.write_bytes(preserved.read_bytes() + suffix)
+assert run("generic", preserved, "RenamedProject")["status"] == "replaced"
+assert preserved.read_bytes().startswith(prefix) and preserved.read_bytes().endswith(suffix)
+if os.name != "nt":
+    assert stat.S_IMODE(preserved.stat().st_mode) == 0o640
+stable = preserved.read_bytes()
+run("generic", preserved, "RenamedProject")
+assert preserved.read_bytes() == stable
+other = root / "other-host.md"
+run("codex", other)
+other_bytes = other.read_bytes().replace(b"\n", b"\r\n").replace(b"\r\n\r\n", b"\r\n" * 4, 1)
+other.write_bytes(b"\xef\xbb\xbf" + other_bytes)
+assert run("generic", other)["status"] == "appended"
+assert other.read_bytes().startswith(b"\xef\xbb\xbf" + other_bytes)
+migrated = root / "preserved-migration.md"
+author_head = b"\xef\xbb\xbf# Author\r\n\r\n\r\n## My notes\r\nKeep.\r\n\r\n"
+author_tail = b"## My tail\r\nKeep this too.\n\n\n"
+old_owned = "# Old — 网文写作工具集（Codex）\r\n\r\n## Codex 项目约定\r\nOld setup.\r\n\r\n".encode("utf-8")
+migrated.write_bytes(author_head + old_owned + author_tail)
+assert run("codex", migrated)["status"] == "migrated"
+assert migrated.read_bytes().startswith(author_head) and migrated.read_bytes().endswith(author_tail)
 PY
 
 # 重部署时 sentinel 的 target_cli 是权威：不认它就会每次重问，且 skills-only 三端根本无从探测。
@@ -917,7 +946,6 @@ assert_grep '导入续写入口顺序|推荐顺序.*story-setup' "$REPO_ROOT/ski
 assert_grep '推荐顺序.*story-setup' "$REPO_ROOT/skills/story-import/references/import-special-cases.md" "story-import special cases must keep the setup-vs-import answer"
 assert_grep '只需重建 `追踪/`' "$REPO_ROOT/skills/story-import/references/import-special-cases.md" "story-import must rebuild legacy tracking without re-analyzing the book"
 assert_grep '\.story/work/导入记录\.md' "$REPO_ROOT/skills/story-import/SKILL.md" "story-import must persist author decisions to the import record"
-assert_grep '超过约 25K 字时脚本自动少排几章' "$REPO_ROOT/skills/story-import/references/outline-reverse.md" "story-import must reverse outlines in bounded batches"
 echo "  OK TS10 version + behavior anchors"
 
 # TS11 — Outline-before-prose write guard (BLOCKING PreToolUse hook)

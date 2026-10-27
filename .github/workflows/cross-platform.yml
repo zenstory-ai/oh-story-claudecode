@@ -97,6 +97,8 @@ jobs:
         run: python3 scripts/test-chapter-completion-lifecycle.py
       - name: Author memory transaction behavior regression
         run: python3 scripts/test-author-memory-commit.py
+      - name: Benchmark evaluation integrity regression (offline)
+        run: python3 scripts/test-bench-evaluation.py
       - name: Check story-setup deployment
         run: bash scripts/check-story-setup-deployment.sh
       - name: Plugin packaging regression
@@ -193,6 +195,8 @@ jobs:
         run: python scripts/test-chapter-completion-lifecycle.py
       - name: Author memory transaction behavior regression
         run: python scripts/test-author-memory-commit.py
+      - name: Benchmark evaluation integrity regression (offline)
+        run: python scripts/test-bench-evaluation.py
       - name: Workflow numbering regression
         shell: bash
         run: bash scripts/test-skill-numbering.sh
@@ -284,6 +288,8 @@ jobs:
         run: python3 scripts/test-chapter-completion-lifecycle.py
       - name: Author memory transaction behavior regression
         run: python3 scripts/test-author-memory-commit.py
+      - name: Benchmark evaluation integrity regression (offline)
+        run: python3 scripts/test-bench-evaluation.py
       - name: Workflow numbering regression
         run: bash scripts/test-skill-numbering.sh
       - name: Long-analysis runtime and compatibility regression

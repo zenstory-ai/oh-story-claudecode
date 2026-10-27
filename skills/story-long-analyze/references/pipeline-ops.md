@@ -15,7 +15,7 @@ Stage 4 另用 `render_relation_chart.py` 从 `角色/角色关系.md` 生成人
 `chapter_index.csv` 是机械章节边界的唯一依据。批次和阶段状态只写在 `_progress.md` 的
 `story-long-analyze:runtime-state` 受管区。`_analysis_cache/` 保存完整结果和恢复证据，不承担状态库功能。
 
-既有项目中的 `schema_version: 2` 沿用且不修改；该值只供报告，不用于否定旧成果。
+保留既有 `schema_version: 2`；只供报告，不据此否定旧成果。
 
 计划只打印到标准输出，由当前运行直接消费；不另建计划、检查点或逐批回执文件。`{PYTHON}` 与路径占位见 SKILL.md「运行约定」。
 
@@ -28,9 +28,9 @@ Stage 4 另用 `render_relation_chart.py` 从 `角色/角色关系.md` 生成人
 - 路径不存在、不是目录或不可读：非零退出，先修正路径。
 - 已存在的空目录：`empty / new_analysis`。
 - 完整旧项目：`direct_use`，不建索引、不读原文。
-- 部分项目：带 `--compact` 时缺章看 `semantic_coverage.missing_ranges`；不带时另有逐章的 `missing_semantic_chapters` 与 `missing_summary_chapters`。
+- 部分项目：`--compact` 用 `semantic_coverage.missing_ranges`；完整输出另列 `missing_semantic_chapters`、`missing_summary_chapters`。
 - 新旧投影混存：`mixed_sources: true` 并列明逐章来源，仍可直接使用完整项目。
-- `stage_repairs` 按 SKILL.md「Phase 2」第二张表补对应 Stage，与 Stage 2 缺章分开处理。
+- `stage_repairs` 按 SKILL.md「Phase 2」第二表补阶段；`invalid_raw_batches` 按 `plan` 续跑，不可直接复用。
 
 ## 2. 需要原文时建立或校验索引
 

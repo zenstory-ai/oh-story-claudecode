@@ -476,27 +476,41 @@ def check_short_analyze(repo: Repo) -> list[str]:
 # ---------- 短篇扫榜 → 写作平台 ----------
 
 
-def phase2_platform_regex(repo: Repo) -> re.Pattern[str] | None:
-    source = repo.text(PHASE2_CHECK)
-    match = re.search(r"settings\.match\(/目标平台\\s\*\[：:\]\\s\*\((.+?)\)/\)", source)
-    if not match:
-        return None
-    return re.compile(rf"^(?:{match.group(1)})$")
-
-
 def check_short_platforms(repo: Repo) -> list[str]:
     failures: list[str] = []
-    accepted = phase2_platform_regex(repo)
-    if accepted is None:
-        return [f"{PHASE2_CHECK}: 没解析出目标平台正则，确认写法后更新本测试"]
 
     design = repo.text(SHORT_DESIGN)
     match = re.search(r"- 目标平台：\{([^}]+)\}", design)
     if not match:
         return failures + [f"{SHORT_DESIGN}: 没找到设定模板的「目标平台」取值，确认写法后更新本测试"]
     choices = split_terms(match.group(1), "/")
+    node = shutil.which("node")
+    if node is None:
+        return failures + [f"{PHASE2_CHECK}: 需要 node 执行目标平台交接检查"]
+    runner = """
+const fs = require('fs')
+const path = require('path')
+const { verify } = require(process.argv[1])
+const project = process.argv[2]
+const platforms = JSON.parse(process.argv[3])
+const accepted = platforms.filter(platform => {
+  fs.writeFileSync(path.join(project, '设定.md'), `- 目标平台：${platform}\\n`)
+  return verify(project).checks.some(check => check.id === 'phase2.platform-declared' && check.ok)
+})
+process.stdout.write(JSON.stringify(accepted))
+"""
+    with tempfile.TemporaryDirectory(prefix="short-platforms-") as tmp:
+        verifier = Path(tmp) / "check-phase2-contract.js"
+        verifier.write_text(repo.text(PHASE2_CHECK), encoding="utf-8")
+        (Path(tmp) / "小节大纲.md").write_text("# 小节大纲\n", encoding="utf-8")
+        run = subprocess.run([node, "-e", runner, str(verifier), tmp, json.dumps(choices)],
+                             capture_output=True, encoding="utf-8")
+    try:
+        accepted = set(json.loads(run.stdout))
+    except (ValueError, TypeError):
+        return failures + [f"{PHASE2_CHECK}: 平台检查输出读不出来：{run.stderr.strip()[:200]}"]
     for choice in choices:
-        if not accepted.match(choice):
+        if choice not in accepted:
             failures.append(f"{SHORT_DESIGN}: 目标平台可选「{choice}」，check-phase2-contract.js 不认")
 
     topic = repo.text(TOPIC_MATCH)
@@ -521,7 +535,7 @@ def check_short_platforms(repo: Repo) -> list[str]:
                 failures.append(
                     f"{TOPIC_MATCH}: 对照表把「{row[0]}」推荐到「{target}」，写作端设定模板只认 {' / '.join(choices)}"
                 )
-            elif not accepted.match(target):
+            elif target not in accepted:
                 failures.append(f"{TOPIC_MATCH}: 对照表目标平台「{target}」过不了 check-phase2-contract.js")
 
     described = re.search(r"分析(.+?)等平台", repo.text(SHORT_SCAN_SKILL))
@@ -669,7 +683,7 @@ def check_long_scan_handoff(repo: Repo) -> list[str]:
 
 # ---------- 导入短篇 → 短篇写作构思检查 ----------
 
-# 导入把题材包的选择留给续写构思：这两项必然没过，其余检查必须过。
+# 导入把题材包的选择留给续写构思；补完这两项后，完整门禁必须通过。
 IMPORT_SHORT_LEFT_FOR_DESIGN = {"phase2.genre-reference-declared", "phase2.genre-moves-declared"}
 IMPORT_FIXTURE_VALUES = {
     "- 目标字数：": "- 目标字数：6000 字",
@@ -725,12 +739,23 @@ def check_import_short(repo: Repo) -> list[str]:
         (Path(tmp) / "小节大纲.md").write_text(outline, encoding="utf-8")
         run = subprocess.run([node, str(ROOT / PHASE2_CHECK), "--json", tmp],
                              capture_output=True, encoding="utf-8")
+        completed = settings.replace("- 题材参考：[待补充]", "- 题材参考：references/genre-writing-formulas.md")
+        completed = completed.replace("- 核心招式：[待补充]", "- 核心招式：证据递进；关系反转")
+        (Path(tmp) / "设定.md").write_text(completed, encoding="utf-8")
+        completed_run = subprocess.run([node, str(ROOT / PHASE2_CHECK), "--json", tmp],
+                                       capture_output=True, encoding="utf-8")
     try:
         failed = {item["id"] for item in json.loads(run.stdout)["failures"]}
+        completed_report = json.loads(completed_run.stdout)
     except (ValueError, KeyError):
         return failures + [f"{PHASE2_CHECK}: 输出读不出来：{run.stderr.strip()[:200]}"]
-    for check_id in sorted(failed - IMPORT_SHORT_LEFT_FOR_DESIGN):
+    if not IMPORT_SHORT_LEFT_FOR_DESIGN <= failed:
+        failures.append(f"{IMPORT_SHORT}: 导入预留的题材参考与核心招式没有阻断构思门禁")
+    for check_id in sorted(failed - IMPORT_SHORT_LEFT_FOR_DESIGN - {"phase2.no-template-placeholders"}):
         failures.append(f"{IMPORT_SHORT}: 照导入模板填好的设定过不了构思检查 {check_id}")
+    if completed_run.returncode != 0 or not completed_report["ok"]:
+        remaining = "、".join(item["id"] for item in completed_report["failures"])
+        failures.append(f"{IMPORT_SHORT}: 只补题材参考与核心招式后仍过不了构思检查：{remaining}")
     # 导入承诺续写构思只补缺项：写作端构思要认「本书续写基线」并只补 [待补充]，写正文从下一节接着写。
     design_text = repo.text(SHORT_DESIGN)
     if "只补缺项" in repo.text(IMPORT_SHORT) and not ("本书续写基线" in design_text and "[待补充]" in design_text):

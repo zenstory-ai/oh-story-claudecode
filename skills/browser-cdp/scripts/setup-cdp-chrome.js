@@ -208,7 +208,7 @@ function sleepSync(ms) {
 }
 
 /**
- * HTTP GET 检查 CDP 端点。拒绝 4xx/5xx；自动 drain 掉响应体。
+ * HTTP GET 读取版本响应，只接受 2xx；协议元数据由 cdpIdentity 校验。
  * agent:false 是必须的——Node 19+ 的 http.globalAgent 默认 keepAlive，探测用过的 socket 会留在
  * 连接池里；而本脚本用 sleepSync 死堵事件循环（等进程退出/等启动），期间服务端按 5s 空闲把这条
  * 连接关掉，客户端来不及处理 FIN。下一次探测复用这条死 socket 就是 ECONNRESET，于是"端口还活着"
@@ -220,7 +220,7 @@ function httpGet(url) {
       let body = "";
       res.on("data", (chunk) => (body += chunk));
       res.on("end", () => {
-        if (res.statusCode >= 400) {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
           reject(new Error(`HTTP ${res.statusCode}`));
         } else {
           resolve(body);
@@ -263,7 +263,7 @@ function probeTcp(port, timeoutMs = 1000) {
 }
 
 /**
- * 从 /json/version 响应里取一个能区分「实例」的标识。
+ * 验证版本 JSON 的 Browser 与浏览器级 ws/wss 地址，取能区分实例的标识。
  * Chrome 每次启动都会换一个新的 browser GUID（webSocketDebuggerUrl 尾段），最适合做这件事。
  * 取不到就返回 null——调用方必须把 null 当作「无法比对」，绝不能当作「相同」或「不同」。
  */
@@ -271,7 +271,12 @@ function cdpIdentity(version) {
   if (!version) return null;
   try {
     const obj = JSON.parse(version);
-    if (obj.webSocketDebuggerUrl) return String(obj.webSocketDebuggerUrl);
+    if (typeof obj?.Browser !== "string" || !obj.Browser.trim() ||
+        typeof obj.webSocketDebuggerUrl !== "string") return null;
+    const endpoint = new URL(obj.webSocketDebuggerUrl);
+    if (!["ws:", "wss:"].includes(endpoint.protocol) ||
+        !/^\/devtools\/browser\/[^/]+$/.test(endpoint.pathname)) return null;
+    return obj.webSocketDebuggerUrl;
   } catch {}
   return null;
 }
@@ -676,7 +681,7 @@ function promptYesNo(question) {
 
 async function runDetectOnly(config) {
   const version = await probeCDP(CDP_PORT);
-  if (version) {
+  if (cdpIdentity(version) !== null) {
     log("CDP_STATUS=ready");
     log(`CDP_URL=http://127.0.0.1:${CDP_PORT}/json/version`);
     // 尝试从 JSON 提取浏览器版本（容错）
@@ -754,7 +759,7 @@ async function main() {
   const hasProfile = fs.existsSync(defaultProfile);
 
   if (ARGS.flags.dryRun) {
-    const cdpAlive = !!(await probeCDP(CDP_PORT));
+    const cdpAlive = cdpIdentity(await probeCDP(CDP_PORT)) !== null;
     const tcpOccupied = await probeTcp(CDP_PORT);
     // --reset / 显式 --profile 会跳过复用（见下方第 3 步），dry-run 必须照实说
     const willReuse = cdpAlive && !ARGS.flags.reset && !ARGS.profileExplicit;
@@ -806,7 +811,8 @@ async function main() {
   //    这两个参数会被静默丢掉，还以 exit 0 报"成功"。因此这两种情况不复用，继续往下重建。
   const existing = await probeCDP(CDP_PORT);
   const portWasListening = await probeTcp(CDP_PORT);
-  if (existing) {
+  const staleIdentity = cdpIdentity(existing);
+  if (staleIdentity !== null) {
     if (!ARGS.flags.reset && !ARGS.profileExplicit) {
       ok("CDP 已就绪，复用现有 Chrome。");
       log(existing.split("\n").slice(0, 5).join("\n"));
@@ -815,8 +821,6 @@ async function main() {
     const requested = ARGS.flags.reset ? "--reset" : `--profile ${ARGS.profile}`;
     warn(`CDP 端口 ${CDP_PORT} 已在监听，但传了 ${requested}：不复用，将关闭现有 Chrome 后重建 debug profile。`);
   }
-  // 重建前那个实例的身份：第 10 步要靠它证明「应答的是新起的实例」，而不只是「有人应答」
-  const staleIdentity = cdpIdentity(existing);
 
   if (!hasProfile) {
     err(`未找到 Chrome profile: ${defaultProfile}`);

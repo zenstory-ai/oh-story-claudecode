@@ -362,6 +362,11 @@ run_cmd_parity() {
   "cd_into_body_redirect": "cd 书/正文 && cat > 第3章.md",
   "cd_into_body_tee": "cd 正文 && tee 第3章.md",
   "cd_redirect_then_pipe": "cd 书 && cat x > 正文/第3章.md 2>&1 | tee log",
+  "cd_nested_shell": "cd 书 && bash -c 'cat > 正文/第3章.md'",
+  "cd_nested_body": "cd 书/正文 && sh -c 'tee 第3章.md'",
+  "cd_nested_relative": "cd 书 && bash -c 'cd 子书 && cat > 正文/第3章.md'",
+  "cd_nested_absolute": "cd /a && bash -c 'cd /b && cat > 正文/第3章.md'",
+  "cd_substitution": "cd 书 && echo \"$(echo x > 正文/第3章.md)\"",
   "commit_plain": "git commit -m x",
   "commit_chain": "git add . && git commit -m x",
   "commit_if": "if true; then git commit -m x; fi",
@@ -409,6 +414,13 @@ JS
       'cd_amp_redirect :: pros=\[书/正文/第3章.md\]' 'cd_into_body_redirect :: pros=\[书/正文/第3章.md\]' \
       'cd_into_body_tee :: pros=\[正文/第3章.md\]' 'cd_redirect_then_pipe :: pros=\[书/正文/第3章.md\]'; do
     grep -q "$want" "$tmp/cpy.txt" || { echo "FAIL: cd 后的写正文目标没认出来：$want" >&2; return 3; }
+  done
+  for want in 'cd_nested_shell :: pros=\[书/正文/第3章.md\]' \
+      'cd_nested_body :: pros=\[书/正文/第3章.md\]' \
+      'cd_nested_relative :: pros=\[书/子书/正文/第3章.md\]' \
+      'cd_nested_absolute :: pros=\[/b/正文/第3章.md\]' \
+      'cd_substitution :: pros=\[书/正文/第3章.md\]'; do
+    grep -q "$want" "$tmp/cpy.txt" || { echo "FAIL: 子 shell 没有继承当前目录：$want" >&2; return 3; }
   done
   grep -q 'cp_quoted_space :: pros=\[my book/正文/第1章_x.md\]' "$tmp/cpy.txt" \
     || { echo "FAIL: cp 的引号目标被按空白切碎，末位取到了另一本书的路径" >&2; return 3; }
@@ -544,6 +556,8 @@ run_uncored_parity() {
   printf '# 角色关系图\n' > "$repo/设定/关系.md"                     # 项目级设定件：不告警
   printf '# 文风\n' > "$repo/设定/文风.md"                           # 项目级设定件：不告警
   printf '# 地理\n' > "$repo/设定/世界观/地理.md"                    # 非角色子目录：整目录跳过
+  mkdir -p "$repo/book/大纲"
+  printf '# 第2章\n作为AI我无法继续创作。\n身高: 180\n' > "$repo/book/正文/第2章_归档_原稿_20261027.md"
   git -C "$repo" add -A
 
   python3 - "$CODEX" "$repo" > "$tmp/spy.txt" <<'PY'
@@ -571,6 +585,36 @@ JS
   grep -q '关系.md' "$tmp/spy.txt" && { echo "FAIL: 项目级设定件 关系.md 不该被当角色卡查 name" >&2; return 3; }
   grep -q '文风.md' "$tmp/spy.txt" && { echo "FAIL: 项目级设定件 文风.md 不该被当角色卡查 name" >&2; return 3; }
   grep -q '地理.md' "$tmp/spy.txt" && { echo "FAIL: 设定/ 下非角色子目录应整目录跳过" >&2; return 3; }
+  grep -q '_原稿_' "$tmp/spy.txt" && { echo "FAIL: 备份进入暂存正文警告" >&2; return 3; }
+  local archived="$tmp/archived"
+  mkdir -p "$archived/正文" "$archived/大纲"
+  for chapter in 1 2; do
+    printf '# 旧章\n作为AI我无法继续创作。\n' > "$archived/正文/第${chapter}章_归档_原稿_20261027.md"
+  done
+  python3 - "$CODEX" "$repo" "$archived" <<'PY' || return 3
+import importlib.util, sys
+from pathlib import Path
+spec = importlib.util.spec_from_file_location("backup_hooks", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+repo, archived = map(Path, sys.argv[2:])
+assert {p.name for p in m.find_changed_prose_files(repo)} == {"第1章.md"}
+assert m.continuity_findings(archived) == []
+for backup in (archived / "正文").iterdir():
+    assert not m._is_prose_path(archived, backup)
+    assert m.prose_block_reason(archived, backup) is None
+PY
+  node - "$CLAUDE_CORE" "$archived" <<'JS' || return 3
+const assert = require("node:assert/strict")
+const fs = require("node:fs"), path = require("node:path")
+const core = require(process.argv[2]), root = process.argv[3]
+assert.deepEqual(core.continuityFindings(root), [])
+for (const name of fs.readdirSync(path.join(root, "正文"))) {
+  const file = path.join(root, "正文", name)
+  assert.equal(core.proseBlockReason(root, file), null)
+  assert.equal(core.proseAfterWrite(root, file), "")
+  assert.deepEqual(core.duplicateTitleFindings(file), [])
+}
+JS
 
   # E2: 大纲/追踪阻断判定 —— 长篇缺细纲(拦)/有细纲(放)、短篇缺小节大纲(拦)/无设定信号(放)、
   #     毒句式欠账门（上一章有欠账拦 / 标「去味:跳过」豁免放 / 全角冒号「去味：跳过」豁免放 /
@@ -996,15 +1040,17 @@ outline_empty_existing pass"
 
   # node 缺席时追踪门必须 fail-open（大纲门仍靠纯 bash 拦住）。
   local nonode="$tmp/nonode"; mkdir -p "$nonode"
+  printf '#!/bin/sh\nexit 1\n' > "$nonode/node"
+  chmod +x "$nonode/node"
   local proj="$tmp/nostate" abs="$tmp/nostate/书/正文/第001章_测试.md"
-  local payload; payload=$(python3 -c 'import json,sys;print(json.dumps({"tool_input":{"file_path":sys.argv[1]}}))' "$abs")
-  ( cd "$proj" && PATH="$nonode:/usr/bin:/bin" CLAUDE_PROJECT_DIR="$proj" CLAUDE_TOOL_INPUT="$payload" \
+  local payload; payload=$(python3 -c 'import json,sys;sys.stdout.buffer.write(json.dumps({"tool_input":{"file_path":sys.argv[1]}},ensure_ascii=False).encode("utf-8"))' "$abs")
+  ( cd "$proj" && PATH="$nonode:$PATH" CLAUDE_PROJECT_DIR="$proj" CLAUDE_TOOL_INPUT="$payload" \
       bash "$CLAUDE_GUARD" ) >/dev/null 2>&1
   [ $? -eq 0 ] || { echo "FAIL: node 缺席时追踪门未 fail-open（BLOCKING 路径不得依赖 node 在场）" >&2; return 3; }
   # 空细纲门是纯 bash：node 缺席时照样拦（负载按 Claude 实际发送的原始 UTF-8，纯 bash 抽取不解 \u 转义）。
   proj="$tmp/outline_empty"; abs="$tmp/outline_empty/书/正文/第001章_测试.md"
   payload=$(python3 -c 'import json,sys;sys.stdout.buffer.write(json.dumps({"tool_input":{"file_path":sys.argv[1]}},ensure_ascii=False).encode("utf-8"))' "$abs")
-  ( cd "$proj" && PATH="$nonode:/usr/bin:/bin" CLAUDE_PROJECT_DIR="$proj" CLAUDE_TOOL_INPUT="$payload" \
+  ( cd "$proj" && PATH="$nonode:$PATH" CLAUDE_PROJECT_DIR="$proj" CLAUDE_TOOL_INPUT="$payload" \
       bash "$CLAUDE_GUARD" ) >/dev/null 2>&1
   [ $? -eq 2 ] || { echo "FAIL: node 缺席时空细纲未被纯 bash 门拦下" >&2; return 3; }
   return 0

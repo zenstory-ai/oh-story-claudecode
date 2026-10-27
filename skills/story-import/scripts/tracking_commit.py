@@ -325,13 +325,14 @@ def archive_retired_tracking_paths(tracking: Path) -> list[str]:
     Nothing is parsed or converted: the old files are kept verbatim for the author to
     consult, and the new state is reconstructed from the init document alone.
     """
-    retired = find_retired_tracking_paths(tracking)
+    retired = sorted(path.name for path in tracking.iterdir()
+                     if path.name not in {RETIRED_ARCHIVE_DIR, ".tracking-commit.lock"})
     if not retired:
         return []
     archive = tracking / RETIRED_ARCHIVE_DIR
     for relative in retired:
         require(
-            not (archive / relative).exists(),
+            not ((archive / relative).exists() or (archive / relative).is_symlink()),
             f"追踪/{RETIRED_ARCHIVE_DIR}/{relative} already exists; move it away before initializing",
         )
     # 先全量校验再搬运；中断后重跑时已搬走的条目不再出现在待搬列表里，可直接续做。
@@ -847,10 +848,9 @@ def render_delta(chapter: int, title: str, delta: dict[str, Any], core_names: se
         "",
         "## 角色变化",
     ]
-    lines.extend(
-        f"- {item['name']}｜{'核心' if item['name'] in core_names else '临时'}｜{item['change']}"
-        for item in delta["character_changes"]
-    )
+    for item in delta["character_changes"]:
+        name = json.dumps(item["name"], ensure_ascii=False)
+        lines.append(f"- {name}｜{'核心' if item['name'] in core_names else '临时'}｜{item['change']}")
     if not delta["character_changes"]:
         lines.append("- 无")
     lines.extend(["", "## 伏笔变化"])
@@ -1290,10 +1290,22 @@ def _apply_transaction_locked(project: Path, document: object) -> dict[str, Any]
             f"chapter delta {transaction['chapter']} already exists with different content",
         )
 
+    previous_payload = (
+        path.read_bytes().decode("utf-8")
+        if transaction["mode"] == "revision" and path.is_file() else None
+    )
     write_if_changed(path, delta_payload)
-    write_views(tracking, views)
-    # 唯一权威文件最后落盘；在此之前失败可用同一事务直接重跑。
-    atomic_write_text(state_path(project), next_state_payload)
+    try:
+        write_views(tracking, views)
+        # 唯一权威最后落盘；失败修订不得把未提交记录留给后续草稿。
+        atomic_write_text(state_path(project), next_state_payload)
+    except Exception:
+        if transaction["mode"] == "revision":
+            if previous_payload is None:
+                path.unlink(missing_ok=True)
+            else:
+                atomic_write_text(path, previous_payload)
+        raise
     warn_sizes(views, delta_payload)
     if previous_record is not None:
         warn_emptied_record(transaction["chapter"], previous_record, transaction["delta"])
@@ -1407,9 +1419,29 @@ def record_prefill(state: dict[str, Any], record: dict[str, Any]) -> tuple[dict[
     notes: list[str] = []
     changes = []
     for line in record["character_changes"]:
-        parts = line.split("｜", 2)
-        if len(parts) == 3:
-            changes.append({"name": parts[0], "change": parts[2]})
+        if line.startswith('"'):
+            name, end = json.JSONDecoder().raw_decode(line)
+            match = re.fullmatch(r"｜(?:核心|临时)｜(.+)", line[end:])
+            require(match is not None, "invalid character change record")
+            changes.append({"name": name, "change": match[1]})
+            continue
+        candidates = []
+        for marker in re.finditer(r"(?<!\\)｜(?:核心|临时)(?=｜)", line):
+            raw_name = line[:marker.start()]
+            # 已转义的名字不能再包含裸分隔符；后续分类文字属于变化正文。
+            if "\\｜" in raw_name and re.search(r"(?<!\\)｜", raw_name):
+                continue
+            change = line[marker.end() + 1:]
+            if raw_name and change:
+                candidates.append({"name": raw_name.replace("\\｜", "｜"), "change": change})
+        known = [item for item in candidates if item["name"] in state["characters"]]
+        candidates = known or candidates
+        require(
+            len(candidates) == 1,
+            "ambiguous character identity in chapter record; confirm the full name and submit "
+            f"an explicit revision transaction instead of guessing: {line}",
+        )
+        changes.append(candidates[0])
     snapshots = {item["name"]: copy.deepcopy(state["characters"][item["name"]])
                  for item in changes if item["name"] in state["characters"]}
 

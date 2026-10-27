@@ -134,6 +134,9 @@ if (js.indexOf("['日榜','月榜']") > -1) {
     },
   ]);
 }
+if (js.indexOf("var headers=['点击榜'") > -1) {
+  out(JSON.parse(process.env.SCAN_FAKE_CIWEIMAO || "[]"));
+}
 if (js.indexOf("var byId={}") > -1) {
   out([{ bookId: "1", title: "七猫甲书", url: "https://www.qimao.com/shuku/1/" }]);
 }
@@ -1216,6 +1219,33 @@ function testQimaoPartialTargetStatus() {
   assert.match(run.stderr, /七猫采集 partial: wrote 1\/2; failed 1/);
 }
 
+function testCiweimaoPartialTargetStatus() {
+  const scraper = path.join(repoRoot, "skills/story-long-scan/scripts/ciweimao-rank-scraper.js");
+  const names = ["点击榜", "收藏榜", "推荐榜", "订阅榜", "月票榜", "吐槽榜", "新书榜", "刀片榜", "更新榜"];
+  const sections = names.map((name) => ({
+    name, entries: [{ rank: 1, title: "刺猬猫样本", author: "作者", metric: "100" }],
+  }));
+  const run = (selected, args = ["--type", "all"]) => runScraper(scraper, args, {
+    SCAN_FAKE_HOST: "www.ciweimao.com",
+    SCAN_FAKE_CIWEIMAO: JSON.stringify(selected),
+    SCAN_TEST_STUB_SCROLL: "1",
+  });
+  const partial = run(sections.slice(0, 1));
+  assert.strictEqual(partial.status, 2, partial.stdout + partial.stderr);
+  assert.strictEqual(partial.files.length, 1);
+  assert.match(partial.stderr, /partial: wrote 1\/9; failed 8/);
+  assert.match(partial.stderr, /收藏榜/);
+  const complete = run(sections);
+  assert.strictEqual(complete.status, 0, complete.stdout + complete.stderr);
+  assert.strictEqual(complete.files.length, 9);
+  const single = run(sections.slice(0, 1), ["--type", "click"]);
+  assert.strictEqual(single.status, 0, single.stdout + single.stderr);
+  assert.strictEqual(single.files.length, 1);
+  const empty = run([]);
+  assert.strictEqual(empty.status, 1, empty.stdout + empty.stderr);
+  assert.strictEqual(empty.files.length, 0);
+}
+
 // ---------------------------------------------------------------------------
 // 七猫书库（--source library）：走 Node https，不开 Chrome。预加载把 https.get 换成按 URL
 // 查夹具的替身，并把 sleep / ab 换成记账，断言请求顺序、限速和「全程没碰 CDP」。
@@ -1723,6 +1753,7 @@ const id = arg("--id", "fake-cdp");
 const portfile = arg("--portfile", null);
 const stopfile = arg("--stopfile", null);
 const status = Number(arg("--status", 200));
+const body = arg("--body", null);
 // --no-identity：照答 /json/version，但不给 webSocketDebuggerUrl，模拟「身份取不到」
 const noIdentity = process.argv.indexOf("--no-identity") > -1;
 let port = Number(arg("--port", arg("--remote-debugging-port", 0)));
@@ -1735,7 +1766,7 @@ const server = http.createServer((req, res) => {
     payload.webSocketDebuggerUrl =
       "ws://127.0.0.1:" + server.address().port + "/devtools/browser/" + id;
   }
-  res.end(JSON.stringify(payload));
+  res.end(body === null ? JSON.stringify(payload) : body);
 });
 server.listen(port, "127.0.0.1", () => {
   if (portfile) fs.writeFileSync(portfile, String(server.address().port), "utf8");
@@ -1909,7 +1940,7 @@ cp.execSync = function (cmd, opts) {
  * 跑一次 setup-cdp-chrome.js。scenario 决定 pgrep/pkill 语义与假 Chrome 行为。
  * 返回 { status, stdout, stderr, sentinelSurvived, debugProfileSurvived }。
  */
-function runSetupCdp(scenario) {
+function runSetupCdp(scenario, versionBody) {
   const setup = path.join(
     repoRoot,
     "skills/browser-cdp/scripts/setup-cdp-chrome.js"
@@ -1954,6 +1985,8 @@ function runSetupCdp(scenario) {
       unhealthyHolder: { args: ["--reset", "--yes"], pids: "empty", kill: "noop", chrome: "fake-chrome-dies.js", oldStatus: 500 },
       genuineReset: { args: ["--reset", "--yes"], pids: "old", kill: "real", chrome: "fake-chrome-fresh.js" },
       plainReuse: { args: [], pids: "empty", kill: "noop", chrome: "fake-chrome-dies.js" },
+      detectOnly: { args: ["--detect-only"], pids: "empty", kill: "noop", chrome: "fake-chrome-dies.js" },
+      redirectedDetect: { args: ["--detect-only"], pids: "empty", kill: "noop", chrome: "fake-chrome-dies.js", oldStatus: 302 },
       orphanEndpoint: { args: ["--reset", "--yes"], pids: "old", kill: "real", chrome: "fake-chrome-orphan.js" },
       foreignHeldPort: { args: ["--reset", "--yes"], pids: "old", kill: "real", chrome: "fake-chrome-foreign-alive.js" },
       outsideTreeHolder: { args: ["--reset", "--yes"], pids: "old", kill: "real", chrome: "fake-chrome-outside-tree.js" },
@@ -1974,6 +2007,7 @@ function runSetupCdp(scenario) {
         "--portfile", portfile,
         "--stopfile", stopfile,
         "--status", String(plan.oldStatus || 200),
+        ...(versionBody === undefined ? [] : ["--body", versionBody]),
       ],
       { stdio: "ignore" }
     );
@@ -2144,6 +2178,31 @@ function testCdpResetSucceedsWhenPortActuallyFrees() {
   // 报出来的必须是新实例的身份，不是重建前那个
   assert(run.stdout.includes("fresh-launched-cdp"), run.stdout);
   assert(!run.stdout.includes("stale-existing-cdp"), run.stdout);
+}
+
+function testCdpRequiresVersionMetadata() {
+  const valid = runSetupCdp("detectOnly");
+  assert.strictEqual(valid.status, 0, valid.stderr);
+  assert.match(valid.stdout, /^CDP_STATUS=ready$/m);
+  for (const body of [
+    "not a CDP endpoint",
+    JSON.stringify({}),
+    JSON.stringify({ Browser: "Chrome/148", webSocketDebuggerUrl: 123 }),
+    JSON.stringify({ webSocketDebuggerUrl: "ws://127.0.0.1:9222/devtools/browser/id" }),
+    JSON.stringify({ Browser: "Chrome/148", webSocketDebuggerUrl: "https://127.0.0.1/devtools/browser/id" }),
+    JSON.stringify({ Browser: "Chrome/148", webSocketDebuggerUrl: "ws://127.0.0.1/devtools/page/id" }),
+  ]) {
+    const detected = runSetupCdp("detectOnly", body);
+    assert.strictEqual(detected.status, 0, detected.stderr);
+    assert.match(detected.stdout, /^CDP_STATUS=needs-setup$/m);
+    assert.doesNotMatch(detected.stdout, /^CDP_STATUS=ready$/m);
+    assert(detected.sentinelSurvived && detected.listenerAliveBeforeCleanup);
+  }
+  const redirect = runSetupCdp("redirectedDetect");
+  assert.match(redirect.stdout, /^CDP_STATUS=needs-setup$/m);
+  const reused = runSetupCdp("plainReuse", "ordinary HTTP server");
+  assert.strictEqual(reused.status, 1, reused.stdout + reused.stderr);
+  assert(reused.sentinelSurvived && reused.listenerAliveBeforeCleanup);
 }
 
 // 不带 --reset/--profile 的复用快路径必须一字不变：直接复用现有 CDP、立刻退出 0
@@ -2352,6 +2411,7 @@ testQidianLibraryFontDecoding();
 testQidianLibraryPagingE2E();
 testQimaoPeriodPlan();
 testQimaoPartialTargetStatus();
+testCiweimaoPartialTargetStatus();
 testQimaoLibraryPagedCollection();
 testQimaoLibraryPageFailures();
 testQimaoLibraryFallbacksAndQuality();
@@ -2359,6 +2419,7 @@ testQimaoLibraryArgumentValidation();
 testLongScanArgumentValidation();
 testHeiyanFieldDriftAndWordFormat();
 testCdpPlainReuseUnchanged();
+testCdpRequiresVersionMetadata();
 testCdpResetRefusesStaleEndpoint();
 testCdpResetRefusesUnhealthyTcpHolder();
 testCdpRejectsEndpointNotFromThisLaunch();

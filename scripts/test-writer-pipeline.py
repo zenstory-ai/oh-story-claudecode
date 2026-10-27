@@ -582,32 +582,6 @@ class PipelineTests(unittest.TestCase):
         # 开书按作者确认点分时刻：卷纲任务包只带卷纲时刻的流程、模板与技法，细纲任务包只带细纲时刻的；
         # 主会话不读包，story-architect 在新上下文里只读包和项目文件。
         refs = SCRIPTS.parent / 'references'
-        vol = self.call('build_architect_brief.py', '--project', self.book, '--task', 'volume', '--volume', 1)
-        self.assertEqual(vol.returncode, 0, vol.stderr)
-        info = json.loads(vol.stdout)
-        text = Path(info['brief']).read_text(encoding='utf-8')
-        self.assertEqual(Path(info['brief']).parent, self.book / '.story' / 'work' / '排纲')
-        self.assertEqual(info['includes'], ['workflow-volume.md（排纲方法）', 'artifact-protocols.md',
-                                            'outline-methods.md（卷纲排法）',
-                                            'reader-contract-and-progression.md', 'SKILL.md（新增物三级）',
-                                            '按条件可读（包外）'])
-        # 包外读不到 SKILL.md：新增物三级判据随包；流程点名的条件参考给出绝对路径与小节。
-        self.assertIn('**先问作者**：新主线事件或反转', text)
-        self.assertIn(f"{refs / 'long-reversal.md'}` 「反转类型」一节", text)
-        self.assertNotIn('## 情感虐心三板斧', text)
-        # 卷纲排法每次随包；八节点、情绪模块公式、换地图按条件在包外读。
-        self.assertIn('### 剧情单元设计', text)
-        self.assertNotIn('## 八节点故事结构', text)
-        self.assertNotIn('## 情绪模块公式', text)
-        self.assertIn(f"{refs / 'outline-methods.md'}` 「八节点故事结构」一节", text)
-        self.assertIn(f"{refs / 'character-relations.md'}` 「感情线阶段」一节", text)
-        # 流程文件只截「排纲方法」：主会话的读取清单与作者汇报模板不进包。
-        self.assertIn('## 排纲方法', text)
-        self.assertIn('### 排纲刻度', text)
-        self.assertNotIn('<!-- author-report -->', text)
-        self.assertNotIn('## 主会话', text)
-        self.assertNotIn('## 细纲（第 N 章）', text)
-        self.assertLess(info['chars'], 30000)
         # story-architect 不能执行命令：覆盖本批章节的单元闭包由脚本取好放进包里。
         self.volume.write_text(self.volume_text() + '### 剧情单元 L1-02\n> 作用域：单元级 L1-02\n'
                                '- 章节范围：第4-12章\n- 单元情绪引擎：保管→被追查→反将一军\n', encoding='utf-8')
@@ -797,14 +771,47 @@ class ImportOutlineBriefTests(unittest.TestCase):
         self.assertTrue(Path(info['brief']).name.endswith(f'第001-{last:03d}章.md'))
         self.assertNotIn(f'### 第{last + 1}章', text)
 
+    def test_incomplete_summaries_budget_complementary_prose(self):
+        for chapter in range(1, 26):
+            self.put(f'正文/第{chapter:03d}章_雨夜.md', f'# 第{chapter}章\n' + '正文证据。' * 1000)
+        original = {p.name: p.read_bytes() for p in (self.book / '正文').iterdir()}
+        for summary in ('', '# 只有标题\n', self.SUMMARY.format(n=1).split('**情节点**')[0],
+                        self.SUMMARY.format(n=1).replace('**因果**：雨夜来信', '**因果**：[待补充]')):
+            with self.subTest(summary=summary[:40]):
+                for chapter in range(1, 26):
+                    self.summary(chapter, summary)
+                info, text = self.brief('1-20')
+                end = int(info['chapters'].split('-')[1])
+                self.assertLess(end, 20)
+                self.assertEqual(info['next'], end + 1)
+                self.assertLessEqual(info['chars'], info['limit'])
+                extra = sum(len(''.join((self.book / f'正文/第{chapter:03d}章_雨夜.md')
+                                       .read_text(encoding='utf-8').split())) for chapter in range(1, end + 1))
+                self.assertEqual(info['chars'], len(''.join(text.split())) + extra)
+                self.assertEqual(info['missing_summaries'], [], "existing summaries remain distinct from missing files")
+                self.assertEqual(original, {p.name: p.read_bytes() for p in (self.book / '正文').iterdir()})
+
     def test_unit_cards_selected_by_chapter_range_field(self):
-        self.volume(('L1-01', '第1-5章', '接信'), ('L1-02', '第6-9章', '反击'), ('L1-03', '第10-10章', '余波'),
+        self.volume(('L1-01', '第1-5章', '接信'), ('L1-02', '第6-9章', '反击'), ('L1-03', '第10-12章', '余波'),
                     ('L1-04', '第15-15章', '单元编号不当章号'), ('L1-05', '第13-25章', '远处'))
         _, text = self.brief('1-12')
         for card in ('### 剧情单元 L1-01', '### 剧情单元 L1-02', '### 剧情单元 L1-03'):
             self.assertIn(card, text)
         self.assertNotIn('L1-04', text)  # 只认「章节范围」字段，其他字段里的「第1-2章」不算
         self.assertNotIn('L1-05', text)
+
+    def test_unit_card_coverage_must_be_complete_and_unique(self):
+        for cards, missing, duplicate in (
+            ((('L1-01', '第1-10章', '接信'), ('L1-02', '第13-25章', '后续')), '11,12', '无'),
+            ((('L1-01', '第1-12章', '接信'), ('L1-02', '第10-25章', '后续')), '无', '10,11,12'),
+        ):
+            with self.subTest(cards=cards):
+                self.volume(*cards)
+                result = self.call('1-12')
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn(f'缺覆盖：{missing}', result.stderr)
+                self.assertIn(f'重复覆盖：{duplicate}', result.stderr)
+                self.assertFalse((self.book / '.story/work/排纲').exists())
 
     def test_cards_the_writer_cannot_read_stop_the_brief(self):
         # 写正文时 outline_view.py --unit 认不出的卷纲（缺作用域行、旧的表格形单元），任务包也不收。

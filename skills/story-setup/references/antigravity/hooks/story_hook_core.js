@@ -155,7 +155,7 @@ function continuityFindings(root) {
     let chapters = []
     try {
       chapters = fs.readdirSync(bodyDir)
-        .filter((file) => /^第.*章.*\.md$/.test(file))
+        .filter((file) => /^第.*章.*\.md$/.test(file) && !isRevisionBackup(file))
         .map((file) => path.join(bodyDir, file))
     } catch {}
 
@@ -561,14 +561,9 @@ function copyLikeTargets(command, args) {
   return [destination]
 }
 
-function extractProseTargets(command, depth = 0) {
+function extractProseTargets(command, depth = 0, initialCwd = "") {
   const targets = []
   const scannable = maskHeredocBodies(command)
-  if (depth < 8) {
-    for (const nested of commandSubstitutions(scannable)) {
-      targets.push(...extractProseTargets(nested, depth + 1))
-    }
-  }
   // `cd 书目录 && cat > 正文/...`：相对写入目标要接在 cd 之后的目录上，否则守卫按会话目录去找细纲，
   // 把有细纲的章误报成缺细纲。命令里没有 cd 时保持整条命令扫描重定向的原行为。
   // `>|`、`>&file`、`&>` 是重定向，不是管道或后台符；先统一成 `>`，免得切段时把目标切丢。
@@ -578,12 +573,17 @@ function extractProseTargets(command, depth = 0) {
     const commandIndex = commandWordIndex(words)
     return { raw, name: commandBasename(words[commandIndex]), args: words.slice(commandIndex + 1) }
   })
-  const hasCd = parsed.some((item) => item.name === "cd")
+  const hasCd = Boolean(initialCwd) || parsed.some((item) => item.name === "cd")
   if (!hasCd) targets.push(...redirectTargets(scannable))
-  let cwd = ""
+  let cwd = initialCwd
   const isAbsolute = (value) => /^([\\/~]|[A-Za-z]:[\\/])/.test(value)
   const underCwd = (value) => (cwd && !isAbsolute(value) ? joinPosix(cwd, value) : value)
   for (const { raw, name: commandName, args: commandArgs } of parsed) {
+    if (depth < 8) {
+      for (const nested of commandSubstitutions(raw)) {
+        targets.push(...extractProseTargets(nested, depth + 1, cwd))
+      }
+    }
     // 引号感知分词（同 shellWords）：/\s+/ 会把 cp draft.md "my book/正文/第1章.md" 的目标切碎，
     // 末位取到 book/正文/第1章.md —— 判到另一本书上（那本有细纲就直接放行）。
     if (commandName === "cd") {
@@ -594,7 +594,7 @@ function extractProseTargets(command, depth = 0) {
     if (hasCd) targets.push(...redirectTargets(raw, true).map(underCwd).filter((target) => target.includes("正文")))
     if (["sh", "bash", "dash", "ksh", "zsh"].includes(commandName)) {
       const nested = nestedShellCommand(commandArgs)
-      if (nested) targets.push(...extractProseTargets(nested, depth + 1))
+      if (nested) targets.push(...extractProseTargets(nested, depth + 1, cwd))
     }
     if (commandName === "tee" || commandName === "touch") {
       for (const destination of writeOperands(commandName, commandArgs).map(underCwd)) {
@@ -692,6 +692,7 @@ function proseBlockReason(root, absolute) {
     return null
   }
   if (parent !== "正文" || !/^第.*章.*\.md$/.test(base)) return null
+  if (isRevisionBackup(base)) return null
   const match = base.match(/^第0*(\d+)章/)
   if (!match) return null
   const chapter = match[1]
@@ -746,7 +747,7 @@ function proseBlockReason(root, absolute) {
       const candidates = fs.readdirSync(path.dirname(absolute))
         .filter((file) => {
           const pm = file.match(/^第0*(\d+)章.*\.md$/)
-          return pm && Number(pm[1]) === prevNum && !file.includes("_原稿_")
+          return pm && Number(pm[1]) === prevNum && !isRevisionBackup(file)
         })
         .sort()
       if (candidates.length) prevFile = path.join(path.dirname(absolute), candidates[0])
@@ -1051,10 +1052,15 @@ function proseNetFindings(text, whitelist = [], rescan = toxicRescanHint("")) {
   return findings
 }
 
+function isRevisionBackup(name) {
+  return name.includes("_原稿_")
+}
+
 function isProsePath(absolute) {
   const base = path.basename(absolute)
   const parent = path.basename(path.dirname(absolute))
   if (base === "正文.md") return fs.existsSync(path.join(path.dirname(absolute), "设定.md"))
+  if (isRevisionBackup(base)) return false
   if (parent !== "正文" || !/^第.*章.*\.md$/.test(base)) return false
   const book = path.dirname(path.dirname(absolute))
   // 大纲/追踪/设定 must be directories; 设定.md a file — matches the bash oracle
@@ -1068,6 +1074,7 @@ function duplicateTitleFindings(absolute) {
   const titles = new Map()
   try {
     for (const file of fs.readdirSync(bodyDir)) {
+      if (isRevisionBackup(file)) continue
       const match = file.replace(/\.md$/, "").match(/^第0*\d+章[_\- 　]+(.+)$/)
       if (!match) continue
       const title = match[1].trim()
@@ -1287,10 +1294,12 @@ function stagedMarkdownWarnings(root) {
   const warnings = []
   for (const relative of output.stdout.toString("utf8").split("\0").filter(Boolean)) {
     if (!relative.endsWith(".md")) continue
+    const prose = relative === "正文.md" || relative.includes("/正文.md") || relative.startsWith("正文/") || relative.includes("/正文/")
+    if (prose && isRevisionBackup(path.basename(relative))) continue
     const full = path.join(root, relative)
     let text = ""
     try { text = fs.readFileSync(full, "utf8") } catch { continue }
-    if (relative === "正文.md" || relative.includes("/正文.md") || relative.startsWith("正文/") || relative.includes("/正文/")) {
+    if (prose) {
       const hits = []
       text.split(/\r?\n/).forEach((line, index) => {
         if (/(身高|体重|年龄)[\s　]*(：|:)[\s　]*[0-9]+/.test(line)) hits.push(`${index + 1}:${line}`)

@@ -179,6 +179,14 @@ try {
   assert.strictEqual(untaggedProgression.status, 1)
   assert(failureIds(untaggedProgression).includes('phase2.outline-subevents'))
 
+  for (const [index, progression] of ['{发现}', '{发现}{冲突}', ' \t{发现} '].entries()) {
+    const tagsOnly = run(writeCase(
+      `tags-only-${index}`, validSettings(), validOutline({ progression: () => progression })
+    ))
+    assert.strictEqual(tagsOnly.status, 1, tagsOnly.stdout + tagsOnly.stderr)
+    assert(failureIds(tagsOnly).includes('phase2.outline-subevents'))
+  }
+
   const explicitShortTarget = run(writeCase(
     'explicit-short-target',
     validSettings({ target: '6000' }),
@@ -210,6 +218,25 @@ try {
     assert.strictEqual(wan.status, 0, wan.stdout + wan.stderr)
   }
 
+  for (const [index, value] of ['-1000', '1000abc', '1000.5', '1000-2000'].entries()) {
+    const malformedTarget = run(writeCase(
+      `malformed-row-target-${index}`, validSettings(), validOutline().replace('| 1000 |', `| ${value} |`)
+    ))
+    assert.strictEqual(malformedTarget.status, 1, malformedTarget.stdout + malformedTarget.stderr)
+    assert(failureIds(malformedTarget).includes('phase2.target-word-sum'))
+  }
+  const zeroTarget = run(writeCase(
+    'zero-row-target', validSettings({ target: '7000' }), validOutline().replace('| 1000 |', '| 0 |')
+  ))
+  assert.strictEqual(zeroTarget.status, 1, zeroTarget.stdout + zeroTarget.stderr)
+  assert(failureIds(zeroTarget).includes('phase2.target-word-sum'))
+  for (const [index, value] of ['1,000', '1000 字', '约 1，000 字（本节）'].entries()) {
+    const formattedTarget = run(writeCase(
+      `formatted-row-target-${index}`, validSettings(), validOutline().replaceAll('| 1000 |', `| ${value} |`)
+    ))
+    assert.strictEqual(formattedTarget.status, 0, formattedTarget.stdout + formattedTarget.stderr)
+  }
+
   // 未填写的模板占位符不算完成设计。
   const placeholders = run(writeCase(
     'unfilled-placeholders',
@@ -221,6 +248,56 @@ try {
   ))
   assert.strictEqual(placeholders.status, 1)
   assert(failureIds(placeholders).includes('phase2.no-template-placeholders'))
+
+  const villainFields = ['身份', '动机', '作恶方式', '致命弱点', '报应']
+  const concreteVillain = validSettings({
+    villain: '反派设计：\n' + villainFields.map((field) => `- ${field}：本篇已确定的${field}`).join('\n'),
+  })
+  const filledVillain = run(writeCase('filled-villain', concreteVillain, validOutline()))
+  assert.strictEqual(filledVillain.status, 0, filledVillain.stdout + filledVillain.stderr)
+  for (const [name, value] of [['placeholders', '{待填写}'], ['empty', ''], ['unknown', '[待补充]']]) {
+    const unfilled = run(writeCase(`unfilled-villain-${name}`, validSettings({
+      villain: '反派设计：\n' + villainFields.map((field) => `- ${field}：${value}`).join('\n'),
+    }), validOutline()))
+    assert.strictEqual(unfilled.status, 1, unfilled.stdout + unfilled.stderr)
+    assert(failureIds(unfilled).includes('phase2.villain-contract'))
+    if (name === 'placeholders') assert(failureIds(unfilled).includes('phase2.no-template-placeholders'))
+  }
+
+  for (const [style, format] of [
+    ['spaced', (text) => text.replace(/^(- )([^：\r\n]+)：/gm, '$1$2 ： ')],
+    ['tabs', (text) => text.replace(/^(- )([^：\r\n]+)：/gm, '$1$2\t:\t')],
+    ['bold', (text) => text.replace(/^(- )([^：\r\n]+)：/gm, '$1**$2** ： ')],
+    ['code', (text) => text.replace(/^(- )([^：\r\n]+)：/gm, '$1`$2` : ')],
+  ]) {
+    const reasonPlaceholder = run(writeCase(`reason-placeholder-${style}`, format(validSettings({
+      villain: '反派设计：不适用（{原因}）',
+    })), validOutline()))
+    assert.strictEqual(reasonPlaceholder.status, 1, reasonPlaceholder.stdout + reasonPlaceholder.stderr)
+    assert(failureIds(reasonPlaceholder).includes('phase2.no-template-placeholders'))
+    const annotatedPlaceholder = run(writeCase(`villain-annotated-${style}`, format(validSettings({
+      villain: '反派设计：\n' + villainFields.map((field) => `- ${field}：{待填写}（待定）`).join('\n'),
+    })), validOutline()))
+    assert.strictEqual(annotatedPlaceholder.status, 1, annotatedPlaceholder.stdout + annotatedPlaceholder.stderr)
+    assert(failureIds(annotatedPlaceholder).includes('phase2.no-template-placeholders'))
+    const formatted = run(writeCase(`filled-fields-${style}`, format(concreteVillain), validOutline()))
+    assert.strictEqual(formatted.status, 0, formatted.stdout + formatted.stderr)
+  }
+  const fieldAliases = run(writeCase('field-aliases', validSettings()
+    .replace('题材参考：', '题材包 ：').replace('反派设计：', '反派 ：'), validOutline()))
+  assert.strictEqual(fieldAliases.status, 0, fieldAliases.stdout + fieldAliases.stderr)
+  const aliasPlaceholder = run(writeCase('alias-placeholder', validSettings({
+    villain: '反派 ：不适用（{原因}）',
+  }), validOutline()))
+  assert.strictEqual(aliasPlaceholder.status, 1, aliasPlaceholder.stdout + aliasPlaceholder.stderr)
+  assert(failureIds(aliasPlaceholder).includes('phase2.no-template-placeholders'))
+  for (const [index, reason] of [' \t', '[待补充]'].entries()) {
+    const missingReason = run(writeCase(`missing-villain-reason-${index}`, validSettings({
+      villain: `反派设计 ：不适用（${reason}）`,
+    }), validOutline()))
+    assert.strictEqual(missingReason.status, 1, missingReason.stdout + missingReason.stderr)
+    assert(failureIds(missingReason).includes('phase2.villain-contract'))
+  }
 
   const missingSettings = run(writeCase('missing-settings', null, validOutline()))
   assert.strictEqual(missingSettings.status, 1)

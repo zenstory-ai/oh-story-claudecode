@@ -515,9 +515,16 @@ def validate(root: Path, workspace: Path | None = None) -> list[str]:
                 errors.append(f"line_{number}:atom_count_invalid")
             if not row.get("source_ids", "").strip():
                 errors.append(f"line_{number}:source_ids_missing")
-            if novel_count == 1 and "单书假设" not in card_text:
+            verification_values = [
+                value.replace("**", "").strip()
+                for value in re.findall(
+                    r"^[ \t]*(?:[-*+][ \t]*)?(?:\*\*)?验证状态(?:\*\*)?[ \t]*[:：][ \t]*(.*?)[ \t]*$",
+                    card_text, re.MULTILINE,
+                )
+            ]
+            if novel_count == 1 and verification_values != ["单书假设"]:
                 errors.append(f"line_{number}:single_book_hypothesis_marker_missing")
-            if novel_count is not None and novel_count >= 2 and "跨书重复验证" not in card_text:
+            if novel_count is not None and novel_count >= 2 and verification_values != ["跨书重复验证"]:
                 errors.append(f"line_{number}:cross_book_validation_marker_missing")
         elif tags:
             errors.append(f"line_{number}:tags_reserved_for_cba")
@@ -552,15 +559,18 @@ def validate(root: Path, workspace: Path | None = None) -> list[str]:
         atom_em = {row.get("source_ids", "").strip() for row in atoms.values()}
         for item_id, row in merges.items():
             refs = source_ids(row.get("source_ids", ""))
-            if len(refs) < 2:
+            unique_refs = set(refs)
+            if len(refs) != len(unique_refs):
+                errors.append(f"{book}/{item_id}:nm_source_em_duplicate")
+            if len(unique_refs) < 2:
                 errors.append(f"{book}/{item_id}:nm_requires_at_least_two_sources")
                 continue
-            unknown = sorted(set(refs) - atom_em)
+            unknown = sorted(unique_refs - atom_em)
             if unknown:
                 errors.append(f"{book}/{item_id}:nm_source_em_missing:{unknown}")
             if positive_int(row.get("novel_count", "")) != 1:
                 errors.append(f"{book}/{item_id}:nm_novel_count_must_equal_one")
-            if positive_int(row.get("atom_count", "")) != len(set(refs) & atom_em):
+            if positive_int(row.get("atom_count", "")) != len(unique_refs & atom_em):
                 errors.append(f"{book}/{item_id}:nm_atom_count_mismatch")
 
     for row in rows:

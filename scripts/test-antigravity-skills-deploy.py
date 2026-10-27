@@ -7,6 +7,7 @@ import importlib.util
 import os
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,7 +27,50 @@ def make_source(root: Path) -> Path:
     return source
 
 
+def test_backup_preservation() -> None:
+    with tempfile.TemporaryDirectory(prefix="oh-story-deploy-recovery-") as directory:
+        root = Path(directory)
+        source = make_source(root)
+        destination = root / "project/skills"
+        destination.mkdir(parents=True)
+        original = destination / "user.txt"
+        original.write_bytes(b"original")
+        backup = destination.with_name(f"{destination.name}.backup-{os.getpid()}")
+        backup.mkdir()
+        sentinel = backup / "recovery.txt"
+        sentinel.write_bytes(b"preexisting recovery")
+        try:
+            MODULE.deploy(source, destination, migrate_symlink=False)
+        except MODULE.DeployError as exc:
+            assert "stale deployment backup" in str(exc)
+        else:
+            raise AssertionError("preexisting backup must stop deployment")
+        assert sentinel.read_bytes() == b"preexisting recovery"
+        assert original.read_bytes() == b"original"
+        sentinel.unlink()
+        backup.rmdir()
+
+        real_rename = Path.rename
+
+        def failed_install_and_restore(path, target):
+            if path == destination:
+                return real_rename(path, target)
+            raise OSError("injected rename failure")
+
+        with patch.object(Path, "rename", failed_install_and_restore):
+            try:
+                MODULE.deploy(source, destination, migrate_symlink=False)
+            except OSError:
+                pass
+            else:
+                raise AssertionError("failed install must report failure")
+        assert not destination.exists()
+        assert (backup / "user.txt").read_bytes() == b"original", "failed rollback must retain recovery data"
+        assert not list(destination.parent.glob(".skills.staging-*"))
+
+
 def main() -> None:
+    test_backup_preservation()
     # The deployer materializes only the skills it names; a skill added under skills/
     # without updating KNOWN_SKILLS would silently never reach Antigravity projects.
     shipped = {path.parent.name for path in (ROOT / "skills").glob("*/SKILL.md")}

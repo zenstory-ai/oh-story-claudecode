@@ -8,6 +8,10 @@ source, successful CI and public release assets.
 
 - `.release/policy.json` is source-bound and names every version authority, the
   dated changelog, exact installable files, exclusions, and exact main CI jobs.
+- Required dashboard checks are `api (ubuntu-latest)`, `api (macos-latest)`,
+  `api (windows-latest)` and `e2e (ubuntu)`. The dashboard workflow runs on every
+  push to `main`, including documentation-only commits, so every releasable SHA
+  has its own results. Pull requests retain path filtering.
 - Pull requests run a read-only contract/archive validation.
 - `workflow_dispatch` is allowed only on `main` and never publishes. It also
   proves the exact main commit's configured CI runs.

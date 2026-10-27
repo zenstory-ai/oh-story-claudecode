@@ -442,6 +442,10 @@ def prose_net_findings(text: str, whitelist=(), rescan: str | None = None) -> li
     return findings
 
 
+def _is_revision_backup(name: str) -> bool:
+    return "_原稿_" in name
+
+
 def _is_prose_path(root: Path, abs_path: Path) -> bool:
     """正文文件判定（与 check-prose-after-write.sh 的 over-capture 门一致）：
     短篇 {书}/正文.md 且同目录有 设定.md；长篇 {书}/正文/第N章*.md 且 {书} 有 大纲/追踪/设定。"""
@@ -449,6 +453,8 @@ def _is_prose_path(root: Path, abs_path: Path) -> bool:
     parent = abs_path.parent.name
     if base == "正文.md":
         return (abs_path.parent / "设定.md").exists()
+    if _is_revision_backup(base):
+        return False
     if parent == "正文" and re.match(r"^第.*章.*\.md$", base):
         book = abs_path.parent.parent
         return (book / "大纲").is_dir() or (book / "追踪").is_dir() or (book / "设定").is_dir() or (book / "设定.md").exists()
@@ -573,7 +579,7 @@ def continuity_findings(root: Path) -> list[str]:
     msgs: list[str] = []
     for book in _discover_all_books(root):
         body_dir = book / "正文"
-        chapters = sorted(body_dir.glob("第*章*.md")) if body_dir.is_dir() else []
+        chapters = sorted(c for c in body_dir.glob("第*章*.md") if not _is_revision_backup(c.name)) if body_dir.is_dir() else []
         # ① 追踪 staleness（仅长篇：有 追踪/上下文.md）
         ctx = book / "追踪" / "上下文.md"
         checkpoint_issue = tracking_checkpoint_issue(book, require_state=bool(chapters))
@@ -1165,16 +1171,13 @@ def _copy_like_targets(command: str, args: list[str]) -> list[str]:
     return [destination]
 
 
-def extract_prose_targets_from_command(command: str, depth: int = 0) -> list[str]:
+def extract_prose_targets_from_command(command: str, depth: int = 0, initial_cwd: str = "") -> list[str]:
     # Only treat a 正文 path as a write target when it is the destination of an actual
     # write op (redirection / tee / touch / cp|mv dest). Scanning the whole command would
     # flag any heredoc body, doc string, or grep pattern that merely *mentions*
     # 正文/第N章.md and wrongly deny the edit.
     targets: list[str] = []
     scannable = _mask_heredoc_bodies(command)
-    if depth < 8:
-        for nested in _command_substitutions(scannable):
-            targets.extend(extract_prose_targets_from_command(nested, depth + 1))
     # 与 JS 核同构：`cd 书目录 && cat > 正文/...` 的相对写入目标接在 cd 之后的目录上；
     # 命令里没有 cd 时保持整条命令扫描重定向的原行为。
     parsed = []
@@ -1187,10 +1190,10 @@ def extract_prose_targets_from_command(command: str, depth: int = 0) -> list[str
         command_index = _command_word_index(words)
         name = _command_basename(words[command_index]) if command_index < len(words) else ""
         parsed.append((raw_segment, name, words[command_index + 1:]))
-    has_cd = any(name == "cd" for _, name, _ in parsed)
+    has_cd = bool(initial_cwd) or any(name == "cd" for _, name, _ in parsed)
     if not has_cd:
         targets.extend(_redirect_targets(scannable))
-    cwd = ""
+    cwd = initial_cwd
 
     def is_absolute(value: str) -> bool:
         return bool(re.match(r"^([\\/~]|[A-Za-z]:[\\/])", value))
@@ -1199,6 +1202,9 @@ def extract_prose_targets_from_command(command: str, depth: int = 0) -> list[str
         return f"{cwd.rstrip('/')}/{value}" if cwd and not is_absolute(value) else value
 
     for raw_segment, command_name, command_args in parsed:
+        if depth < 8:
+            for nested in _command_substitutions(raw_segment):
+                targets.extend(extract_prose_targets_from_command(nested, depth + 1, cwd))
         if command_name == "cd":
             directory = next((arg for arg in command_args if not arg.startswith("-")), None)
             if directory:
@@ -1212,7 +1218,7 @@ def extract_prose_targets_from_command(command: str, depth: int = 0) -> list[str
         if command_name in ("sh", "bash", "dash", "ksh", "zsh"):
             nested = _nested_shell_command(command_args)
             if nested:
-                targets.extend(extract_prose_targets_from_command(nested, depth + 1))
+                targets.extend(extract_prose_targets_from_command(nested, depth + 1, cwd))
         if command_name in ("tee", "touch"):
             targets.extend(
                 destination
@@ -1312,6 +1318,8 @@ def _outline_is_empty(file: Path) -> bool:
 def prose_block_reason(root: Path, abs_path: Path) -> str | None:
     base = abs_path.name
     parent = abs_path.parent.name
+    if parent == "正文" and _is_revision_backup(base):
+        return None
     if base == "正文.md":
         if abs_path.exists():
             return None
@@ -1387,7 +1395,7 @@ def prose_block_reason(root: Path, abs_path: Path) -> str | None:
                 c for c in abs_path.parent.iterdir()
                 if re.match(r"^第0*(\d+)章.*\.md$", c.name)
                 and int(re.match(r"^第0*(\d+)章", c.name).group(1)) == prev_num
-                and "_原稿_" not in c.name
+                and not _is_revision_backup(c.name)
             )
             prev_file = candidates[0] if candidates else None
         except OSError:
@@ -1574,13 +1582,16 @@ def staged_markdown_warnings(root: Path) -> str:
         if not file.endswith(".md"):
             continue
         full = root / file
+        prose = file == "正文.md" or "/正文.md" in file or file.startswith("正文/") or "/正文/" in file
+        if prose and _is_revision_backup(full.name):
+            continue
         if not full.exists():
             continue
         text = full.read_text(encoding="utf-8", errors="ignore")
         # 匹配语义与警告文案对齐 JS core（story_hook_core.js stagedMarkdownWarnings，跨 CLI 的
         # 权威实现）：name 字段 re.I 大小写不敏感、中文文案。py↔js 由
         # scripts/test-prose-net-parity.sh Part E 锁 parity。
-        if file == "正文.md" or "/正文.md" in file or file.startswith("正文/") or "/正文/" in file:
+        if prose:
             hits = []
             for idx, line in enumerate(text.splitlines(), 1):
                 if re.search(r"(身高|体重|年龄)(\s|　)*(：|:)(\s|　)*[0-9]+", line):

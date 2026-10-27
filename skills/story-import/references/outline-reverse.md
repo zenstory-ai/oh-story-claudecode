@@ -10,9 +10,9 @@
 {PYTHON} {story-import skill 根}/scripts/build_outline_brief.py --project {书目录} --chapters {A-B}
 ```
 
-脚本将反推规则与模板（[outline-reverse-rules.md](outline-reverse-rules.md) 全文）、测好的历史长度、摘要要点和覆盖本批的卷纲剧情单元卡，拼成 `{书目录}/.story/work/排纲/导入细纲_第AAA-BBB章.md`。历史长度按 `visible_chars_v1` 计算；执行者要读的总量超过约 25K 字时脚本自动少排几章（可少于 10 章）。以 stdout JSON 的 `chapters` 为实际范围、`next` 为下一批起点，`null` 表示已到最后一章。缺摘要的章改读正文，所需正文量也计入总量。
+脚本把规则模板（[outline-reverse-rules.md](outline-reverse-rules.md) 全文）、实测历史长度、摘要要点与本批单元卡写成 `{书目录}/.story/work/排纲/导入细纲_第AAA-BBB章.md`。每章须唯一归属单元，历史长度按 `visible_chars_v1`。读取量含包与补读正文：缺失或不完整摘要按全章计补读上限，超过约 25K 时少排几章（可少于 10 章）。以 stdout JSON 的 `chapters` 为实际范围、`next` 为下批起点，`null` 表示末章。
 
-长度必须由脚本测，不得用模型估算或静默跳过。找不到 Python 3 或脚本报错时停下，用一句话告诉作者卡在哪（如「第 12 章正文读不到，先把正文迁完」），原文报错放技术备注；卷纲缺失或找不到覆盖本批的单元卡时，先回结构迁移补卷纲。
+长度必须由脚本测，不得用模型估算或静默跳过。找不到 Python 3 或脚本报错时停下，用一句话告诉作者卡在哪（如「第 12 章正文读不到，先把正文迁完」），原文报错放技术备注；卷纲缺失、单元缺覆盖或重叠时，先回结构迁移补卷纲。
 
 ## Step 2：写本批细纲
 

@@ -4,7 +4,7 @@
 
 ## 主会话：读取、分工与汇报
 
-**读取**：[artifact-protocols.md](artifact-protocols.md)（大纲与卷纲模板）、`references/outline-methods.md`「卷纲排法」、`references/reader-contract-and-progression.md`（排纲自查第 4 项）；有主对标时按「对标节奏迁移」读主对标的 `剧情/节奏.md`。设定从 `设定/` 读，不回翻对话；只交付卷纲时不读细纲文件。下面几项只在条件满足时读，只读点名的那一节：
+**读取**：[artifact-protocols.md](artifact-protocols.md) 的「大纲/大纲.md」「大纲/卷纲_第X卷.md」两节（含段位契约）；`references/outline-methods.md`「卷纲排法」；`references/reader-contract-and-progression.md` 第 0–3 节与第 5 节（契约四问、核心概念、机构设计、风险三级、续接与换书债，不含第 4 节示例）。有主对标时按「对标节奏迁移」读 `剧情/节奏.md`。设定从 `设定/` 读；只出卷纲不读细纲。其余按下列条件只读点名小节：
 
 - 没有主对标：outline-methods「八节点故事结构」
 - 卷纲里有自创单元：outline-methods「情绪模块公式」

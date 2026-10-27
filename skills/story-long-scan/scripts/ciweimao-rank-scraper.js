@@ -11,6 +11,9 @@
  *   node ciweimao-rank-scraper.js --type monthly      # 月票榜
  *   node ciweimao-rank-scraper.js --type all           # 全部榜单
  *
+ * 退出码：0 = 请求的榜单全部写出；2 = 部分榜单缺失/失败，成功文件保留；
+ *           1 = 没有写出任何榜单或整体失败。
+ *
  * 前置：
  *   node {SKILL_DIR}/browser-cdp/scripts/setup-cdp-chrome.js 9222
  */
@@ -217,10 +220,14 @@ function main() {
       : RANK_TYPES.filter((r) => r.id === RANKTYPE);
 
   let written = 0;
+  let failed = 0;
+  const partialReasons = [];
   for (const rt of targetTypes) {
     try {
       const section = sections.find((s) => s.name === rt.header);
       if (!section || !section.entries.length) {
+        failed++;
+        partialReasons.push(`${rt.label} 无数据`);
         console.log(`  ⚠ ${rt.label} 无数据，跳过`);
         continue;
       }
@@ -234,10 +241,12 @@ function main() {
       written++;
       console.log(`  ✓ ${rt.label}：${section.entries.length} 条 → ${filepath}`);
     } catch (rankErr) {
+      failed++;
+      partialReasons.push(`${rt.label}: ${rankErr.message}`);
       console.error(`[ciweimao] ${rt.label} 处理出错，跳过: ${rankErr.message}`);
     }
   }
-  return written;
+  return { planned: targetTypes.length, written, failed, partialReasons };
 }
 
 if (require.main === module) {

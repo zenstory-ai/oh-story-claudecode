@@ -3,7 +3,7 @@
 
 用法：
   compare.py --base <run目录>... --cand <run目录>... --coverage <judge coverage 目录>
-             --pairwise <judge pairwise 目录> [--tell <tell仓库>] [--json]
+             --pairwise <judge pairwise 目录> [--judge agy|claude|codex] [--tell <tell仓库>] [--json]
 
 门槛（非劣效，全部满足才算通过；数值在预注册协议里冻结，这里是默认值）：
   Q1 情节点兑现率（landed=1、summarized=0.5、missing=0；未提交的章按 0 计）候选 − 基线 ≥ −0.05
@@ -20,20 +20,21 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import metrics  # noqa: E402
+import judge  # noqa: E402
 
 SCORE = {'landed': 1.0, 'summarized': 0.5, 'missing': 0.0}
 
 
 def coverage_rows(cov_dir, runs):
-    names = {Path(r).name for r in runs}
     rows = {}
-    for f in Path(cov_dir).glob('*.json'):
-        d = json.loads(f.read_text(encoding='utf-8'))
-        if d['run'] not in names or not d.get('result'):
-            continue
-        beats = d['result'].get('beats') or []
-        rate = sum(SCORE.get(b.get('status'), 0) for b in beats) / len(beats) if beats else 0.0
-        rows[(d['host'], d['case'], d['chapter'])] = (rate, len(d['result'].get('unauthorized') or []))
+    for identity, key, _ in judge.coverage_requests(runs):
+        document = judge.cached_evaluation(cov_dir, 'coverage', key)
+        if document is None:
+            raise ValueError(f'{identity["run"]}, chapter {identity["chapter"]}: missing, stale or invalid '
+                             'ordinary coverage; rerun judge.py coverage without --strict using the selected --judge')
+        beats = document['result']['beats']
+        rate = sum(SCORE[b['status']] for b in beats) / len(beats)
+        rows[(identity['run'], identity['chapter'])] = (rate, len(document['result']['unauthorized']))
     return rows
 
 
@@ -41,10 +42,10 @@ def side(runs, cov_dir, tell):
     summaries = [metrics.summarize(r, tell) for r in runs]
     cov = coverage_rows(cov_dir, runs)
     rates, unauth, adv, tells = [], [], [], []
-    for s in summaries:
+    for run, s in zip(runs, summaries):
         goal_chapters = s['chapters_goal']
         committed = {p['chapter']: p for p in s['prose'] if not p.get('missing')}
-        keys = [k for k in cov if k[0] == s['host'] and k[1] == s['case']]
+        keys = [k for k in cov if k[0] == str(Path(run).resolve())]
         for k in keys:
             rates.append(cov[k][0])
             unauth.append(cov[k][1])
@@ -75,16 +76,25 @@ def main():
     ap.add_argument('--pairwise', required=True)
     ap.add_argument('--tell')
     ap.add_argument('--json', action='store_true')
+    ap.add_argument('--judge', choices=sorted(judge.JUDGE_MODELS), default='agy')
     a = ap.parse_args()
+    judge.JUDGE = a.judge
     base, cand = side(a.base, a.coverage, a.tell), side(a.cand, a.coverage, a.tell)
-    finals = [json.loads(f.read_text(encoding='utf-8'))['final'] for f in Path(a.pairwise).glob('*.json')]
+    finals = []
+    for identity, key, _ in judge.pairwise_requests(a.base, a.cand):
+        document = judge.cached_evaluation(a.pairwise, 'pairwise', key)
+        if document is None:
+            raise ValueError(f'{identity}: missing, stale or invalid pairwise assessment; rerun judge.py pairwise')
+        finals.append(document['final'])
     decisive = [f for f in finals if f in ('base', 'cand')]
     win = sum(f == 'cand' for f in decisive) / len(decisive) if decisive else None
     gates = {
         'Q1_coverage': (cand['coverage'] - base['coverage']) >= -0.05,
-        'Q2_unauthorized': (cand['unauthorized_per_chapter'] - base['unauthorized_per_chapter']) <= 0.3,
+        'Q2_unauthorized': ('证据不足' if cand['unauthorized_per_chapter'] is None or base['unauthorized_per_chapter'] is None
+                            else (cand['unauthorized_per_chapter'] - base['unauthorized_per_chapter']) <= 0.3),
         'Q3_pairwise': ('证据不足' if len(decisive) < 6 else win >= 0.35),
-        'Q4_advisory': (cand['advisory_per_chapter'] - base['advisory_per_chapter']) <= 1.0,
+        'Q4_advisory': ('证据不足' if cand['advisory_per_chapter'] is None or base['advisory_per_chapter'] is None
+                        else (cand['advisory_per_chapter'] - base['advisory_per_chapter']) <= 1.0),
     }
     if base['tell_median'] is not None and cand['tell_median'] is not None:
         gates['Q4_tell'] = (cand['tell_median'] - base['tell_median']) <= 1
@@ -105,4 +115,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except ValueError as exc:
+        sys.exit(str(exc))

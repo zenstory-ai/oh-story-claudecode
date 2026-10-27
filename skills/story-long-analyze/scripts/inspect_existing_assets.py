@@ -424,6 +424,34 @@ def legacy_mapping_check(root: Path, index_rows: list[dict[str, object]]) -> dic
     }
 
 
+def invalid_raw_batches(root: Path) -> list[str]:
+    # Load lazily: the runtime imports this inspector, and owns batch validation.
+    from manage_analysis_run import RunError, completed_batch, load_state, read_index
+
+    state, _ = load_state(root / "_progress.md")
+    batches = [batch for batch in state["batches"].values()
+               if batch["input_kind"] == "raw-original" and batch["status"] in {"completed", "success"}]
+    if not batches:
+        return []
+    try:
+        rows = read_index(root)
+    except RunError:
+        rows = None
+    invalid = []
+    covered = set()
+    for batch in batches:
+        try:
+            valid = completed_batch(root, batch, rows)
+        except RunError:
+            valid = False
+        if valid:
+            covered.update(range(batch["start"], batch["end"] + 1))
+        else:
+            invalid.append(batch)
+    return sorted(batch["batch_id"] for batch in invalid
+                  if not set(range(batch["start"], batch["end"] + 1)) <= covered)
+
+
 def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
     root = root.resolve()
     schema, progress_total, final_state = read_progress(root / "_progress.md")
@@ -431,6 +459,7 @@ def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
     index_chapters, index_errors = read_index_chapters(root / "chapter_index.csv")
     index_identities = read_index_identities(root / "chapter_index.csv")
     managed_state_present, managed_stages = read_managed_stages(progress_text)
+    stale_batches = invalid_raw_batches(root) if managed_state_present else []
 
     summaries, summary_sources, duplicate_summaries = collect_numbered_files(root / "章节", SUMMARY_RE)
     golden, golden_sources, duplicate_golden = collect_numbered_files(root / "章节", GOLDEN_RE)
@@ -525,7 +554,7 @@ def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
         preferred_kinds = {chapter: kind for chapter, kind in preferred_kinds.items() if chapter in expected_set}
     semantic_set = set(preferred_paths)
 
-    full_result_available = usable_upstream_complete or legacy_core
+    full_result_available = (usable_upstream_complete or legacy_core) and not stale_batches
     mixed_sources = len(set(preferred_kinds.values())) > 1
 
     # Files numbered by an older run can drift from the index; this run's golden
@@ -560,7 +589,10 @@ def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
                 if stage not in stage_repairs and not any(item.startswith(stage + "_") for item in stage_repairs):
                     stage_repairs.append(stage)
 
-    if not has_any:
+    if stale_batches:
+        classification = "partial_or_mixed"
+        recommended_path = "continue_partial"
+    elif not has_any:
         classification = "empty"
         recommended_path = "new_analysis"
     elif usable_upstream_complete:
@@ -580,6 +612,7 @@ def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
     conflicts.extend(f"重复摘要：{item}" for item in duplicate_summaries)
     conflicts.extend(f"重复黄金三章：{item}" for item in duplicate_golden)
     conflicts.extend(mapping_conflicts)
+    conflicts.extend(f"受管原文批次需要重新提交：{batch}" for batch in stale_batches)
     if final_state == "completed" and not usable_upstream_complete:
         conflicts.append("进度标记 completed，但当前主产物或上游逐章覆盖不完整")
     if final_state == "completed_with_errors" and not semantic_coverage_complete:
@@ -631,6 +664,7 @@ def inspect(root: Path, expected_override: int | None) -> dict[str, object]:
         "mixed_sources": mixed_sources,
         "stage_repairs": stage_repairs,
         "managed_stage_status": managed_stages,
+        "invalid_raw_batches": stale_batches,
         "chapter_mapping_conflicts": mapping_conflicts,
         "chapter_mapping_blocked_chapters": mapping_blocked_chapters,
         "chapter_mapping_author_message": mapping["author_message"] if mapping else None,

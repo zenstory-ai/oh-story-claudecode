@@ -10,8 +10,8 @@
 | 章节记录 | `逐章记录/第NNN章.md` | 本章对未来连续性有用的紧凑变化；目标 ≤1536 字节，硬上限 3072 字节；导入范围内修订写成覆盖记录 |
 | 派生视图 | `上下文.md`、`角色状态/{角色名}.md`、`伏笔.md`、`时间线/作者真相.md`、`时间线/读者已知.md` | 完全从 `_tracking-state.json` 生成；禁止手改，不作为程序输入 |
 
-Markdown 只负责给作者和 Agent 阅读，工具不再反向解析 Markdown。`check` 直接从 `_tracking-state.json` 重渲染并逐文件比较。未来“第几章揭示”的计划写在卷纲/细纲，不写成时间线既成事实。
-逐章记录只是便于人阅读的紧凑变化记录，不承诺单独无损重建全部当前状态；完整当前语义以 `_tracking-state.json` 为准。
+派生视图只供阅读；`check` 从 `_tracking-state.json` 重渲染比较。未来揭示留在卷纲/细纲。
+逐章记录只存紧凑变化，不能重建完整 state。角色名字段用 JSON 字符串；旧记录按权威身份唯一消歧，否则拒绝 `draft`，须确认原名后显式修订。事务和 state 格式、快照名不变。
 
 ## 运行工具
 
@@ -37,7 +37,7 @@ Markdown 只负责给作者和 Agent 阅读，工具不再反向解析 Markdown�
 
 每本书由 `追踪/.tracking-commit.lock` 串行写事务，`expected_state_revision` 再拒绝基于旧状态构造的 stale transaction。两个不同事务并发时至多一个修订成功。字数记录也在锁内对当前正文和目标重新验证，正文或目标变化会让预先构造的记录直接失败。
 
-事务 JSON 是临时输入，不是项目产物：只写在书目录 `.story/work/` 下（逐章事务放 `.story/work/第NNN章/tracking.json`），不写系统 `/tmp`、书根、`大纲/` 或 `正文/`；成功前必须保留，提交成功后即可删除（`storyctl.py chapter commit` / `accept-current-length` 成功时自动删除该章目录；直接调用 `tracking_commit.py commit` 时由调用方删除。已有字数记录的章节正文或目标改过后，`tracking_commit.py commit` 拒绝修订事务，须走 `storyctl.py chapter commit`）——之后 `check` 失败按下文提交 `mode=revision` 新事务修复，不需要原事务。若文件写入失败，`_tracking-state.json` 尚未推进；修正环境后直接重跑**同一份** `commit`。append 重跑只接受内容完全相同的既有逐章记录，不维护 `dirty/pending/repair` 状态机。
+事务 JSON 仅作临时输入，放在书目录 `.story/work/`（逐章为 `.story/work/第NNN章/tracking.json`），不写系统 `/tmp`、书根、`大纲/`、`正文/`。成功前保留；两个 `storyctl.py chapter` 提交入口成功后自动删该章目录，直接 `tracking_commit.py commit` 由调用方删。正文或目标改过且已有字数记录时，修订须走 `storyctl.py chapter commit` 重测。提交后 `check` 失败按下文以新 revision 修复，不需原事务；写入失败且权威未推进时，修订恢复原记录（新覆盖记录撤销），修正环境后重跑同一事务。append 重跑只收完全相同的既有记录，不另设恢复状态机。
 
 校验失败与写入失败处理方式不同：校验失败（字段非法、退役结构、容量超限）要按报错改事务本身，重跑同一份结果不变。派生视图被手改或外部改动导致 `check` 报 `derived view differs from _tracking-state.json` 时，重新提交**该章**的 `mode=revision` 事务让工具整份重建，`expected_state_revision` 取 `追踪/_tracking-state.json` 的 `state_revision` 字段——`check` 失败时只往 stderr 打 ERROR，不输出 JSON；不手改派生文件，也不删 `_tracking-state.json` 重来。手写出的逐章记录会让同章 `append` 永久报 `chapter delta N already exists with different content`——删掉那个手写文件后重跑原事务即可。
 

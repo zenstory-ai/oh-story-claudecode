@@ -35,12 +35,21 @@ Codex 主机**必须**用独立的 `CODEX_HOME`：目录里只放一个指向 `~
 | `deploy.py deploy --pkg <包> --host claude-code\|codex --proj <项目>` | 按 story-setup 部署清单确定性部署（skills、agents、hooks、rules、入口文档、部署标记），不经过模型 |
 | `run.py --case <用例> --pkg <包> --host <主机> --out <runs目录> [--label <标签>]` | 复制 fixture、部署、`git init`，按 `cases.json` 的轮次跑真实会话；作者被问到时按 `follow_up` 回答，直到提交够章数 |
 | `judge.py [--judge agy\|claude\|codex] coverage\|pairwise ...` | 评委（默认 Antigravity 上的 Gemini；必须与写手不同家族）逐条核对情节点是否落地、列越界新增；两版配对盲评，交换顺序各评一次，两次一致才算胜负；两版细纲不同时各附各的细纲 |
-| `compare.py --base ... --cand ... --coverage ... --pairwise ...` | 汇总两个版本的效率与质量，按非劣效门槛给出通过/不通过 |
+| `compare.py --base ... --cand ... --coverage ... --pairwise ... [--judge agy\|claude\|codex]` | 汇总两个版本的效率与质量，按非劣效门槛给出通过/不通过；评委选项须与生成评估时相同（默认 agy） |
 | `metrics.py <run目录>... [--table] [--tell <tell仓库>]` | 每章平均墙钟、累计输入/输出 token、主会话调用、工具调用、子 agent 次数、上下文峰值、压缩次数；每章字数、首次字数检查结论、检测器命中；给 `--tell` 时加人类区间越界项数 |
 
 `--tell` 可不给；给时要指向一个外部私有仓库，用到其中的 `detectors/human_ref_check.py`。
 
 Claude Code 主机默认用隔离 HOME，会话与子 agent 转录都在 `<run>/home/.claude/projects/` 下，`metrics.py` 从那里取 token。隔离 HOME 只适合用 `env_files` 传凭据的第三方端点；用本机登录的 Claude 时在 hosts.json 里写 `"real_home": true`：沿用真实 HOME 取凭据，以 `--setting-sources project,local` 挡住用户级设置、插件与 CLAUDE.md，每轮结束把转录复制进运行目录。Codex 主机用独立 CODEX_HOME（复用登录），token 取自 `--json` 输出的 `turn.completed`。
+
+## 评估结果与缓存
+
+- 普通 `coverage` 评估情节点兑现与越界新增，供 `compare.py` 的 Q1/Q2 使用。`coverage --strict` 只观察 scene / summary / missing，没有越界检查，不能当成普通评估交给 Q1/Q2；两种结果可存在同一目录，比较器只读取本次输入对应的普通评估。
+- 响应字段、枚举或必需观察缺失时记为 `status: invalid`，命令退出 1；配对结果的 `final` 为 null，不是 tie。两轮有效但胜负不一致仍按原协议记平局。失败进程即使 stdout 有 JSON 也不是有效评估。
+- 缓存文件按模式与内容指纹命名，指纹绑定协议版本、完整提示词、评委模型、运行绝对路径与元数据、正文和细纲；配对还绑定双方身份与两轮顺序。只复用完整有效且指纹匹配的结果；损坏、无效结果重跑原命令即可重新评估，不会自动追加收费重试。
+- 比较器只消费本次运行、文本与所选评委对应的结果，缺失或失效时报错，不把缺少评估当成零分或零越界。旧版无身份指纹的缓存保留但不再可信复用，需要重新生成；移动运行目录也会让原缓存失效。
+- 同一宿主、用例、章号每侧只接受一份运行；重复实验分别调用 pairwise，避免静默覆盖。离线回归用 `python3 scripts/test-bench-evaluation.py`，不需要凭据或模型额度。
+
 
 ## 用例
 

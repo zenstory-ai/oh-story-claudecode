@@ -23,6 +23,7 @@ import argparse
 import json
 import os
 import re
+import stat
 import sys
 import tempfile
 from pathlib import Path
@@ -55,13 +56,13 @@ def end_marker(host: str) -> str:
 
 def block_re(host: str) -> re.Pattern[str]:
     return re.compile(
-        r"^<!-- oh-story:" + re.escape(host) + r" 开始[^\n]*-->\n.*?^<!-- oh-story:"
-        + re.escape(host) + r" 结束 -->[ \t]*$",
+        r"^<!-- oh-story:" + re.escape(host) + r" 开始[^\r\n]*-->\r?\n.*?^<!-- oh-story:"
+        + re.escape(host) + r" 结束 -->[ \t]*(?=\r?$)",
         re.S | re.M,
     )
 
 
-ANY_BEGIN_RE = re.compile(r"^<!-- oh-story:([a-z-]+) 开始[^\n]*-->$", re.M)
+ANY_BEGIN_RE = re.compile(r"^<!-- oh-story:([a-z-]+) 开始[^\r\n]*-->(?=\r?$)", re.M)
 
 
 def render_block(template: str, host: str, project_name: str) -> str:
@@ -81,7 +82,7 @@ def protected_spans(text: str) -> list[tuple[int, int]]:
     spans = []
     for match in ANY_BEGIN_RE.finditer(text):
         host = match.group(1)
-        end = re.compile(r"^<!-- oh-story:" + re.escape(host) + r" 结束 -->[ \t]*$", re.M).search(text, match.end())
+        end = re.compile(r"^<!-- oh-story:" + re.escape(host) + r" 结束 -->[ \t]*(?=\r?$)", re.M).search(text, match.end())
         if end is None:
             raise MergeError(f"unterminated oh-story:{host} block")
         spans.append((match.start(), end.end()))
@@ -178,19 +179,15 @@ def strip_legacy(text: str, template: str) -> tuple[str, int | None, list[str]]:
     return new_text, insert_at, removed_titles
 
 
-def tidy(text: str) -> str:
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip("\n") + "\n"
-
-
 def merge(existing: str, template: str, host: str, project_name: str) -> tuple[str, dict]:
-    block = render_block(template, host, project_name)
-    crlf = existing.count("\r\n") > existing.count("\n") / 2 if existing else False
-    text = existing.replace("\r\n", "\n")
+    bom = "\ufeff" if existing.startswith("\ufeff") else ""
+    text = existing[len(bom):]
+    newline = "\r\n" if text.count("\r\n") > text.count("\n") / 2 else "\n"
+    block = render_block(template, host, project_name).replace("\n", newline)
     report: dict = {"host": host, "removed_legacy_sections": []}
-    if not text.strip():
+    if not text:
         report["status"] = "created"
-        merged = block + "\n"
+        merged = block + newline
     else:
         protected_spans(text)  # 先校验已有块都闭合
         pattern = block_re(host)
@@ -199,32 +196,31 @@ def merge(existing: str, template: str, host: str, project_name: str) -> tuple[s
             raise MergeError(f"more than one oh-story:{host} block")
         if matches:
             report["status"] = "replaced"
-            merged = tidy(text[: matches[0].start()] + block + text[matches[0].end():])
+            merged = text[:matches[0].start()] + block + text[matches[0].end():]
         else:
             stripped, insert_at, removed = strip_legacy(text, template)
             if insert_at is None:
                 report["status"] = "appended"
-                merged = tidy(text.rstrip("\n") + "\n\n" + block)
+                separator = "" if text.endswith(("\n\n", "\n\r\n")) else (
+                    newline if text.endswith("\n") else newline * 2
+                )
+                merged = text + separator + block + newline
             else:
                 report["status"] = "migrated"
                 report["removed_legacy_sections"] = removed
                 before, after = stripped[:insert_at], stripped[insert_at:]
-                merged = tidy(
-                    (before.rstrip("\n") + "\n\n" if before.strip() else "")
-                    + block
-                    + ("\n\n" + after.lstrip("\n") if after.strip() else "")
-                )
-    if crlf:
-        merged = merged.replace("\n", "\r\n")
-    return merged, report
+                merged = before + block + newline + after
+    return bom + merged, report
 
 
 def atomic_write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o644
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
             handle.write(text)
+        os.chmod(tmp, mode)
         os.replace(tmp, path)
     except BaseException:
         try:
@@ -244,7 +240,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         template = args.template.read_text(encoding="utf-8")
-        existing = args.existing.read_text(encoding="utf-8") if args.existing.is_file() else ""
+        if args.existing.is_file():
+            with args.existing.open(encoding="utf-8", newline="") as handle:
+                existing = handle.read()
+        else:
+            existing = ""
         merged, report = merge(existing, template, args.host, args.project_name)
         unchanged = merged == existing and args.output.resolve() == args.existing.resolve()
         if not unchanged:

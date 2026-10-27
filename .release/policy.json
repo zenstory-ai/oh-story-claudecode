@@ -77,6 +77,15 @@
       ]
     },
     {
+      "file": "dashboard.yml",
+      "jobs": [
+        "api (ubuntu-latest)",
+        "api (macos-latest)",
+        "api (windows-latest)",
+        "e2e (ubuntu)"
+      ]
+    },
+    {
       "file": "validate-clawhub.yml",
       "jobs": [
         "guard-central-ref",

@@ -22,6 +22,26 @@ function run(args) {
 }
 
 try {
+  for (const [name, bytes] of [
+    ["gbk", Buffer.from("c4e3bac32d2dcac0bde7", "hex")],
+    ["utf16le", Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("正文--继续", "utf16le")])],
+    ["truncated-utf8", Buffer.concat([Buffer.from("正文--"), Buffer.from([0xe4, 0xb8])])],
+  ]) {
+    const file = path.join(tmpDir, `${name}.md`);
+    fs.writeFileSync(file, bytes);
+    for (const args of [["--check", file], [file]]) {
+      const result = run(args);
+      assert.strictEqual(result.status, 2, `${name}: ${result.stdout}${result.stderr}`);
+      assert.match(result.stderr, /utf-8/i);
+      assert.deepStrictEqual(fs.readFileSync(file), bytes, `${name}: invalid bytes must remain untouched`);
+    }
+  }
+
+  const bom = path.join(tmpDir, "bom.md");
+  fs.writeFileSync(bom, "\ufeff# 正文\r\n原文�--继续。\r\n", "utf8");
+  assert.strictEqual(run([bom]).status, 0);
+  assert.deepStrictEqual(fs.readFileSync(bom), Buffer.from("\ufeff# 正文\r\n原文�，继续。\r\n"));
+
   const prose = path.join(tmpDir, "prose.md");
   const original = [
     "---",

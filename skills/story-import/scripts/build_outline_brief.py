@@ -18,8 +18,8 @@
   `outline_view.py --unit` 也用它），任务包取得到的单元，写正文时也取得到。
 本书设定与作者已定的事不进包，执行者按规则定点读项目文件与 `.story/work/导入记录.md`。
 
-批大小按总量定：请求 10–20 章（全书最后一批可以更少）；执行者要读的总量（任务包 + 没有摘要、
-只能读正文的章）超过约 25K 字时，从请求范围末尾往前少排几章（可少于 10 章，至少 1 章）。
+批大小按总量定：请求 10–20 章（全书最后一批可以更少）；读取量包括任务包，
+以及摘要缺失/证据不全时按全章计的正文补读上限。超过约 25K 字时从末尾少排几章（可少于 10 章，至少 1 章）。
 
 stdout 输出一行 JSON：任务包路径、本批实际章节范围与下一批起点、执行者要读的总量 chars（去空白）、
 本批每章长度、没找到摘要的章。
@@ -167,15 +167,18 @@ def summary_points(text: str) -> list[str]:
     return points
 
 
-def summary_lines(text: str) -> list[str]:
+def summary_lines(text: str) -> tuple[list[str], bool]:
     blocks = label_blocks(text)
     out = []
+    complete = True
     for name, aliases in SUMMARY_FIELDS:
         raw = next((blocks[key] for key in (name, *aliases) if blocks.get(key)), "")
-        out.append(f"- {name}：{flatten(raw) or '（摘要未写）'}")
+        value = flatten(raw)
+        complete = complete and bool(value) and value != "[待补充]"
+        out.append(f"- {name}：{value or '（摘要未写）'}")
     points = summary_points(text)
     out.append("- 情节点（标题｜类型｜基调）：" + ("；".join(points) if points else "（摘要里没有可读的情节点）"))
-    return out
+    return out, complete and bool(points)
 
 
 def previous_hook(analysis: Path, chapter: int) -> str | None:
@@ -198,9 +201,12 @@ def chapter_block(project: Path, analysis: Path, chapter: int, first: int) -> tu
         head.append(f"- 上一章（第{chapter - 1}章）章尾钩子：{hook}")
     summary = analysis / "章节" / f"第{chapter}章_摘要.md"
     if summary.is_file():
+        evidence, complete = summary_lines(summary.read_text(encoding="utf-8-sig"))
         lines = [f"- 摘要要点（抽自 `{shown_path(summary, project.parent)}`）："] + [
-            "  " + line for line in summary_lines(summary.read_text(encoding="utf-8").lstrip("﻿"))]
-        return "\n".join(head + lines), actual, 0, False
+            "  " + line for line in evidence]
+        if not complete:
+            lines.append("- 摘要要点不全；可能补读的正文已按全章计入本批读取量，优先用现有证据。")
+        return "\n".join(head + lines), actual, 0 if complete else weight(body_text), False
     note = "- 摘要：未找到，读该章正文反推，证据不足处写 [待补充]"
     return "\n".join(head + [note]), actual, weight(body_text), True
 
@@ -213,6 +219,7 @@ def unit_cards(project: Path, first: int, last: int) -> list[str]:
     if not volumes:
         raise SystemExit("ERROR: 大纲/ 下没有卷纲，先在结构迁移时刻写定卷纲")
     out: list[str] = []
+    coverage = {chapter: 0 for chapter in range(first, last + 1)}
     for volume in volumes:
         lines, sections = parse_volume(volume.read_text(encoding="utf-8-sig"))
         for section in sections:
@@ -221,6 +228,8 @@ def unit_cards(project: Path, first: int, last: int) -> list[str]:
             span = unit_chapter_range([section], section.unit)
             if span is None or span[0] > last or span[1] < first:
                 continue
+            for chapter in range(max(first, span[0]), min(last, span[1]) + 1):
+                coverage[chapter] += 1
             end = next((other.start for other in sections
                         if other.start > section.start and other.level <= section.level), len(lines))
             out += [f"来源：`{project.name}/大纲/{volume.name}`", "", *lines[section.start:end], ""]
@@ -228,6 +237,11 @@ def unit_cards(project: Path, first: int, last: int) -> list[str]:
         raise SystemExit(f"ERROR: 卷纲里找不到章节范围覆盖第{first}-{last}章的剧情单元卡（卡标题下一行写"
                          "「> 作用域：单元级 {单元ID}」，卡里写「- 章节范围：第A-B章」），先补卷纲，"
                          "再用 outline_view.py --check --strict 核对")
+    missing = [str(chapter) for chapter, count in coverage.items() if count == 0]
+    duplicate = [str(chapter) for chapter, count in coverage.items() if count > 1]
+    if missing or duplicate:
+        raise SystemExit(f"ERROR: 卷纲剧情单元缺覆盖：{','.join(missing) or '无'}；"
+                         f"重复覆盖：{','.join(duplicate) or '无'}；每章必须只属一张卡，先修卷纲")
     return out
 
 

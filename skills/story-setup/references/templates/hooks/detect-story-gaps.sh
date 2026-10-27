@@ -41,7 +41,7 @@ for BOOK_DIR in "${BOOK_DIRS[@]}"; do
   # `|| true` + 数字兜底不能省：子目录不可读时 find 会退 1，pipefail 把它变成整条管道的
   # 退出码，set -e 就在这里终止脚本——OUTPUT 到文末才 flush，所有警告连 stderr 一起丢光。
   if [ -d "$BOOK_DIR/正文" ]; then
-    CHAPTER_COUNT=$(find "$BOOK_DIR/正文" -name "*.md" 2>/dev/null | wc -l | tr -d ' ' || true)
+    CHAPTER_COUNT=$(find "$BOOK_DIR/正文" -name "*.md" ! -name "*_原稿_*" 2>/dev/null | wc -l | tr -d ' ' || true)
     case "$CHAPTER_COUNT" in ''|*[!0-9]*) CHAPTER_COUNT=0 ;; esac
   elif [ -f "$BOOK_DIR/正文.md" ]; then
     CHAPTER_COUNT=1

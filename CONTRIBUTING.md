@@ -139,6 +139,7 @@ bash scripts/test-prose-net-parity.sh
 bash scripts/test-story-continuity.sh
 python3 scripts/test-storyctl.py
 python3 scripts/test-author-memory-commit.py
+python3 scripts/test-bench-evaluation.py
 bash scripts/check-story-setup-deployment.sh
 python3 scripts/test-plugin-packaging.py
 bash scripts/check-claude-adapter.sh

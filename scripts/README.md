@@ -5,7 +5,7 @@
 - 绝大多数由 CI 自动跑（`.github/workflows/cross-platform.yml`）。提交前完整的本地验证命令见 [CONTRIBUTING.md](../CONTRIBUTING.md)「CI 检查」。
 - **改名 / 移动任一脚本**，要同步改 `.github/workflows/*.yml`、`CONTRIBUTING.md`、本文件，以及调用它的兄弟脚本（见下方「何时跑」里的调用关系）。
 
-`python scripts/test-writer-pipeline.py` 验证长篇取段器与 prompt 组装器的公开 CLI：存量卷纲、作用域、退役历史、原生路径、必需资料与召回降档；在三平台 CI 运行。
+`python scripts/test-writer-pipeline.py` 验证长篇取段器与 prompt 组装器的公开 CLI：存量卷纲、作用域、退役历史、原生路径、必需资料、召回降档，以及导入单元唯一覆盖、摘要不足时的正文补读预算；在三平台 CI 运行。
 
 `python scripts/test-long-analyze-runtime.py` 验证长篇拆文的单状态运行时：机械章节索引与逐章 hash、旧成果识别、只读计划、范围批次、兼容摘要投影、相邻拆分、原子提交和缓存恢复。实际运行只使用 `skills/story-long-analyze/scripts/` 下三个脚本：`build_chapter_index.py`、`inspect_existing_assets.py`、`manage_analysis_run.py`。测试还覆盖旧版（带「章节边界」表）拆文库遇到楔子时的章号核对与并入出路、Windows/GBK 控制台下的 UTF-8 输出，以及 `render_relation_chart.py` 在没有中文字体时只写 Markdown 关系图、不出拼音图。
 
@@ -53,13 +53,14 @@
 | `check-reference-gates.js` | 长短篇「写前必读」的首屏位置、关键路由、长篇「记下本轮约束」锚点、短篇交付预检命令与写正文只靠设计文件交接（不回查构思方法论、「像」不设硬上限）的静态守卫（gate 是提示词，无运行时入口可断言） | Linux / Windows / macOS CI |
 | `test-outline-contract.js` | 长篇细纲结构验收：字段、小节、五段式、四列情节点表、字数口径与「契约风险」取值的正负例回归 | Linux / Windows / macOS CI |
 | `test-degeneration.sh` | 模型退化检测器 `check-degeneration.js` 回归 | CI |
-| `test-prose-net-parity.sh` | 正文兜底「轻量确定性网」、写正文守卫与命令目标抽取的 JS 核 / Codex Python / Claude bash parity | CI |
-| `test-prose-backstop-hook.sh` | `check-prose-after-write.sh` 回归 | CI |
+| `test-prose-net-parity.sh` | 正文兜底、守卫、子 shell/cd 目标解析、原稿备份排除的 JS 核 / Codex Python / Claude bash parity | CI |
+| `test-prose-backstop-hook.sh` | 写后内容网、活跃正文与回炉原稿区分、白名单及复扫指引 | CI |
 | `test-story-continuity.sh` | `detect-story-gaps.sh` 跨批连续性兜底回归 | CI |
 | `test-tracking-commit.py` | 单权威追踪行为：原子 state、字数事件链、hash 失效、激活边界、幂等与并发提交 | CI |
-| `test-storyctl.py` | `visible_chars_v1`、双层区间与作者范围、「字数目标」两端解析一致、章节检查状态与去味豁免、提交记录与 demo 同口径证据 | Linux / Windows / macOS CI |
+| `test-storyctl.py` | `visible_chars_v1`、双层区间与作者范围、字数记录边界、目标两端解析一致、工具故障阻断、去味豁免与提交记录 | Linux / Windows / macOS CI |
 | `test-chapter-completion-lifecycle.py` | 公开 CLI 的 checkpoint、正常提交、欠长接受、超长单次压缩区间、blocking quality 阻断与下一章继续 | Linux / Windows / macOS CI |
-| `test-author-memory-commit.py` | 工作区作者记忆行为：单事件回执、交写手的行 ≤2KB 且漏项全数列出、证据候选、冲突替代、撤回、失败零写入、旧修订、幂等重放与派生修复 | CI |
+| `test-author-memory-commit.py` | 工作区作者记忆行为：单事件回执、交写手的行 ≤2KB 且漏项全数列出、证据候选、冲突替代、撤回、失败零写入、旧修订、幂等重放、跨进程提交与派生修复 | CI |
+| `test-bench-evaluation.py` | 离线基准评估：普通/严格格式分离、无效响应不算平局、交换盲评顺序、失败重跑与按文本/模型/协议/运行身份失效的缓存；不调用真实模型 | Linux / Windows / macOS CI |
 | `test-codex-hooks.sh` | Codex hook 合成 stdin/stdout 契约 | CI |
 | `test-static-check.py` | 真 frontmatter block、精确路径/锚点、跨 Skill 引用、fence、死 reference、Agent 与章节链接 fixture | CI |
 | `test-current-skill-contracts.py` | current-contract manifest 类型/固定值与主产物 fail-fast 语义 fixture | CI |
@@ -69,7 +70,7 @@
 | `test-claude-plugin-lifecycle.py` | 隔离 HOME 后用真实 Claude CLI 演练 13 个旧身份迁移为单 bundle、更新/卸载及无关插件保留 | `CLAUDE_REAL_CHECK=1`，由 `check-claude-adapter.sh` 调用 |
 | `test-shared-assets.py` | 共享资产 manifest 的 drift、sync、路径越界、basename 单一 owner 与未登记重复检测 | CI |
 | `test-shared-references.py` | reference manifest 的别名、目录组、drift/sync、未登记副本与 Agent 消费链回归 | CI |
-| `test-normalize-punctuation.js` | 标点归一化的只读检查、frontmatter/fence、CRLF、引号模式与幂等性 | CI |
+| `test-normalize-punctuation.js` | 标点归一化的 UTF-8 拒绝与原字节保留、只读检查、frontmatter/fence、CRLF、引号模式与幂等性 | CI |
 | `test-scan-runtime.js` | CDP argv 边界/报错/JSON 契约与 7 个 scraper 无副作用 import；七猫、起点书库翻页（名次跨页、去重、空页停止、部分失败、参数校验）与起点反爬字体解码 | CI |
 | `test-scan-aggregate.py` | 扫榜聚合 `aggregate-rank.js`：七个平台采集格式与手动榜单的题材/热度口径/字数分桶/标签解析、同书跨榜去重、采集问题上浮、样本不足标注、抽样取回原文、跳过非榜单文件、700 条级输入压到五分之一以下、没有热度的书库新书不拖掉平台热度口径 | Linux / Windows / macOS CI |
 | `test-scan-runtime-policy.py` | 变异验证 scan/browser 静态策略不会被无关或死代码关键词骗过 | CI；改 `check-scan-runtime-policy.sh` 后 |
@@ -78,11 +79,11 @@
 | `test-zcode-hooks.sh` | ZCode 严格 JSON Hook、正文守卫与连续性回归 | CI |
 | `test-antigravity-hooks.mjs` | Antigravity 实际注册命令的 shell/字面 argv 兼容性（空格与中文项目路径）、Hook I/O、正文守卫、artifact 桥接与 Stop 单次续跑 | CI（Linux/Windows/macOS） |
 | `test-antigravity-hook-merge.py` | `.agents/hooks.json` 顶层 `oh-story` 管理组替换、用户组保留与幂等回归 | 被 `check-antigravity-adapter.sh` 调用 |
-| `test-antigravity-skills-deploy.py` | Antigravity 13 个已知 Skill 原子物化、未知 Skill 保留、symlink fail-closed/显式迁移与防穿透写回归 | 被 `check-antigravity-adapter.sh` 调用 |
+| `test-antigravity-skills-deploy.py` | 13 个已知 Skill 物化、未知 Skill 保留、symlink 边界、已有备份拒绝与双重失败恢复数据保全 | 被 `check-antigravity-adapter.sh` 调用 |
 | `test-charcount-portable.sh` | 跨平台字符统计命令在三平台 + Windows 的正确性 | CI（调 check-python-invocation） |
 | `test-hook-encoding-portable.sh` | 部署 hook 在 Windows 中文系统的编码健壮性 | CI |
-| `test-long-analyze-runtime.py` | 长篇拆文索引、旧成果直接使用/增强/续跑路由、旧章号与楔子对齐、无重叠原文块、批次提交与恢复、关系图中文字体回退 | CI；改 story-long-analyze 运行时后 |
-| `test-inspiration-index.py` | 三层灵感库索引：EM 卡登记幂等、专名泄漏拦截、NM/CBA 闭包与计数、卡内路径引用拒绝、标签检索 | CI；改 inspiration_index.py 或灵感库契约后 |
+| `test-long-analyze-runtime.py` | 拆文索引、旧成果路由、章号与楔子对齐、批次提交与恢复、重建后检查/digest 失效、关系图字体回退 | CI；改 story-long-analyze 运行时后 |
+| `test-inspiration-index.py` | 灵感库登记幂等、泄漏拦截、NM 来源去重、NM/CBA 闭包与计数、精确验证状态、路径拒绝与标签检索 | CI；改 inspiration_index.py 或灵感库契约后 |
 | `test-opencode-cli-e2e.sh` | 真实 OpenCode 2.x CLI e2e：repo skills 发现 / 13 commands / 7 agents / 插件 active，并用 mock 模型在后台服务上验证写正文拦截、写后兜底与 compaction 注入 | CLI compatibility CI；需已安装 OpenCode 2.x（`@opencode/cli`） |
 | `opencode-mock-llm.mjs` | OpenAI 兼容 mock 模型：按剧本文件发出工具调用并记录请求，供上面两个真实 OpenCode 测试驱动运行时 | 被 `test-opencode-cli-e2e.sh`、`test-agent-permissions.py --opencode` 调用 |
 | `test-skill-numbering.sh` | Step 重排级联安全、锚点 fail-closed、代码块引用、验证零写入/提交回滚、dry-run/write/幂等性 | Linux / Windows Git Bash / macOS CI |

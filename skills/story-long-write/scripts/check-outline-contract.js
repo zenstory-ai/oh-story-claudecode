@@ -131,7 +131,19 @@ function makeCheck(id, ok, file, evidence, expected, repair, severity = 'blockin
 function parseTableRow(line) {
   const trimmed = line.trim()
   if (!trimmed.startsWith('|') || !trimmed.endsWith('|')) return null
-  return trimmed.slice(1, -1).split('|').map((cell) => cell.replace(/\*\*/g, '').replace(/`/g, '').trim())
+  const raw = trimmed.slice(1, -1)
+  const cells = []
+  let start = 0
+  let escaped = false
+  for (let index = 0; index < raw.length; index++) {
+    if (raw[index] === '|' && !escaped) {
+      cells.push(raw.slice(start, index))
+      start = index + 1
+    }
+    escaped = raw[index] === '\\' && !escaped
+  }
+  cells.push(raw.slice(start))
+  return cells.map((cell) => cell.replace(/\*\*/g, '').replace(/`/g, '').trim())
 }
 
 function resolveBookRoot(file, projectRoot) {
@@ -204,10 +216,8 @@ function verify(file, projectRoot = null) {
   // 盲评 3/3 胜过不补；补满五个字段与只补这两个不可区分。所以这两个字段不接受占位符，
   // 其余字段仍按契约允许 [待补充]。
   const hollow = INTENT_FIELDS.filter((field) => {
-    const match = text.match(new RegExp(`^\\s*[-*+]\\s*\\*{0,2}${field.replace('/', '\\/')}\\*{0,2}\\s*[：:]\\s*(.*)$`, 'm'))
-    if (!match) return false
-    const value = match[1].replace(/\[待补充\]/g, '').replace(/[\s、，,。;；]/g, '')
-    return value.length === 0
+    return fieldValues(text, field).some((value) =>
+      value.replace(/\[待补充\]/g, '').replace(/[\s`、，,。;；]/g, '').length === 0)
   })
   checks.push(makeCheck(
     'outline.intent-fields-substantive',
@@ -240,62 +250,72 @@ function verify(file, projectRoot = null) {
 
   const lines = text.split(/\r?\n/)
   let header = null
-  for (const line of lines) {
+  let plotLevel = 0
+  const rows = []
+  const malformedRows = []
+  for (const [index, line] of lines.entries()) {
     const cells = parseTableRow(line)
-    // 现行模板默认四列（# / 情节点 / 功能标签 / 执行边界（禁＋放）），需要时在功能标签后加「分辨率」列成五列。
-    // 两种都收：功能标签固定在第 3 列，执行边界一律取最后一列。
-    if (cells && (cells.length === 4 || cells.length === 5) && PLOT_HEADER_FIRST.test(cells[0])) {
-      header = cells
-      break
+    if (header) {
+      if (!cells) break
+      if (cells.length === header.length && cells.every((cell) => /^:?-{3,}:?$/.test(cell))) continue
+      if (cells.length === header.length && /^\d+$/.test(cells[0])) rows.push(cells)
+      else malformedRows.push(index + 1)
+      continue
     }
+    const heading = line.match(/^(#{1,6})\s*(.*)$/)
+    if (heading) {
+      if (plotLevel && heading[1].length <= plotLevel) break
+      if (!plotLevel && /^#{3,4}$/.test(heading[1]) && /^情节细化/.test(heading[2])) plotLevel = heading[1].length
+      continue
+    }
+    if (!plotLevel) continue
+    // 四列默认，五列在功能标签后加「分辨率」；只消费本小节这一张表。
+    if (cells && (cells.length === 4 || cells.length === 5) && PLOT_HEADER_FIRST.test(cells[0])) header = cells
   }
   const headerOk = Boolean(header)
     && header[2].includes('功能标签')
     && header[header.length - 1].includes('执行边界')
     && (header.length === 4 || header[3].includes('分辨率'))
+  const tableOk = headerOk && rows.length > 0 && malformedRows.length === 0
   checks.push(makeCheck(
     'outline.plotpoint-table',
-    headerOk,
+    tableOk,
     name,
-    header ? `表头：${header.join(' | ')}` : '未找到 | # | 情节点 | 功能标签 | [分辨率] | 执行边界 | 表头',
-    '情节细化使用表格：# / 情节点（谁做了什么） / 功能标签 / 执行边界（禁＋放）；需要时可在功能标签后加「分辨率」列',
-    '只把情节点序列改成这张表，逐点补功能标签与执行边界；不增删情节点本身。'
+    !header ? '未找到情节细化表头'
+      : malformedRows.length ? `情节点列数或编号错误行：${malformedRows.join('、')}`
+        : rows.length ? `表头：${header.join(' | ')}；${rows.length} 个情节点`
+          : '情节细化表只有表头，没有情节点',
+    '情节细化表至少一个编号数据行，逐行列数须与表头一致：# / 情节点 / 功能标签 / [分辨率] / 执行边界',
+    '只按既定剧情补缺失行或修正报告行的列数和编号，不新增情节。'
   ))
 
   // 「放」半边：五列表或表头写明「禁＋放」的四列表，执行边界必须至少一个点解除限制，
   // 全是禁令的情节点表实测会把整章压成同一个温度（015 章十一个点全「不许」）。表头没写「禁＋放」的四列表不追溯。
-  if (headerOk && (header.length === 5 || /放/.test(header[header.length - 1]))) {
-    const rows = []
-    for (const line of lines) {
-      const cells = parseTableRow(line)
-      if (cells && cells.length === header.length && /^\d+$/.test(cells[0])) rows.push(cells)
-    }
-    if (rows.length) {
-      const released = rows.filter((cells) => {
-        const match = cells[cells.length - 1].match(/(?:^|[。；;\s])放\s*[：:]([^]*?)(?=(?:禁|放)\s*[：:]|$)/)
-        if (!match) return false
-        const value = match[1].replace(/[\s。；;，,、\[\]【】]/g, '')
-        return value.length > 0 && !/^(?:无|暂无|待补充|待定|无缺口)$/.test(value)
-      })
+  if (tableOk && (header.length === 5 || /放/.test(header[header.length - 1]))) {
+    const released = rows.filter((cells) => {
+      const match = cells[cells.length - 1].match(/(?:^|[。；;\s])放\s*[：:]([^]*?)(?=(?:禁|放)\s*[：:]|$)/)
+      if (!match) return false
+      const value = match[1].replace(/[\s。；;，,、\[\]【】]/g, '')
+      return value.length > 0 && !/^(?:无|暂无|待补充|待定|无缺口)$/.test(value)
+    })
+    checks.push(makeCheck(
+      'outline.plotpoint-release',
+      released.length > 0,
+      name,
+      `${rows.length} 个情节点里 ${released.length} 个写了「放」`,
+      '执行边界写成「禁＋放」两半，每章至少一个点写了「放」——放行是解除限制，不是义务',
+      '给最该出彩的一两个点补「放」半边（谁可以出声、谁可以失态、允不允许当场标价），不改情节点本身。'
+    ))
+    if (released.length > 0 && rows.length >= 3 && released.length * 3 < rows.length) {
       checks.push(makeCheck(
-        'outline.plotpoint-release',
-        released.length > 0,
+        'outline.plotpoint-release-ratio',
+        false,
         name,
-        `${rows.length} 个情节点里 ${released.length} 个写了「放」`,
-        '执行边界写成「禁＋放」两半，每章至少一个点写了「放」——放行是解除限制，不是义务',
-        '给最该出彩的一两个点补「放」半边（谁可以出声、谁可以失态、允不允许当场标价），不改情节点本身。'
+        `${rows.length} 个情节点里只有 ${released.length} 个写了「放」（不足三分之一）`,
+        '建议至少三分之一的情节点写「放」半边，避免整章只剩禁令',
+        '按人工判断酌情补「放」；本项不阻断。',
+        'advisory'
       ))
-      if (released.length > 0 && rows.length >= 3 && released.length * 3 < rows.length) {
-        checks.push(makeCheck(
-          'outline.plotpoint-release-ratio',
-          false,
-          name,
-          `${rows.length} 个情节点里只有 ${released.length} 个写了「放」（不足三分之一）`,
-          '建议至少三分之一的情节点写「放」半边，避免整章只剩禁令',
-          '按人工判断酌情补「放」；本项不阻断。',
-          'advisory'
-        ))
-      }
     }
   }
 

@@ -102,6 +102,26 @@ class VisibleCharsTests(unittest.TestCase):
             "INVALID_TARGET",
         )
 
+    def test_record_status_and_resolution_follow_count_boundaries(self) -> None:
+        for actual, status in ((849, "under"), (850, "borderline"), (879, "borderline"),
+                               (880, "internal_pass"), (1120, "internal_pass"),
+                               (1121, "borderline"), (1150, "borderline"), (1151, "over")):
+            record = {"metric": storyctl.METRIC, "target": 1000, "actual": actual, "status": status,
+                      "resolution": "within_user_band" if status in {"internal_pass", "borderline"}
+                      else "accepted_current_length", "body_sha256": "0" * 64}
+            self.assertEqual(storyctl.normalize_wordcount_record(record), record)
+            with self.assertRaises(storyctl.WordcountError):
+                storyctl.normalize_wordcount_record({**record, "status": "invalid"})
+            opposite = "accepted_current_length" if record["resolution"] == "within_user_band" else "within_user_band"
+            with self.assertRaises(storyctl.WordcountError):
+                storyctl.normalize_wordcount_record({**record, "resolution": opposite})
+        for actual, status in ((949, "under"), (950, "internal_pass"),
+                               (1010, "internal_pass"), (1011, "over")):
+            record = {"metric": storyctl.METRIC, "target": 1000, "actual": actual, "status": status,
+                      "resolution": "within_user_band" if status == "internal_pass" else "accepted_current_length",
+                      "body_sha256": "0" * 64, "author_range": {"min": 950, "max": 1010}}
+            self.assertEqual(storyctl.normalize_wordcount_record(record), record)
+
 
 class OutlineTargetTests(unittest.TestCase):
     def test_outline_target_accepts_utf8_bom_and_crlf(self) -> None:
@@ -515,6 +535,20 @@ class ToolFailureTests(unittest.TestCase):
         unnormalized = self._quality_with("normalize-punctuation.js", 1, "x.md:1:1: ascii-comma: 半角逗号")
         self.assertEqual(unnormalized["status"], "fail", unnormalized)
         self.assertEqual(unnormalized["blocking_findings"][0]["type"], "PUNCTUATION_NOT_NORMALIZED")
+
+    @unittest.skipUnless(shutil.which("node"), "node absent")
+    def test_outline_copy_fault_is_not_a_semantic_advisory(self) -> None:
+        for returncode in (2, -9):
+            with self.subTest(returncode=returncode):
+                quality = self._quality_with("check-outline-copy.js", returncode, "")
+                self.assertEqual(quality["status"], "unavailable", quality)
+                self.assertEqual(quality["tool_errors"][0]["tool"], "check-outline-copy.js")
+                self.assertEqual(quality["tool_errors"][0]["message"], "boom")
+                self.assertFalse(any(row["source"] == "outline-copy" for row in quality["advisories"]))
+        overlap = self._quality_with("check-outline-copy.js", 1, "原句需要复核")
+        self.assertEqual(overlap["status"], "pass", overlap)
+        self.assertTrue(any(row["source"] == "outline-copy" and row["message"] == "原句需要复核"
+                            for row in overlap["advisories"]))
 
 
 class OutlineRangeOverrideTests(unittest.TestCase):

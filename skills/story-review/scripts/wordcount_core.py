@@ -169,6 +169,14 @@ def compute_wordcount_bands(value: Any, author_range: Any = None) -> dict[str, d
     }
 
 
+def _wordcount_status(actual: int, bands: dict[str, dict[str, int]]) -> str:
+    if bands["internal"]["min"] <= actual <= bands["internal"]["max"]:
+        return "internal_pass"
+    if bands["user"]["min"] <= actual <= bands["user"]["max"]:
+        return "borderline"
+    return "under" if actual < bands["user"]["min"] else "over"
+
+
 def invalid_wordcount_result(
     reason: str, *, chapter: Any = None, case_id: Any = None,
     target: int | None = None, actual: int | None = None,
@@ -213,11 +221,9 @@ def evaluate_wordcount(
     if actual == 0:
         return invalid_wordcount_result("EMPTY_BODY", chapter=chapter, case_id=case_id, target=target, actual=actual)
     bands = compute_wordcount_bands(target, author)
-    internal_pass = bands["internal"]["min"] <= actual <= bands["internal"]["max"]
-    user_pass = bands["user"]["min"] <= actual <= bands["user"]["max"]
-    status = "internal_pass" if internal_pass else (
-        "borderline" if user_pass else ("under" if actual < bands["user"]["min"] else "over")
-    )
+    status = _wordcount_status(actual, bands)
+    internal_pass = status == "internal_pass"
+    user_pass = status in {"internal_pass", "borderline"}
     signed_error = (actual - target) / target
     return {
         "schema": WORDCOUNT_SCHEMA, "metric": METRIC, "chapter": chapter, "case_id": case_id,
@@ -363,11 +369,11 @@ def normalize_wordcount_record(value: object) -> dict[str, Any]:
     author = normalize_author_range(value.get("author_range"))
     actual = value.get("actual")
     require(isinstance(actual, int) and not isinstance(actual, bool) and actual >= 1, "wordcount actual is invalid")
-    expected = evaluate_wordcount("字" * actual, target, author_range=author)
-    require(value.get("status") == expected["status"], "wordcount status does not match target and actual")
+    expected_status = _wordcount_status(actual, compute_wordcount_bands(target, author))
+    require(value.get("status") == expected_status, "wordcount status does not match target and actual")
     resolution = value.get("resolution")
     require(resolution in RESOLUTIONS, "wordcount resolution is unsupported")
-    in_user_band = expected["status"] in {"internal_pass", "borderline"}
+    in_user_band = expected_status in {"internal_pass", "borderline"}
     require((resolution == "within_user_band") == in_user_band, "wordcount resolution does not match status")
     digest = value.get("body_sha256")
     require(isinstance(digest, str) and re.fullmatch(r"[0-9a-f]{64}", digest) is not None, "body_sha256 is invalid")

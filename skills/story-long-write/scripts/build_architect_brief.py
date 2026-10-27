@@ -15,8 +15,8 @@
 - world：workflow-setup.md 的 Phase 2 与设定模板、character-basics.md、long-genre-mechanics.md 的
   「核心梗三层递进设计」与「金手指」、character-relations.md 的「人物关系类型」、reader-contract-and-progression.md。
 - volume：workflow-volume.md 的「排纲方法」（刻度、交付、自查、关键点法、对标迁移、章节定位）、
-  artifact-protocols.md（大纲与卷纲模板）、outline-methods.md 的「卷纲排法」、
-  reader-contract-and-progression.md（排纲自查第 4 项契约四问）。
+  artifact-protocols.md 的大纲与卷纲两节、outline-methods.md 的「卷纲排法」、
+  reader-contract-and-progression.md 的契约四问、核心概念、机构设计、风险与续接判据（不带示例）。
 - outline：workflow-outline.md 的「排纲方法」（批次步骤、细纲模板与验收、设定补全、排纲底稿模板）、
   long-chapter-hooks.md 的「章尾钩子 13 式」与「章首钩子 7 式」（细纲模板要从中选；只带名称与公式，示例列不进包）、
   character-basics.md 的主角卡与配角卡模板、plot-core-methods.md（首批整份；之后不带开篇噱头一节）；
@@ -199,9 +199,12 @@ def build(task: str, volume: int | None, chapters: tuple[int, int] | None,
                 f"`设定/题材定位.md`）。{outside}交付后只回：写了哪些文件、排纲自查 1–4 "
                 "的结论各一句、要作者定的事（没有写「无」）。")
         parts = [("workflow-volume.md（排纲方法）", section(read_reference("workflow-volume.md"), "排纲方法")),
-                 ("artifact-protocols.md", read_reference("artifact-protocols.md")),
+                 ("artifact-protocols.md（大纲与卷纲模板）",
+                  section(read_reference("artifact-protocols.md"), "大纲/大纲.md", "大纲/细纲_第XXX章.md")),
                  ("outline-methods.md（卷纲排法）", section(read_reference("outline-methods.md"), "卷纲排法", "换地图")),
-                 ("reader-contract-and-progression.md", read_reference("reader-contract-and-progression.md"))]
+                 ("reader-contract-and-progression.md（规划判据）",
+                  section(read_reference("reader-contract-and-progression.md"), "0. 契约四问", "4. 好/坏例与例外")
+                  + "\n\n" + section(read_reference("reader-contract-and-progression.md"), "5. 续接与换书债"))]
     else:
         first, last = chapters
         head = (f"# 任务包：出第{first}-{last}章细纲\n\n"

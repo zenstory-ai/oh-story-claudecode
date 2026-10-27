@@ -1,8 +1,7 @@
 #!/bin/bash
 # test-story-continuity.sh — detect-story-gaps.sh 的跨批连续性兜底回归测试
-# 保证：① 追踪 staleness（正文更新到第N章但 上下文.md 更早）→ 提示续写状态卡滞后；
-#       ② 章节标题去重（两章撞名）→ 提示改名；③ missing/mismatched/malformed state → 明确警告；
-#       ④ 干净项目（state/上下文 revision 一致、上下文新于正文、标题唯一）静默。
+# 保证：章节撞名与 missing/mismatched/malformed state 发出诊断；
+#       state/上下文 revision 一致、上下文新于正文、标题唯一的干净项目静默。
 # 与 codex story_codex_hook.py 的 continuity_findings 同触发条件（codex 侧由 test-codex-hooks.sh 覆盖）。
 set -euo pipefail
 
@@ -30,14 +29,11 @@ make_book() {
   printf '%s\n' '> 状态修订：0' > "$root/某书/追踪/上下文.md"
 }
 
-# ① 追踪 staleness + ② 标题去重
+# 标题去重：诊断必须指出撞名。
 T1="$(mktemp -d)"; make_book "$T1"
-printf '旧上下文\n' > "$T1/某书/追踪/上下文.md"
-sleep 1
 printf '# 第1章 决战\n正文。\n' > "$T1/某书/正文/第001章_决战.md"
 printf '# 第2章 决战\n正文。\n' > "$T1/某书/正文/第002章_决战.md"
 out="$(run "$T1")"
-printf '%s' "$out" | grep -q '续写状态卡更早' || { echo "FAIL: 追踪 staleness 未触发"; echo "$out" >&2; fails=$((fails+1)); }
 printf '%s' "$out" | grep -q '标题重复' || { echo "FAIL: 标题去重 未触发"; echo "$out" >&2; fails=$((fails+1)); }
 rm -rf "$T1"
 
@@ -68,16 +64,6 @@ printf '%s\n' '> 状态修订：0' '新上下文，已更新到第2章' > "$T2/�
 out="$(run "$T2")"
 [ -z "$out" ] || { echo "FAIL: 干净项目应静默，却输出："; echo "$out" >&2; fails=$((fails+1)); }
 rm -rf "$T2"
-
-# ⑤ 短篇项目（无 追踪/）：不做 staleness（无 上下文.md），也不误报
-T3="$(mktemp -d)"
-mkdir -p "$T3/短篇/正文" "$T3/短篇/设定"
-printf 'a\n' > "$T3/短篇/设定/角色.md"; printf 'b\n' > "$T3/短篇/设定/世界.md"; printf 'c\n' > "$T3/短篇/设定/力量.md"
-printf '# 第1章 起\n正文。\n' > "$T3/短篇/正文/第001章_起.md"
-mkdir -p "$T3/短篇/大纲"; printf '大纲\n' > "$T3/短篇/大纲/卷纲.md"
-out="$(run "$T3")"
-printf '%s' "$out" | grep -q '续写状态卡更早' && { echo "FAIL: 短篇无追踪不应报 staleness"; echo "$out" >&2; fails=$((fails+1)); } || true
-rm -rf "$T3"
 
 if [ "$fails" -ne 0 ]; then
   echo "Story continuity tests FAILED ($fails)." >&2

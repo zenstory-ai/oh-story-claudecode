@@ -26,6 +26,7 @@ from pathlib import Path
 
 JUDGE_MODELS = {'agy': 'gemini-3.8-flash-high', 'claude': 'claude-opus-5-5', 'codex': 'gpt-5.6-sol'}
 JUDGE = 'agy'
+EVALUATION_PROTOCOL = 1
 
 COVERAGE_PROMPT = """你是网文责编，只核对事实，不评文笔。下面是一章的细纲和成稿正文。
 
@@ -81,6 +82,37 @@ PAIRWISE_PROMPT = """你是番茄小说的资深编辑。下面是{source}写出
 """
 
 
+def valid_result(result, mode):
+    """Validate observations before they become scores or reusable assessments."""
+    if mode not in ('coverage', 'strict', 'pairwise') or not isinstance(result, dict):
+        return False
+    if mode == 'pairwise':
+        return result.get('winner') in ('A', 'B', 'tie') and isinstance(result.get('reason'), str) and bool(result['reason'].strip())
+    field, values = ('render', ('scene', 'summary', 'missing')) if mode == 'strict' else (
+        'status', ('landed', 'summarized', 'missing'))
+    beats = result.get('beats')
+    if not isinstance(beats, list) or not beats:
+        return False
+    ids = set()
+    for beat in beats:
+        if not isinstance(beat, dict):
+            return False
+        item_id = beat.get('id')
+        if not isinstance(item_id, str) or not item_id.strip() or item_id in ids:
+            return False
+        ids.add(item_id)
+        if not isinstance(beat.get('beat'), str) or not beat['beat'].strip() or beat.get(field) not in values:
+            return False
+        if mode == 'strict' and not isinstance(beat.get('quote'), str):
+            return False
+    if mode == 'strict':
+        return True
+    unauthorized = result.get('unauthorized')
+    return isinstance(unauthorized, list) and all(
+        isinstance(item, dict) and all(isinstance(item.get(k), str) and item[k].strip() for k in ('fact', 'quote'))
+        for item in unauthorized)
+
+
 def ask(prompt, cwd):
     model = JUDGE_MODELS[JUDGE]
     if JUDGE == 'claude':
@@ -96,6 +128,8 @@ def ask(prompt, cwd):
     completed = subprocess.run(cmd, cwd=cwd, input=stdin, capture_output=True, text=True, encoding='utf-8',
                                **({} if stdin is not None else {'stdin': subprocess.DEVNULL}))
     text = completed.stdout
+    if completed.returncode != 0:
+        return None, text + completed.stderr
     match = re.search(r'\{.*\}', text, re.S)
     try:
         return json.loads(match.group(0)) if match else None, text
@@ -110,63 +144,137 @@ def chapters(run):
     for n in range(meta['start_committed'] + 1, meta.get('end_committed', 0) + 1):
         body = sorted((book / '正文').glob(f'第{n:03d}章*.md'))
         outline = sorted((book / '大纲').glob(f'细纲_第{n:03d}章*.md'))
-        if body and outline:
-            yield meta, n, body[0], outline[0]
+        if not body or not outline:
+            raise ValueError(f'{run}: committed chapter {n} is missing prose or outline')
+        yield meta, n, body[0], outline[0]
 
 
-def coverage(runs, out, strict=False):
-    out.mkdir(parents=True, exist_ok=True)
+def request_key(mode, inputs, prompts):
+    payload = {'protocol': EVALUATION_PROTOCOL, 'mode': mode, 'judge': JUDGE_MODELS[JUDGE],
+               'inputs': inputs, 'prompts': prompts}
+    return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()
+
+
+def coverage_requests(runs, strict=False):
+    mode = 'strict' if strict else 'coverage'
     for run in runs:
+        run = Path(run).resolve()
         for meta, n, body, outline in chapters(run):
-            dest = out / f'{Path(run).name}-{n:03d}-{JUDGE}.json'
-            if dest.exists():
-                continue
             prompt = (SCENE_PROMPT if strict else COVERAGE_PROMPT).format(
                 outline=outline.read_text(encoding='utf-8'), body=body.read_text(encoding='utf-8'))
-            result, raw = ask(prompt, out)
-            dest.write_text(json.dumps({'run': Path(run).name, 'host': meta['host'], 'case': meta['case']['id'],
-                                        'pkg': meta['pkg'].get('ref'), 'chapter': n, 'judge': JUDGE_MODELS[JUDGE],
-                                        'result': result, 'raw': raw},
-                                       ensure_ascii=False, indent=1), encoding='utf-8')
-            print(dest.name, 'ok' if result else 'PARSE_FAIL', flush=True)
+            identity = {'run': str(run), 'host': meta['host'], 'case': meta['case']['id'],
+                        'pkg': meta['pkg'].get('ref'), 'chapter': n}
+            key = request_key(mode, [{'run': str(run), 'meta': meta}], [prompt])
+            yield identity, key, prompt
 
 
-def pairwise(base_runs, cand_runs, out):
-    out.mkdir(parents=True, exist_ok=True)
+def pairwise_requests(base_runs, cand_runs):
     index = {}
     for label, runs in (('base', base_runs), ('cand', cand_runs)):
         for run in runs:
             for meta, n, body, outline in chapters(run):
-                index.setdefault((meta['host'], meta['case']['id'], n), {})[label] = (body, outline)
+                pair = index.setdefault((meta['host'], meta['case']['id'], n), {})
+                if label in pair:
+                    raise ValueError(f'{meta["host"]}/{meta["case"]["id"]}/{n}: duplicate {label} run; evaluate repetitions separately')
+                pair[label] = (Path(run).resolve(), meta, body, outline)
     for (host, case, n), pair in sorted(index.items()):
         if len(pair) != 2:
-            continue
-        dest = out / f'{host}-{case}-{n:03d}-{JUDGE}.json'
-        if dest.exists():
             continue
         seed = int(hashlib.sha256(f'{host}{case}{n}'.encode()).hexdigest(), 16)
         first = random.Random(seed).choice(['base', 'cand'])
         second = 'cand' if first == 'base' else 'base'
-        outlines = {k: v[1].read_text(encoding='utf-8') for k, v in pair.items()}
-        texts = {k: v[0].read_text(encoding='utf-8') for k, v in pair.items()}
-        rounds = []
+        outlines = {k: v[3].read_text(encoding='utf-8') for k, v in pair.items()}
+        texts = {k: v[2].read_text(encoding='utf-8') for k, v in pair.items()}
+        requests = []
         for a, b in ((first, second), (second, first)):
             if outlines['base'] == outlines['cand']:
                 source, outline = '同一份细纲', '===== 细纲 =====\n' + outlines['base']
             else:
                 source = '各自细纲（同一段剧情、分别补写）'
                 outline = '===== A 的细纲 =====\n%s\n\n===== B 的细纲 =====\n%s' % (outlines[a], outlines[b])
-            result, raw = ask(PAIRWISE_PROMPT.format(source=source, chapter=n, outline=outline, a=texts[a], b=texts[b]),
-                              out)
-            w = (result or {}).get('winner')
+            prompt = PAIRWISE_PROMPT.format(source=source, chapter=n, outline=outline, a=texts[a], b=texts[b])
+            requests.append((a, b, prompt))
+        inputs = {label: {'run': str(value[0]), 'meta': value[1]} for label, value in pair.items()}
+        key = request_key('pairwise', inputs, [r[2] for r in requests])
+        identity = {'host': host, 'case': case, 'chapter': n,
+                    'runs': {label: str(value[0]) for label, value in pair.items()}}
+        yield identity, key, requests
+
+
+def pairwise_winner(rounds):
+    if not isinstance(rounds, list) or len(rounds) != 2:
+        return None
+    for item in rounds:
+        if (not isinstance(item, dict) or item.get('A') not in ('base', 'cand')
+                or item.get('B') not in ('base', 'cand') or item['A'] == item['B']):
+            return None
+        if item.get('winner') not in ('base', 'cand', 'tie') or not isinstance(item.get('reason'), str) or not item['reason'].strip():
+            return None
+    if rounds[0]['A'] != rounds[1]['B']:
+        return None
+    votes = [item['winner'] for item in rounds]
+    return votes[0] if votes[0] == votes[1] else 'tie'
+
+
+def cached_evaluation(out, mode, key):
+    path = Path(out) / f'{mode}-{key}.json'
+    try:
+        document = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(document, dict) or document.get('cache_key') != key or document.get('mode') != mode:
+        return None
+    if document.get('status') != 'complete' or document.get('judge') != JUDGE_MODELS[JUDGE]:
+        return None
+    if mode == 'pairwise':
+        winner = pairwise_winner(document.get('rounds'))
+        valid = winner is not None and document.get('final') == winner
+    else:
+        valid = valid_result(document.get('result'), mode)
+    return document if valid else None
+
+
+def coverage(runs, out, strict=False):
+    out.mkdir(parents=True, exist_ok=True)
+    mode = 'strict' if strict else 'coverage'
+    failed = False
+    for identity, key, prompt in coverage_requests(runs, strict):
+        if cached_evaluation(out, mode, key) is not None:
+            continue
+        result, raw = ask(prompt, out)
+        valid = valid_result(result, mode)
+        failed |= not valid
+        dest = out / f'{mode}-{key}.json'
+        dest.write_text(json.dumps({**identity, 'cache_key': key, 'judge': JUDGE_MODELS[JUDGE],
+                                    'mode': mode, 'status': 'complete' if valid else 'invalid',
+                                    'result': result, 'raw': raw},
+                                   ensure_ascii=False, indent=1), encoding='utf-8')
+        print(dest.name, 'ok' if valid else 'INVALID', flush=True)
+    return int(failed)
+
+
+def pairwise(base_runs, cand_runs, out):
+    out.mkdir(parents=True, exist_ok=True)
+    failed = False
+    for identity, key, requests in pairwise_requests(base_runs, cand_runs):
+        if cached_evaluation(out, 'pairwise', key) is not None:
+            continue
+        rounds = []
+        for a, b, prompt in requests:
+            result, raw = ask(prompt, out)
+            w = result['winner'] if valid_result(result, 'pairwise') else None
             rounds.append({'A': a, 'B': b, 'winner': {'A': a, 'B': b}.get(w, 'tie' if w == 'tie' else None),
-                           'reason': (result or {}).get('reason'), 'raw': raw})
-        votes = [r['winner'] for r in rounds]
-        final = votes[0] if votes[0] == votes[1] and votes[0] in ('base', 'cand') else 'tie'
-        dest.write_text(json.dumps({'host': host, 'case': case, 'chapter': n, 'judge': JUDGE_MODELS[JUDGE],
+                           'reason': result.get('reason') if isinstance(result, dict) else None, 'raw': raw})
+        final = pairwise_winner(rounds)
+        valid = final is not None
+        failed |= not valid
+        dest = out / f'pairwise-{key}.json'
+        dest.write_text(json.dumps({**identity, 'cache_key': key, 'judge': JUDGE_MODELS[JUDGE],
+                                    'mode': 'pairwise', 'status': 'complete' if valid else 'invalid',
                                     'final': final, 'rounds': rounds},
                                    ensure_ascii=False, indent=1), encoding='utf-8')
-        print(dest.name, final, flush=True)
+        print(dest.name, final if valid else 'INVALID', flush=True)
+    return int(failed)
 
 
 def main():
@@ -186,10 +294,12 @@ def main():
     a = ap.parse_args()
     JUDGE = a.judge
     if a.cmd == 'coverage':
-        coverage(a.runs, Path(a.out), strict=a.strict)
-    else:
-        pairwise(a.base, a.cand, Path(a.out))
+        return coverage(a.runs, Path(a.out), strict=a.strict)
+    return pairwise(a.base, a.cand, Path(a.out))
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except ValueError as exc:
+        sys.exit(str(exc))

@@ -111,8 +111,6 @@ def deploy(source: Path, destination: Path, *, migrate_symlink: bool) -> str:
     finally:
         if staging.exists():
             shutil.rmtree(staging)
-        if backup.exists():
-            shutil.rmtree(backup)
 
 
 def main() -> int:

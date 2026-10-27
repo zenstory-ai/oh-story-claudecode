@@ -63,6 +63,7 @@ while IFS= read -r -d '' file; do
   # 也认全角空格 U+3000（否则全角空格分隔的写法会漏检/误判）。
   case "$file" in
     正文.md|*/正文.md|正文/*|*/正文/*)
+      case "${file##*/}" in *_原稿_*) continue ;; esac
       HARDCODED=$(grep -nE "(身高|体重|年龄)([[:space:]]|　)*(：|:)([[:space:]]|　)*[0-9]+" "$FULL_PATH" 2>/dev/null || true)
       if [ -n "$HARDCODED" ]; then
         WARNINGS="$WARNINGS${NL}⚠ $file: 正文硬编码角色属性，应引用设定文件：${NL}$HARDCODED"

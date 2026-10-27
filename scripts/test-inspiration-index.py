@@ -536,6 +536,55 @@ def test_parser_does_not_block_legit_modules() -> None:
         require("line_3:column_count_mismatch" in errors, f"坏行按文件实际行号报告：{errors}")
 
 
+def test_nm_sources_must_be_distinct() -> None:
+    with tempfile.TemporaryDirectory(prefix="ilib-distinct-") as temporary:
+        base = Path(temporary)
+        root = make_workspace(base)
+        MODULE["register_atoms"](root, base / "拆文库/测试书/剧情/情绪模块.md", "测试书")
+        for item_id, refs, count in (("NM-001", "EM-001|EM-001", "1"),
+                                     ("NM-002", "EM-001|EM-002|EM-001", "2")):
+            relative = f"单小说灵感合并/测试书/{item_id}.md"
+            write(root / relative, f"# {item_id}：合并\n- 合并对象：{refs}\n")
+            append_row(root, base_row(item_id=item_id, layer="单小说灵感合并", title="合并",
+                                      source_book="测试书", path=relative, source_ids=refs, atom_count=count))
+        errors = MODULE["validate"](root)
+        for item_id in ("NM-001", "NM-002"):
+            require(f"测试书/{item_id}:nm_source_em_duplicate" in errors, f"重复来源必须拒绝：{errors}")
+        require("测试书/NM-001:nm_requires_at_least_two_sources" in errors,
+                f"重复同一来源不能满足两个来源下限：{errors}")
+
+
+def test_cba_verification_requires_an_explicit_exact_field() -> None:
+    with tempfile.TemporaryDirectory(prefix="ilib-verification-") as temporary:
+        base = Path(temporary)
+        root = make_workspace(base)
+        MODULE["register_atoms"](root, base / "拆文库/测试书/剧情/情绪模块.md", "测试书")
+        make_workspace(base, book="乙书")
+        MODULE["register_atoms"](root, base / "拆文库/乙书/剧情/情绪模块.md", "乙书")
+        atoms = index_rows(root)
+        relative = "跨书灵感聚合/CBA-001.md"
+        for count, expected in ((1, "单书假设"), (2, "跨书重复验证")):
+            refs = "测试书/EM-001" if count == 1 else "测试书/EM-001|乙书/EM-001"
+            row = base_row(item_id="CBA-001", layer="跨书灵感聚合", title="机制",
+                           source_book="测试书", path=relative, source_ids=refs,
+                           novel_count=str(count), atom_count=str(count), tags=CBA_TAGS)
+            write(root / "灵感索引.csv", MODULE["csv_text"]([*atoms, row]))
+            for field in (f"- 验证状态：{expected}", f"- **验证状态**: **{expected}**"):
+                write(root / relative, f"# CBA-001：机制\r\n{field}\r\n")
+                require(not MODULE["validate"](root), f"合法显式状态必须通过：{field}")
+            opposite = "跨书重复验证" if count == 1 else "单书假设"
+            for field in (
+                f"- 验证状态：目前不应标为{expected}",
+                f"正文中只是提及{expected}。",
+                f"- 验证状态：{opposite}\n正文中提及{expected}。",
+                f"- 验证状态：{expected}\n- 验证状态：{opposite}",
+            ):
+                write(root / relative, f"# CBA-001：机制\n{field}\n")
+                errors = MODULE["validate"](root)
+                require(any("marker_missing" in error for error in errors),
+                        f"否定、旁文、错误值和冲突字段不能冒充验证状态：{field}: {errors}")
+
+
 def main() -> int:
     test_register_and_idempotence()
     test_parse_genre_variants()
@@ -543,10 +592,12 @@ def main() -> int:
     test_workspace_gate_and_check_atoms()
     test_multiline_values_and_leak_tiering()
     test_validate_cba_closure_and_markers()
+    test_cba_verification_requires_an_explicit_exact_field()
     test_vocabulary_guard()
     test_coverage_reports_uncovered_atoms()
     test_validate_rejects_path_reference_in_card()
     test_validate_set_mismatch_and_nm_rules()
+    test_nm_sources_must_be_distinct()
     test_parser_and_gate_hardening()
     test_parser_does_not_block_legit_modules()
     print("OK: inspiration index regressions passed")

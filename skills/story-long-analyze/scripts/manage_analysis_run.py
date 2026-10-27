@@ -984,23 +984,42 @@ def parse_chapter_window(value: Optional[str]) -> Optional[Tuple[int, int]]:
 
 
 def digest_caches(root: Path) -> List[Tuple[int, int, str, Path]]:
-    """Complete caches of committed batches, falling back to every complete cache on disk."""
+    """Verified committed caches; scan legacy caches only when no batch state exists."""
     state, _ = load_state(root / "_progress.md")
+    try:
+        rows = read_index(root)
+    except RunError:
+        rows = None
     chosen = {}  # type: Dict[str, Tuple[int, int, str, Path]]
     for row in state["batches"].values():
         if row.get("status") not in {"completed", "success"}:
             continue
         path = root / row["cache"] if row.get("cache") else cache_path(root, row["batch_id"])
-        if cache_complete(path):
+        try:
+            valid = completed_batch(root, row, rows)
+        except RunError:
+            valid = False
+        if valid:
             chosen[row["batch_id"]] = (row["start"], row["end"], row["batch_id"], path)
-    if not chosen:
+    if not state["batches"]:
         for path in sorted((root / "_analysis_cache").glob("批次-*.md")):
-            try:
-                _, start, end = parse_batch_id(path.stem[len("批次-"):])
-            except RunError:
+            if not cache_complete(path):
                 continue
-            if cache_complete(path):
-                chosen[path.stem] = (start, end, path.stem[len("批次-"):], path)
+            try:
+                metadata = parse_cache(path)
+                batch_id = path.stem[len("批次-"):]
+                kind, start, end = parse_batch_id(batch_id)
+                if (metadata["batch_id"], metadata["input_kind"], metadata["start"], metadata["end"]) != (
+                    batch_id, kind, start, end
+                ):
+                    continue
+                if kind == "raw-original" and (
+                    rows is None or metadata["range_sha256"] != range_sha256(rows, start, end)
+                ):
+                    continue
+            except (OSError, UnicodeError, RunError):
+                continue
+            chosen[batch_id] = (start, end, batch_id, path)
     return sorted(chosen.values())
 
 
