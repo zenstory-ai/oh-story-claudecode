@@ -2,7 +2,7 @@
 
 Status: implemented
 
-Related: [2026-09-24-opencode-version-gate-fail-closed](../bug-fix/2026-09-24-opencode-version-gate-fail-closed.md)（「版本无法确定时继续部署」一条已翻转为停止部署）
+Related: [2026-09-24-opencode-version-gate-fail-closed](../bug-fix/2026-09-24-opencode-version-gate-fail-closed.md)（「版本无法确定时继续部署」一条已翻转为停止部署）；[2026-10-29-opencode-2-2-call-gated-tools](../testing/2026-10-29-opencode-2-2-call-gated-tools.md)（2.2 起 `skill` 与 Code Mode 工具改用调用验证）
 
 ## Problem
 

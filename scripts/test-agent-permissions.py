@@ -315,7 +315,8 @@ def test_opencode_runtime(cli: str) -> None:
     """Exercise the real OpenCode 2.x tool registry through `opencode run --agent`.
 
     OpenCode 2.x drops every tool whose last matching rule is a blanket deny from the tool list
-    it sends to the model, so the tool names the mock model receives are the runtime verdict.
+    it sends to the model, so the tool names the mock model receives are the runtime verdict —
+    except `skill` and Code Mode tools since 2.2, which are checked by calling them (see below).
     A few scripted tool calls then prove that allowed tools really execute and denied ones don't.
     """
     with tempfile.TemporaryDirectory(prefix="opencode-agent-permissions-") as tmp:
@@ -335,6 +336,9 @@ def test_opencode_runtime(cli: str) -> None:
         shutil.copytree(generated / "agents", project / ".opencode/agents")
         shutil.copytree(OPENCODE_BASELINE / "agents", project / ".opencode/agents", dirs_exist_ok=True)
         (project / "canary.txt").write_text("PERMISSION_CANARY\n", encoding="utf-8")
+        probe_skill = project / ".opencode/skills/probe/SKILL.md"
+        probe_skill.parent.mkdir(parents=True)
+        probe_skill.write_text("---\nname: probe\ndescription: Permission probe.\n---\n\nSKILL_CANARY\n", encoding="utf-8")
         # OpenCode 从当前目录向上找到项目根为止发现 .opencode/；项目根由 git 仓库界定。
         subprocess.run(["git", "init", "-q", str(project)], check=True)
         home = root / "home"
@@ -406,36 +410,60 @@ def test_opencode_runtime(cli: str) -> None:
                 ]
                 return tools, "\n".join(results)
 
+            # 2.2 起有两类工具不再由列表裁决，只能看调用：
+            # - skill 按被加载的 skill 逐个判权限；2.2 给每个 agent 追加了针对浏览器 skill 的规则，
+            #   skill 的最后一条匹配规则不再是全局 deny，所以它总在列表里，调用时仍被 "*" deny 拦下。
+            # - execute 被拒时，Code Mode 工具直接暴露（OpenCode #59315）；opencode_worktree_remove
+            #   走 edit 权限，只要 agent 有任何 edit allow 就会出现。
+            def visible(name: str, tools: set[str]) -> set[str]:
+                if "opencode_worktree_remove" in tools:
+                    assert "edit" in tools, (name, tools)
+                return tools - {"skill", "opencode_worktree_remove"}
+
+            def assert_skill_denied(name: str) -> None:
+                _, results = run_agent(name, [{"name": "skill", "arguments": {"id": "probe"}}])
+                assert "SKILL_CANARY" not in results, (name, results)
+
             read_like = {"read", "glob", "grep"}
             for name in ("chapter-extractor", "character-designer", "consistency-checker",
                          "narrative-writer", "story-architect", "story-explorer", "story-researcher"):
-                tools, _ = run_agent(name)
+                raw, _ = run_agent(name)
+                tools = visible(name, raw)
                 assert read_like <= tools, (name, tools)
                 assert ("shell" in tools) == (name in {"narrative-writer", "story-researcher"}), (name, tools)
                 assert not tools & {"subagent", "webfetch", "websearch", "skill", "execute"}, (name, tools)
-                print(f"  OpenCode {name}: {', '.join(sorted(tools))}")
+                if "skill" in raw:
+                    assert_skill_denied(name)
+                print(f"  OpenCode {name}: {', '.join(sorted(raw))}")
 
             tools, results = run_agent("reader", [
                 {"name": "write", "arguments": {"path": "reader-write.txt", "content": "DENIED"}},
             ])
+            tools = visible("reader", tools)
             assert tools == {"read"}, tools
             assert not (project / "reader-write.txt").exists()
             assert re.search(r'No tool named \\?"write\\?"', results), results
-            tools, _ = run_agent("glob-only")
+            tools = visible("glob-only", run_agent("glob-only")[0])
             assert tools == {"glob"}, tools
-            tools, _ = run_agent("inherit-minus-glob")
+            raw, _ = run_agent("inherit-minus-glob")
+            if "skill" in raw:  # 继承全部工具的对照组确实能加载 probe，证明上面的拒绝不是因为 skill 没被发现
+                _, results = run_agent("inherit-minus-glob", [{"name": "skill", "arguments": {"id": "probe"}}])
+                assert "SKILL_CANARY" in results, results
+            tools = visible("inherit-minus-glob", raw)
             assert {"read", "grep"} <= tools and not tools & {"glob", "write", "edit", "patch", "shell"}, tools
             tools, _ = run_agent("writer", [
                 {"name": "write", "arguments": {"path": "created.txt", "content": "CREATED"}},
             ])
+            tools = visible("writer", tools)
             assert {"read", "write", "edit"} <= tools <= {"read", "write", "edit", "patch"}, tools
             assert (project / "created.txt").read_text(encoding="utf-8") == "CREATED"
             tools, results = run_agent("shell", [
                 {"name": "shell", "arguments": {"command": "printf SHELL_OK", "description": "Fixture shell control"}},
             ])
+            tools = visible("shell", tools)
             assert tools == {"read", "shell"}, tools
             assert "SHELL_OK" in results, results
-            tools, _ = run_agent("empty")
+            tools = visible("empty", run_agent("empty")[0])
             assert tools == set(), tools
             print("  OpenCode fixtures: reader/glob-only/inherit-minus-glob/writer/shell/empty match capabilities")
             assert (project / "canary.txt").read_text(encoding="utf-8") == "PERMISSION_CANARY\n"
