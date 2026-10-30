@@ -14,6 +14,8 @@
 <p align="center">
   <a href="https://zenstory.ai/oh-story"><b>Project page</b></a>
   &nbsp;·&nbsp;
+  <a href="https://app.zenstory.ai/?utm_source=gh-oh-story-en&utm_medium=readme"><b>Web workbench</b></a>
+  &nbsp;·&nbsp;
   <a href="#installation"><b>Install</b></a>
   &nbsp;·&nbsp;
   <a href="#faq"><b>FAQ</b></a>

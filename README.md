@@ -11,6 +11,8 @@
 <p align="center">
   <a href="https://zenstory.ai/zh/oh-story"><b>项目主页</b></a>
   &nbsp;·&nbsp;
+  <a href="https://app.zenstory.ai/?utm_source=gh-oh-story&utm_medium=readme"><b>在线写作工作台</b></a>
+  &nbsp;·&nbsp;
   <a href="#安装"><b>安装</b></a>
   &nbsp;·&nbsp;
   <a href="#常见问题"><b>常见问题</b></a>
