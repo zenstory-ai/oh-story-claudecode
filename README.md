@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://zenstory.ai/brand/zenstory-ai-mark.svg" alt="" width="76" height="76">
+  <img src="https://raw.githubusercontent.com/zenstory-ai/zenstory/main/apps/web/public/brand/zenstory-ai-mark.svg" alt="" width="76" height="76">
 </p>
 
 <h1 align="center">Oh Story</h1>
