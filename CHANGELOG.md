@@ -12,6 +12,22 @@ compare 链接；小节名使用 Keep a Changelog 的六个英文类别（`Added
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-10-29
+
+> 本版 `agents_version: 38`、`setup_skill_version: 1.3.6`。更新技能包后，在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`），再新开会话，项目里才会有新的发布资料技能和入口。书稿、设定、追踪和作者记忆无需迁移。
+
+v0.9.2 新增发布资料技能 `story-publish`，先适配番茄小说的长篇和短故事；封面技能可以只出提示词。
+
+### Added
+
+- **整理平台建书资料（`/story-publish`、`/发布资料`）。** 从已有的设定和大纲整理书名、简介、签约模式、目标读者、主角、标签或分类，按平台规则逐项核对后，保存为书目录下的 `发布资料-番茄小说.md`。只有你确认过的内容才写进字段，候选方案放在「待作者确认」里由你挑；不会替你登录后台、填表或发布。
+- **番茄规则有据可查。** 长篇阅读标签、内容标签和短故事分类对照了番茄作家后台截图；书名只能用中英文、数字和全角「！，？：【】」、长篇最多 15 字，封面 600×800、不超过 5MB 且须带书名和笔名，均取自番茄作家帮助中心。资料与后台界面不一致时以界面为准。
+- **封面可以只出提示词。** `story-cover` 新增仅提示词模式，不需要生图工具或 API Key（OpenClaw 仍要配好 Key 才能发现这个技能），适合拿去别的绘图工具生成；整理发布资料时会先问你要直接生成、只要提示词还是暂缓。
+
+### Changed
+
+- **想填建书资料时直接说。** 说「整理发布资料」「填建书表单」「起书名写简介选标签」会进 `story-publish`；只说「开书」仍照常进长篇写作。
+
 ## [0.9.1] - 2026-10-26
 
 > 本版 `agents_version: 37`、`setup_skill_version: 1.3.5`。更新技能包后，在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`），再新开会话。ZCode 请先在 Plugin Management 更新并启用 `oh-story`，再从新版插件运行 story-setup，避免项目旧快照遮蔽更新；只安装独立 Skills 不会注册插件助手。书稿、设定、追踪和作者记忆无需迁移。
@@ -1308,7 +1324,8 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 - 初始版本：长篇/短篇写作、拆文、扫榜、去 AI 味、浏览器操控
 - 用 52000+ 本真实数据增强知识库
 
-[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.8.6...v0.9.0
 [0.8.6]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.8.5...v0.8.6

@@ -1,151 +1,205 @@
-"""Read-only validation of a publishing-preparation Markdown document."""
+"""Read-only check of a publishing-preparation document against its platform reference.
+
+The platform rules come from the reference files' frontmatter (one JSON line per work type),
+so adding a platform means adding references, not editing this script.
+FAIL: the file breaks the format contract or names an option the platform doesn't offer.
+WARN: a confirmed value the platform may reject; the author decides.
+"""
 
 import argparse
+import json
 from pathlib import Path
 import re
 import sys
-import unicodedata
 
 
-TITLE_MAX_CHARS = 15
-CHINESE_SYMBOLS = frozenset("，。！？；：、（）【】《》〈〉「」『』“”‘’〔〕［］｛｝—…·～％＃＆＠＊＋－／＝＜＞｜＿￥")
+REFERENCES = Path(__file__).resolve().parents[1] / "references"
+FORMAT_VERSION = "1"
+HEADER_KEYS = ["格式版本", "目标平台", "作品类型", "核验"]
+TAIL = ["作品简介", "待作者确认", "待平台核实", "来源说明"]
+COVER_FIELDS = ["模式", "状态", "提示词", "图片"]
+COVER_MODES = {"直接生成", "仅提示词", "暂缓"}
+BLANK = "（不填）"
+PLACEHOLDER = re.compile(r"待(?:作者)?确认|待定|未定|建议|草案|TBD|暂无", re.I)
 
 
-SECTIONS = [
-    "封面",
-    "阅读标签",
-    "内容标签",
-    "作品简介",
-    "待作者按照发布界面核实的内容",
-    "待平台核实",
-    "来源说明",
-]
-TAG_FIELDS = {
-    "阅读标签": ["主分类", "主题", "角色", "情节"],
-    "内容标签": ["情节", "情感", "人设", "世界观"],
-}
-SHORT_FIELDS = ["主分类", "情节", "角色", "情绪", "背景"]
-SHORT_SECTIONS = ["封面", "作品分类", *SECTIONS[3:]]
+def frontmatter(path):
+    text = path.read_text(encoding="utf-8")
+    match = re.match(r"---\n(.*?)\n---\n", text, re.S)
+    return dict(line.split(": ", 1) for line in match[1].splitlines() if ": " in line) if match else {}
 
 
-def short_candidates():
-    """Read the maintained field-scoped Markdown list, not a second inventory."""
-    reference = Path(__file__).resolve().parents[1] / "references/fanqie-short-2026-10-28.md"
-    result = {}
-    for line in reference.read_text(encoding="utf-8").splitlines():
-        columns = [column.strip() for column in line.strip("|").split("|")]
-        if len(columns) == 2 and columns[0] in SHORT_FIELDS:
-            result[columns[0]] = set(columns[1].split("、"))
-    if set(result) != set(SHORT_FIELDS):
-        raise ValueError("短故事分类参考缺少候选字段。")
-    return result
+def load_spec(platform, work_type):
+    """Find the reference whose frontmatter names this platform and carries this work type."""
+    for path in sorted(REFERENCES.glob("*.md")):
+        meta = frontmatter(path)
+        if meta.get("platform") == platform and work_type in meta:
+            return json.loads(meta[work_type])
+    raise ValueError(f"没有「{platform}」的「{work_type}」适配资料。")
 
 
-def validate_title(title):
-    title = title.strip()
-    errors = []
-    if not title:
-        errors.append("书本名称不能为空。")
-    if len(title) > TITLE_MAX_CHARS:
-        errors.append(f"书本名称共 {len(title)} 个字符，最多允许 {TITLE_MAX_CHARS} 个；数字和符号也计数。")
-    invalid = list(dict.fromkeys(
-        char for char in title
-        if unicodedata.category(char)[0] in {"P", "S"} and char not in CHINESE_SYMBOLS
-    ))
-    if invalid:
-        errors.append("书本名称必须使用中文符号，不允许：" + "、".join(invalid) + "。")
-    return errors
+def load_options(name):
+    """Return {field: (candidates, limit)} from a reference's '## 字段 / 规则 / 候选值' blocks."""
+    options = {}
+    for block in re.split(r"^## ", (REFERENCES / name).read_text(encoding="utf-8"), flags=re.M)[1:]:
+        field, _, body = block.partition("\n")
+        values = re.search(r"^候选值：(.+?)。?\s*$", body, re.M)
+        if values:
+            limit = re.search(r"^规则：.*?选\s*(\d+)\s*个", body, re.M)
+            options[field.strip()] = (set(values[1].split("、")), int(limit[1]) if limit else None)
+    if not options:
+        raise ValueError(f"{name} 没有可读的候选值。")
+    return options
 
 
-def validate(text):
-    lines = text.lstrip("\ufeff").splitlines()
-    errors = []
-    headings = []
-    fence = None
-    for index, line in enumerate(lines):
-        marker = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+def unfenced(lines, start=0, end=None):
+    """(index, line) pairs outside fenced code; a long cover prompt may hold its own headings."""
+    kept, fence = [], None
+    for index in range(start, len(lines) if end is None else end):
+        marker = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", lines[index])
         if fence:
             if marker and marker[1][0] == fence[0] and len(marker[1]) >= len(fence) and not marker[2].strip():
                 fence = None
-            continue
-        if marker:
+        elif marker:
             fence = marker[1]
+        else:
+            kept.append((index, lines[index]))
+    return kept
+
+
+def block(lines, headings, position):
+    """Non-blank lines under a heading, fenced code left out."""
+    start = headings[position][0] + 1
+    end = headings[position + 1][0] if position + 1 < len(headings) else len(lines)
+    return [line for _, line in unfenced(lines, start, end) if line.strip()]
+
+
+def parse_fields(lines, where, errors):
+    """'- 字段：值' lines -> {field: value}; each field once, each on its own line."""
+    fields = {}
+    for line in lines:
+        match = re.fullmatch(r"- ([^：:]+)：(.*)", line)
+        if not match:
+            errors.append(f"{where}的每个字段必须写成独立的「- 字段：值」行：{line.strip()}")
             continue
-        match = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
-        if match:
-            headings.append((index, len(match[1]), match[2]))
+        name, value = match[1], match[2].strip()
+        if name in fields:
+            errors.append(f"{where}的 {name} 出现了不止一次。")
+        if re.search(r"[^\s、，,]+\s*[：:]", value):
+            errors.append(f"{where}的 {name} 行混入了其他字段，要拆行。")
+        fields[name] = value
+    return fields
 
-    if not headings or headings[0][1] != 1 or not re.fullmatch(
-        r"书本名称：\s*\S.*", headings[0][2]
-    ):
-        errors.append("首个正文标题必须是 # 书本名称：<书名>，不能使用资料总标题。")
-    else:
-        errors.extend(validate_title(headings[0][2].partition("：")[2]))
-        metadata = [line for line in lines[: headings[0][0]] if line.strip()]
-        if not metadata or any(not line.startswith("> ") for line in metadata):
-            errors.append("书名前只能有引用块元信息和空行。")
 
-    metadata_end = headings[0][0] if headings else 0
-    types = re.findall(r"^> 作品类型：\s*(.*?)\s*$", "\n".join(lines[:metadata_end]), re.M)
-    is_short = types == ["短故事"]
-    if types and types not in (["短故事"], ["长篇"]):
-        errors.append("作品类型元信息须唯一且为长篇或短故事。")
-    sections = SHORT_SECTIONS if is_short else SECTIONS
-    tag_fields = {"作品分类": SHORT_FIELDS} if is_short else TAG_FIELDS
-    if [(level, title) for _, level, title in headings[1:]] != [
-        (2, section) for section in sections
-    ]:
-        errors.append("小节必须依次为：" + " → ".join(sections) + "，且使用二级标题。")
-    if is_short and headings:
-        end = headings[1][0] if len(headings) > 1 else len(lines)
-        basics = "\n".join(lines[headings[0][0] + 1:end])
-        for field in ("是否使用AI", "试读比例", "发布协议"):
-            if not re.search(r"^- " + field + "：", basics, re.M):
-                errors.append(f"短故事基础资料缺少 {field} 字段。")
-        if re.search(r"^- (?:签约模式|目标读者|主角[12])：", basics, re.M):
-            errors.append("短故事基础资料不能套用长篇签约模式、频道或主角字段。")
+def check_value(where, name, value, errors):
+    if value and value != BLANK and PLACEHOLDER.search(value):
+        errors.append(f"{where}的 {name} 写了建议或占位词；未定就留空，决定不填写「{BLANK}」。")
 
-    covers = [(position, item) for position, item in enumerate(headings) if item[2] == "封面"]
-    if len(covers) == 1:
-        position, (start, _, _) = covers[0]
-        end = headings[position + 1][0] if position + 1 < len(headings) else len(lines)
-        content = "\n".join(lines[start + 1 : end])
-        for field in ("模式", "状态", "提示词", "图片"):
-            if not re.search(r"^- " + field + "：", content, re.M):
-                errors.append(f"封面小节缺少 {field} 字段。")
 
-    candidates = short_candidates() if is_short else {}
-    total = 0
-    for section, expected in tag_fields.items():
-        matches = [(position, item) for position, item in enumerate(headings) if item[2] == section]
-        if len(matches) != 1:
-            continue
-        position, (start, _, _) = matches[0]
-        end = headings[position + 1][0] if position + 1 < len(headings) else len(lines)
-        content = [line for line in lines[start + 1 : end] if line.strip()]
-        fields = []
-        for line in content:
-            match = re.fullmatch(r"- ([^：:]+)：(.*)", line)
-            if not match:
-                errors.append(f"{section}的每个子字段必须使用独立的 '- 字段：值' 行。")
+def values_of(value):
+    return [] if value in ("", BLANK) else [item.strip() for item in value.split("、") if item.strip()]
+
+
+def title_warnings(title, rule):
+    warnings = []
+    if any(char.isspace() for char in title):
+        warnings.append("书名不能有空格。")
+    half = rule.get("half_width")
+    length = sum(half if half and ord(char) < 128 else 1 for char in title)
+    if length > rule["max"]:
+        warnings.append(f"书名计 {length:g} 个字，平台上限 {rule['max']}。")
+    if "symbols" in rule:
+        invalid = "".join(dict.fromkeys(
+            char for char in title if not char.isalnum() and not char.isspace() and char not in rule["symbols"]
+        ))
+        if invalid:
+            warnings.append(f"书名只能用这些符号：{rule['symbols']}，不能用：{invalid}")
+    return warnings
+
+
+def check(text):
+    """Return (errors, warnings) for one publishing document."""
+    lines = text.lstrip("﻿").splitlines()
+    headings = [(index, len(match[1]), match[2]) for index, line in unfenced(lines)
+                if (match := re.match(r"^(#{1,6})\s+(.*?)\s*$", line))]
+    errors, warnings = [], []
+
+    if not headings or headings[0][1] != 1 or not headings[0][2].startswith("书本名称："):
+        return ["第一个标题必须是「# 书本名称：<书名>」，前面只放元信息。"], []
+    title_line = headings[0][0]
+    header = [re.fullmatch(r"> ([^：]+)：(.*)", line) for line in lines[:title_line] if line.strip()]
+    if not all(header) or [match[1] for match in header] != HEADER_KEYS:
+        return ["元信息必须每行一项，依次为：" + "、".join(HEADER_KEYS) + "。"], []
+    meta = {match[1]: match[2].strip() for match in header}
+    if meta["格式版本"] != FORMAT_VERSION:
+        return [f"格式版本应为 {FORMAT_VERSION}。"], []
+    try:
+        spec = load_spec(meta["目标平台"], meta["作品类型"])
+    except ValueError as error:
+        return [str(error)], []
+
+    title = headings[0][2].partition("：")[2].strip()
+    check_value("书名", "书本名称", title, errors)
+    if title and not errors:
+        warnings += title_warnings(title, spec["title"])
+
+    sections = ["封面", *spec["tag_sections"], *TAIL]
+    if [(level, name) for _, level, name in headings[1:]] != [(2, name) for name in sections]:
+        errors.append("小节必须依次为：" + " → ".join(sections) + "，都用二级标题。")
+        return errors, warnings
+    basics = parse_fields(block(lines, headings, 0), "基础资料", errors)
+    if list(basics) != spec["basics"]:
+        errors.append("基础字段必须依次为：" + "、".join(spec["basics"]) + "。")
+    for name, value in basics.items():
+        check_value("基础资料", name, value, errors)
+        choices = spec.get("choices", {}).get(name)
+        if choices and value not in ("", BLANK) and value not in choices:
+            errors.append(f"{name} 只能是：" + "、".join(choices) + f"，不能是 {value}。")
+        limit = spec.get("max_length", {}).get(name)
+        if limit and len(value) > limit:
+            warnings.append(f"{name} {len(value)} 个字，平台上限 {limit}。")
+
+    cover = parse_fields(block(lines, headings, 1), "封面", errors)
+    if list(cover) != COVER_FIELDS:
+        errors.append("封面小节字段必须依次为：" + "、".join(COVER_FIELDS) + "。")
+    if cover.get("模式") and cover["模式"] not in COVER_MODES:
+        errors.append("封面模式只能是：" + "、".join(sorted(COVER_MODES)) + "，未选时留空。")
+
+    for position, (section, rule) in enumerate(spec["tag_sections"].items(), start=2):
+        fields = parse_fields(block(lines, headings, position), section, errors)
+        file = rule["files"].get("*") or rule["files"].get(basics.get(rule.get("by", ""), ""))
+        if file is None:
+            options = load_options(next(iter(rule["files"].values())))
+            if any(values_of(value) for value in fields.values()):
+                errors.append(f"填{section}前先确定{rule['by']}（" + "或".join(rule["files"]) + "）。")
+        else:
+            options = load_options(file)
+        if list(fields) != list(options):
+            errors.append(f"{section}字段必须依次为：" + "、".join(options) + "。")
+        total = 0
+        for name, value in fields.items():
+            check_value(section, name, value, errors)
+            chosen = values_of(value)
+            total += len(chosen)
+            if name not in options or file is None:
                 continue
-            fields.append(match[1])
-            if re.search(r"(?:主分类|主题|角色|情节|情感|人设|世界观|情绪|背景)\s*[:：]", match[2]):
-                errors.append(f"{section}的 {match[1]} 行混入其他子字段，必须拆行。")
-            if is_short and match[1] in candidates:
-                values = [value.strip() for value in match[2].split("、") if value.strip()]
-                total += len(values)
-                if len(values) != len(set(values)):
-                    errors.append(f"作品分类的 {match[1]} 存在重复值。")
-                for value in values:
-                    if value not in candidates[match[1]]:
-                        errors.append(f"作品分类的 {match[1]} 值不在本字段候选中：{value}。")
-        if fields != expected:
-            errors.append(f"{section}子字段必须依次独立列出：" + "、".join(expected) + "。")
-    if total > 8:
-        errors.append(f"短故事分类共 {total} 个，五组总计最多 8 个。")
-    # This is a preparation document: blank fields are allowed, not submission readiness.
-    return errors
+            candidates, limit = options[name]
+            if len(chosen) != len(set(chosen)):
+                errors.append(f"{section}的 {name} 有重复值。")
+            if limit and len(chosen) > limit:
+                errors.append(f"{section}的 {name} 选了 {len(chosen)} 个，最多 {limit} 个。")
+            errors += [f"{section}的 {name} 不在候选里：{item}。" for item in chosen if item not in candidates]
+        if rule.get("total") and total > rule["total"]:
+            errors.append(f"{section}合计 {total} 个，最多 {rule['total']} 个。")
+
+    synopsis = "\n".join(block(lines, headings, len(spec["tag_sections"]) + 2)).strip()
+    if synopsis != BLANK:
+        check_value("作品简介", "正文", synopsis, errors)
+        limit = spec.get("max_length", {}).get("作品简介")
+        if limit and len(synopsis) > limit:
+            warnings.append(f"作品简介 {len(synopsis)} 字，平台上限 {limit}。")
+    # Blank fields are allowed: this is a preparation document, not submission readiness.
+    return errors, warnings
 
 
 def main():
@@ -153,16 +207,16 @@ def main():
     parser.add_argument("file", type=Path)
     args = parser.parse_args()
     try:
-        errors = validate(args.file.read_text(encoding="utf-8-sig"))
+        errors, warnings = check(args.file.read_text(encoding="utf-8-sig"))
     except (OSError, UnicodeError, ValueError) as error:
+        errors, warnings = [str(error)], []
+    for warning in warnings:
+        print(f"WARN: {warning}")
+    for error in errors:
         print(f"FAIL: {error}", file=sys.stderr)
-        return 1
-    if errors:
-        for error in errors:
-            print(f"FAIL: {error}", file=sys.stderr)
-        return 1
-    print("PASS: publishing document order, title and tag layout")
-    return 0
+    if not errors:
+        print("PASS: 发布资料符合格式契约与平台候选")
+    return 1 if errors else 0
 
 
 if __name__ == "__main__":

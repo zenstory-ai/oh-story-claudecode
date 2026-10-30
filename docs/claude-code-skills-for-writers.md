@@ -1,6 +1,6 @@
 # Claude Code skills that are not for coding: a fiction-writing skill pack as the worked example
 
-Agent skills can organize non-coding work. Oh Story (`zenstory-ai/oh-story-claudecode`) is an MIT-licensed set of 13 skills that turns Claude Code, Codex CLI, OpenCode, Google Antigravity, OpenClaw, ZCode and Reasonix into a full workflow for writing serialized fiction: scan bestseller charts, deconstruct top-ranked books, draft chapters with file-based continuity tracking, strip AI-flavored prose, generate covers. No code is written by the user; the agent reads and writes Markdown files in a book project.
+Agent skills can organize non-coding work. Oh Story (`zenstory-ai/oh-story-claudecode`) is an MIT-licensed set of 14 skills that turns Claude Code, Codex CLI, OpenCode, Google Antigravity, OpenClaw, ZCode and Reasonix into a full workflow for writing serialized fiction: scan bestseller charts, deconstruct top-ranked books, draft chapters with file-based continuity tracking, strip AI-flavored prose, prepare platform book-entry details, generate covers. No code is written by the user; the agent reads and writes Markdown files in a book project.
 
 ## What a skill is, in one paragraph
 
@@ -8,7 +8,7 @@ A skill is a folder with a `SKILL.md` file and optional `references/` and `scrip
 
 ## What a non-coding pack looks like
 
-The 13 skills in Oh Story, grouped by writing task:
+The 14 skills in Oh Story, grouped by writing task:
 
 | Task | Skill | What it does |
 |---|---|---|
@@ -20,7 +20,8 @@ The 13 skills in Oh Story, grouped by writing task:
 | Revise | `story-deslop` | Diagnoses expression, narrative emphasis and story causality, then revises within the author's scope and authorization |
 | Review | `story-review` | Multi-perspective review with parallel reviewer agents, falls back to single-thread |
 | Import | `story-import` | Reverse-parse an existing manuscript into the project structure |
-| Cover | `story-cover` | Cover generation from title and genre |
+| Publish prep | `story-publish` | Turns confirmed settings and outlines into a platform's book-entry details (title, synopsis, tags), checked against that platform's rules; Fanqie for now |
+| Cover | `story-cover` | Cover prompts or images from title and genre |
 | Browser | `browser-cdp` | Reuse a logged-in Chrome session to fetch chart data |
 
 The parts that make it more than a prompt collection:

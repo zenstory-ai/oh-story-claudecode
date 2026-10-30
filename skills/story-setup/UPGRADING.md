@@ -2,12 +2,12 @@
 
 ## 当前版本
 
-助手版本 37（v0.9.1）。已有项目更新技能包后，在项目根重跑 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或直接点名），再新开会话。
+助手版本 38（v0.9.2）。已有项目更新技能包后，在项目根重跑 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或直接点名），再新开会话。
 
-- `setup_skill_version: 1.3.5`
-- `agents_version: 37`
+- `setup_skill_version: 1.3.6`
+- `agents_version: 38`
 
-`.story-deployed` 字段不全，或 `agents_version` 不是整数、低于 37，都算待更新，重跑 story-setup 即可。项目里的 `agents_version` 大于 37，说明本机技能包比项目旧：先更新 oh-story-claudecode，不要用旧包覆盖。各版本改了什么见仓库根目录 `CHANGELOG.md`。
+`.story-deployed` 字段不全，或 `agents_version` 不是整数、低于 38，都算待更新，重跑 story-setup 即可。项目里的 `agents_version` 大于 38，说明本机技能包比项目旧：先更新 oh-story-claudecode，不要用旧包覆盖。各版本改了什么见仓库根目录 `CHANGELOG.md`。
 
 ## 升级步骤
 
@@ -17,7 +17,12 @@
 4. 正在写的长篇：确认每本书有 `追踪/_tracking-state.json`。没有就按下方「追踪模型迁移」重建，否则写下一章会被拦。
 5. 拆文成果或细纲不满足当前格式时，按检查提示定点补齐，不因单项缺口整本重拆。
 
-## 本次更新必须重跑 story-setup（v0.9.1，助手版本 37）
+## 本次更新必须重跑 story-setup（v0.9.2，助手版本 38）
+
+- 新增发布资料技能 `story-publish`。重跑 story-setup 后，项目里才会有这个技能（OpenClaw、Reasonix、通用模式复制到项目 `skills/`）、项目指令里的「发布资料」入口，以及 OpenCode、ZCode 的 `/story-publish` 命令。
+- 书稿、设定、追踪和作者记忆不用迁移。
+
+## v0.9.1 升级说明（助手版本 37）
 
 - 更新技能包后重跑 story-setup，并新开会话，让新版助手与 hook 生效。
 - ZCode 用户须先更新并启用 `oh-story` 插件，再从**更新后的插件副本**运行 story-setup，覆盖项目 `.zcode/skills` 快照；不要用项目里的旧 story-setup 重部署。独立安装的 Skills 不会注册插件角色。

@@ -1,33 +1,11 @@
 ---
 platform: 番茄小说
-source_snapshot_version: "2026-10-08"
 verified_on: "2026-10-25"
-backend_options_verified: true
-verified_scope: "2026-10-25 番茄作家专区 Web 创建作品页，小说男频；作者等级未提供"
-source_url: "https://fanqienovel.com/main/writer/create?enter_from=book_manage"
-source_type: "用户提供的 2026-10-08 候选项快照；2026-10-25 当前后台七张连续滚动截图逐项核对"
-section: 阅读标签
-reader_scope: 男频
-conditionally_required_groups: [主分类]
-selection_limits:
-  主分类: 1
-  主题: 2
-  角色: 2
-  情节: 2
-option_counts:
-  主分类: 19
-  主题: 33
-  角色: 22
-  情节: 80
 ---
 
-# 男频阅读标签
+# 长篇阅读标签（男频）
 
-原资料版本 2026-10-08。2026-10-25 对照作者提供的七张连续截图，逐项核对番茄作家专区 Web「作品管理 > 小说 > 创建作品 > 阅读标签」男频弹窗：主分类 19、主题 33、角色 22、情节 80，均与本页候选值一致。截图覆盖该弹窗四组的首尾和连续滚动内容，证据限于这一次网页入口；未核验 App、其他账号等级或作品类型。截图提示「主分类必选且只能选一个，主题、角色、情节最多可选两个，签约后不能修改」。
-
-入库的去账号截图：[主分类与主题](evidence/fanqie-web-male-reading-1.png)、[角色](evidence/fanqie-web-male-reading-2.png)、[情节](evidence/fanqie-web-male-reading-3.png)。含账号名的原图不入库。
-
-后台核验日期：**2026-10-25（Asia/Shanghai）**；平台未给出本次标签更新日期。阅读标签弹窗内主分类必选，不能据此推定全部建书入口都要求立即打开此弹窗。候选值勿跨字段或目标读者分支复用。
+2026-10-25 对照 Web 创建作品弹窗截图逐项核对（男频）。只用本页候选值；同名候选在不同字段里不通用，也不跨频道或给短故事用。
 
 ## 主分类
 

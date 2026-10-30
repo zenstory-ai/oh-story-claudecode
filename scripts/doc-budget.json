@@ -12,38 +12,33 @@
   "files": [
     {
       "path": "skills/story-publish/SKILL.md",
-      "budget": 5400,
-      "why": "发布平台书籍资料入口；约束已确认事实、带版本平台选项、书目录定位与覆盖保护。2026-10-27：输出顺序、格式校验与封面模式确认随入口读取；补充两万字提醒及作者要求的中文符号、十五字符书名预检，显式增加预算。"
+      "budget": 3000,
+      "why": "发布资料准备入口：状态与定稿原则、作品材料定位、封面交接、输出模板与格式检查；番茄规则只在参考文件里写一次。发布资料文件是以后自动填表的格式契约（元信息、三种字段取值、文件名），随入口读。"
     },
     {
-      "path": "skills/story-publish/references/fanqie-2026-10-08.md",
-      "budget": 3500,
-      "why": "番茄平台索引；区分标签截图核验、作者约束与阶段报告。2026-10-28 新增阶段入口及签约模式字段澄清，保留独立核验范围。 2026-10-28 增加短故事分支索引。"
-    },
-    {
-      "path": "skills/story-publish/references/fanqie-stages-2026-10-28.md",
-      "budget": 4600,
-      "why": "账号、作品类型与三阶段必填依据；2026-10-28 V1.2 区分证据层级并新增 Web 管理入口及 E01–E08 缺口跟踪，防止跨阶段套用。 补记自动书名、默认连载、修改页和 AI 状态差异，不保存私人截图。"
-    },
-    {
-      "path": "skills/story-publish/references/fanqie-short-2026-10-28.md",
-      "budget": 1900,
-      "why": "2026-10-28 六张获准公开的截图、102 个短故事分类与独立输出契约；仅短故事按需读取。"
-    },
-    {
-      "path": "skills/story-publish/references/fanqie-reading-male-2026-10-08.md",
+      "path": "skills/story-publish/references/fanqie.md",
       "budget": 1600,
-      "why": "男频阅读标签候选快照；仅在需要男频标签时条件读取，2026-10-25 后台 Web 截图逐项核对后增加核验范围与限制。"
+      "why": "番茄字段规则与核验范围，每次必读；取证过程在 docs/evidence/fanqie/，不进运行时。"
     },
     {
-      "path": "skills/story-publish/references/fanqie-reading-female-2026-10-08.md",
+      "path": "skills/story-publish/references/fanqie-reading-male.md",
+      "budget": 900,
+      "why": "男频阅读标签候选，选男频时读。"
+    },
+    {
+      "path": "skills/story-publish/references/fanqie-reading-female.md",
+      "budget": 1000,
+      "why": "女频阅读标签候选，选女频时读。"
+    },
+    {
+      "path": "skills/story-publish/references/fanqie-content-tags.md",
       "budget": 1700,
-      "why": "女频阅读标签候选快照；仅在需要女频标签时条件读取，2026-10-25 后台 Web 截图逐项核对后增加证据链接。"
+      "why": "长篇内容标签候选，可与男/女频阅读标签同轮读。"
     },
     {
-      "path": "skills/story-publish/references/fanqie-content-tags-2026-10-08.md",
-      "budget": 2700,
-      "why": "内容标签候选快照；可与男频或女频阅读标签同轮读取，2026-10-25 两频 Web 后台截图逐项核对并记录证据。"
+      "path": "skills/story-publish/references/fanqie-short.md",
+      "budget": 1300,
+      "why": "短故事分类候选、发布设置与输出替换，只在短故事时读。"
     },
     {
       "path": "skills/story-long-write/SKILL.md",
@@ -328,38 +323,32 @@
   ],
   "paths": [
     {
-      "label": "番茄发布准备",
+      "label": "番茄发布准备（长篇）",
       "files": [
         "skills/story-publish/SKILL.md",
-        "skills/story-publish/references/fanqie-2026-10-08.md",
-        "skills/story-publish/references/fanqie-stages-2026-10-28.md"
+        "skills/story-publish/references/fanqie.md"
       ],
       "branches": [
         {
-          "label": "基础资料",
-          "files": [],
-          "budget": 13390
-        },
-        {
           "label": "男频阅读标签",
           "files": [
-            "skills/story-publish/references/fanqie-reading-male-2026-10-08.md"
+            "skills/story-publish/references/fanqie-reading-male.md"
           ],
-          "budget": 14952
+          "budget": 5300
         },
         {
           "label": "女频阅读标签",
           "files": [
-            "skills/story-publish/references/fanqie-reading-female-2026-10-08.md"
+            "skills/story-publish/references/fanqie-reading-female.md"
           ],
-          "budget": 15030
+          "budget": 5400
         },
         {
           "label": "内容标签",
           "files": [
-            "skills/story-publish/references/fanqie-content-tags-2026-10-08.md"
+            "skills/story-publish/references/fanqie-content-tags.md"
           ],
-          "budget": 15994
+          "budget": 6100
         },
         {
           "label": "封面方案",
@@ -367,18 +356,18 @@
             "skills/story-cover/SKILL.md",
             "skills/story-cover/references/cover-styles.md"
           ],
-          "budget": 25199
+          "budget": 16100
         },
         {
           "label": "封面API回退",
           "files": [
             "skills/story-cover/references/api-fallback.md"
           ],
-          "budget": 16648
+          "budget": 7800
         }
       ],
       "stacking": {
-        "budget": 32701,
+        "budget": 21800,
         "slots": [
           [
             "男频阅读标签",
@@ -395,40 +384,34 @@
           ]
         ]
       },
-      "why": "固定输出与检查；男/女频互斥，内容标签、封面与风格参考可叠加，作者指定 API 回退时再读 API 参考。2026-10-28 将阶段报告列为必读并澄清签约模式，V1.2 补 Web 入口和证据跟踪，共增加 4200 字；保留两万字提醒和作者书名约束。宿主外置工具说明不计入。 补充先写章节入口的脱敏观察及适用边界，各路径增加 700 字。 2026-10-28 按最终文件实测重新锁定预算；短故事分独立路径，不与长篇标签叠加。"
+      "why": "男/女频互斥；内容标签、封面方案可同轮叠加，作者指定 API 时再加 API 回退。"
     },
     {
-      "label": "番茄短故事发布准备",
+      "label": "番茄发布准备（短故事）",
       "files": [
         "skills/story-publish/SKILL.md",
-        "skills/story-publish/references/fanqie-2026-10-08.md",
-        "skills/story-publish/references/fanqie-stages-2026-10-28.md",
-        "skills/story-publish/references/fanqie-short-2026-10-28.md"
+        "skills/story-publish/references/fanqie.md",
+        "skills/story-publish/references/fanqie-short.md"
       ],
       "branches": [
-        {
-          "label": "基础资料",
-          "files": [],
-          "budget": 15170
-        },
         {
           "label": "封面方案",
           "files": [
             "skills/story-cover/SKILL.md",
             "skills/story-cover/references/cover-styles.md"
           ],
-          "budget": 26979
+          "budget": 17300
         },
         {
           "label": "封面API回退",
           "files": [
             "skills/story-cover/references/api-fallback.md"
           ],
-          "budget": 18428
+          "budget": 9000
         }
       ],
       "stacking": {
-        "budget": 30237,
+        "budget": 20600,
         "slots": [
           [
             "封面方案"
@@ -438,7 +421,7 @@
           ]
         ]
       },
-      "why": "短故事与长篇互斥，仅加载独立分类参考；封面风格与显式指定的 API 回退可能同轮读取，登记叠加，保持 35K 硬上限。"
+      "why": "短故事与长篇互斥，只加短故事参考；封面方案与 API 回退可叠加。"
     },
     {
       "label": "长篇日更主会话（写手代写）",

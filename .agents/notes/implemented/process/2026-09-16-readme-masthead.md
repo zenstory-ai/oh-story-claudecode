@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-六个仓库的两份 README 共用同一个居中 masthead，顺序固定：品牌标记（76px，引用 `https://zenstory.ai/brand/zenstory-ai-mark.svg`）、`<h1>` 产品名、一句加粗的话、一行导航（项目主页 · 两个正文锚点 · 另一种语言）、一行 flat-square 徽章、一行 for-the-badge 社区按钮。徽章统一 flat-square 并使用品牌色：star 数 `#22D3EE`，Release 与计数 `#081431`，License `#1F6FEB`。核心四项是 Stars、Release、项目规模（Skills N 或 Workbenches N）、License；仓库特有的运行事实（Python 版本、CI、Validate、MiMo）接在其后。产品名用站点上的名字，不用仓库 slug。
+六个仓库的两份 README 共用同一个居中 masthead，顺序固定：品牌标记（76px，引用 `https://raw.githubusercontent.com/zenstory-ai/zenstory/main/apps/web/public/brand/zenstory-ai-mark.svg`；2026-10-29 起不再引用 zenstory.ai 上的副本：GitHub 图片代理在每次 README 浏览时回源，占 Vercel CDN 请求约 16%）、`<h1>` 产品名、一句加粗的话、一行导航（项目主页 · 两个正文锚点 · 另一种语言）、一行 flat-square 徽章、一行 for-the-badge 社区按钮。徽章统一 flat-square 并使用品牌色：star 数 `#22D3EE`，Release 与计数 `#081431`，License `#1F6FEB`。核心四项是 Stars、Release、项目规模（Skills N 或 Workbenches N）、License；仓库特有的运行事实（Python 版本、CI、Validate、MiMo）接在其后。产品名用站点上的名字，不用仓库 slug。
 
 ## Alternatives considered
 

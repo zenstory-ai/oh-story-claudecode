@@ -2,7 +2,7 @@
 
 
 <p align="center">
-  <img src="https://zenstory.ai/brand/zenstory-ai-mark.svg" alt="" width="76" height="76">
+  <img src="https://raw.githubusercontent.com/zenstory-ai/zenstory/main/apps/web/public/brand/zenstory-ai-mark.svg" alt="" width="76" height="76">
 </p>
 
 <h1 align="center">Oh Story</h1>
@@ -309,13 +309,13 @@ flowchart LR
 | `story-short-scan` | `/story-short-scan` | Short-form trend scan — Zhihu Yanyan/Fanqie short-form trending data |
 | `story-import` | `/story-import` | Reverse import — parse existing novels into standard project structure |
 | `story-review` | `/story-review` | Multi-perspective review — full / lean / solo modes with Fanqie/Qidian/Zhihu scoring rubrics |
-| `story-publish` | `/story-publish` | Publishing preparation — reuse writing-project facts for titles, synopses and tags; male/female tags on Fanqie's Web create-book page checked 2026-10-25, other entry points and submission validation unverified |
+| `story-publish` | `/story-publish` | Publishing preparation — turn existing settings and outlines into a platform's book-entry details (title, synopsis, tags); Fanqie supported for now |
 | `story-cover` | `/story-cover` | Cover prompts or images — image generation uses GPT-Image-2 via Codex included usage or API fallback |
 | `browser-cdp` | `/browser-cdp` | Browser control — CDP protocol for scraping with reusable login sessions |
 
 > `story-deslop` uses local prose linting: blocking applies only to deterministic style/punctuation issues, while other findings require read-through judgment; external detectors such as Zhuque are self-check references, not replacements for human review.
 
-Natural language also triggers: `帮我开书` ("help me start a book") → first clarify story planning versus platform book entry, `整理番茄发布资料` ("prepare Fanqie book details") → `story-publish`, `这篇太AI了` ("this is too AI-ish") → `story-deslop`, `把我的书导进来` ("import my book") → `story-import`, `打开工作台` ("open the dashboard") → `story dashboard`, `记住我的写作习惯` ("remember my writing habits") → `story`, which routes the request to the appropriate writing skill to manage author memory. Asking `沈栀现在什么状态` ("what's Shen Zhi's current status") searches project files, using `story-explorer` when the host supports it.
+Natural language also triggers: `帮我开书` ("help me start writing") → `story-long-write`, `整理番茄发布资料` ("prepare Fanqie book details") → `story-publish`, `这篇太AI了` ("this is too AI-ish") → `story-deslop`, `把我的书导进来` ("import my book") → `story-import`, `打开工作台` ("open the dashboard") → `story dashboard`, `记住我的写作习惯` ("remember my writing habits") → `story`, which routes the request to the appropriate writing skill to manage author memory. Asking `沈栀现在什么状态` ("what's Shen Zhi's current status") searches project files, using `story-explorer` when the host supports it.
 
 ## How it works
 

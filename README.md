@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://zenstory.ai/brand/zenstory-ai-mark.svg" alt="" width="76" height="76">
+  <img src="https://raw.githubusercontent.com/zenstory-ai/zenstory/main/apps/web/public/brand/zenstory-ai-mark.svg" alt="" width="76" height="76">
 </p>
 
 <h1 align="center">Oh Story</h1>
@@ -296,14 +296,14 @@ flowchart LR
 | `story-short-scan` | `/story-short-scan` `/短篇扫榜` | 短篇扫榜 · 知乎盐言/番茄短篇风口数据 |
 | `story-import` | `/story-import` `/导入小说` | 逆向导入 · 将已有小说反向解析为标准项目结构 |
 | `story-review` | `/story-review` `/审查` | 多视角审查 · full / lean / solo 模式 + 番茄/起点/知乎评分标准 |
-| `story-publish` | `/story-publish` | 发布准备 · 复用写作工程整理书名、简介、标签；番茄 Web 创建作品页男/女频标签于 2026-10-25 核验，其他入口及提交校验待核实 |
+| `story-publish` | `/story-publish` | 发布准备 · 用已有设定和大纲整理平台建书资料（书名、简介、标签），目前适配番茄 |
 | `story-cover` | `/story-cover` `/封面` | 封面提示词或成图 · 成图调用 GPT-Image-2（Codex 内置用量 / API 回退） |
 | `browser-cdp` | `/browser-cdp` | 浏览器操控 · CDP 协议复用登录态抓取数据 |
 
 > `story-deslop` 的本地检查是写作 lint：blocking 只限确定性句式/标点问题，其他提示按读感判断；朱雀等外部检测只作自测参考，不替代人工读感。
 
 自然语言同样触发：
-- 「帮我开书」→ 先确认是规划故事还是填写平台建书资料
+- 「帮我开书」→ `story-long-write`
 - 「整理番茄发布资料」→ `story-publish`
 - 「这篇太 AI 了」→ `story-deslop`
 - 「把我的书导进来」→ `story-import`
