@@ -10,7 +10,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > Agent 兼容性：只检查当前宿主：Claude `.claude/agents/{agent}.md`（`subagent_type`）、OpenCode `.opencode/agents/{agent}.md`（`subagent` 的 `agent`）、Codex `.codex/agents/{agent}.toml`（`agent_type`）、Antigravity `.agents/agents/agent-name/agent.md`（`invoke_subagent` + `TypeName`）。ZCode 查插件注册的同名角色，用 `Agent` 按实际 schema 派发，不要求 `.zcode/agents`。仅角色/工具不可用或返回未知 agent 时降级 solo/direct，不因其他端目录存在或宿主名固定串行。
 >
-> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 37` 不一致时（标记缺失、字段缺失/非整数、小于或大于 37）**照常按当前宿主角色来源检查并 spawn**，同时用一句白话提示作者「分析助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」，`Notice: agents bundle 版本不匹配（项目 {N}，本版 37）` 原文写进汇报最后一行「技术备注：」；大于 37 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct，`Fallback: project custom agents unavailable -> solo` 同样只进技术备注行。
+> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 38` 不一致时（标记缺失、字段缺失/非整数、小于或大于 38）**照常按当前宿主角色来源检查并 spawn**，同时用一句白话提示作者「分析助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」，`Notice: agents bundle 版本不匹配（项目 {N}，本版 38）` 原文写进汇报最后一行「技术备注：」；大于 38 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct，`Fallback: project custom agents unavailable -> solo` 同样只进技术备注行。
 
 ## 名词与目录边界（全流程硬约束）
 

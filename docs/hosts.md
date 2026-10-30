@@ -15,7 +15,7 @@ Windows 上偶尔会看到 `ENOENT ... mkdir` 报错但末尾仍显示 `Done!`�
 
 ## Claude Code
 
-marketplace 名保持 `oh-story-skills`，其中现在只有一个 `oh-story` bundle，由 Claude Code 从仓库根自动发现全部 13 个 Skills：
+marketplace 名保持 `oh-story-skills`，其中现在只有一个 `oh-story` bundle，由 Claude Code 从仓库根自动发现全部 14 个 Skills：
 
 ```bash
 claude plugin marketplace add https://github.com/zenstory-ai/oh-story-claudecode
@@ -26,17 +26,17 @@ claude plugin install oh-story@oh-story-skills
 
 ## Antigravity
 
-先用 `/skills` 或自然语言运行 `story-setup`，它会自动识别当前宿主（`target_cli=antigravity`），判断不出时才会问你。它只在当前写作项目创建/更新 13 个 `.agents/skills/` 已知目录、7 个 `.agents/agents/agent-name/agent.md` 已知定义（`agent-name` 替换为实际名称）、`.agents/rules/oh-story.md`、两个 `.agents/hooks/` runtime 文件与 `.agents/hooks.json` 的 `oh-story` 管理组；其他用户 Skills、Agents、Rules、Hooks 和 hook groups 都保留，部署器本身不会写 `~/.gemini/`。项目内 Skills 使用真实目录；若 `.agents/skills` 已是 symlink，会先解释 git diff 并征求明确迁移同意，未同意绝不沿链接写入。Hook 依赖 PATH 中的 `node`；部署后新开 conversation，再分别在 IDE 与交互式 `agy` 中 smoke test。命令行写作可从项目目录启动交互式 `agy`，确认 `/skills`、`/agents`、`/hooks` 已发现 oh-story 后再发任务。**print 模式（`agy -p`）必须带 `--add-dir "$PWD"`**：实测 agy 1.2.10 带上它会加载工作区 `.agents/`（13 个 skills、7 个 agents 与 hooks），不带则一个都不加载，skill 回退、甚至把普通模型输出写到 `~/.gemini/antigravity-cli/scratch/`。测试后检查 scratch 没有意外小说产物。
+先用 `/skills` 或自然语言运行 `story-setup`，它会自动识别当前宿主（`target_cli=antigravity`），判断不出时才会问你。它只在当前写作项目创建/更新 14 个 `.agents/skills/` 已知目录、7 个 `.agents/agents/agent-name/agent.md` 已知定义（`agent-name` 替换为实际名称）、`.agents/rules/oh-story.md`、两个 `.agents/hooks/` runtime 文件与 `.agents/hooks.json` 的 `oh-story` 管理组；其他用户 Skills、Agents、Rules、Hooks 和 hook groups 都保留，部署器本身不会写 `~/.gemini/`。项目内 Skills 使用真实目录；若 `.agents/skills` 已是 symlink，会先解释 git diff 并征求明确迁移同意，未同意绝不沿链接写入。Hook 依赖 PATH 中的 `node`；部署后新开 conversation，再分别在 IDE 与交互式 `agy` 中 smoke test。命令行写作可从项目目录启动交互式 `agy`，确认 `/skills`、`/agents`、`/hooks` 已发现 oh-story 后再发任务。**print 模式（`agy -p`）必须带 `--add-dir "$PWD"`**：实测 agy 1.2.10 带上它会加载工作区 `.agents/`（14 个 skills、7 个 agents 与 hooks），不带则一个都不加载，skill 回退、甚至把普通模型输出写到 `~/.gemini/antigravity-cli/scratch/`。测试后检查 scratch 没有意外小说产物。
 
 ## Codex
 
-repo 内直接使用：Codex 会扫描 `$REPO_ROOT/.agents/skills`（指向 `skills/` 的 symlink）发现 13 个 skill；用 `$story`、`$story-setup` 或 `/skills` 调用。Windows 上 git 需开 `core.symlinks=true`，否则 symlink 失效，改走下方 `$story-setup` 部署。
+repo 内直接使用：Codex 会扫描 `$REPO_ROOT/.agents/skills`（指向 `skills/` 的 symlink）发现 14 个 skill；用 `$story`、`$story-setup` 或 `/skills` 调用。Windows 上 git 需开 `core.symlinks=true`，否则 symlink 失效，改走下方 `$story-setup` 部署。
 
 跑 `$story-setup` 部署到写作项目后，会写入 `.codex/agents/*.toml`、`.codex/hooks.json`、`.codex/hooks/{story_codex_hook.py,run-story-hook.sh,run-story-hook.cmd}` 和 `.codex/skills/story-setup/references/agent-references/`；请信任项目 `.codex/` 配置层并在 `/hooks` review/trust hooks、新开 Codex 会话，让 custom agents 生效。**在 `/hooks` 信任之前，Codex 会静默跳过这些 hooks，包括写正文前的大纲守卫**，不报错也不提示；自动化里的 `codex exec` 可加 `--dangerously-bypass-hook-trust`。
 
 ## ZCode
 
-在 Plugin Management 中添加本仓库，安装 `oh-story`，即可调用全部 13 个 Skills/Commands。市场名可能显示 `oh-story-zcode`（根 catalog）或 `oh-story-skills`（Claude catalog）；选择其中一个即可，内容相同。旧版多条目安装按[升级指南](../skills/story-setup/UPGRADING.md#插件打包身份迁移v079-同版本修复)迁移。`$story-setup` 选择 `target_cli=zcode` 会部署 `.zcode/skills/`、`.zcode/commands/`、`.zcode/hooks/story_zcode_hook.js`，安全合并 `.zcode/config.json` 与根 `AGENTS.md`；Hook 依赖 PATH 中的 `node`。当前 ZCode 支持插件子代理；oh-story 插件注册 7 个专业角色，按当前 `Agent` 工具派发，只有角色或工具不可用时才降级。独立安装 Skills 不会注册这些角色，需启用插件；不创建 `.zcode/agents/` 或写入用户 home。升级插件后重新运行 `$story-setup` 更新项目快照和旧 AGENTS 指令，再新开会话。现有 Hook 适配不注册 `PreCompact` / `SessionEnd`，compact 后由 `SessionStart` 恢复上下文。见 [ZCode 插件](https://zcode.z.ai/en/docs/plugin)与[子代理文档](https://zcode.z.ai/en/docs/subagents)。
+在 Plugin Management 中添加本仓库，安装 `oh-story`，即可调用全部 14 个 Skills/Commands。市场名可能显示 `oh-story-zcode`（根 catalog）或 `oh-story-skills`（Claude catalog）；选择其中一个即可，内容相同。旧版多条目安装按[升级指南](../skills/story-setup/UPGRADING.md#插件打包身份迁移v079-同版本修复)迁移。`$story-setup` 选择 `target_cli=zcode` 会部署 `.zcode/skills/`、`.zcode/commands/`、`.zcode/hooks/story_zcode_hook.js`，安全合并 `.zcode/config.json` 与根 `AGENTS.md`；Hook 依赖 PATH 中的 `node`。当前 ZCode 支持插件子代理；oh-story 插件注册 7 个专业角色，按当前 `Agent` 工具派发，只有角色或工具不可用时才降级。独立安装 Skills 不会注册这些角色，需启用插件；不创建 `.zcode/agents/` 或写入用户 home。升级插件后重新运行 `$story-setup` 更新项目快照和旧 AGENTS 指令，再新开会话。现有 Hook 适配不注册 `PreCompact` / `SessionEnd`，compact 后由 `SessionStart` 恢复上下文。见 [ZCode 插件](https://zcode.z.ai/en/docs/plugin)与[子代理文档](https://zcode.z.ai/en/docs/subagents)。
 
 ## OpenCode
 
@@ -44,11 +44,11 @@ repo 内直接使用：Codex 会扫描 `$REPO_ROOT/.agents/skills`（指向 `ski
 
 ## OpenClaw
 
-当前支持 skills-only：OpenClaw 可从 workspace `skills/`、`.agents/skills`、`~/.agents/skills`、`~/.openclaw/skills` 等 skill root 发现本项目 13 个 skill；`SKILL.md` 已按 OpenClaw 要求使用单行 `name` / `description` 与单行 JSON `metadata.openclaw`。`story-setup` 选择 `target_cli=openclaw` 时会把 skills 复制到项目 `skills/` 并写入 OpenClaw 版 `AGENTS.md`；agents/hooks 暂不部署，写正文前大纲守卫在 OpenClaw 下是 skill 内软约束。部署后如未显示新 skills，请新开 OpenClaw session 或等待 watcher 刷新。
+当前支持 skills-only：OpenClaw 可从 workspace `skills/`、`.agents/skills`、`~/.agents/skills`、`~/.openclaw/skills` 等 skill root 发现本项目 14 个 skill；`SKILL.md` 已按 OpenClaw 要求使用单行 `name` / `description` 与单行 JSON `metadata.openclaw`。`story-setup` 选择 `target_cli=openclaw` 时会把 skills 复制到项目 `skills/` 并写入 OpenClaw 版 `AGENTS.md`；agents/hooks 暂不部署，写正文前大纲守卫在 OpenClaw 下是 skill 内软约束。部署后如未显示新 skills，请新开 OpenClaw session 或等待 watcher 刷新。
 
 ## Reasonix
 
-当前支持 skills + 原生 plugin manifest：Reasonix 原生扫描项目 skill root（`.agents/skills` 等，指向 `skills/` 的 symlink）发现 13 个 skill，用 `reasonix doctor capabilities` 校验；也可用根 `reasonix-plugin.json` 走 `reasonix plugin install`。`story-setup` 选择 `target_cli=reasonix` 时会把 skills 复制到项目 `skills/` 并写入 Reasonix 版 `AGENTS.md`；hooks/custom agents 暂不部署，涉及专业 Agent 的 skill 走 solo/direct fallback。Windows 未启用 symlink 时改走原生 plugin。
+当前支持 skills + 原生 plugin manifest：Reasonix 原生扫描项目 skill root（`.agents/skills` 等，指向 `skills/` 的 symlink）发现 14 个 skill，用 `reasonix doctor capabilities` 校验；也可用根 `reasonix-plugin.json` 走 `reasonix plugin install`。`story-setup` 选择 `target_cli=reasonix` 时会把 skills 复制到项目 `skills/` 并写入 Reasonix 版 `AGENTS.md`；hooks/custom agents 暂不部署，涉及专业 Agent 的 skill 走 solo/direct fallback。Windows 未启用 symlink 时改走原生 plugin。
 
 ## Web AI / 通用 Agent
 

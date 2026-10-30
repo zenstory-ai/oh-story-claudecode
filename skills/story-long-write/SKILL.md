@@ -25,7 +25,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > 专业 agent 只查当前宿主：Claude `.claude/agents`、OpenCode `.opencode/agents`、Codex `.codex/agents` TOML、Antigravity `.agents/agents`（`invoke_subagent` + 同名 `TypeName`）；ZCode 查已启用插件注册的同名角色，用 `Agent` 工具按实际 schema 派发，不要求 `.zcode/agents`。仅角色或调用能力缺失、返回 unknown agent 时报告 fallback 并 solo/direct，不因宿主名或其他端目录存在而降级。
 >
-> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 37` 不一致时（标记缺失、字段缺失/非整数、小于或大于 37）**照常按当前宿主角色来源检查并 spawn**；同时用一句白话提示作者「写作助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」，`Notice: agents bundle 版本不匹配（项目 {N}，本版 37）` 原文写进技术备注行；大于 37 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct，`Fallback: ... -> solo` 同样只进技术备注行。
+> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 38` 不一致时（标记缺失、字段缺失/非整数、小于或大于 38）**照常按当前宿主角色来源检查并 spawn**；同时用一句白话提示作者「写作助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」，`Notice: agents bundle 版本不匹配（项目 {N}，本版 38）` 原文写进技术备注行；大于 38 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct，`Fallback: ... -> solo` 同样只进技术备注行。
 
 **文风裁决**：正文写作、改写或审稿前先读 [references/style-resolution.md](references/style-resolution.md)，加载本书文风并形成 `style_resolution`；无作者记忆也执行。当前请求、本书文风和 active 偏好按维度覆盖通用 references；同一裁决交给后续执行者。
 

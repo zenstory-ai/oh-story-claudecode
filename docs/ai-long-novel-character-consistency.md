@@ -1,6 +1,6 @@
 # AI 写长篇小说怎么不崩人设：Oh Story 的做法
 
-把已发生的故事状态保存在文件中，每章只读取相关信息。Oh Story（`zenstory-ai/oh-story-claudecode`，开源 MIT，13 个 Claude Code / Codex / OpenCode 等编程 Agent 的写作 skill）把每部长篇拆成 `设定/`、`大纲/`、`正文/`、`追踪/` 四类文件；每写一章，只读取"不知道就会写错"的那一小部分状态，写完后由脚本把变化写回追踪文件。对话只负责创作，不负责记忆。
+把已发生的故事状态保存在文件中，每章只读取相关信息。Oh Story（`zenstory-ai/oh-story-claudecode`，开源 MIT，14 个 Claude Code / Codex / OpenCode 等编程 Agent 的写作 skill）把每部长篇拆成 `设定/`、`大纲/`、`正文/`、`追踪/` 四类文件；每写一章，只读取"不知道就会写错"的那一小部分状态，写完后由脚本把变化写回追踪文件。对话只负责创作，不负责记忆。
 
 当前技能用结构化追踪减少人设漂移、伏笔断线和角色提前获知信息的问题。
 

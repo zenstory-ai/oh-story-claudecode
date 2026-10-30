@@ -1,6 +1,6 @@
 ---
 name: story-setup
-version: 1.3.5
+version: 1.3.6
 description: "网文写作工具集基础设施部署与检查。为 Claude Code / OpenCode / Codex / Google Antigravity / ZCode / OpenClaw / Reasonix 提供内置适配；Web AI / 通用 Agent 可走 skills + AGENTS.md 文件模式。触发方式：/story-setup、$story-setup、「准备写书」「帮我搭一下环境」「配置写作项目」「检查写作环境」。"
 metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudecode"}}
 ---
@@ -26,9 +26,9 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 > 判据是「有没有 `SKILL.md`」：只看正在执行的 `SKILL.md` 同级的 `references/`。项目内 `.claude/skills/story-setup/`、`.codex/skills/story-setup/` 和 OpenCode 的 `skills/story-setup/` 只有 `references/agent-references/`、不含 `SKILL.md`，不会是执行目录，也不要拿它们核对。Antigravity / ZCode / OpenClaw / Reasonix / generic 的项目副本是整份 skill 拷贝、自带 `SKILL.md`，9 个子目录本就齐全，照常核对即可。
 
 1. 检查当前目录是否已部署过（存在 `.story-deployed`）
-   - `agents_version` 缺失、非整数或小于 `37` → 标记为待更新，继续执行当前部署
-   - `agents_version: 37` → 使用 AskUserQuestion 确认是否重新部署；提示里写明重新部署只用**当前本地 skill 包**刷新项目文件，要拿 skill 本身的新版本得先更新 oh-story-claudecode（`npx skills add` 或 marketplace），再回来重跑
-   - `agents_version` 大于 `37` → 当前 story-setup 比项目部署旧；停止以避免降级覆盖，提示先更新 oh-story-claudecode，不写任何部署文件
+   - `agents_version` 缺失、非整数或小于 `38` → 标记为待更新，继续执行当前部署
+   - `agents_version: 38` → 使用 AskUserQuestion 确认是否重新部署；提示里写明重新部署只用**当前本地 skill 包**刷新项目文件，要拿 skill 本身的新版本得先更新 oh-story-claudecode（`npx skills add` 或 marketplace），再回来重跑
+   - `agents_version` 大于 `38` → 当前 story-setup 比项目部署旧；停止以避免降级覆盖，提示先更新 oh-story-claudecode，不写任何部署文件
    - 同时读 `target_cli` 字段。**已部署项目以 sentinel 里的值为准**：非空时（逗号分隔的多端组合原样保留）这些端照常重新部署，不再让作者选；第 4 步仍判断当前宿主：判断出来且不在其中（作者换了软件）→ AskUserQuestion 问「这个文件夹之前是给 {已部署宿主名} 装的，你现在用的是 {当前宿主名}，要一起装上吗？」（「一起装上（推荐）」「只更新原来的」），选前者就加进 `target_cli`；判断不出不问。字段缺失或为空才走第 4-6 步。用户明确要求增删目标端时，用 AskUserQuestion 在现有值基础上改，改完的值写回 sentinel。
    - `target_cli` 不含 opencode、但项目里有 `.opencode/plugins/story-hooks.ts` 或 `.opencode/agents/`（多端部署时 OpenCode 曾被版本门拦下）→ 用 AskUserQuestion 问是否把 OpenCode 加回来；选加回则先过 [references/deploy-opencode.md](references/deploy-opencode.md) 的「部署前置」，通过后写回 `target_cli`
 2. 检查是否有书名目录（包含 `追踪/` 子目录的目录，或用户自定义结构）
@@ -89,8 +89,8 @@ Phase 2 幂等：复制、写入与各宿主合并重复执行结果一致。受
 - 写入以下字段（YAML `key: value` 格式，hook 用 `references/templates/hooks/lib/sentinel.sh` 读取）：
   ```
   deployed_at: <date -u +"%Y-%m-%dT%H:%M:%SZ">
-  agents_version: 37
-  setup_skill_version: 1.3.5
+  agents_version: 38
+  setup_skill_version: 1.3.6
   target_cli: claude-code（或 opencode、codex、antigravity、zcode、openclaw、reasonix、generic，或其任意组合）
   resolver_strategy: project-local-skill-reference
   references_dir: .claude/skills/story-setup/references/agent-references（Codex 写 .codex/skills/...；Antigravity 写 .agents/skills/...；ZCode 写 .zcode/skills/...；OpenCode / OpenClaw / Reasonix / generic 写 skills/...；多端用逗号分隔）
