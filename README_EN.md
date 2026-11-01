@@ -60,7 +60,8 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 
 `-g` installs globally for every directory; drop it to install into the current directory only. **To update, run the same command again.**
 
-You can also just tell your agent (any platform that can import a GitHub repo or skill):
+You can also just tell your agent (any platform that can import a GitHub repo or skill, such as WorkBuddy;
+see a [community walkthrough](https://zhuanlan.zhihu.com/p/2087452622655592204), in Chinese):
 
 ```
 Install this skill https://github.com/zenstory-ai/oh-story-claudecode

@@ -57,7 +57,7 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 
 `-g` 全局安装，所有目录可用；去掉 `-g` 则只装到当前目录。**更新时重新执行同一条命令即可。**
 
-也可以直接对 Agent 说一句话（支持导入 GitHub 仓库 / skill 的平台都适用）：
+也可以直接对 Agent 说一句话（支持导入 GitHub 仓库 / skill 的平台都适用，例如 WorkBuddy，见社区写的[开书实操](https://zhuanlan.zhihu.com/p/2087452622655592204)）：
 
 ```
 安装这个 skill https://github.com/zenstory-ai/oh-story-claudecode
