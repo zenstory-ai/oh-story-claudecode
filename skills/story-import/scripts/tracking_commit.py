@@ -1614,6 +1614,10 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = build_parser().parse_args()
     try:
+        try:
+            args.project = wordcount_core.resolve_book_dir(args.project)
+        except wordcount_core.WordcountError as exc:
+            raise TrackingError(str(exc)) from exc
         if args.command == "draft":
             document, snapshots, extra = draft_transaction(args.project, args.chapter)
             previous_position = extra if document["mode"] == "append" else {}
