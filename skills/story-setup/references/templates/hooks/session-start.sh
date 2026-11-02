@@ -26,10 +26,17 @@ export LC_ALL=C
 
 ROOT=$(project_root)
 
+# SessionStart 输入的 source：startup / resume 是新进程，compact / clear 仍在原进程里。
+HOOK_SOURCE=""
+if [ ! -t 0 ]; then
+  HOOK_SOURCE=$(cat 2>/dev/null | LC_ALL=C sed -n 's/.*"source"[[:space:]]*:[[:space:]]*"\([a-z]*\)".*/\1/p' | head -1 || true)
+fi
+
 # story-setup 部署后的一次性重启确认。custom agents 只在会话启动时被注册成
 # subagent_type；story-setup 部署完会留下 .claude/.agents-pending-restart 标记。
-# 走到这里说明已是新会话、agents 已随会话重新加载——确认并清除标记（一次性）。
-if [ -f "$ROOT/.claude/.agents-pending-restart" ]; then
+# compact / clear 不重新加载 agents（已部署项目里重跑 setup 后压缩上下文也会触发本 hook），
+# 这时保留标记；其余来源说明已是新会话、agents 已随会话重新加载——确认并清除标记（一次性）。
+if [ -f "$ROOT/.claude/.agents-pending-restart" ] && [ "$HOOK_SOURCE" != "compact" ] && [ "$HOOK_SOURCE" != "clear" ]; then
   OUTPUT+="[INFO] story-setup 刚部署/更新了 agents，本会话已重新加载——story-architect、narrative-writer 等 custom agent 现已注册可用。${NL}"
   OUTPUT+="  若写作 skill 仍提示 spawn 失败 / 降级 solo，说明你还在部署时的旧会话里，请再新开一个 Claude Code 会话。${NL}${NL}"
   HAS_CONTENT=true
