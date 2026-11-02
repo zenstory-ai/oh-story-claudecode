@@ -16,6 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 STORYCTL = ROOT / "skills/story-long-write/scripts/storyctl.py"
 TRACKING = ROOT / "skills/story-long-write/scripts/tracking_commit.py"
+BUILD_PROMPT = ROOT / "skills/story-long-write/scripts/build_writer_prompt.py"
 
 
 def position() -> dict[str, object]:
@@ -363,6 +364,41 @@ class FinalChapterFlowTests(unittest.TestCase):
         self.assertEqual(committed["work_dir_removed"], ".story/work/第001章")
         self.assertEqual(self.state()["wordcount_records"]["1"]["actual"], 950)
         self.assertIn("第1章完成。", (self.project / "追踪/逐章记录/第001章.md").read_text(encoding="utf-8"))
+
+    def test_workspace_root_with_active_book_works_like_the_book_dir(self) -> None:
+        # 作者自然会把放 .active-book 的工作区根传给 --project：三个脚本都要落到那本书，不能报「没初始化」。
+        (self.root / ".active-book").write_text("book\n", encoding="utf-8")
+        self.write_contract(1, 1000)
+        document = transaction(1, self.state()["state_revision"])
+        committed = self.run_process([
+            sys.executable, str(STORYCTL), "chapter", "commit", "--project", str(self.root), "--chapter", "1",
+            "--input", str(self.write_input("chapter-1", document)),
+        ])
+        self.assertTrue(committed["tracking_committed"])
+        self.assertEqual(self.state()["last_committed_chapter"], 1)
+        for script, args in (
+            (TRACKING, ["check"]),
+            (TRACKING, ["draft", "--chapter", "2", "--force"]),
+            (STORYCTL, ["chapter", "check", "--chapter", "1"]),
+            (BUILD_PROMPT, ["--chapter", "1"]),
+        ):
+            outputs = []
+            for project in (self.project, self.root):
+                completed = subprocess.run(
+                    [sys.executable, str(script), *args, "--project", str(project)],
+                    cwd=ROOT, text=True, encoding="utf-8", capture_output=True, check=False,
+                )
+                outputs.append((completed.returncode, completed.stdout, completed.stderr))
+            self.assertEqual(outputs[0], outputs[1], (script.name, args))
+
+    def test_active_book_pointing_outside_the_workspace_names_the_fix(self) -> None:
+        (self.root / ".active-book").write_text("../elsewhere\n", encoding="utf-8")
+        completed = subprocess.run(
+            [sys.executable, str(TRACKING), "check", "--project", str(self.root)],
+            cwd=ROOT, text=True, encoding="utf-8", capture_output=True, check=False,
+        )
+        self.assertEqual(completed.returncode, 2)
+        self.assertIn("--project 直接传书目录", completed.stderr)
 
     def test_chapter_work_dir_survives_failure_and_is_removed_after_commit(self) -> None:
         work = self.project / ".story/work/第001章"

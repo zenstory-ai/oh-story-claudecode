@@ -41,6 +41,7 @@ import subprocess
 import sys
 from pathlib import Path
 from outline_view import parse as parse_volume
+from wordcount_core import WordcountError, resolve_book_dir
 
 TAIL_CHARS = 400          # 上一章结尾注入的目标字符数（按整行回退，不切半句）
 STATE_SECTIONS = ("当前位置", "长期约束", "核心角色状态", "活跃伏笔", "近三章速记", "下一章承诺", "连贯性风险")
@@ -641,6 +642,11 @@ def main(argv=None):
         parser.error("--chapter 必须大于 0")
     if not project.is_dir():
         sys.stderr.write(f"项目目录不存在：{project}\n")
+        return 2
+    try:
+        project = resolve_book_dir(project)
+    except WordcountError as exc:
+        sys.stderr.write(f"{exc}\n")
         return 2
 
     report = []
