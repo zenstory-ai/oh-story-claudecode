@@ -1110,7 +1110,17 @@ copy_hooks "$restart_root"
 copy_agent_refs "$restart_root"
 write_sentinel "$restart_root"
 touch "$restart_root/.claude/.agents-pending-restart"
-restart_out="$(run_from_nested "$restart_root" session-start.sh || true)"
+# compact / clear 不是新会话：不能声称 agents 已重新加载，也不能吃掉标记
+for restart_source in compact clear; do
+  restart_out="$(printf '{"hook_event_name":"SessionStart","source":"%s"}' "$restart_source" \
+    | run_from_nested "$restart_root" session-start.sh || true)"
+  if echo "$restart_out" | grep -q '现已注册可用'; then
+    fail "session-start claimed agents reloaded on source=$restart_source"
+  fi
+  [ -f "$restart_root/.claude/.agents-pending-restart" ] || fail "session-start cleared the restart flag on source=$restart_source"
+done
+restart_out="$(printf '{"hook_event_name":"SessionStart","source":"startup"}' \
+  | run_from_nested "$restart_root" session-start.sh || true)"
 echo "$restart_out" | grep -q '现已注册可用' || fail "session-start did not confirm agents registered after restart flag"
 [ ! -f "$restart_root/.claude/.agents-pending-restart" ] || fail "session-start did not clear the one-shot .agents-pending-restart flag"
 echo "  OK TS12 restart-flag confirmation"
