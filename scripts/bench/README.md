@@ -34,7 +34,7 @@ Codex 主机**必须**用独立的 `CODEX_HOME`：目录里只放一个指向 `~
 | `deploy.py export --ref <git ref> --out <目录>` | 从 git 导出某个版本的 `skills/` 与契约文件 |
 | `deploy.py deploy --pkg <包> --host claude-code\|codex --proj <项目>` | 按 story-setup 部署清单确定性部署（skills、agents、hooks、rules、入口文档、部署标记），不经过模型 |
 | `run.py --case <用例> --pkg <包> --host <主机> --out <runs目录> [--label <标签>]` | 复制 fixture、部署、`git init`，按 `cases.json` 的轮次跑真实会话；作者被问到时按 `follow_up` 回答，直到提交够章数 |
-| `judge.py [--judge agy\|claude\|codex] coverage\|pairwise ...` | 评委（默认 Antigravity 上的 Gemini；必须与写手不同家族）逐条核对情节点是否落地、列越界新增；两版配对盲评，交换顺序各评一次，两次一致才算胜负；两版细纲不同时各附各的细纲 |
+| `judge.py [--judge agy\|claude\|codex] coverage\|pairwise ...` | 评委（默认 Antigravity 上的 Gemini；必须与写手不同家族）逐条核对情节点是否落地、列越界新增；两版配对盲评，交换顺序各评一次，两次一致才算胜负；两版细纲不同时各附各的细纲；`--criterion reader` 改问哪一版更像目标平台读者会追的网文 |
 | `compare.py --base ... --cand ... --coverage ... --pairwise ...` | 汇总两个版本的效率与质量，按非劣效门槛给出通过/不通过 |
 | `metrics.py <run目录>... [--table] [--tell <tell仓库>]` | 每章平均墙钟、累计输入/输出 token、主会话调用、工具调用、子 agent 次数、上下文峰值、压缩次数；每章字数、首次字数检查结论、检测器命中；给 `--tell` 时加人类区间越界项数 |
 
@@ -48,6 +48,7 @@ Claude Code 主机默认用隔离 HOME，会话与子 agent 转录都在 `<run>/
 
 - `mid-daily`：demo 书第 21 章之后日更 3 章（成熟项目、有追踪、有对标）
 - `open-xuanhuan`、`open-nvpin`：新开的书从第 1 章写到第 3 章（开篇章节、首次初始化追踪）
+- `open-nvpin-niche`：冷门行业的番茄女频轻悬疑，先补第 1 章细纲再写；配 `judge.py pairwise --criterion reader` 看首章是不是网文，不只看文笔
 
 ## 质量结论怎么下
 

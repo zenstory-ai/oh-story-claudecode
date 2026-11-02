@@ -44,6 +44,17 @@
       ],
       "follow_up": "按你推荐的处理，然后接着写下一章。",
       "max_follow_ups": 5
+    },
+    {
+      "id": "open-nvpin-niche",
+      "fixture": "地铁女频-ch0",
+      "book_dir": "两点十七分的空车",
+      "chapters": 1,
+      "turns": [
+        "/story-long-write 补第1章细纲，然后写第1章"
+      ],
+      "follow_up": "按你推荐的处理，然后接着写。",
+      "max_follow_ups": 3
     }
   ]
 }

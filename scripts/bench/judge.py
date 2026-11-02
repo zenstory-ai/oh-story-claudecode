@@ -13,6 +13,8 @@ coverage：每章单独评，评委只看本章细纲与正文，不知道版本
 pairwise：同 (主机, 用例, 章号) 的两个版本随机分 A/B，交换顺序各评一次；
           两次一致才算胜负，不一致记平。评委不知道哪份是哪个版本。两版细纲不同（用例现补细纲）时
           各附各的细纲，不拿一方的细纲评另一方。
+          --criterion reader：改问「哪一版更像目标平台读者会追的网文」（抓手、站到主角这边、情绪推进、
+          期待回击、章尾）。默认口径偏爱克制，看不出「写成了现实主义短篇、不像网文」这类问题。
 所有原始回复落在 --out，便于复核；重复运行跳过已有结果。
 """
 import argparse
@@ -81,6 +83,24 @@ PAIRWISE_PROMPT = """你是番茄小说的资深编辑。下面是{source}写出
 """
 
 
+READER_PAIRWISE_PROMPT = """你是番茄小说的签约编辑。下面是{source}写出的两版第 {chapter} 章正文（A 与 B），
+来源未知。只回答一个问题：哪一版更像目标平台读者会点进来并追下去的网文？看开头几百字有没有抓手，
+读者能不能站到主角这边（她要什么、受了什么委屈、心里怎么想），有没有情绪推进和让人期待她回击的东西，
+章尾想不想点下一章。不评文学性，不因长短本身加减分。
+
+只输出一个 JSON 对象，不要任何别的文字：
+{{"winner": "A|B|tie", "reason": "两三句具体理由，引用原文片段"}}
+
+{outline}
+
+===== A =====
+{a}
+
+===== B =====
+{b}
+"""
+
+
 def ask(prompt, cwd):
     model = JUDGE_MODELS[JUDGE]
     if JUDGE == 'claude':
@@ -131,7 +151,7 @@ def coverage(runs, out, strict=False):
             print(dest.name, 'ok' if result else 'PARSE_FAIL', flush=True)
 
 
-def pairwise(base_runs, cand_runs, out):
+def pairwise(base_runs, cand_runs, out, criterion='quality'):
     out.mkdir(parents=True, exist_ok=True)
     index = {}
     for label, runs in (('base', base_runs), ('cand', cand_runs)):
@@ -141,7 +161,8 @@ def pairwise(base_runs, cand_runs, out):
     for (host, case, n), pair in sorted(index.items()):
         if len(pair) != 2:
             continue
-        dest = out / f'{host}-{case}-{n:03d}-{JUDGE}.json'
+        suffix = '' if criterion == 'quality' else f'-{criterion}'
+        dest = out / f'{host}-{case}-{n:03d}-{JUDGE}{suffix}.json'
         if dest.exists():
             continue
         seed = int(hashlib.sha256(f'{host}{case}{n}'.encode()).hexdigest(), 16)
@@ -156,7 +177,8 @@ def pairwise(base_runs, cand_runs, out):
             else:
                 source = '各自细纲（同一段剧情、分别补写）'
                 outline = '===== A 的细纲 =====\n%s\n\n===== B 的细纲 =====\n%s' % (outlines[a], outlines[b])
-            result, raw = ask(PAIRWISE_PROMPT.format(source=source, chapter=n, outline=outline, a=texts[a], b=texts[b]),
+            template = READER_PAIRWISE_PROMPT if criterion == 'reader' else PAIRWISE_PROMPT
+            result, raw = ask(template.format(source=source, chapter=n, outline=outline, a=texts[a], b=texts[b]),
                               out)
             w = (result or {}).get('winner')
             rounds.append({'A': a, 'B': b, 'winner': {'A': a, 'B': b}.get(w, 'tie' if w == 'tie' else None),
@@ -164,6 +186,7 @@ def pairwise(base_runs, cand_runs, out):
         votes = [r['winner'] for r in rounds]
         final = votes[0] if votes[0] == votes[1] and votes[0] in ('base', 'cand') else 'tie'
         dest.write_text(json.dumps({'host': host, 'case': case, 'chapter': n, 'judge': JUDGE_MODELS[JUDGE],
+                                    'criterion': criterion,
                                     'final': final, 'rounds': rounds},
                                    ensure_ascii=False, indent=1), encoding='utf-8')
         print(dest.name, final, flush=True)
@@ -183,12 +206,14 @@ def main():
     p.add_argument('--base', nargs='+', required=True)
     p.add_argument('--cand', nargs='+', required=True)
     p.add_argument('--out', required=True)
+    p.add_argument('--criterion', choices=['quality', 'reader'], default='quality',
+                   help='quality：更好看、更不像 AI（默认）；reader：更像目标平台读者会追的网文')
     a = ap.parse_args()
     JUDGE = a.judge
     if a.cmd == 'coverage':
         coverage(a.runs, Path(a.out), strict=a.strict)
     else:
-        pairwise(a.base, a.cand, Path(a.out))
+        pairwise(a.base, a.cand, Path(a.out), criterion=a.criterion)
 
 
 if __name__ == '__main__':
