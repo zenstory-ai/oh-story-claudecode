@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import os
 import subprocess
@@ -763,28 +764,28 @@ class TrackingCommitTests(unittest.TestCase):
         self.assertIn(constraint, record)
         self.run_tool("check")
 
-    def test_revision_without_remeasuring_a_changed_body_is_rejected(self) -> None:
+    def test_revision_recounts_a_body_edited_after_commit(self) -> None:
+        # 提交后去味或审稿改了正文：修订照常提交，字数记录按现正文重算，不让作者换工具。
         self.init()
         body = self.write_chapter_contract(1, actual=1000, target=1000)
         self.run_tool("commit", self.bind_wordcount(transaction(1), resolution="within_user_band"))
-        (self.project / "正文/第001章_测试.md").write_bytes(body.replace("字".encode("utf-8"), "改".encode("utf-8"), 50))
+        committed_actual = self.read_state()["wordcount_records"]["1"]["actual"]
+        body_path = self.project / "正文/第001章_测试.md"
+        body_path.write_bytes(body.replace("字".encode("utf-8"), "".encode("utf-8"), 50))
+        self.run_tool("commit", transaction(1, mode="revision"))
+        record = self.read_state()["wordcount_records"]["1"]
+        self.assertEqual(record["actual"], committed_actual - 50)
+        self.assertEqual(record["body_sha256"], hashlib.sha256(body_path.read_bytes()).hexdigest())
+        self.run_tool("check")
+        # 改到出了作者范围才停下要作者定；报的是改了哪一项，记录不动。
+        outline = self.project / "大纲/细纲_第001章.md"
+        outline.write_text(outline.read_text(encoding="utf-8").replace("1000 字", "1200 字"), encoding="utf-8")
         before = self.read_state()
         result = self.run_tool("commit", transaction(1, mode="revision"), expect=2)
-        self.assertIn("storyctl.py chapter commit", result.stderr)
-        self.assertEqual(self.read_state(), before)
-        # 报错说清改的是哪一项，并指向带 storyctl 的写作 skill（story-review / story-import 不带 storyctl）。
-        self.assertIn("第1章正文已改", result.stderr)
-        self.assertIn("story-long-write 的 storyctl.py chapter commit", result.stderr)
-        # 正文没动的纯追踪修订（例如修派生视图）照常可提交。
-        (self.project / "正文/第001章_测试.md").write_bytes(body)
-        self.run_tool("commit", transaction(1, mode="revision"))
-        # 只改字数目标：报「字数目标已改」，不谎报正文已改。
-        outline = self.project / "大纲/细纲_第001章.md"
-        original_outline = outline.read_text(encoding="utf-8")
-        outline.write_text(original_outline.replace("1000 字", "1200 字"), encoding="utf-8")
-        result = self.run_tool("commit", transaction(1, mode="revision"), expect=2)
         self.assertIn("第1章字数目标已改", result.stderr)
-        self.assertNotIn("正文已改", result.stderr)
+        self.assertNotIn("正文", result.stderr.split("；")[0])
+        self.assertIn("accept-current-length", result.stderr)
+        self.assertEqual(self.read_state(), before)
 
     def test_tracking_only_revision_survives_a_later_author_range_line(self) -> None:
         # 提交时细纲没写「字数范围」（记录无 author_range）；作者事后给细纲补一行范围。正文与目标都没动，
