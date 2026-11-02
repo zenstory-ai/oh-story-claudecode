@@ -1062,7 +1062,7 @@
             "skills/story-setup/references/agent-references/opening-design.md#开篇规划",
             "skills/story-setup/references/agent-references/plot-core-methods.md"
           ],
-          "budget": 9500
+          "budget": 9650
         },
         {
           "label": "结构审查（审稿 full/lean）",
@@ -1075,7 +1075,7 @@
           "budget": 11900
         }
       ],
-      "why": "没有任务包时的 story-architect 调用（agent-calls「题材定位与角色细化」、审稿 full/lean 的结构视角）。方法层重组后模板不再逐项写「执行时按 profile 读取」，改为只按 agent-reference-profiles 逐行判定、只读和本次任务类型对得上的行，点名小节的只读那一节；按调用类型登记为互斥分支：题材定位读题材目录（女频改读女频手册）、核心梗与金手指、读者与平台；讨论卷结构读「卷纲排法」，没有主对标加八节点，弧线拿不准加弧线速查；新书开篇读「开篇规划」和 plot-core-methods；结构审查读质量核心、长篇质量覆盖，外加细纲方法与弧线速查。卷纲、细纲、定设定都走任务包，不在这条路径。 有感情线时另读 character-relations「感情线阶段」（profile 已列，女频手册与卷结构都把阶段名指向那里），算进女频题材定位与卷结构两个分支。"
+      "why": "没有任务包时的 story-architect 调用（agent-calls「题材定位与角色细化」、审稿 full/lean 的结构视角）。方法层重组后模板不再逐项写「执行时按 profile 读取」，改为只按 agent-reference-profiles 逐行判定、只读和本次任务类型对得上的行，点名小节的只读那一节；按调用类型登记为互斥分支：题材定位读题材目录（女频改读女频手册）、核心梗与金手指、读者与平台；讨论卷结构读「卷纲排法」，没有主对标加八节点，弧线拿不准加弧线速查；新书开篇读「开篇规划」和 plot-core-methods；结构审查读质量核心、长篇质量覆盖，外加细纲方法与弧线速查。卷纲、细纲、定设定都走任务包，不在这条路径。 有感情线时另读 character-relations「感情线阶段」（profile 已列，女频手册与卷结构都把阶段名指向那里），算进女频题材定位与卷结构两个分支。 开篇规划补「快节奏平台的第 1 章细纲」（约 230）：番茄/七猫第 1 章的不公要当场演出、主角心声不禁、爽点不写无，否则冷门题材会排出没有代入的现实主义首章（2026-11-01 实跑）。"
     },
     {
       "label": "长篇出一批细纲或补纲（主会话自己做）",
@@ -1098,7 +1098,7 @@
           "files": [
             "skills/story-long-write/references/opening-design.md#开篇规划"
           ],
-          "budget": 24800
+          "budget": 24950
         },
         {
           "label": "对标登记 ≥2 本",
@@ -1123,7 +1123,7 @@
         }
       ],
       "stacking": {
-        "budget": 28600,
+        "budget": 28750,
         "slots": [
           [
             "首批含前 3 章"
@@ -1139,7 +1139,7 @@
           ]
         ]
       },
-      "why": "v0.8.2：没有子代理时的细纲时刻，也是日常补纲的加载。 补登：细纲模板要求章首、章尾钩子从「章首钩子 7 式」「章尾钩子 13 式」里选，workflow-outline 指向这两节，主会话自己出细纲时要读（+约 890）。 方法层重组：workflow-outline 让填目标情绪、主角选择、爽点、五段式时读 plot-core-methods（整份约 2.2K，计入基础）；前 3 章只读 opening-design「开篇规划」；有感情线时读 character-relations「感情线阶段」。"
+      "why": "v0.8.2：没有子代理时的细纲时刻，也是日常补纲的加载。 补登：细纲模板要求章首、章尾钩子从「章首钩子 7 式」「章尾钩子 13 式」里选，workflow-outline 指向这两节，主会话自己出细纲时要读（+约 890）。 方法层重组：workflow-outline 让填目标情绪、主角选择、爽点、五段式时读 plot-core-methods（整份约 2.2K，计入基础）；前 3 章只读 opening-design「开篇规划」；有感情线时读 character-relations「感情线阶段」。 开篇规划补「快节奏平台的第 1 章细纲」（约 230）：番茄/七猫第 1 章的不公要当场演出、主角心声不禁、爽点不写无，否则冷门题材会排出没有代入的现实主义首章（2026-11-01 实跑）。"
     },
     {
       "label": "写手去味审查（narrative-writer 审查调用）",
