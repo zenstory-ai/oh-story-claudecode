@@ -1068,14 +1068,15 @@ def _normalize_transaction(project: Path, state: dict[str, Any], document: objec
             wordcount_core.validate_current_wordcount_record, project, chapter, wordcount_input
         )
     elif mode == "revision" and str(chapter) in state["wordcount_records"]:
-        # 已提交字数记录的章节：正文或目标改过却绕开 storyctl 提交修订，会留下过期的 actual/body_sha256。
+        # 已提交字数记录的章节：去味、审稿改过正文或目标后的修订，按现文件重新计数，记录不留旧值。
         # 只核对记录钉住的正文与目标；细纲事后补的「字数范围」不算过期。
+        previous = state["wordcount_records"][str(chapter)]
         try:
-            drift = wordcount_core.wordcount_record_drift(project, chapter, state["wordcount_records"][str(chapter)])
+            drift = wordcount_core.wordcount_record_drift(project, chapter, previous)
         except wordcount_core.WordcountError as exc:
             raise TrackingError(f"第{chapter}章的字数记录无法核对（{exc}）；{RECOUNT_HINT}") from exc
         if drift:
-            raise TrackingError(f"第{chapter}章{'和'.join(drift)}已改；{RECOUNT_HINT}")
+            wordcount = recount_revised_chapter(project, chapter, previous, drift)
     return {
         "mode": mode,
         "chapter": chapter,
@@ -1085,6 +1086,22 @@ def _normalize_transaction(project: Path, state: dict[str, Any], document: objec
         "snapshots": snapshots,
         "wordcount": wordcount,
     }
+
+
+def recount_revised_chapter(project: Path, chapter: int, previous: dict[str, Any], drift: list[str]) -> dict[str, Any]:
+    """改后仍在作者范围内，或作者原先就接受了带外长度且仍在带外：直接按现文件记账。
+    原本在范围内、改后出了范围，才要作者拍板，交给 storyctl 的 accept-current-length。"""
+    resolutions = ["within_user_band"]
+    if previous["resolution"] == "accepted_current_length":
+        resolutions.append("accepted_current_length")
+    for resolution in resolutions:
+        try:
+            return wordcount_core.build_project_wordcount_record(
+                project, chapter, resolution=resolution, author_range=previous.get("author_range"),
+            )
+        except wordcount_core.WordcountError:
+            continue
+    raise TrackingError(f"第{chapter}章{'和'.join(drift)}已改，字数出了作者范围；{RECOUNT_HINT}")
 
 
 def checkpoint_record(
