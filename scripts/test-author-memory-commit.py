@@ -507,7 +507,6 @@ def main() -> None:
         assert {path.name for path in memory.iterdir()} == {
             "_author-memory-state.json",
             "作者画像.md",
-            "待确认.md",
             "变更记录.md",
         }
         run("check", "--workspace", str(workspace))
@@ -537,19 +536,24 @@ def main() -> None:
         assert "different content" in error.stderr
         assert snapshot(memory) == before_failure
 
-        # ---- #436：pending 只剩一种来源——作者原话范围含糊；推断管道不再写入 ----
-        pending = transaction(
-            "tx-pending",
+        # ---- 0.10：不再记待确认、冲突候选，也没有 decide；推断管道不再写入（#436）----
+        for status, extra in (("pending", {}), ("conflict", {"conflicts_with": ["AP001"]})):
+            candidate = transaction(f"tx-{status}-rejected", 1, [{"action": "remember", "preference": preference(
+                "候选不再写入", "大概这样吧。", status=status, **extra)}])
+            before_failure = snapshot(memory)
+            error = commit(workspace, input_path, candidate, expect=2)
+            assert "不再记待确认或冲突候选" in error.stderr, "拒写要告诉 agent 先问作者"
+            assert snapshot(memory) == before_failure
+        second = transaction(
+            "tx-second",
             1,
             [{"action": "remember", "preference": preference(
                 "倾向用物件细节替代直接心理说明",
-                "心理活动……大概还是落到东西上比较好吧。",
-                status="pending",
+                "以后心理活动落到东西上。",
             )}],
         )
-        commit(workspace, input_path, pending)
-        assert state(workspace)["items"]["AP002"]["status"] == "pending"
-        assert "AP002" in (memory / "待确认.md").read_text(encoding="utf-8")
+        commit(workspace, input_path, second)
+        assert state(workspace)["items"]["AP002"]["status"] == "active"
 
         for inferred_source in ("inferred_pattern", "repeated_correction"):
             inferred = transaction(
@@ -567,33 +571,33 @@ def main() -> None:
             assert "已不再写入" in error.stderr and "explicit_user" in error.stderr, "拒写要告诉 agent 该怎么改"
             assert snapshot(memory) == before_failure
 
-        decide = transaction(
-            "tx-decide",
+        restate = transaction(
+            "tx-restate",
             2,
-            [{
-                "action": "decide",
-                "item_id": "AP002",
-                "decision": "activate",
-                "quote": "对，这也是我的长期习惯。",
-                "reason": "author confirmed the candidate",
-            }],
+            [{"action": "remember", "preference": preference(
+                "倾向用物件细节替代直接心理说明",
+                "对，这也是我的长期习惯。",
+            )}],
         )
-        commit(workspace, input_path, decide)
-        assert state(workspace)["items"]["AP002"]["status"] == "active"
+        commit(workspace, input_path, restate)
+        assert state(workspace)["items"]["AP002"]["confirmation_count"] == 2
 
-        # 同 store 内的冲突候选：全局新说法与 AP001 矛盾，先记 conflict
-        conflict = transaction(
-            "tx-conflict",
+        third = transaction(
+            "tx-third",
             3,
             [{"action": "remember", "preference": preference(
                 "允许更长的试探性对话",
                 "以后对话慢一点，多试探几轮。",
-                status="conflict",
-                conflicts_with=["AP001"],
             )}],
         )
-        commit(workspace, input_path, conflict)
-        assert state(workspace)["items"]["AP003"]["status"] == "conflict"
+        commit(workspace, input_path, third)
+        # 直改 state 模拟旧版留下的冲突候选（冲突对象 AP001）：不进查询，只能 replace / forget。
+        legacy_conflict = state(workspace)
+        legacy_conflict["items"]["AP003"]["status"] = "conflict"
+        legacy_conflict["items"]["AP003"]["conflicts_with"] = ["AP001"]
+        save_state(workspace, legacy_conflict)
+        run("init", "--workspace", str(workspace))
+        assert "AP003" not in [item["id"] for item in query(workspace, "--kind", "prose_style")["items"]]
 
         illegal_activation = transaction(
             "tx-illegal-conflict-activation",
@@ -603,12 +607,12 @@ def main() -> None:
                 "item_id": "AP003",
                 "decision": "activate",
                 "quote": "启用它。",
-                "reason": "must still use replace",
+                "reason": "decide is gone",
             }],
         )
         before_failure = snapshot(memory)
         error = commit(workspace, input_path, illegal_activation, expect=2)
-        assert "must be activated with replace" in error.stderr
+        assert "decide 已移除" in error.stderr
         assert snapshot(memory) == before_failure
 
         replace = transaction(
@@ -731,7 +735,7 @@ def main() -> None:
         final = state(workspace)
         assert final["state_revision"] == 9
         assert set(final["applied_transactions"]) == {
-            "tx-active", "tx-pending", "tx-decide", "tx-conflict", "tx-replace", "tx-forget", "tx-reinforce",
+            "tx-active", "tx-second", "tx-restate", "tx-third", "tx-replace", "tx-forget", "tx-reinforce",
             "record:conversation-message-42", "record:conversation-message-43",
         }
         assert all(record["item_ids"] for record in final["applied_transactions"].values())
@@ -769,7 +773,7 @@ def main() -> None:
         book_recorded = json.loads(record(workspace, input_path, remember("book-with-root", book_pref), "--book-root", str(book_root)).stdout)
         assert book_recorded["receipt"] == "Author Memory Receipt: r1 · BP001"
         assert book_recorded["store"] == "book" and book_recorded["book"] == "雾港来信"
-        assert {path.name for path in book_memory.iterdir()} == {"_author-memory-state.json", "作者画像.md", "待确认.md", "变更记录.md"}
+        assert {path.name for path in book_memory.iterdir()} == {"_author-memory-state.json", "作者画像.md", "变更记录.md"}
         book_state = state(book_root)
         assert book_state["book"] == "雾港来信" and book_state["items"]["BP001"]["scope"] == {"level": "book", "value": "雾港来信"}
         assert "BP001" in (book_memory / "作者画像.md").read_text(encoding="utf-8")
@@ -829,7 +833,7 @@ def main() -> None:
             "本书允许段尾抒情", "这本书例外。", status="conflict", scope_level="book", scope_value="雾港来信", conflicts_with=["AP007"],
         ))
         error = record(workspace, input_path, cross_conflict, "--book-root", str(book_root), expect=2)
-        assert "同一 store" in error.stderr and "本书例外" in error.stderr
+        assert "不再记待确认或冲突候选" in error.stderr
         assert state(book_root)["state_revision"] == 1 and state(workspace)["state_revision"] == 14
 
         # decide / forget 按编号前缀路由：BP 没传 --book-root 拒，传了就进书级
@@ -870,7 +874,7 @@ def main() -> None:
         legacy_root = legacy_workspace / "长篇" / "甲"
         legacy_root.mkdir(parents=True)
         record(legacy_workspace, input_path, remember("seed-global", preference("全局：动词承重", "记住：动词承重。")))
-        record(legacy_workspace, input_path, remember("seed-pending", preference("甲书候选：章末留钩子", "这本书章末……留个钩子吧。", status="pending")))
+        record(legacy_workspace, input_path, remember("seed-second", preference("甲书候选：章末留钩子", "记住：章末留个钩子。")))
         legacy_state = state(legacy_workspace)
         # 直改 state 模拟升级前的库：AP002 是甲书 active，AP003 是甲书 conflict（冲突对象是全局 AP001），
         # AP004 是甲书 pending，AP005 是乙书 active。
@@ -946,7 +950,10 @@ def main() -> None:
         # 回滚项目级到迁移前，模拟第二步写入失败；窗口里作者确认了 AP007、退役了 AP008
         save_state(legacy_workspace, before_project)
         run("init", "--workspace", str(legacy_workspace))
-        record(legacy_workspace, input_path, event("window-decide", {"action": "decide", "item_id": "AP007", "decision": "activate", "quote": "对。", "reason": "窗口内确认"}))
+        window = state(legacy_workspace)  # 窗口里旧版工具确认了 AP007
+        window["items"]["AP007"]["status"] = "active"
+        save_state(legacy_workspace, window)
+        run("init", "--workspace", str(legacy_workspace))
         resumed = json.loads(run("migrate", "--workspace", str(legacy_workspace), "--book-root", str(b_root)).stdout)
         assert resumed["migrated"] == [{"from": "AP005", "to": "BP001"}, {"from": "AP007", "to": "BP002"}, {"from": "AP008", "to": "BP003"}], "重跑复用已建编号，不重复建条，也不因源条目状态变化锁死"
         b_state = state(b_root)
@@ -955,6 +962,11 @@ def main() -> None:
         assert all(state(legacy_workspace)["items"][item_id]["status"] == "superseded" for item_id in ("AP005", "AP007", "AP008"))
         run("check", "--workspace", str(legacy_workspace), "--book-root", str(b_root))
         assert [item["id"] for item in query(legacy_workspace, "--kind", "prose_style", "--book-root", str(b_root))["items"]][:2] == ["BP003", "BP001"]
+        # 旧版待确认条目不进查询；作者把同一句话再说一次就生效。
+        assert "BP002" not in [item["id"] for item in query(legacy_workspace, "--kind", "prose_style", "--book-root", str(b_root))["items"]]
+        restated = json.loads(record(legacy_workspace, input_path, remember("restate-legacy-pending", preference(
+            "乙书补充：章末留白", "对，章末留白。", scope_level="book", scope_value="乙")), "--book-root", str(b_root)).stdout)
+        assert restated["item_ids"] == ["BP002"] and state(b_root)["items"]["BP002"]["status"] == "active"
 
         # ---- 预算提醒在两级 store 下的口径 ----
         auto_workspace = Path(temporary) / "自动初始化工作区"
@@ -1162,8 +1174,8 @@ def main() -> None:
     # 只锚 prompt 与运行时 CLI / 槽位的对接片段，不钉措辞
     injection_contracts = {
         # 写一章的填槽说明随「只在交给写手时才用」迁到 agent-calls.md（v0.8.2）。
-        REPO / "skills/story-long-write/references/agent-calls.md": (
-            "`author_preferences`",
+        REPO / "skills/story-long-write/scripts/build_writer_prompt.py": (
+            "——— 作者偏好（",
         ),
         # 查到的偏好要进子代理 prompt 的槽位，否则 query 照跑、结果到不了写手。
         # 短篇派写手的 prompt 同样随「只在交给写手时才用」迁到 agent-calls.md（v0.8.2）。
@@ -1192,7 +1204,7 @@ def main() -> None:
     owners = ("story-long-write", "story-short-write")
     expected_protocols = {REPO / "skills" / owner / "references" / name
                           for owner in owners
-                          for name in ("author-memory.md", "author-memory-maintenance.md")}
+                          for name in ("author-memory.md",)}
     assert set((REPO / "skills").glob("*/references/author-memory*.md")) == expected_protocols
     assert set((REPO / "skills").glob("*/scripts/author_memory_commit.py")) == {
         REPO / "skills" / owner / "scripts/author_memory_commit.py" for owner in owners}
@@ -1200,20 +1212,14 @@ def main() -> None:
     for path in sorted(expected_protocols) + [REPO / "skills" / owner / "SKILL.md" for owner in owners]:
         content = path.read_text(encoding="utf-8")
         assert "repeated_correction" not in content and "inferred_pattern" not in content, f"{path} 仍在引导推断写入"
-    # v0.8.2：协议按作者时刻拆分——记一条偏好的时刻只读 author-memory.md，少见时刻的规则在维护文件。
-    # 只锚小节与指路，防止规则被悄悄删掉或挪回常读文件。
-    moment_anchors = {
-        "author-memory.md": ("author-memory-maintenance.md", "## 回执怎么告诉作者", "## 记不记、记成什么", "record --workspace", "query  --workspace"),
-        "author-memory-maintenance.md": ("## 整理作者记忆", "## 任务映射表", "## 单书布局", "## 存量迁移", "## 冲突候选", "12288", "migrate --workspace", "commit  --workspace", "check   --workspace"),
-    }
-    for name, fragments in moment_anchors.items():
-        for path in sorted(path for path in expected_protocols if path.name == name):
-            content = path.read_text(encoding="utf-8")
-            for fragment in fragments:
-                assert fragment in content, f"{path} 缺少作者记忆时刻锚点：{fragment}"
-    hot = (REPO / "skills/story-long-write/references/author-memory.md").read_text(encoding="utf-8")
-    for rare in ("## 整理作者记忆", "12288", "migrate --workspace", "commit  --workspace"):
-        assert rare not in hot, f"少见时刻规则回流到 author-memory.md：{rare}"
+    # 0.10：两份协议合成一份，只锚小节与命令，防止规则被悄悄删掉；待确认、冲突、decide 不再回流。
+    for path in sorted(expected_protocols):
+        content = path.read_text(encoding="utf-8")
+        for fragment in ("## 回执怎么告诉作者", "## 记不记、记成什么", "## 改、忘与整理", "record  --workspace",
+                         "query   --workspace", "migrate --workspace", "check   --workspace", "12288"):
+            assert fragment in content, f"{path} 缺少作者记忆锚点：{fragment}"
+        for gone in ('"status": "pending"', '"action":"decide"', "author-memory-maintenance.md", "技术备注"):
+            assert gone not in content, f"{path} 仍引导已删的作者记忆机制：{gone}"
 
     print("OK: author-memory transaction behavior")
 

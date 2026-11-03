@@ -86,10 +86,10 @@ def parse_range_field(text: str) -> dict[str, Any]:
 
 
 def parse_metric_field(text: str) -> dict[str, Any]:
-    """「字数口径：visible_chars_v1（按可见字符）」；每行都得是口径名（可带括号备注），且只能是 METRIC。"""
+    """「字数口径：visible_chars_v1（按可见字符）」可不写，没写按默认口径；写了就每行都得是口径名（可带括号备注），且只能是 METRIC。"""
     raws = _field_values(normalize_newlines(text).lstrip("\ufeff"), "字数口径")
     matches = [_METRIC_VALUE_RE.fullmatch(raw) for raw in raws]
-    ok = bool(raws) and all(matches) and {match.group(1) for match in matches if match} == {METRIC}
+    ok = not raws or (all(matches) and {match.group(1) for match in matches if match} == {METRIC})
     return {"ok": ok, "raw": raws}
 
 
@@ -281,7 +281,7 @@ def target_from_outline(value: str) -> int:
         text = text[1:]
     parsed = parse_target_field(text)
     require(parsed["status"] == "ok", f"字数目标 {_FIELD_ERRORS.get(parsed['status'], '')}: {parsed['raw']}")
-    require(parse_metric_field(text)["ok"], f"字数口径 must be {METRIC}")
+    require(parse_metric_field(text)["ok"], f"字数口径 must be {METRIC} when written")
     return parse_target(parsed["value"])
 
 

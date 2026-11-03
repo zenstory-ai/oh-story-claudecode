@@ -75,7 +75,7 @@ node scripts/check-ai-patterns.js --check --fail-on=blocking <正文文件...>
 
 > Agent 兼容性：只检查当前宿主：Claude `.claude/agents/{agent}.md`（`subagent_type`）、OpenCode `.opencode/agents/{agent}.md`（`subagent` 的 `agent`）、Codex `.codex/agents/{agent}.toml`（`agent_type`）、Antigravity `.agents/agents/agent-name/agent.md`（`invoke_subagent` + `TypeName`）。ZCode 查插件注册的同名角色，用 `Agent` 按实际 schema 派发，不要求 `.zcode/agents`。仅角色/工具不可用或返回未知 agent 时降级 solo/direct：白话告诉作者「这次由我直接改」，`Fallback: project custom agents unavailable -> solo` 原文只进报告最后一行「技术备注：」。
 >
-> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 38` 不一致时（标记缺失、字段缺失/非整数、小于或大于 38）**照常按当前宿主角色来源检查并 spawn**，同时用一句白话提示作者「写作助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」，`Notice: agents bundle 版本不匹配（项目 {N}，本版 38）` 原文写进技术备注行；大于 38 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct，`Fallback: ... -> solo` 同样只进技术备注行。
+> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 39` 不一致时（标记缺失、字段缺失/非整数、小于或大于 39）**照常按当前宿主角色来源检查并 spawn**，同时用一句白话提示作者「写作助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」，`Notice: agents bundle 版本不匹配（项目 {N}，本版 39）` 原文写进技术备注行；大于 39 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct，`Fallback: ... -> solo` 同样只进技术备注行。
 
 改动文件前，先把原文复制到书内 `.story/work/去味原稿/{YYYYMMDD}_{原文件名}`，Phase 4 对照它回读；作者要撤回时用它恢复。
 
@@ -106,7 +106,7 @@ node scripts/check-degeneration.js --check --fail-on=blocking <正文文件...>
 node scripts/normalize-punctuation.js <正文文件...>
 ```
 
-标点脚本把白名单以外的省略号、破折号、双连字符换成逗号、句号、冒号或删去，并删除独立分隔线；不动问号和感叹号，默认不改引号。仅作者或项目明确要求时才加 `--quote-mode ascii` 或 `--quote-mode yan`。白名单登记按文风裁决文件执行，不因脚本报警自行放行。
+标点脚本保留引号里的省略号（统一成 `……`），把白名单以外的其余省略号、破折号、双连字符换成逗号、句号、冒号或删去，并删除独立分隔线；不动问号和感叹号，默认不改引号。仅作者或项目明确要求时才加 `--quote-mode ascii` 或 `--quote-mode yan`。白名单登记按文风裁决文件执行，不因脚本报警自行放行。
 
 完成一次改稿与复扫；仅为新发现的具体问题继续修补，全文扫描最多三轮。没有新问题即停，达到上限仍未解决的列入报告。脚本不可用时如实说明，继续可完成的语义检查，不宣称已通过。
 

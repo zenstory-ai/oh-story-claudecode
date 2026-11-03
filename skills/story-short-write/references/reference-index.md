@@ -16,6 +16,6 @@
 | [style-resolution.md](style-resolution.md) | 写正文、改写、去味或审稿前裁决文风 |
 | [short-deslop.md](short-deslop.md) · [deslop-gates.md](deslop-gates.md) · [banned-words.md](banned-words.md) | 精修去味：短篇保护项、检查范围与分工、AI 味词句信号 |
 | [expression.md](expression.md) · [narrative-focus.md](narrative-focus.md) · [story-logic.md](story-logic.md) | 作者要完整三层去味时（入口见 short-deslop.md） |
-| [author-memory.md](author-memory.md) · [author-memory-maintenance.md](author-memory-maintenance.md) | 管理作者习惯 |
+| [author-memory.md](author-memory.md) | 管理作者习惯 |
 
 **同一主题先读谁**：平台、导语、字数 → `submission-craft.md`；情绪怎么写 → `short-craft.md`「情绪落地」；人物声线与开篇 → 题材包的「对话风格」「开篇范式」；反转 → `short-reversal.md`，反派揭露 → `villain-and-reveal.md`；格式与节奏 → `short-format.md`。

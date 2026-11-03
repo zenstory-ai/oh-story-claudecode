@@ -36,13 +36,6 @@
       ]
     },
     {
-      "name": "author-memory-maintenance-reference",
-      "source": "skills/story-long-write/references/author-memory-maintenance.md",
-      "targets": [
-        "skills/story-short-write/references/author-memory-maintenance.md"
-      ]
-    },
-    {
       "name": "prose-banned-words",
       "source": "skills/story-long-write/references/banned-words.md",
       "targets": [
@@ -71,16 +64,6 @@
         "skills/story-short-write/references/dialogue-mastery.md",
         "skills/story-setup/references/agent-references/dialogue-mastery.md"
       ]
-    },
-    {
-      "name": "emotion-on-page",
-      "source": "skills/story-long-write/references/emotion-on-page.md",
-      "targets": ["skills/story-setup/references/agent-references/emotion-on-page.md"]
-    },
-    {
-      "name": "emotional-arc-design",
-      "source": "skills/story-long-write/references/emotional-arc-design.md",
-      "targets": ["skills/story-setup/references/agent-references/emotional-arc-design.md"]
     },
     {
       "name": "short-emotional-methods",
@@ -165,11 +148,6 @@
       "targets": ["skills/story-setup/references/agent-references/style-combat-face.md"]
     },
     {
-      "name": "style-genre-modules",
-      "source": "skills/story-long-write/references/style-genre-modules.md",
-      "targets": ["skills/story-setup/references/agent-references/style-genre-modules.md"]
-    },
-    {
       "name": "tracking-transaction-reference",
       "source": "skills/story-long-write/references/tracking-transaction.md",
       "targets": [
@@ -178,10 +156,9 @@
     },
     {
       "name": "style-resolution",
-      "source": "skills/story-long-write/references/style-resolution.md",
+      "source": "skills/story-deslop/references/style-resolution.md",
       "targets": [
         "skills/story-short-write/references/style-resolution.md",
-        "skills/story-deslop/references/style-resolution.md",
         "skills/story-review/references/style-resolution.md",
         "skills/story-setup/references/agent-references/style-resolution.md"
       ]
@@ -255,6 +232,7 @@
         "抗战谍战.md",
         "星光璀璨.md",
         "民国言情.md",
+        "流派兜底.md",
         "游戏体育.md",
         "玄幻脑洞.md",
         "玄幻言情.md",

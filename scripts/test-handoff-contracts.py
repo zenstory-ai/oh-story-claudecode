@@ -812,10 +812,11 @@ def check_import_long(repo: Repo) -> list[str]:
     if "```markdown\n" not in after:
         return [f"{IMPORT_LONG}: 卷纲模板不在 markdown 代码块里，确认写法后更新本测试"]
     template = after.split("```markdown\n", 1)[1].split("\n```\n", 1)[0]
-    # 写正文组装脚本从单元卡读这两个字段，缺了就只能全量召回。
-    for field in re.findall(r'extract_field\(unit_block or "", "([^"]+)"\)', repo.text(LONG_WRITER_PROMPT)):
-        if "／" not in field and f"- {field}：" not in template:
-            failures.append(f"{IMPORT_LONG}: 卷纲单元卡缺写正文要读的「{field}」")
+    # 写正文组装脚本从剧情段卡读这两个字段（新旧叫法集中在取段器的 UNIT_FIELD_NAMES），缺了就只能全量召回。
+    names = runpy.run_path(str(ROOT / LONG_OUTLINE_VIEW))["UNIT_FIELD_NAMES"]
+    for aliases in names.values():
+        if not any(f"- {field}：" in template for field in aliases):
+            failures.append(f"{IMPORT_LONG}: 卷纲剧情段卡缺写正文要读的「{aliases[0]}」")
     with tempfile.TemporaryDirectory(prefix="import-volume-") as tmp:
         volume = Path(tmp) / "卷纲_第1卷.md"
         volume.write_text(template + "\n", encoding="utf-8")
@@ -827,7 +828,7 @@ def check_import_long(repo: Repo) -> list[str]:
             failures.append(f"{IMPORT_LONG}: 导入卷纲模板过不了写作端 outline_view --check --strict："
                             f"{(check.stdout + check.stderr).strip()[-200:]}")
         unit = run("--unit", "L1-01")
-        if unit.returncode != 0 or "单元情绪引擎" not in unit.stdout:
+        if unit.returncode != 0 or "这段让读者图什么" not in unit.stdout:
             failures.append(f"{IMPORT_LONG}: 写作端按单元取不到导入卷纲的单元卡 L1-01")
     node = shutil.which("node")
     if node is None:
@@ -1049,8 +1050,8 @@ NEGATIVE_CASES = (
     ("路由派查资料助手用了模板不认的字段", ROUTER, "查询参数：{", "查询内容：{", "查询内容"),
     ("资料研究助手模板丢了 cdp_port", RESEARCHER, "- `cdp_port`：CDP 端口号（可选，默认 9222）\n", "", "cdp_port"),
     ("检查员模板丢了短篇分支", CHECKER, "或 prompt 写「无追踪」", "", "无追踪"),
-    ("导入卷纲单元卡丢了作用域行", IMPORT_LONG, "> 作用域：单元级 L1-01\n", "", "outline_view"),
-    ("导入卷纲单元卡丢了单元情绪引擎", IMPORT_LONG, "- 单元情绪引擎：", "- 情绪引擎：", "单元情绪引擎"),
+    ("导入卷纲剧情段丢了单元编号注释", IMPORT_LONG, "{一句话} <!-- L1-01 -->", "{一句话}", "outline_view"),
+    ("导入卷纲剧情段丢了这段让读者图什么", IMPORT_LONG, "- 这段让读者图什么：", "- 情绪引擎：", "这段让读者图什么"),
     ("审稿平台映射漏了晋江", REVIEW_SKILL, "晋江、其他", "其他", "晋江"),
     ("审稿平台映射漏了黑岩", REVIEW_SKILL, "七猫、黑岩、红果", "七猫、红果", "黑岩"),
     ("审稿端不给 consistency-checker 传修订号", REVIEW_PROMPTS, "  state_revision：", "  修订号：", "state_revision"),

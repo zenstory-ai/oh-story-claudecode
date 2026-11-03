@@ -8,7 +8,8 @@ const path = require('path');
 const USAGE = `Usage: node normalize-punctuation.js [--check] [--quote-mode keep|ascii|yan] <file...>
 
 Normalize正文 punctuation deterministically:
-  - replace ellipses, em dashes, and double hyphens with Chinese punctuation
+  - keep ellipses inside quotes (“”「」『』 and paired ASCII "), unified as ……
+  - replace other ellipses, em dashes, and double hyphens with Chinese punctuation
   - remove markdown divider lines (---) from正文
   - preserve pause punctuation covered by book-local .deslop-whitelist literals
   - keep quote style by default; convert quotes only when explicitly requested
@@ -240,7 +241,8 @@ function isClosingFence(line, fence) {
 
 // 删空停顿符会把两侧的半角点/连字符粘成新的 `...`/`--`（`他.……..说` → `他...说`），
 // 一遍归一化留不干净，再跑一遍还会改已定稿的正文；所以反复归一化到不动点。
-// 每遍至少把一个 `…/./—/-` 换成非停顿字符，字符数严格递减，必然收敛。
+// 引号外每遍至少把一个 `…/./—/-` 换成非停顿字符，字符数严格递减；引号内的省略号
+// 一遍就落成 `……`，之后不再变，所以仍必然收敛。
 // findings 只留第一遍：同一处不重复计数，column 也仍然是原行的偏移。
 function normalizePausePunctuation(line, lineNo, commentOpen, whitelist) {
   let current = line;
@@ -263,6 +265,7 @@ function normalizePausePunctuationPass(line, lineNo, commentSpans) {
   const findings = [];
   const original = line;
   const pattern = /…+|\.{3,}|——|—|--+/g;
+  const quotes = quoteSpans(original);
   let output = '';
   let lastIndex = 0;
   let match;
@@ -272,6 +275,18 @@ function normalizePausePunctuationPass(line, lineNo, commentSpans) {
     // HTML 注释是正文里的元信息（如 `<!-- 去味:跳过 -->` 豁免标记）：`<!--`/`-->` 里的
     // `--` 不是停顿标点，改掉它注释就散了，标记会变成读者看得见的正文。
     if (insideSpans(match.index, match.index + token.length, commentSpans)) continue;
+    // 引号里的省略号是人物说话的犹豫、打断和拖音（真人正文每千字约 0.8 个），保留，
+    // 只统一成全角六点；紧挨着的几段（`...……`）并成一个。破折号不在此列。
+    if (getPauseType(token) === 'ellipsis' && insideSpans(match.index, match.index + token.length, quotes)) {
+      const merged = lastIndex === match.index && output.endsWith('……');
+      const replacement = merged ? '' : '……';
+      output += original.slice(lastIndex, match.index) + replacement;
+      lastIndex = match.index + token.length;
+      if (replacement !== token) {
+        findings.push({ line: lineNo, column: match.index + 1, type: 'ellipsis', message: '引号内的省略号统一为「……」。' });
+      }
+      continue;
+    }
     output += original.slice(lastIndex, match.index);
     const replacement = choosePauseReplacement(original, match.index, token.length);
     output += replacement;
@@ -316,6 +331,27 @@ function htmlCommentSpans(line, openBefore) {
   return { spans, open };
 }
 
+// 行内引号区间（不含引号本身）。“「『 开、”」』 关，可嵌套；半角 " 成对开关。
+// 一段对话通常在同一行内收口；没收口的引号算到行尾（多段连说的台词每段只开不关）。
+function quoteSpans(line) {
+  const spans = [];
+  const stack = [];
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (ch === '"' && stack.length && stack[stack.length - 1].ch === '"') {
+      const open = stack.pop();
+      if (!stack.length) spans.push([open.at + 1, i]);
+    } else if (ch === '"' || ch === '“' || ch === '「' || ch === '『') {
+      stack.push({ ch, at: i });
+    } else if ((ch === '”' || ch === '」' || ch === '』') && stack.length) {
+      const open = stack.pop();
+      if (!stack.length) spans.push([open.at + 1, i]);
+    }
+  }
+  if (stack.length) spans.push([stack[0].at + 1, line.length]);
+  return spans;
+}
+
 function insideSpans(start, end, spans) {
   return spans.some(([spanStart, spanEnd]) => start < spanEnd && end > spanStart);
 }
@@ -342,7 +378,7 @@ function choosePauseReplacement(text, start, length) {
   const after = nextNonSpace(text, start + length);
   const rest = text.slice(start + length).trimStart();
 
-  // 正文产物不保留 `……`、`——`、`—` 或 `--`；对话打断和数字区间不设例外。
+  // 引号外不保留 `……`；`——`、`—`、`--` 引号内外都不保留，数字区间不设例外。
   if (before === '') return '';
   // 紧跟开引号/开括号的停顿符号属于句首边界，删空即可，避免产出 `「，…」` 或 `「。」`。
   if (isOpeningDelimiter(before)) return '';

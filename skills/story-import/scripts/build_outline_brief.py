@@ -35,7 +35,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from outline_view import parse as parse_volume, unit_chapter_range  # noqa: E402
+from outline_view import is_unit_card, parse as parse_volume, unit_chapter_range  # noqa: E402
 from wordcount_core import METRIC, WordcountError, find_chapter_file, measure_wordcount  # noqa: E402
 
 RULES = Path(__file__).resolve().parent.parent / "references" / "outline-reverse-rules.md"
@@ -216,7 +216,7 @@ def unit_cards(project: Path, first: int, last: int) -> list[str]:
     for volume in volumes:
         lines, sections = parse_volume(volume.read_text(encoding="utf-8-sig"))
         for section in sections:
-            if section.kind != "单元级" or "剧情单元" not in section.title or section.status == "已退役":
+            if not is_unit_card(section) or section.status == "已退役":
                 continue
             span = unit_chapter_range([section], section.unit)
             if span is None or span[0] > last or span[1] < first:
@@ -225,8 +225,8 @@ def unit_cards(project: Path, first: int, last: int) -> list[str]:
                         if other.start > section.start and other.level <= section.level), len(lines))
             out += [f"来源：`{project.name}/大纲/{volume.name}`", "", *lines[section.start:end], ""]
     if not out:
-        raise SystemExit(f"ERROR: 卷纲里找不到章节范围覆盖第{first}-{last}章的剧情单元卡（卡标题下一行写"
-                         "「> 作用域：单元级 {单元ID}」，卡里写「- 章节范围：第A-B章」），先补卷纲，"
+        raise SystemExit(f"ERROR: 卷纲里找不到章节范围覆盖第{first}-{last}章的剧情段卡（卡标题末尾写单元编号注释"
+                         "如「### 第一段剧情：退婚风波 <!-- L1-01 -->」，卡里写「- 章节范围：第A-B章」），先补卷纲，"
                          "再用 outline_view.py --check --strict 核对")
     return out
 

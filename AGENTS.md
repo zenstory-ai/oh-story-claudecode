@@ -15,6 +15,7 @@
 - **改 agent 模板或 CLAUDE.md.tmpl 后必须重新生成适配层**（OpenCode、Codex、Antigravity 等）并提交生成结果，否则适配层 CI 红。
 - **skill 文档禁止裸调 `python3`**，须走 python3 → python → py 探测。
 - **改名或移动任一 `scripts/` 脚本**，要同步 `.github/workflows/*.yml`、CONTRIBUTING.md、scripts/README.md 和调用它的兄弟脚本。
+- **作者会打开的文件和汇报只用白话**：卷纲、细纲、题材定位等模板与给作者的汇报里，不写脚本名、字段口径、内部编号和自造词（作用域、契约、任务包、主会话之类）；机器要按名读的字段在模板里用注释标出谁在读。不设禁词守卫，靠评审守住。
 - 本文件不得出现 story-setup 用来识别已部署项目的标记文本（各端 AGENTS.md.tmpl 的标题行），否则在仓库根运行 story-setup 会把仓库误判为已部署项目。
 
 完整规则、各编程 Agent 适配维护步骤与提交流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。

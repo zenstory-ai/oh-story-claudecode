@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Measure, checkpoint, check, and commit long-form story chapters."""
+"""Measure, checkpoint, check, and commit long-form story chapters.
+
+`chapter check --plain` 把同一份检查结果说成作者能懂的话（单章检查一条命令出白话结论），
+并报本章碎度两个数：短段占比与叙述句长中位数，附真人参照；碎度只提示、不拦。
+"""
 
 from __future__ import annotations
 
@@ -9,6 +13,7 @@ import importlib.util
 import json
 import re
 import shutil
+import statistics
 import subprocess
 import sys
 from pathlib import Path
@@ -35,6 +40,40 @@ CHAPTER_ERROR_SCHEMA = "story-chapter-error/v1"
 # 书内工作目录：分组 segment、writer prompt 留档、逐章事务 JSON 的唯一落点。
 # 与 build_writer_prompt.py 同一口径；提交成功后整目录删除，失败时原样保留供重跑。
 WORK_ROOT = (".story", "work")
+
+
+# ---- 碎度（只提示，不拦）----
+# 与 0.10 对照实验的统计同一算法：先去掉 # 开头的行；短段＝非空行里去空白后不到 20 字的占比（对话段也算）；
+# 叙述句＝去掉“…”里的对话后按 。！？!? 切句，取每句去空白后的字数求中位数。
+# 真人参照：七猫三本完结书（玄幻、古言、现言）前 30 章，平均短段约 19%、叙述句长中位约 39 字；
+# 分章 P10–P90 为短段 2%–33%、句长 27–54 字。原生模型短段约 42%，0.9.2 约 45%。
+SHORT_PARAGRAPH_CHARS = 20
+HUMAN_SHORT_PARAGRAPH_RATIO = 0.19
+HUMAN_NARRATIVE_SENTENCE_MEDIAN = 39
+HUMAN_SHORT_PARAGRAPH_RANGE = (0.02, 0.33)
+HUMAN_NARRATIVE_SENTENCE_RANGE = (27, 54)
+_QUOTED = re.compile(r"“[^”]*”")
+_COMMENT_LINE = re.compile(r"^\s*<!--.*-->\s*$")
+
+
+def fragmentation(text: str) -> dict[str, Any]:
+    lines = [line.strip() for line in text.lstrip("\ufeff").splitlines()]
+    paragraphs = [line for line in lines if line and not line.startswith("#") and not _COMMENT_LINE.match(line)]
+    short = sum(1 for line in paragraphs if len(re.sub(r"\s", "", line)) < SHORT_PARAGRAPH_CHARS)
+    narrative = _QUOTED.sub("", "\n".join(paragraphs))
+    sentences = re.split(r"[。！？!?]", narrative)
+    lengths = [n for n in (len(re.sub(r"\s", "", sentence)) for sentence in sentences) if n]
+    return {
+        "paragraphs": len(paragraphs),
+        "short_paragraphs": short,
+        "short_paragraph_ratio": round(short / len(paragraphs), 3) if paragraphs else None,
+        "narrative_sentences": len(lengths),
+        "narrative_sentence_median": statistics.median(lengths) if lengths else None,
+        "human_reference": {"short_paragraph_ratio": HUMAN_SHORT_PARAGRAPH_RATIO,
+                            "narrative_sentence_median": HUMAN_NARRATIVE_SENTENCE_MEDIAN,
+                            "short_paragraph_range": list(HUMAN_SHORT_PARAGRAPH_RANGE),
+                            "narrative_sentence_range": list(HUMAN_NARRATIVE_SENTENCE_RANGE)},
+    }
 
 
 class CliArgumentError(ValueError):
@@ -65,6 +104,11 @@ def _json_line(payload: dict[str, Any]) -> None:
     # consume UTF-8.  Write protocol output as bytes so JSON never depends on
     # the host console code page.
     sys.stdout.buffer.write(rendered.encode("utf-8"))
+    sys.stdout.buffer.flush()
+
+
+def _text_lines(lines: list[str]) -> None:
+    sys.stdout.buffer.write(("\n".join(lines) + "\n").encode("utf-8"))
     sys.stdout.buffer.flush()
 
 
@@ -313,6 +357,7 @@ def chapter_check(project: Path, chapter: int, author_range: Any = None) -> dict
         "chapter": chapter,
         "length": length,
         "quality": quality,
+        "fragmentation": fragmentation(body),
         "compression": compression,
         "state_revision": state["state_revision"],
         "tracking_committed": state["last_committed_chapter"] >= chapter,
@@ -426,6 +471,96 @@ def chapter_commit(
     return checked
 
 
+PLAIN_SHOWN = 8  # 建议看的提示最多列几条，其余报个数
+
+
+def _finding_line(row: dict[str, Any]) -> str:
+    where = f"第 {row['line']} 行" if row.get("line") else "全章"
+    excerpt = str(row.get("excerpt") or "").strip()
+    message = str(row.get("message") or row.get("type") or "").strip()
+    return f"- {where}" + (f"「{excerpt[:40]}」" if excerpt else "") + f"：{message}"
+
+
+def plain_report(result: dict[str, Any]) -> list[str]:
+    """把 chapter check 的结果说成白话：先结论，再字数、必须改的、建议看的、碎度。"""
+    chapter = result["chapter"]
+    status = result["status"]
+    length = result["length"]
+    quality = result["quality"]
+    lines: list[str] = []
+    verdict = {
+        "ready": f"第 {chapter} 章检查完了，可以提交。",
+        "needs_decision": f"第 {chapter} 章没有必须改的，但字数不在范围里，要请作者定。",
+        "blocked": f"第 {chapter} 章有必须改的地方，改完再查一次。",
+        "invalid": f"第 {chapter} 章正文是空的或读不出字数，先把正文写进去再查。",
+        "tool_unavailable": f"第 {chapter} 章这次没查完：检查工具没跑起来，不能提交。",
+    }[status]
+    if result.get("punctuation_fixed"):
+        verdict += "标点已顺手整理过。"
+    lines.append(verdict)
+    actual = length.get("actual")
+    band = length.get("user_band") or {}
+    if actual is not None and band:
+        span = f"{band.get('min')} 到 {band.get('max')} 字"
+        if length.get("status") == "under":
+            lines.append(f"字数：约 {actual} 字，比范围（{span}）少了约 {band['min'] - actual} 字。欠的不补写，请作者选：收下现在的长度、改细纲或目标后重写、或不要这章。")
+        elif length.get("status") == "over":
+            lines.append(f"字数：约 {actual} 字，比范围（{span}）多了约 {actual - band['max']} 字。")
+            compression = result.get("compression")
+            if compression:
+                remove = compression["remove_to_internal_band"]
+                lines.append(f"先做一次只删不加的压缩：删掉 {max(remove['min'], 0)} 到 {remove['max']} 字（删重复解释、装饰排比、没用的小动作，情节点和钩子都留着），删完再查；还超就请作者选。")
+        else:
+            lines.append(f"字数：约 {actual} 字，在范围里（{span}）。")
+    for error in quality.get("tool_errors") or []:
+        lines.append(f"- 没跑起来：{error.get('message') or error.get('tool')}")
+    blocking = quality.get("blocking_findings") or []
+    if blocking:
+        lines.append(f"必须改的 {len(blocking)} 处：")
+        lines.extend(_finding_line(row) for row in blocking)
+    advisories = quality.get("advisories") or []
+    if advisories:
+        semantic = quality.get("semantic_advisories", 0)
+        lines.append(f"建议看看的 {len(advisories)} 处（其中像 AI 腔、要读原文判断的 {semantic} 处；确属问题才改）：")
+        lines.extend(_finding_line(row) for row in advisories[:PLAIN_SHOWN])
+        if len(advisories) > PLAIN_SHOWN:
+            lines.append(f"- 另有 {len(advisories) - PLAIN_SHOWN} 处，见 chapter check 的完整结果")
+    if not blocking and not advisories and status in {"ready", "needs_decision"}:
+        lines.append("没发现 AI 腔或写坏的地方。")
+    frag = result.get("fragmentation") or {}
+    ratio, median = frag.get("short_paragraph_ratio"), frag.get("narrative_sentence_median")
+    if ratio is not None or median is not None:
+        parts = []
+        low, high = HUMAN_SHORT_PARAGRAPH_RANGE
+        if ratio is not None:
+            parts.append(f"不到 {SHORT_PARAGRAPH_CHARS} 字的短段占 {round(ratio * 100)}%"
+                         f"（真人平均约 {round(HUMAN_SHORT_PARAGRAPH_RATIO * 100)}%，多数章在 {round(low * 100)}%–{round(high * 100)}%）")
+        shortest, longest = HUMAN_NARRATIVE_SENTENCE_RANGE
+        if median is not None:
+            parts.append(f"叙述句长中位数 {median:g} 字（真人平均约 {HUMAN_NARRATIVE_SENTENCE_MEDIAN} 字，多数章在 {shortest}–{longest} 字）")
+        choppy = (ratio is not None and ratio > high) or (median is not None and median < shortest)
+        tail = "。偏碎：同一个动作或同一层意思的几句可以接成一句、并成一段。" if choppy else "。"
+        lines.append("这章碎不碎（只作参考，不拦）：" + "，".join(parts) + tail)
+    return lines
+
+
+_PLAIN_ERRORS = (
+    (re.compile(r"chapter (\d+) must have exactly one outline file"), "第 {0} 章没有细纲，或者细纲不止一份"),
+    (re.compile(r"chapter (\d+) must have exactly one body file"), "第 {0} 章没有正文，或者正文不止一份"),
+    (re.compile(r"chapter directory is missing: .*/(\S+)$"), "书里没有「{0}」这个目录"),
+    (re.compile(r"字数目标"), "细纲的字数目标没写或写法不对（写成「字数目标：2500 字」）"),
+    (re.compile(r"字数范围"), "细纲的字数范围写法不对（写成「字数范围：2000-2600」）"),
+)
+
+
+def _plain_error(message: str) -> list[str]:
+    for pattern, text in _PLAIN_ERRORS:
+        match = pattern.search(message)
+        if match:
+            return [f"这次没查成：{text.format(*match.groups())}。"]
+    return [f"这次没查成：{message}"]
+
+
 def _build_parser() -> StructuredArgumentParser:
     parser = StructuredArgumentParser(prog="storyctl.py")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -454,6 +589,8 @@ def _build_parser() -> StructuredArgumentParser:
         else:
             subparser.add_argument("--fix-punctuation", action="store_true",
                                    help="先就地整理正文标点，再做检查")
+            subparser.add_argument("--plain", action="store_true",
+                                   help="用白话输出结论（给作者和主会话看），不输出 JSON；退出码不变")
         if command == "accept-current-length":
             subparser.add_argument("--force", action="store_true",
                                    help="作者明确拍板：越过欠长一半下限与超长先压缩一次的要求")
@@ -550,9 +687,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
     except (WordcountError, OSError, UnicodeError) as exc:
         code = exc.code if isinstance(exc, ChapterRefused) else "CHECK_FAILED"
-        _json_line({"schema": CHAPTER_ERROR_SCHEMA, "status": "error", "error_code": code, "message": str(exc)})
+        if getattr(args, "plain", False):
+            _text_lines(_plain_error(str(exc)))
+        else:
+            _json_line({"schema": CHAPTER_ERROR_SCHEMA, "status": "error", "error_code": code, "message": str(exc)})
         return ERROR_EXIT_CODES.get(code, 2)
-    _json_line(result)
+    if getattr(args, "plain", False):
+        _text_lines(plain_report(result))
+    else:
+        _json_line(result)
     if args.chapter_command != "check":
         return 0
     return CHECK_EXIT_CODES[result["status"]]

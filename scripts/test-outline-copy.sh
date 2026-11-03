@@ -75,20 +75,21 @@ printf '%s，%s。\n' "$COPIED" "$OATH" >"$TMP_DIR/p1.md"
 run --outline "$TMP_DIR/o1.md" "$TMP_DIR/p1.md"
 expect_status 1
 expect_contains "22 字「${COPIED}」"
-expect_contains "1 处 6 字为复沓锚句"
+expect_contains "1 处 6 字为登记原话"
 
-# --- 2. 锚句之后存在超阈值重合 ---
+# --- 2. 锚句之后存在超阈值重合（0.10 起字段叫「原样出现的原话」，旧名「复沓锚句」照认）---
 CASE="anchor-head"
 cat >"$TMP_DIR/o2.md" <<EOF
 #### 情节细化
 - 点1：${OATH}，${COPIED}。
-- 复沓锚句：
+- 原样出现的原话：
   点1：${OATH}
 EOF
 printf '%s，%s。\n' "$OATH" "$COPIED" >"$TMP_DIR/p2.md"
 run --outline "$TMP_DIR/o2.md" "$TMP_DIR/p2.md"
 expect_status 1
 expect_contains "22 字「${COPIED}」"
+expect_contains "1 处 6 字为登记原话"
 
 # --- 3. 一个重合片段里包含多个锚句：中间段照报，两端各自扣除 ---
 CASE="multi-anchor"
@@ -103,7 +104,7 @@ printf '%s，%s，%s。\n' "$OATH" "$COPIED" "$VOW" >"$TMP_DIR/p3.md"
 run --outline "$TMP_DIR/o3.md" "$TMP_DIR/p3.md"
 expect_status 1
 expect_contains "22 字「${COPIED}」"
-expect_contains "10 字为复沓锚句"
+expect_contains "10 字为登记原话"
 
 # --- 4. 片段完全等于锚句：豁免仍然生效，静默放行并报出豁免量 ---
 CASE="pure-anchor"
@@ -153,7 +154,7 @@ printf '%s，%s。\n' "$COPIED" "$OATH" >"$TMP_DIR/p7.md"
 run --outline "$TMP_DIR/o7.md" "$TMP_DIR/p7.md"
 expect_status 1
 expect_contains "28 字"
-expect_missing "为复沓锚句"
+expect_missing "为登记原话"
 
 # --- 8. 锚句字段写「无」：不得把「无」当成锚句 ---
 CASE="anchor-field-none"
@@ -167,7 +168,7 @@ printf '%s。\n' "$COPIED" >"$TMP_DIR/p8.md"
 run --outline "$TMP_DIR/o8.md" "$TMP_DIR/p8.md"
 expect_status 1
 expect_contains "22 字「${COPIED}」"
-expect_missing "为复沓锚句"
+expect_missing "为登记原话"
 
 # --- 9. 正文与细纲无重合：完全静默 ---
 CASE="clean"

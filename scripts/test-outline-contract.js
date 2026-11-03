@@ -11,23 +11,29 @@ const repoRoot = path.resolve(__dirname, '..')
 const verifier = path.join(repoRoot, 'skills/story-long-write/scripts/check-outline-contract.js')
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'outline-contract-'))
 
+// 现行模板（0.10 白话字段名）；旧字段名的细纲另有一组用例（legacy-*）。
 const FIELDS = [
   ['核心事件', '江晨拿到伴奏后决定去老兵家里听故事'],
   ['字数目标', '2300 字'],
-  ['字数口径', 'visible_chars_v1'],
   ['阶段位置', '收尾期 · 第2阶段第11章'],
-  ['单元ID/位置', 'U03；单元内第 1 拍'],
+  ['属于哪段剧情', '第三段剧情，第一步：接下托付 <!-- L1-03 -->'],
   ['目标情绪', '踏实的期待 → 被托付的沉重'],
   ['主角目标/关键选择', '要真实素材；在报批与先去听故事之间选一个'],
-  ['章节定位', '推进'],
+  ['松紧', '推进'],
   ['本章结构公式', '接到邀约 + 上门 + 老兵开口 + 立下承诺'],
   ['章首钩子', '悬念前置 — 老人把铁盒推过来'],
   ['爽点', '无显性爽点，功能是把宏大叙事落到具体的人身上'],
   ['本章标价', '铁盒＝老兵一辈子唯一没交出去的东西；尺子在点1立好（他连勋章都捐了）'],
   ['闭环状态', '获得+使用，见效与估值扣住，第22章开奖'],
-  ['本章禁止提前释放', '铁盒内容与终局表彰的关系'],
+  ['这章不能说破', '铁盒内容与终局表彰的关系'],
   ['写手自由区', '老兵讲故事的细节、屋内陈设、对话内容由写手自定'],
-  ['契约风险', '契约安全'],
+  ['有没有硬伤', '没问题'],
+]
+// 0.9.2 及以前的字段名：照样过检查。
+const LEGACY_RENAMES = [
+  ['- 属于哪段剧情：第三段剧情，第一步：接下托付 <!-- L1-03 -->', '- 字数口径：visible_chars_v1\n- 单元ID/位置：L1-03；单元内第 1 拍'],
+  ['- 这章不能说破：', '- 本章禁止提前释放：'],
+  ['- 有没有硬伤：没问题', '- 契约风险：契约安全'],
 ]
 
 function outline(overrides = {}) {
@@ -35,10 +41,10 @@ function outline(overrides = {}) {
     .filter(([name]) => overrides.dropField !== name)
     .map(([name, value]) => `- ${name}：${overrides.fieldValues?.[name] ?? value}`)
   const table = overrides.plotTable ?? [
-    '| # | 情节点（谁做了什么） | 功能标签 | 分辨率 | 执行边界 |',
+    '| # | 情节点（谁做了什么） | 作用 | 分辨率 | 分寸 |',
     '|---|---|---|---|---|',
-    '| 1 | 江晨接到邀约 | 铺垫 | 疏 | 禁：不提铁盒。放：无 |',
-    '| 2 | 老人推过铁盒 | 高潮 | 密 | 禁：不评价当下。放：允许老人当场说出这东西他留了几十年 |',
+    '| 1 | 江晨接到邀约 | 铺垫 | 疏 | 只给邀约，铁盒先不露面 |',
+    '| 2 | 老人推过铁盒 | 高潮 | 密 | 老人可以当场说出这东西他留了几十年，盒里是什么不说 |',
   ].join('\n')
   const acts = ['起因', '发展', '转折', '高潮', '结尾']
     .filter((act) => overrides.dropAct !== act)
@@ -116,7 +122,7 @@ try {
 
   // ……但其余字段仍按契约允许 [待补充]，不能因此判失败。
   const hollowOther = run(writeCase('hollow-other', outline({
-    fieldValues: { 契约风险: '[待补充]', 章节定位: '[待补充]', '单元ID/位置': '[待补充]' },
+    fieldValues: { 有没有硬伤: '[待补充]', 松紧: '[待补充]', 属于哪段剧情: '[待补充]' },
   })))
   assert.strictEqual(hollowOther.status, 0, hollowOther.stdout + hollowOther.stderr)
   assert.strictEqual(hollowOther.report.ok, true)
@@ -146,6 +152,26 @@ try {
   assert.strictEqual(threeCol.status, 1)
   assert.deepStrictEqual(failureIds(threeCol), ['outline.plotpoint-table'])
 
+  // 旧字段名（字数口径、单元ID/位置、本章禁止提前释放、契约风险）与旧表头照样过——老书细纲不必改。
+  const legacyBody = LEGACY_RENAMES.reduce((text, [from, to]) => text.replace(from, to), outline({ plotTable: [
+    '| # | 情节点（谁做了什么） | 功能标签 | 分辨率 | 执行边界 |',
+    '|---|---|---|---|---|',
+    '| 1 | 江晨接到邀约 | 铺垫 | 疏 | 禁：不提铁盒。放：无 |',
+    '| 2 | 老人推过铁盒 | 高潮 | 密 | 禁：不评价当下。放：允许老人当场说出这东西他留了几十年 |',
+  ].join('\n') }))
+  assert.match(legacyBody, /本章禁止提前释放/)
+  const legacy = run(writeCase('legacy-field-names', legacyBody))
+  assert.strictEqual(legacy.status, 0, legacy.stdout + legacy.stderr)
+  assert.deepStrictEqual(legacy.report.contract_risk, { level: '没问题', detail: '', status: 'ok' })
+  // 新旧名都没有才算缺：报新名。
+  const noRelease = run(writeCase('missing-release', outline({ dropField: '这章不能说破' })))
+  assert.deepStrictEqual(failureIds(noRelease), ['outline.required-fields'])
+  assert.match(noRelease.report.failures[0].evidence, /这章不能说破/)
+  // 字数口径可不写；写了就只能是 visible_chars_v1。
+  assert.doesNotMatch(outline(), /字数口径/)
+  const badCaliber = run(writeCase('bad-caliber', outline() + '\n- 字数口径：chars\n'))
+  assert.deepStrictEqual(failureIds(badCaliber), ['outline.wordcount-target'])
+
   // 加「分辨率」列之前的四列旧表仍然收——既有项目的细纲不因模板加列而失效。
   const legacyFourCol = run(writeCase('plot-legacy-four-col', outline({
     plotTable: [
@@ -158,7 +184,7 @@ try {
   assert.strictEqual(legacyFourCol.report.ok, true)
 
   // 阅读体验字段可选：只写核心字段的细纲也过（#383 隔离实验只证明了目标情绪与主角目标的收益）。
-  const OPTIONAL = ['阶段位置', '章节定位', '本章结构公式', '本章标价', '闭环状态', '写手自由区', '契约风险']
+  const OPTIONAL = ['阶段位置', '松紧', '本章结构公式', '本章标价', '闭环状态', '写手自由区', '有没有硬伤']
   const coreOnly = outline({ plotTable: [
     '| # | 情节点（谁做了什么） | 功能标签 | 执行边界（禁＋放） |',
     '|---|---|---|---|',
@@ -176,6 +202,14 @@ try {
   ].join('\n') })))
   assert.strictEqual(allBan.status, 1)
   assert.deepStrictEqual(failureIds(allBan), ['outline.plotpoint-release'])
+
+  // 新表头「分寸」不拆禁、放两半，不查「放」。
+  const newFourCol = run(writeCase('plot-new-four-col', outline({ plotTable: [
+    '| # | 情节点（谁做了什么） | 作用 | 分寸 |',
+    '|---|---|---|---|',
+    '| 1 | 江晨接到邀约 | 铺垫 | 只给邀约 |',
+  ].join('\n') })))
+  assert.strictEqual(newFourCol.status, 0, newFourCol.stdout + newFourCol.stderr)
 
   // 五列但中间那列不是分辨率，判偏离——防止随便加一列就算数。
   const wrongFifth = run(writeCase('plot-wrong-fifth', outline({
@@ -207,27 +241,23 @@ try {
   assert.strictEqual(badRange.status, 1)
   assert.deepStrictEqual(failureIds(badRange), ['outline.wordcount-target'])
 
-  // 契约风险可选；写了就只收三档，并把档位放进 JSON 供审稿与作者汇报取用。
-  assert.deepStrictEqual(good.report.contract_risk, { level: '契约安全', detail: '', status: 'ok' })
-  const reinforce = run(writeCase('risk-reinforce', outline({ fieldValues: { 契约风险: '需补强——补一段交换，让主角付出代价' } })))
+  // 有没有硬伤可选；写了就只收三档，并把档位放进 JSON 供审稿与作者汇报取用。
+  assert.deepStrictEqual(good.report.contract_risk, { level: '没问题', detail: '', status: 'ok' })
+  const reinforce = run(writeCase('risk-reinforce', outline({ fieldValues: { 有没有硬伤: '要补——补一段交换，让主角付出代价' } })))
   assert.strictEqual(reinforce.status, 0, reinforce.stdout)
-  assert.deepStrictEqual(reinforce.report.contract_risk, { level: '需补强', detail: '补一段交换，让主角付出代价', status: 'ok' })
-  const badRisk = run(writeCase('risk-invalid', outline({ fieldValues: { 契约风险: '低风险' } })))
+  assert.deepStrictEqual(reinforce.report.contract_risk, { level: '要补', detail: '补一段交换，让主角付出代价', status: 'ok' })
+  const badRisk = run(writeCase('risk-invalid', outline({ fieldValues: { 有没有硬伤: '低风险' } })))
   assert.strictEqual(badRisk.status, 1)
   assert.deepStrictEqual(failureIds(badRisk), ['outline.contract-risk'])
   assert.strictEqual(badRisk.report.contract_risk.status, 'invalid')
-  // 旧名「风险等级」按同一字段认。
-  const legacyRisk = run(writeCase('risk-legacy-name', outline().replace('- 契约风险：契约安全', '- 风险等级：契约破坏')))
+  // 旧名「风险等级」「契约风险」与旧档名按同一字段认，回报用新档名。
+  const legacyRisk = run(writeCase('risk-legacy-name', outline().replace('- 有没有硬伤：没问题', '- 风险等级：契约破坏')))
   assert.strictEqual(legacyRisk.status, 0, legacyRisk.stdout)
-  assert.strictEqual(legacyRisk.report.contract_risk.level, '契约破坏')
-  const legacyBad = run(writeCase('risk-legacy-invalid', outline().replace('- 契约风险：契约安全', '- 风险等级：高')))
+  assert.strictEqual(legacyRisk.report.contract_risk.level, '有硬伤')
+  const legacyBad = run(writeCase('risk-legacy-invalid', outline().replace('- 有没有硬伤：没问题', '- 风险等级：高')))
   assert.deepStrictEqual(failureIds(legacyBad), ['outline.contract-risk'])
 
-  const noCaliber = run(writeCase('no-caliber', outline({ fieldValues: { 字数口径: 'chars' } })))
-  assert.strictEqual(noCaliber.status, 1)
-  assert.deepStrictEqual(failureIds(noCaliber), ['outline.wordcount-target'])
-
-  // 五列表全是禁令（一个「放」都没有）必须被判出来——015 章的实测事故形态。
+  // 旧表头「执行边界」的五列表全是禁令（一个「放」都没有）必须被判出来——015 章的实测事故形态。
   const allForbid = run(writeCase('plot-all-forbid', outline({
     plotTable: [
       '| # | 情节点（谁做了什么） | 功能标签 | 分辨率 | 执行边界 |',
@@ -253,9 +283,9 @@ try {
   assert.strictEqual(lowRelease.status, 0, lowRelease.stdout + lowRelease.stderr)
   assert(lowRelease.report.advisories.map((a) => a.id).includes('outline.plotpoint-release-ratio'))
 
-  // 禁止提前释放条目超过五条：疑似复读卷级常任，advisory 不阻断。
+  // 这章不能说破超过五条：疑似复读全卷不能碰的，advisory 不阻断。
   const boilerplate = run(writeCase('release-boilerplate', outline({
-    fieldValues: { 本章禁止提前释放: '铁盒内容、终局表彰、幕后资助人、母亲身世、纪念馆改建、旧部队番号' },
+    fieldValues: { 这章不能说破: '铁盒内容、终局表彰、幕后资助人、母亲身世、纪念馆改建、旧部队番号' },
   })))
   assert.strictEqual(boilerplate.status, 0, boilerplate.stdout + boilerplate.stderr)
   assert(boilerplate.report.advisories.map((a) => a.id).includes('outline.release-brevity'))
@@ -293,17 +323,28 @@ try {
   assert.strictEqual(supplyOk.status, 0, supplyOk.stdout + supplyOk.stderr)
   const supplyMissing = spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' })
   assert.strictEqual(supplyMissing.status, 1)
-  assert.match(JSON.parse(supplyMissing.stdout).evidence, /供给自查/)
+  assert.match(JSON.parse(supplyMissing.stdout).evidence, /写纲前查缺/)
   // 新书：供给自查写在卷纲旁的 排纲底稿_{单元ID}.md，优先于单元卡。
   fs.writeFileSync(path.join(volumeDir, '排纲底稿_D1-03.md'), '# D1-03 排纲底稿\n\n## 供给自查\n无缺口\n', 'utf8')
   const supplyDraft = spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' })
   assert.strictEqual(supplyDraft.status, 0, supplyDraft.stdout + supplyDraft.stderr)
-  assert.match(JSON.parse(supplyDraft.stdout).evidence, /排纲底稿含「供给自查」/)
+  assert.match(JSON.parse(supplyDraft.stdout).evidence, /排纲底稿含「写纲前查缺」/)
   fs.writeFileSync(path.join(volumeDir, '排纲底稿_D1-03.md'), '# D1-03 排纲底稿\n\n## 建纲追加\n无追加\n', 'utf8')
   assert.strictEqual(spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' }).status, 1)
+  // 0.10 起文件叫排纲笔记、小节叫「写纲前查缺」；新名优先于旧文件。
+  fs.writeFileSync(path.join(volumeDir, '排纲笔记_D1-03.md'), '# D1-03 排纲笔记\n\n## 写纲前查缺\n无缺口\n', 'utf8')
+  const supplyNotes = spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' })
+  assert.strictEqual(supplyNotes.status, 0, supplyNotes.stdout + supplyNotes.stderr)
+  assert.match(JSON.parse(supplyNotes.stdout).file, /排纲笔记_D1-03\.md$/)
 
+  const legacyTable = outline({ plotTable: [
+    '| # | 情节点（谁做了什么） | 功能标签 | 分辨率 | 执行边界 |',
+    '|---|---|---|---|---|',
+    '| 1 | 江晨接到邀约 | 铺垫 | 疏 | 禁：不提铁盒。放：无 |',
+    '| 2 | 老人推过铁盒 | 高潮 | 密 | 禁：不评价当下。放：允许老人当场说出这东西他留了几十年 |',
+  ].join('\n') })
   for (const empty of ['无', '无。', '[待补充]', '；禁：不说破', '']) {
-    const body = outline().replace('允许老人当场说出这东西他留了几十年', empty)
+    const body = legacyTable.replace('允许老人当场说出这东西他留了几十年', empty)
     const result = run(writeCase(`empty-release-${Buffer.from(empty).toString('hex')}`, body))
     assert(failureIds(result).includes('outline.plotpoint-release'), result.stdout)
   }
@@ -328,6 +369,10 @@ try {
     ['### 剧情单元 L1-01\n#### 供给自查', true],
     ['### 剧情单元 L1-01：码头\n#### 供给自查（本批）\n无缺口', true],
     ['### 码头\n- **单元ID**：L1-01\n#### 信息\n##### 供给自查\n无', true],
+    // 新写法：单元编号在标题尾部注释里
+    ['### 第一段剧情：码头 <!-- L1-01 -->\n#### 写纲前查缺\n无缺口', true],
+    ['### 第一段剧情：码头 <!-- L1-01 -->\n### 第二段剧情 <!-- L1-02 -->\n#### 写纲前查缺', false],
+    ['### 第十段剧情 <!-- L1-010 -->\n#### 写纲前查缺', false],
   ]
   for (const [body, ok] of supplyCases) {
     fs.writeFileSync(volumeFile, body)

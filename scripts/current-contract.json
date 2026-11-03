@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "setup_skill_version": "1.3.6",
-  "agents_version": 38,
+  "agents_version": 39,
   "topic_decision_phase": 5,
   "progress_schema_version": 2,
   "primary_benchmark_artifacts": [
@@ -10,8 +10,8 @@
   ],
   "required_outline_sections": [
     {
-      "rule": "禁止提前释放",
-      "demo": "本章禁止提前释放"
+      "rule": "这章不能说破",
+      "demo": "这章不能说破"
     },
     {
       "rule": "内容概括",
@@ -33,5 +33,17 @@
       "rule": "结尾设定和钩子",
       "demo": "结尾设定和钩子"
     }
+  ],
+  "template_fences": [
+    "题材定位",
+    "全书梗概",
+    "关系",
+    "大纲",
+    "卷纲",
+    "细纲",
+    "排纲笔记",
+    "主角卡",
+    "配角卡",
+    "题材正文提示卡"
   ]
 }

@@ -53,12 +53,13 @@ try {
   assert(normalized.includes("title: fixture\r\n---"), "frontmatter must remain intact");
   assert(normalized.includes("围栏内……与---必须保留"), "fenced text must remain intact");
   assert(normalized.includes("10到20"), "numeric ranges must use 到");
-  assert(normalized.includes("「引号，保留样式」"), "default mode must keep quote style");
+  assert(normalized.includes("「引号……保留样式」"), "default mode must keep quote style and quoted ellipsis");
   assert(!normalized.split("\r\n").includes("---", 3), "body divider must be removed");
   assert(normalized.includes("\r\n"), "CRLF input must keep CRLF output");
   const normalizedProse = normalized
     .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "")
-    .replace(/```[\s\S]*?```/g, "");
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/「[^」]*」/g, "");
   assert(!/(?:……|——|--)/m.test(normalizedProse));
 
   const second = run([prose]);
@@ -145,6 +146,41 @@ try {
   assert.strictEqual(mergeRecheck.status, 0, "一遍归一化后 --check 必须已清零: " + mergeRecheck.stdout);
   assert.match(run([merge]).stdout, /Changed files: 0/);
 
+  // 引号内的省略号是人物说话的停顿，保留并统一成全角六点；引号外照旧替换；破折号引号内外都替换。
+  const quoted = path.join(tmpDir, "quoted.md");
+  fs.writeFileSync(
+    quoted,
+    [
+      "“你……你来了。”他站在门口……没动。",
+      "「我...我不是」『好…』",
+      "\"等等——....……\"她说。",
+      "“这一段没收口……",
+      "他说完了……”",
+      "“……”",
+      "",
+    ].join("\n"),
+    "utf8"
+  );
+  const quotedCheck = run(["--check", quoted]);
+  assert.strictEqual(quotedCheck.status, 1, quotedCheck.stderr);
+  assert.doesNotMatch(quotedCheck.stdout, /quoted\.md:1:3:/, "already-normalized quoted ellipsis must not be reported");
+  assert.doesNotMatch(quotedCheck.stdout, /quoted\.md:6:/, "a bare quoted ellipsis must not be reported");
+  assert.strictEqual(run([quoted]).status, 0);
+  assert.strictEqual(
+    fs.readFileSync(quoted, "utf8"),
+    [
+      "“你……你来了。”他站在门口，没动。",
+      "「我……我不是」『好……』",
+      "\"等等……\"她说。",
+      "“这一段没收口……",
+      "他说完了。”",
+      "“……”",
+      "",
+    ].join("\n"),
+    "quoted ellipsis kept as ……, unquoted ellipsis and all dashes replaced"
+  );
+  assert.strictEqual(run(["--check", quoted]).status, 0, "quoted ellipsis must pass a recheck");
+
   const fences = path.join(tmpDir, "fences.md");
   const fencedOriginal = [
     "~~~markdown",
@@ -191,7 +227,7 @@ try {
   assert.strictEqual(missing.status, 2);
   assert.match(missing.stderr, /unable to read/);
 
-  console.log("OK: punctuation normalizer check/write, robust fences, CRLF, quote modes, and errors");
+  console.log("OK: punctuation normalizer check/write, quoted ellipsis, robust fences, CRLF, quote modes, and errors");
 } finally {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 }

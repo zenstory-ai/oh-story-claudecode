@@ -30,8 +30,7 @@
 | [character-relations.md](character-relations.md) | 本书有感情线：只读「感情线阶段」 |
 | [outline-methods.md](outline-methods.md) | 讨论或审查卷结构：读「卷纲排法」；没有主对标再读「八节点故事结构」，有自创单元读「情绪模块公式」，换地图读「换地图」 |
 | [opening-design.md](opening-design.md) | 新书开篇或前 3 章细纲：只读「开篇规划」 |
-| [emotional-arc-design.md](emotional-arc-design.md) | 设计或审查卷、剧情单元的情绪弧线：只读「六种弧线速查」 |
-| [long-emotional-methods.md](long-emotional-methods.md) | 设计感情桥段：三板斧、拉扯节奏与失败模式 |
+| [long-emotional-methods.md](long-emotional-methods.md) | 设计感情桥段或单场情绪：三板斧、两种场景情绪结构、拉扯节奏与失败模式 |
 | [long-chapter-hooks.md](long-chapter-hooks.md) | 设计章首/章尾与跨章期待，不采用固定百字配额 |
 | [long-suspense.md](long-suspense.md) | 编排短期、中期、远期悬念与回收周期 |
 | [long-reversal.md](long-reversal.md) | 设计单元、卷级或全书反转，不采用全文百分比铁律 |
@@ -49,5 +48,5 @@ Long profile 禁止读取 `short-*` 文件，不得采用“6 章”“每节 50
 | [short-reversal.md](short-reversal.md) | 设计短篇线索、误导与揭示；两层反转按所选方案使用 |
 | [short-quality.md](short-quality.md) | 审查全文密度、付费点、反转证据链和结尾兑现 |
 
-Short profile 禁止读取 `long-*`、`outline-*`、`opening-design.md`、`emotional-arc-design.md`、`female-audience-writing.md` 或 `genre-prose-cards.md`；不得把卷级、日更或跨十几章指标当硬门槛。
+Short profile 禁止读取 `long-*`、`outline-*`、`opening-design.md`、`female-audience-writing.md` 或 `genre-prose-cards.md`；不得把卷级、日更或跨十几章指标当硬门槛。
 

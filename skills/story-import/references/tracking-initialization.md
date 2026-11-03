@@ -1,5 +1,7 @@
 # 追踪初始化事务
 
+> 谁读：还没有追踪状态、要初始化时读（新书写第 1 章前）。
+
 ## 初始化事务
 
 仅尚无追踪状态时初始化。新书从第 0 章开始：把下面的 JSON 写到 `{书目录}/.story/work/init.json`，跑 `{PYTHON} {skill 根}/scripts/tracking_commit.py init --project {书目录} --input {书目录}/.story/work/init.json`，成功后删掉临时文件。`story-import` 导入已有小说时把最后完整章写入 `last_chapter=N`；第 1..N 章不伪造日更记录，常规续写从 N+1 章开始。
