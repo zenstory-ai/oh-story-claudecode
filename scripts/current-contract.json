@@ -10,12 +10,8 @@
   ],
   "required_outline_sections": [
     {
-      "rule": "这章不能说破",
-      "demo": "这章不能说破"
-    },
-    {
-      "rule": "内容概括",
-      "demo": "内容概括（五段式）"
+      "rule": "这章怎么走",
+      "demo": "这章怎么走"
     },
     {
       "rule": "情节安排",

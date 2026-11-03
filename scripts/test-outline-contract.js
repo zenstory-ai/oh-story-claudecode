@@ -16,7 +16,7 @@ const FIELDS = [
   ['核心事件', '江晨拿到伴奏后决定去老兵家里听故事'],
   ['字数目标', '2300 字'],
   ['阶段位置', '收尾期 · 第2阶段第11章'],
-  ['属于哪段剧情', '第三段剧情，第一步：接下托付 <!-- L1-03 -->'],
+  ['属于哪段剧情', '第三段剧情：老兵的铁盒，第一步：接下托付'],
   ['目标情绪', '踏实的期待 → 被托付的沉重'],
   ['主角目标/关键选择', '要真实素材；在报批与先去听故事之间选一个'],
   ['松紧', '推进'],
@@ -25,26 +25,29 @@ const FIELDS = [
   ['爽点', '无显性爽点，功能是把宏大叙事落到具体的人身上'],
   ['本章标价', '铁盒＝老兵一辈子唯一没交出去的东西；尺子在点1立好（他连勋章都捐了）'],
   ['闭环状态', '获得+使用，见效与估值扣住，第22章开奖'],
-  ['这章不能说破', '铁盒内容与终局表彰的关系'],
-  ['写手自由区', '老兵讲故事的细节、屋内陈设、对话内容由写手自定'],
+  ['这章不能说破', '铁盒里装的是什么先不露'],
+  ['可以放开写的地方', '老兵讲故事的细节、屋内陈设、对话内容由写手自定'],
   ['有没有硬伤', '没问题'],
 ]
-// 0.9.2 及以前的字段名：照样过检查。
+// 0.9.2 及以前的字段名、小节名：照样过检查。
 const LEGACY_RENAMES = [
-  ['- 属于哪段剧情：第三段剧情，第一步：接下托付 <!-- L1-03 -->', '- 字数口径：visible_chars_v1\n- 单元ID/位置：L1-03；单元内第 1 拍'],
+  ['- 属于哪段剧情：第三段剧情：老兵的铁盒，第一步：接下托付', '- 字数口径：visible_chars_v1\n- 单元ID/位置：L1-03；单元内第 1 拍'],
   ['- 这章不能说破：', '- 本章禁止提前释放：'],
+  ['- 可以放开写的地方：', '- 写手自由区：'],
   ['- 有没有硬伤：没问题', '- 契约风险：契约安全'],
+  ['#### 这章怎么走', '#### 内容概括（五段式）'],
 ]
 
 function outline(overrides = {}) {
   const fields = FIELDS
     .filter(([name]) => overrides.dropField !== name)
     .map(([name, value]) => `- ${name}：${overrides.fieldValues?.[name] ?? value}`)
+  // 现行模板默认三列（# / 情节点 / 作用）
   const table = overrides.plotTable ?? [
-    '| # | 情节点（谁做了什么） | 作用 | 分辨率 | 分寸 |',
-    '|---|---|---|---|---|',
-    '| 1 | 江晨接到邀约 | 铺垫 | 疏 | 只给邀约，铁盒先不露面 |',
-    '| 2 | 老人推过铁盒 | 高潮 | 密 | 老人可以当场说出这东西他留了几十年，盒里是什么不说 |',
+    '| # | 情节点（谁做了什么） | 作用 |',
+    '|---|---|---|',
+    '| 1 | 江晨接到邀约 | 铺垫 |',
+    '| 2 | 老人推过铁盒，说这东西他留了几十年 | 高潮 |',
   ].join('\n')
   const acts = ['起因', '发展', '转折', '高潮', '结尾']
     .filter((act) => overrides.dropAct !== act)
@@ -55,7 +58,7 @@ function outline(overrides = {}) {
     '### 第 21 章：新的伴奏',
     ...fields,
     '',
-    '#### 内容概括（五段式）',
+    '#### 这章怎么走',
     ...acts,
     '',
     '#### 情节安排（多线）',
@@ -145,12 +148,31 @@ try {
   assert.strictEqual(listStyle.status, 1)
   assert.deepStrictEqual(failureIds(listStyle), ['outline.plotpoint-table'])
 
-  // 三列表格缺执行边界，也是偏离。
+  // 三列表是现行默认；旧表头「功能标签」的三列表同样收。
   const threeCol = run(writeCase('plot-three-col', outline({
     plotTable: '| # | 情节点 | 功能标签 |\n|---|---|---|\n| 1 | 江晨接到邀约 | 铺垫 |',
   })))
-  assert.strictEqual(threeCol.status, 1)
-  assert.deepStrictEqual(failureIds(threeCol), ['outline.plotpoint-table'])
+  assert.strictEqual(threeCol.status, 0, threeCol.stdout + threeCol.stderr)
+  // 两列、或第三列不是「作用」的表仍是偏离。
+  const twoCol = run(writeCase('plot-two-col', outline({
+    plotTable: '| # | 情节点 |\n|---|---|\n| 1 | 江晨接到邀约 |',
+  })))
+  assert.deepStrictEqual(failureIds(twoCol), ['outline.plotpoint-table'])
+  const wrongThird = run(writeCase('plot-wrong-third', outline({
+    plotTable: '| # | 情节点 | 字数 |\n|---|---|---|\n| 1 | 江晨接到邀约 | 300 |',
+  })))
+  assert.deepStrictEqual(failureIds(wrongThird), ['outline.plotpoint-table'])
+  // 加了「分寸」「分辨率」列的四列、五列表都收；「分寸」不在最后一列判偏离。
+  for (const header of ['| # | 情节点 | 作用 | 分寸 |', '| # | 情节点 | 作用 | 分辨率 |', '| # | 情节点 | 作用 | 分辨率 | 分寸 |']) {
+    const cols = header.split('|').length - 2
+    const body = `${header}\n|${'---|'.repeat(cols)}\n| 1 | 江晨接到邀约 | 铺垫 |${' 疏 |'.repeat(cols - 3)}`
+    const result = run(writeCase(`plot-cols-${Buffer.from(header).toString('hex').slice(0, 24)}-${cols}`, outline({ plotTable: body })))
+    assert.strictEqual(result.status, 0, header + result.stdout)
+  }
+  const boundFirst = run(writeCase('plot-bound-first', outline({
+    plotTable: '| # | 情节点 | 作用 | 分寸 | 分辨率 |\n|---|---|---|---|---|\n| 1 | 江晨接到邀约 | 铺垫 | 只给邀约 | 疏 |',
+  })))
+  assert.deepStrictEqual(failureIds(boundFirst), ['outline.plotpoint-table'])
 
   // 旧字段名（字数口径、单元ID/位置、本章禁止提前释放、契约风险）与旧表头照样过——老书细纲不必改。
   const legacyBody = LEGACY_RENAMES.reduce((text, [from, to]) => text.replace(from, to), outline({ plotTable: [
@@ -160,13 +182,18 @@ try {
     '| 2 | 老人推过铁盒 | 高潮 | 密 | 禁：不评价当下。放：允许老人当场说出这东西他留了几十年 |',
   ].join('\n') }))
   assert.match(legacyBody, /本章禁止提前释放/)
+  assert.match(legacyBody, /内容概括（五段式）/)
   const legacy = run(writeCase('legacy-field-names', legacyBody))
   assert.strictEqual(legacy.status, 0, legacy.stdout + legacy.stderr)
   assert.deepStrictEqual(legacy.report.contract_risk, { level: '没问题', detail: '', status: 'ok' })
-  // 新旧名都没有才算缺：报新名。
+  // 「这章不能说破」可选：没写不拦。
   const noRelease = run(writeCase('missing-release', outline({ dropField: '这章不能说破' })))
-  assert.deepStrictEqual(failureIds(noRelease), ['outline.required-fields'])
-  assert.match(noRelease.report.failures[0].evidence, /这章不能说破/)
+  assert.strictEqual(noRelease.status, 0, noRelease.stdout + noRelease.stderr)
+  assert.deepStrictEqual(noRelease.report.advisories, [])
+  // 小节新旧名都没有才算缺：报新名。
+  const noRoute = run(writeCase('missing-route', outline().replace('#### 这章怎么走\n', '')))
+  assert.deepStrictEqual(failureIds(noRoute), ['outline.subsections'])
+  assert.match(noRoute.report.failures[0].evidence, /这章怎么走/)
   // 字数口径可不写；写了就只能是 visible_chars_v1。
   assert.doesNotMatch(outline(), /字数口径/)
   const badCaliber = run(writeCase('bad-caliber', outline() + '\n- 字数口径：chars\n'))
@@ -184,7 +211,7 @@ try {
   assert.strictEqual(legacyFourCol.report.ok, true)
 
   // 阅读体验字段可选：只写核心字段的细纲也过（#383 隔离实验只证明了目标情绪与主角目标的收益）。
-  const OPTIONAL = ['阶段位置', '松紧', '本章结构公式', '本章标价', '闭环状态', '写手自由区', '有没有硬伤']
+  const OPTIONAL = ['阶段位置', '松紧', '本章结构公式', '本章标价', '闭环状态', '可以放开写的地方', '有没有硬伤', '这章不能说破']
   const coreOnly = outline({ plotTable: [
     '| # | 情节点（谁做了什么） | 功能标签 | 执行边界（禁＋放） |',
     '|---|---|---|---|',
@@ -283,9 +310,9 @@ try {
   assert.strictEqual(lowRelease.status, 0, lowRelease.stdout + lowRelease.stderr)
   assert(lowRelease.report.advisories.map((a) => a.id).includes('outline.plotpoint-release-ratio'))
 
-  // 这章不能说破超过五条：疑似复读全卷不能碰的，advisory 不阻断。
+  // 这章不能说破写了才查长度：超过三条疑似复读全卷压着的，advisory 不阻断。
   const boilerplate = run(writeCase('release-boilerplate', outline({
-    fieldValues: { 这章不能说破: '铁盒内容、终局表彰、幕后资助人、母亲身世、纪念馆改建、旧部队番号' },
+    fieldValues: { 这章不能说破: '铁盒内容、终局表彰、幕后资助人、母亲身世' },
   })))
   assert.strictEqual(boilerplate.status, 0, boilerplate.stdout + boilerplate.stderr)
   assert(boilerplate.report.advisories.map((a) => a.id).includes('outline.release-brevity'))
@@ -336,6 +363,17 @@ try {
   const supplyNotes = spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' })
   assert.strictEqual(supplyNotes.status, 0, supplyNotes.stdout + supplyNotes.stderr)
   assert.match(JSON.parse(supplyNotes.stdout).file, /排纲笔记_D1-03\.md$/)
+  // 新书写在书目录的隐藏目录 .story/排纲笔记/{编号}.md，优先于大纲/下的老位置。
+  const hiddenNotes = path.join(tmpRoot, 'supply-case', '.story', '排纲笔记')
+  fs.mkdirSync(hiddenNotes, { recursive: true })
+  fs.writeFileSync(path.join(hiddenNotes, 'D1-03.md'), '# 第三段剧情 排纲笔记\n\n## 写纲时补的\n无\n', 'utf8')
+  const hiddenMissing = spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' })
+  assert.strictEqual(hiddenMissing.status, 1, hiddenMissing.stdout)
+  assert.match(JSON.parse(hiddenMissing.stdout).file, /\.story[\\/]排纲笔记[\\/]D1-03\.md$/)
+  fs.writeFileSync(path.join(hiddenNotes, 'D1-03.md'), '# 第三段剧情 排纲笔记\n\n## 写纲前查缺\n无缺口\n', 'utf8')
+  const hiddenOk = spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' })
+  assert.strictEqual(hiddenOk.status, 0, hiddenOk.stdout + hiddenOk.stderr)
+  fs.rmSync(path.join(tmpRoot, 'supply-case', '.story'), { recursive: true, force: true })
 
   const legacyTable = outline({ plotTable: [
     '| # | 情节点（谁做了什么） | 功能标签 | 分辨率 | 执行边界 |',

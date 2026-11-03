@@ -42,7 +42,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from outline_view import CHAPTER_UNIT_FIELDS, UNIT_FIELD_NAMES as UNIT_CARD_FIELDS, is_unit_card, parse as parse_volume
+from outline_view import CHAPTER_UNIT_FIELDS, UNIT_FIELD_NAMES as UNIT_CARD_FIELDS, chapter_unit_in_volume, is_unit_card, parse as parse_volume
 from wordcount_core import WordcountError, resolve_book_dir
 
 # 细纲里写前必须有内容的两行（全仓唯一有消融证据的字段）；缺了不拒写，主会话按卷纲补出写回细纲。
@@ -560,15 +560,18 @@ def build(project: Path, chapter: int, report: list):
         "（术语口径、程序、数字锚）。无则写「无」。")
 
     # ---- 降档判定与情绪/节奏槽 ----
+    # 新细纲「属于哪段剧情」只写段名：按本章章号落在哪段剧情的章节范围里定位；
+    # 旧细纲行末注释的编号、旧「单元ID/位置」字段写了编号就先用它。
     unit_field = extract_any(outline_text, UNIT_FIELD_NAMES)
-    unit_id = unit_id_from(unit_field) if unit_field else None
-    unit_block = None
-    if unit_id:
-        for volume in sorted((project / "大纲").glob("卷纲_*.md")):
-            block = extract_unit_block(read_text(volume) or "", unit_id)
-            if block:
-                unit_block = block
-                break
+    volumes = [read_text(volume) or "" for volume in sorted((project / "大纲").glob("卷纲_*.md"))]
+    candidates = [unit_id_from(unit_field) if unit_field else None]
+    candidates += [chapter_unit_in_volume(text, chapter) for text in volumes]
+    unit_id, unit_block = None, None
+    for candidate in filter(None, candidates):
+        block = next(filter(None, (extract_unit_block(text, candidate) for text in volumes)), None)
+        if block:
+            unit_id, unit_block = candidate, block
+            break
 
     gaps = outline_gaps(outline_text)
     if gaps:

@@ -16,7 +16,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 |---|---|---|
 | 定方向 | `workflow-setup.md` | 没方向：`long-genre-catalog.md`（特殊题材只读对应一节）；女频改读 `female-audience-writing.md`；平台、赛道、暂定书名：`genre-readers.md`；派子代理：`agent-calls.md` |
 | 定设定 | `workflow-setup.md`；自己做加 `character-basics.md`、`reader-contract-and-progression.md`、`long-genre-mechanics.md`「核心梗三层递进设计」「金手指」、`character-relations.md`「人物关系类型」 | 女频：`female-audience-writing.md`；有感情线：`character-relations.md`「感情线阶段」；对标登记 ≥2 本：`cross-book-recall.md` |
-| 出卷纲 | `workflow-volume.md`；自己排加 `artifact-protocols.md`、`outline-methods.md`「卷纲排法」、`reader-contract-and-progression.md` | 没有主对标：outline-methods「八节点故事结构」；有自创剧情段：「情绪模块公式」；换地图：「换地图」；有反转：`long-reversal.md`「反转类型」；感情线、对标同上 |
+| 出卷纲 | `workflow-volume.md`；自己排加 `artifact-protocols.md`、`outline-methods.md`「卷纲排法」、`reader-contract-and-progression.md` | 没有主对标：outline-methods「常见的八步结构」；有自创剧情段：「情绪模块公式」；换地图：「换地图」；有反转：`long-reversal.md`「反转类型」；感情线、对标同上 |
 | 出细纲、补纲 | `workflow-outline.md`；自己出加 `outline-template.md`、`plot-core-methods.md`、`character-basics.md`、`long-chapter-hooks.md`「章尾钩子 13 式」「章首钩子 7 式」 | 含前 3 章：`opening-design.md`「开篇规划」；感情线、对标同上 |
 | 写一章 | `workflow-chapter.md`；交写手加 `agent-calls.md`；自己写加 `long-format.md`、`writing-craft.md`、本章技法 | 新书第 1 章：`tracking-initialization.md`、`genre-prose-cards.md`「全书题材正文提示卡」与核对报告点名的卡；召回降档不成立：`benchmark-recall.md`；缺文件、找产物放哪：`project-files.md`；自己写第 1-3 章：`opening-design.md`「开篇落笔」；排查单章问题：`long-chapter-quality.md` |
 | 日更 | 先 `workflow-daily.md`，每章同「写一章」 | 同「写一章」 |
@@ -60,7 +60,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | **结构讨论** | "只讨论/推敲故事结构" | 只交付结构方案，不建工程、不自动落盘；不要求先填完设定或细纲 |
 | **大纲规划** | "写大纲/规划剧情/规划全书/规划第X卷/开新卷" | 按需取 Phase 1→3，交付所请求大纲/卷纲及必要设定；不自动展开细纲或初始化追踪 |
 | **细纲规划** | "出细纲/补纲/扩纲/补细纲/写或修改第N章细纲" | Phase 3：既有单元内只补/改点名章；需要新单元才走「中途补纲/扩纲小流程」。指定范围不扩到整单元；未指定时按剧情批建纲 |
-| **开书** | "帮我开书"，未限定规划层级 | 按确认点逐个走：定方向→定设定→卷纲→首批 10 章细纲，每个确认点作者说继续才往下；**最远停在细纲交付，不自动写正文** |
+| **开书** | "帮我开书"，未限定规划层级 | 按确认点逐个走：定方向→定设定→卷纲→前 10 章细纲，每个确认点作者说继续才往下；**最远停在细纲交付，不自动写正文** |
 | **定设定** | "定设定"，或已有题材定位、还没有角色与关系 | Phase 2，交付设定后停 |
 | **写指定章** | "写第 N 章" / "写第1章" / "开书并写首章"，对象是正文 | Phase 4→5，只写点名章后停止；缺前置时先补必要设定、卷纲和点名章细纲，不套用完整开书的 10 章默认 |
 | **日更续写** | 关键词（"日更"/"续写"/"继续写"）**且**项目已有正文+追踪 | 按 workflow-daily 控制批次 |
@@ -94,12 +94,12 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 >
 > **对标资料**：路径查找、无对标的判定、缺资料怎么办，都只在 benchmark-recall.md 定义。
 >
-> **卷纲不整读**：一律走 `{PYTHON} {skill 根}/scripts/outline_view.py --unit {单元ID} {卷纲路径}`（只要卷级部分用 `--contract`，看目录用 `--toc`）；找不到单元就核对编号或先补卷纲，不改用整读。
+> **卷纲不整读**：一律走 `{PYTHON} {skill 根}/scripts/outline_view.py --chapter {章号} {卷纲路径}`（知道编号也可用 `--unit {编号}`；只要卷级部分用 `--contract`，看目录用 `--toc`）；找不到就核对章节范围或先补卷纲，不改用整读。
 >
 > **新增物三级**（缺东西时三种处理；排纲、写正文、处置共用；只看下一章需不需要知道它存在过）：
 > - **直接写**：微连接、路人、器物、地名细部、一次性对话、现场细节；不申报。
 > - **补上并记下**：具名配角、势力、复用地点属性、能力形态、规矩、刻度、新伏笔、新关系或承诺、给主角留下的东西；照写并逐条进申报表（类型／名目／落在哪／后续义务；无写 `0`；末行「本章没写成的」），主会话核对后才算续写事实。正文里新长出的伏笔由主会话登记时取本卷伏笔表的下一个编号、追加进伏笔表（只增不改，不算改卷纲）。
-> - **先问作者**：新主线事件或反转、金手指规则与力量档位、真相或伏笔结算、经济锚点、读者期待、提前写后续章、改变细纲已定结果或人物决定、卷纲新增主线或故事线、碰主推线或留到后面的大牌、与既有规矩或承诺冲突；写正文时不写，排纲时挂起列候选，由主会话问作者。
+> - **先问作者**：新主线事件或反转、金手指规则与力量档位、真相或伏笔结算、经济锚点、读者期待、提前写后续章、改变细纲已定结果或人物决定、卷纲新增主线或故事线、碰这卷主打的线或后面才揭开的东西、与既有规矩或承诺冲突；写正文时不写，排纲时挂起列候选，由主会话问作者。
 > 拿不准：写时按补上并记下，处置时按先问作者。
 
 ---

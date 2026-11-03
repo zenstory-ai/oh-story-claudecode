@@ -28,7 +28,7 @@
 | [long-genre-mechanics.md](long-genre-mechanics.md) | 提炼长篇核心梗、设计金手指或微创新 |
 | [genre-prose-cards.md](genre-prose-cards.md) | 确定长篇题材声线与长线约束 |
 | [character-relations.md](character-relations.md) | 本书有感情线：只读「感情线阶段」 |
-| [outline-methods.md](outline-methods.md) | 讨论或审查卷结构：读「卷纲排法」；没有主对标再读「八节点故事结构」，有自创单元读「情绪模块公式」，换地图读「换地图」 |
+| [outline-methods.md](outline-methods.md) | 讨论或审查卷结构：读「卷纲排法」；没有主对标再读「常见的八步结构」，有自创单元读「情绪模块公式」，换地图读「换地图」 |
 | [opening-design.md](opening-design.md) | 新书开篇或前 3 章细纲：只读「开篇规划」 |
 | [long-emotional-methods.md](long-emotional-methods.md) | 设计感情桥段或单场情绪：三板斧、两种场景情绪结构、拉扯节奏与失败模式 |
 | [long-chapter-hooks.md](long-chapter-hooks.md) | 设计章首/章尾与跨章期待，不采用固定百字配额 |

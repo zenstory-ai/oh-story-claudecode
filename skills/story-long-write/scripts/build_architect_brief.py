@@ -20,12 +20,12 @@
 - outline：workflow-outline.md 的「排纲方法」（批次步骤、设定补全、按剧情批出细纲）、outline-template.md 整份
   （细纲与排纲笔记模板、字段说明）、long-chapter-hooks.md 的「章尾钩子 13 式」与「章首钩子 7 式」
   （细纲模板要从中选；只带名称与公式，示例列不进包）、character-basics.md 的主角卡与配角卡模板、
-  plot-core-methods.md（首批整份；之后不带开篇噱头一节）；首章在范围内时加 opening-design.md 的「开篇规划」。
+  plot-core-methods.md（含前 3 章时整份；之后不带开篇噱头一节）；首章在范围内时加 opening-design.md 的「开篇规划」。
 方法按小节名取：只取点名的那一节（到下一个同级或更高级标题为止），要两节就点两个名字，
 不按「从 A 切到 B」的区间取——小节挪了位置或文末加了内容，不会悄悄混进包里；点名的小节不在了直接报错。
 模板按围栏标签取（```markdown template=题材定位，见 template_fence.py）：只取那一块，标签不在或重复直接报错。
 流程文件的主会话一节（读取清单、分工、作者汇报）不进包。流程里点名、但只在某些书才用得上的参考
-（多对标时的跨书召回、女频手册、八节点、情绪模块公式、换地图、感情线阶段、反转速查）
+（多对标时的跨书召回、女频手册、常见的八步结构、情绪模块公式、换地图、感情线阶段、反转速查）
 不进包，列在包末「按条件可读」，给出绝对路径与小节，条件满足才读。
 本书的方向、设定与作者口头定下的事都在 `设定/`，不进包，由执行者按包里的流程定点读。
 `--rules-only` 只拼规则部分（不取本书卷纲），供仓库的预算守卫计量每次调用的加载量。
@@ -54,7 +54,7 @@ CROSS_BOOK = ("cross-book-recall.md", None, "`设定/题材定位.md`「对标�
 ROMANCE = ("character-relations.md", "感情线阶段", "本书有感情线")
 CONDITIONAL = {
     "world": [("female-audience-writing.md", None, "本书是女频"), ROMANCE, CROSS_BOOK],
-    "volume": [CROSS_BOOK, ("outline-methods.md", "八节点故事结构", "没有主对标"),
+    "volume": [CROSS_BOOK, ("outline-methods.md", "常见的八步结构", "没有主对标"),
                ("outline-methods.md", "情绪模块公式", "卷纲里有自创的剧情段"),
                ("outline-methods.md", "换地图", "本卷换大地图或开新地图"),
                ("long-reversal.md", "反转类型", "本卷规划了反转"), ROMANCE],
@@ -69,7 +69,7 @@ TEMPLATE_TARGETS = {
 TIERS_TITLES = ("新增物三级", "缺东西时三种处理")
 # 前 3 章不在范围时 plot-core-methods 带的小节（不带「噱头分类与开篇流程」）
 PLOT_CORE_AFTER_OPENING = ("目标情绪与主角选择", "爽点：六类与倒推", "高潮构建公式",
-                           "情节细化：情节点怎么排", "这章不能说破与章尾", "过渡章与衔接")
+                           "情节细化：情节点怎么排", "留悬念与章尾", "过渡章与衔接")
 
 
 def read_reference(name: str) -> str:
@@ -210,7 +210,7 @@ def unit_closures(project: Path, first: int, last: int) -> list[tuple[str, str]]
             else:
                 text = render(sections, set(shared + live), span, lines[:sections[0].start] if sections else None)
             given = True
-            found.append((f"{volume.name} · 单元 {unit}（第{span[0]}-{span[1]}章）", text))
+            found.append((f"{volume.name} · 剧情段 {unit}（第{span[0]}-{span[1]}章；排纲笔记写 .story/排纲笔记/{unit}.md）", text))
     missing = [n for n in range(first, last + 1) if n not in covered]
     if missing:
         hint = (f"；这些剧情段的标题末尾缺单元编号注释（如 <!-- L1-01 -->）：{'、'.join(undeclared)}"
@@ -271,7 +271,7 @@ def build(task: str, volume: int | None, chapters: tuple[int, int] | None,
     else:
         first, last = chapters
         head = (f"# 任务包：出第{first}-{last}章细纲\n\n"
-                f"只交付 `大纲/细纲_第{first:03d}章` 到第{last:03d}章，以及排纲笔记与必要的设定补全，不写正文、"
+                f"只交付 `大纲/细纲_第{first:03d}章` 到第{last:03d}章，以及排纲笔记（`.story/排纲笔记/{{剧情段编号}}.md`）与必要的设定补全，不写正文、"
                 "不建 `追踪/`。本批涉及的卷纲剧情段附在包末（已按段取好），卷纲本身不整读；设定从 `设定/` 定点读；"
                 f"{outside}交付后只回：写了哪些文件、"
                 "每章一句核心事件、要作者定的事（没有写「无」）。")

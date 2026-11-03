@@ -54,7 +54,7 @@
 | `test-doc-budget.py` | 临时文档工程中的路径求和、超限、缺失文件、按节计量、拼包计量、叠加最坏组合（含变异对照）与硬上限配置失败 | CI |
 | `test-delivery-contract.js` | 短篇最终字数、节数、标记与空行交付契约回归 | Linux / Windows / macOS CI |
 | `check-reference-gates.js` | 长短篇「写前必读」的首屏位置、关键路由、长篇「记下本轮约束」锚点、短篇交付预检命令与写正文只靠设计文件交接（不回查构思方法论、「像」不设硬上限）的静态守卫（gate 是提示词，无运行时入口可断言） | Linux / Windows / macOS CI |
-| `test-outline-contract.js` | 长篇细纲结构验收：新旧字段名、小节、五段式、四列情节点表、可不写的字数口径与「有没有硬伤」取值的正负例回归 | Linux / Windows / macOS CI |
+| `test-outline-contract.js` | 长篇细纲结构验收：新旧字段名与小节名、「这章怎么走」五行、三到五列情节点表、可选的「这章不能说破」、可不写的字数口径与「有没有硬伤」取值的正负例回归 | Linux / Windows / macOS CI |
 | `test-degeneration.sh` | 模型退化检测器 `check-degeneration.js` 回归 | CI |
 | `test-prose-net-parity.sh` | 正文兜底「轻量确定性网」、写正文守卫与命令目标抽取的 JS 核 / Codex Python / Claude bash parity | CI |
 | `test-prose-backstop-hook.sh` | `check-prose-after-write.sh` 回归 | CI |

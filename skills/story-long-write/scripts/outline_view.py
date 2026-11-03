@@ -20,9 +20,13 @@
 卷纲、细纲按名读取的字段在这里集中给出新旧名（UNIT_FIELD_NAMES、CHAPTER_UNIT_FIELDS），
 其他脚本从这里取，不各自写死一种叫法。
 
+细纲属于哪段剧情：新细纲只写段名（「第一段剧情：退婚风波」），按本章章号落在卷纲哪张剧情段卡的
+「章节范围」里定位（unit_for_chapter / --chapter）；旧细纲行末的编号注释、旧「单元ID/位置」字段照样认。
+
 用法：
     outline_view.py --toc   卷纲.md
     outline_view.py --unit D1-03 卷纲.md
+    outline_view.py --chapter 12 卷纲.md      # 第 12 章落在哪段剧情，就取哪段（同 --unit）
     outline_view.py --contract 卷纲.md
     outline_view.py --check 卷纲.md
     任意子命令加 --history 连退役行一起输出
@@ -104,8 +108,32 @@ def unit_id_of(value):
 
 
 def chapter_unit(outline_text):
-    """细纲属于哪段剧情（单元编号）；新字段「属于哪段剧情」、旧字段「单元ID/位置」都认。"""
+    """细纲里写明的剧情段编号（旧写法：行末注释或「单元ID/位置」）；新细纲不写编号，返回 None，
+    由调用方按章号走 unit_for_chapter。"""
     return unit_id_of(field_value(outline_text, CHAPTER_UNIT_FIELDS))
+
+
+def unit_for_chapter(sections, chapter):
+    """本章章号落在哪张剧情段卡的「章节范围」里（跳过已退役的卡）；没有返回 None。"""
+    for section in sections:
+        if section.status == "已退役" or not section.unit or not is_unit_card(section):
+            continue
+        for line in section.lines:
+            found = CH_RANGE.search(line)
+            if found:
+                if int(found.group(1)) <= chapter <= int(found.group(2)):
+                    return section.unit
+                break
+    return None
+
+
+def chapter_unit_in_volume(volume_text, chapter):
+    """卷纲全文 + 章号 → 剧情段编号；卷纲读不出或没有覆盖本章的段返回 None。"""
+    try:
+        _, sections = parse(volume_text or "")
+    except Exception:  # noqa: BLE001 —— 卷纲写坏时按「找不到」处理，由调用方报告
+        return None
+    return unit_for_chapter(sections, chapter)
 
 
 def read(path):
@@ -297,11 +325,12 @@ def main():
     parser.add_argument("path")
     parser.add_argument("--toc", action="store_true")
     parser.add_argument("--unit")
+    parser.add_argument("--chapter", type=int, help="按章号找本章落在哪段剧情的章节范围里，取那一段（同 --unit）")
     parser.add_argument("--contract", action="store_true")
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--history", action="store_true")
     parser.add_argument("--strict", action="store_true", help="新建卷纲校验：标题没标全卷或单元编号也视为错误")
-    # 排纲笔记放在卷纲外的 大纲/排纲笔记_{单元ID}.md（老书叫排纲底稿），默认输出就是写作要的闭包。
+    # 排纲笔记放在卷纲外的 .story/排纲笔记/{单元ID}.md（老书在 大纲/排纲笔记_ 或 排纲底稿_），默认输出就是写作要的闭包。
     # --stage outline 只为老卷纲保留：它们的供给自查等底稿还写在卷纲里（作用域：批次底稿）。
     parser.add_argument("--stage", choices=["outline", "write"], default="write",
                         help="write（默认）＝卷级常任＋单元级；"
@@ -340,6 +369,15 @@ def main():
     if args.contract:
         emit(sections, set(permanent + undeclared), None, args.history, note, preamble)
         return 0
+
+    if args.chapter is not None and not args.unit:
+        args.unit = unit_for_chapter(active, args.chapter)
+        if not args.unit:
+            sys.stderr.write(
+                "卷纲里没有哪段剧情的章节范围覆盖第 %d 章 —— 不静默降级。核对剧情段的「章节范围」，或先补卷纲。\n"
+                % args.chapter)
+            return 1
+        sys.stderr.write("第 %d 章属于剧情段 %s\n" % (args.chapter, args.unit))
 
     if args.unit:
         unit = args.unit

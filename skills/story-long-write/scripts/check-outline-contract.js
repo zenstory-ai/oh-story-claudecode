@@ -20,16 +20,20 @@ const path = require('path')
 
 // 权威模板：references/outline-template.md 的细纲模板（story-import 的副本对照 outline-reverse-rules.md）
 // 必填只留有证据或事故撑腰的核心字段；阶段位置、松紧、结构公式、本章标价、闭环状态、
-// 写手自由区、有没有硬伤、镜头准入、信息差触发点与「分辨率」列是可选的阅读体验字段——
+// 可以放开写的地方（旧名写手自由区）、有没有硬伤、镜头准入、信息差触发点与「分辨率」「分寸」列是可选的阅读体验字段——
 // 写了照样消费，没写不拦（#383 隔离实验：只补目标情绪与主角目标就复现了补满全部字段的收益）。
 // 0.10 起字段改白话：新名在前，旧名照认（老书细纲不必改）。「字数口径」不再必填：没写按默认口径。
+// 「这章不能说破」（旧名本章禁止提前释放）可选：只有本章确有一件具体的事要压住时写一行，写了才查长度。
 const FIELD_NAMES = [
   ['核心事件'], ['字数目标'], ['属于哪段剧情', '单元ID/位置'], ['目标情绪'],
-  ['主角目标/关键选择'], ['章首钩子'], ['爽点'], ['这章不能说破', '本章禁止提前释放'],
+  ['主角目标/关键选择'], ['章首钩子'], ['爽点'],
 ]
 const FIELDS = FIELD_NAMES.map((names) => names[0])
 const RELEASE_FIELDS = ['这章不能说破', '本章禁止提前释放']
-const SUBSECTIONS = ['内容概括', '情节安排', '人物关系和出场顺序', '情节细化']
+const RELEASE_MAX_ITEMS = 3
+// 小节名新名在前，旧名照认：「这章怎么走」旧叫「内容概括（五段式）」。
+const SUBSECTION_NAMES = [['这章怎么走', '内容概括'], ['情节安排'], ['人物关系和出场顺序'], ['情节细化']]
+const SUBSECTIONS = SUBSECTION_NAMES.map((names) => names[0])
 const FIVE_ACT = ['起因', '发展', '转折', '高潮', '结尾']
 const PLOT_HEADER_FIRST = /^(?:#|序号)$/
 // 这两个字段实测直接影响正文质量，必须有实际内容
@@ -230,13 +234,15 @@ function verify(file, projectRoot = null) {
     '只把这两个字段替换成本章的实际情绪变化与实际取舍；其余字段不动。'
   ))
 
-  const missingSubs = SUBSECTIONS.filter((sub) => !new RegExp(`^#{3,4}\\s*${sub}`, 'm').test(text))
+  const missingSubs = SUBSECTION_NAMES
+    .filter((names) => !names.some((sub) => new RegExp(`^#{3,4}\\s*${sub}`, 'm').test(text)))
+    .map((names) => names[0])
   checks.push(makeCheck(
     'outline.subsections',
     missingSubs.length === 0,
     name,
     missingSubs.length ? `缺小节：${missingSubs.join('、')}` : '四个小节齐全',
-    '包含 内容概括 / 情节安排 / 人物关系和出场顺序 / 情节细化 四个小节',
+    '包含 这章怎么走 / 情节安排 / 人物关系和出场顺序 / 情节细化 四个小节（旧名「内容概括」照认）',
     '只补缺失的小节标题及其条目，不重写已成立的内容。'
   ))
 
@@ -245,8 +251,8 @@ function verify(file, projectRoot = null) {
     'outline.five-act',
     missingActs.length === 0,
     name,
-    missingActs.length ? `五段式缺：${missingActs.join('、')}` : '五段式齐全',
-    '内容概括写全 起因 / 发展 / 转折 / 高潮 / 结尾',
+    missingActs.length ? `「这章怎么走」缺：${missingActs.join('、')}` : '「这章怎么走」五行齐全',
+    '「这章怎么走」写全 起因 / 发展 / 转折 / 高潮 / 结尾',
     '只补缺的那一段，不改其余四段。'
   ))
 
@@ -254,24 +260,29 @@ function verify(file, projectRoot = null) {
   let header = null
   for (const line of lines) {
     const cells = parseTableRow(line)
-    // 现行模板默认四列（# / 情节点 / 作用 / 分寸），需要时在「作用」后加「分辨率」列成五列。
-    // 旧表头「功能标签」「执行边界（禁＋放）」照收：作用固定在第 3 列，分寸一律取最后一列。
-    if (cells && (cells.length === 4 || cells.length === 5) && PLOT_HEADER_FIRST.test(cells[0])) {
+    // 现行模板默认三列（# / 情节点 / 作用）；需要时加「分辨率」列、表末加「分寸」列，三到五列都收。
+    // 旧表头「功能标签」「执行边界（禁＋放）」照收：作用固定在第 3 列，分寸/执行边界只能在最后一列。
+    if (cells && cells.length >= 3 && cells.length <= 5 && PLOT_HEADER_FIRST.test(cells[0])) {
       header = cells
       break
     }
   }
+  const extraColumnsOk = (extra) => {
+    // 第 4 列起只收「分辨率」「分寸/执行边界」各至多一列，分寸在最后；旧四列表的最后一列必须是执行边界/分寸。
+    const kinds = extra.map((cell) => (/分辨率/.test(cell) ? 'res' : (/执行边界|分寸/.test(cell) ? 'bound' : null)))
+    if (kinds.includes(null) || new Set(kinds).size !== kinds.length) return false
+    return !kinds.includes('bound') || kinds[kinds.length - 1] === 'bound'
+  }
   const headerOk = Boolean(header)
     && /功能标签|作用/.test(header[2])
-    && /执行边界|分寸/.test(header[header.length - 1])
-    && (header.length === 4 || header[3].includes('分辨率'))
+    && extraColumnsOk(header.slice(3))
   checks.push(makeCheck(
     'outline.plotpoint-table',
     headerOk,
     name,
-    header ? `表头：${header.join(' | ')}` : '未找到 | # | 情节点 | 作用 | [分辨率] | 分寸 | 表头',
-    '情节细化使用表格：# / 情节点（谁做了什么） / 作用 / 分寸；需要时可在「作用」后加「分辨率」列',
-    '只把情节点序列改成这张表，逐点补作用与分寸；不增删情节点本身。'
+    header ? `表头：${header.join(' | ')}` : '未找到 | # | 情节点 | 作用 | 表头',
+    '情节细化使用表格：# / 情节点（谁做了什么） / 作用；需要时可加「分辨率」列，某个点确实要限定写到什么程度时在表末加「分寸」列',
+    '只把情节点序列改成这张表，逐点补作用；不增删情节点本身。'
   ))
 
   // 「放」半边只管旧表头「执行边界」：五列表或表头写明「禁＋放」的四列表，必须至少一个点解除限制，
@@ -312,20 +323,20 @@ function verify(file, projectRoot = null) {
     }
   }
 
-  // 「这章不能说破」只写本章特有的三五条；条目过多多半是把全卷都不能碰的逐章复读了。
+  // 「这章不能说破」可选，写了只写本章确要压住的一件事；条目过多多半是把全卷都压着的逐章复读了。
   const releaseMatch = RELEASE_FIELDS
     .map((label) => text.match(new RegExp(`^\\s*[-*+]\\s*\\*{0,2}${label}\\*{0,2}\\s*[：:]\\s*(.*)$`, 'm')))
     .find(Boolean)
   if (releaseMatch) {
     const items = releaseMatch[1].split(/[、；;，,\/]/).map((s) => s.trim()).filter(Boolean)
-    if (items.length > 5) {
+    if (items.length > RELEASE_MAX_ITEMS) {
       checks.push(makeCheck(
         'outline.release-brevity',
         false,
         name,
         `这章不能说破列了 ${items.length} 条`,
-        '只写这章特有的三五条；全卷都不能碰的写在卷纲「本卷不能碰的大牌」，不逐章复读',
-        '把和卷纲重复的条目删掉，只留这章特有的；本项不阻断。',
+        `只在这章确有一件具体的事要压住时写一行（至多 ${RELEASE_MAX_ITEMS} 条）；全卷都压着的写在卷纲「这卷先不能揭开、不能用上的」，不逐章复读`,
+        '把和卷纲重复的条目删掉，只留这章确要压住的那件事；没有就整行删掉。本项不阻断。',
         'advisory'
       ))
     }
@@ -411,8 +422,9 @@ function resolveChapter(project, chapter) {
   return { file: path.join(dir, hit) }
 }
 
-// --supply：批末验证「写纲前查缺」已落盘。新书写在卷纲旁的 排纲笔记_{单元ID}.md（老书叫 排纲底稿_{单元ID}.md），
-// 更老的卷纲写在单元卡块内。小节名新旧都认：写纲前查缺 / 供给自查。
+// --supply：批末验证「写纲前查缺」已落盘。新书写在书目录的隐藏目录 .story/排纲笔记/{单元ID}.md；
+// 0.10 早期写在卷纲旁的 大纲/排纲笔记_{单元ID}.md，再老叫 排纲底稿_{单元ID}.md，更老的卷纲写在单元卡块内。
+// 位置按这个顺序找，小节名新旧都认：写纲前查缺 / 供给自查。
 const SUPPLY_HEADING = /^(?:写纲前查缺|供给自查)(?:\s|[（(<]|$)/
 
 function stripTrailingComment(title) {
@@ -426,15 +438,24 @@ function hasSupplyHeading(text) {
   })
 }
 
+function notesCandidates(volumeFile, unitId) {
+  const outlineDir = path.dirname(path.resolve(volumeFile))
+  const bookRoot = path.dirname(outlineDir)
+  return [
+    { file: path.join(bookRoot, '.story', '排纲笔记', `${unitId}.md`), label: '排纲笔记' },
+    { file: path.join(outlineDir, `排纲笔记_${unitId}.md`), label: '排纲笔记' },
+    { file: path.join(outlineDir, `排纲底稿_${unitId}.md`), label: '排纲底稿' },
+  ]
+}
+
 function verifySupply(volumeFile, unitId) {
-  for (const base of ['排纲笔记', '排纲底稿']) {
-    const draftFile = path.join(path.dirname(volumeFile), `${base}_${unitId}.md`)
+  for (const { file: draftFile, label } of notesCandidates(volumeFile, unitId)) {
     const draft = readUtf8(draftFile)
     if (!draft.ok) continue
     const ok = hasSupplyHeading(draft.text)
     return {
       schema_version: 1, verifier: 'story-long-write.outline-supply', file: path.resolve(draftFile), unit: unitId, ok,
-      evidence: ok ? `${base}含「写纲前查缺」小节` : `${path.basename(draftFile)} 里没有「写纲前查缺」小节——每批出细纲前都要查一遍缺什么（没缺也写「无缺口」），见 workflow-outline.md「写纲前查缺」`,
+      evidence: ok ? `${label}含「写纲前查缺」小节` : `${path.basename(draftFile)} 里没有「写纲前查缺」小节——每批出细纲前都要查一遍缺什么（没缺也写「无缺口」），见 workflow-outline.md「写纲前查缺」`,
     }
   }
   const read = readUtf8(volumeFile)
@@ -485,7 +506,7 @@ function verifySupply(volumeFile, unitId) {
     file: path.resolve(volumeFile),
     unit: unitId,
     ok,
-    evidence: ok ? '剧情段内含「写纲前查缺」小节' : `没有 排纲笔记_${unitId}.md，剧情段 ${unitId} 里也没有「写纲前查缺」小节——每批出细纲前都要查一遍缺什么（没缺也写「无缺口」），见 workflow-outline.md「写纲前查缺」`,
+    evidence: ok ? '剧情段内含「写纲前查缺」小节' : `没有 .story/排纲笔记/${unitId}.md，剧情段 ${unitId} 里也没有「写纲前查缺」小节——每批出细纲前都要查一遍缺什么（没缺也写「无缺口」），见 workflow-outline.md「写纲前查缺」`,
   }
 }
 
