@@ -127,8 +127,8 @@
     },
     {
       "path": "skills/story-short-write/references/short-craft.md",
-      "budget": 3300,
-      "why": "同上，Phase 2 与 Phase 3 通用底座 v0.8.2：场景写法（三维度揉进、疏密与主语节奏）只在写正文时用，迁到 scene-craft.md，构思时刻不再付；导语长度只按 submission-craft。 v0.8.x −500：题材包没写到时才补位，虐爽默认写法只属于虐爽题材；平台表改按 设定.md「平台基调」，删去与长篇比较的一节。 0.10 短篇清理后按实际用量收紧。"
+      "budget": 3350,
+      "why": "同上，Phase 2 与 Phase 3 通用底座 v0.8.2：场景写法（三维度揉进、疏密与主语节奏）只在写正文时用，迁到 scene-craft.md，构思时刻不再付；导语长度只按 submission-craft。 v0.8.x −500：题材包没写到时才补位，虐爽默认写法只属于虐爽题材；平台表改按 设定.md「平台基调」，删去与长篇比较的一节。 0.10 短篇清理后按实际用量收紧。；v0.10 二轮：爽点写当面发生、程序一句带过（开书与短篇评委都指出爽点被核对留证稀释），细纲记账类字段挪进可选"
     },
     {
       "path": "skills/story-short-write/references/short-reversal.md",
@@ -1020,7 +1020,7 @@
         {
           "label": "常规",
           "files": [],
-          "budget": 24200
+          "budget": 24250
         },
         {
           "label": "首批含前 3 章",
@@ -1041,7 +1041,7 @@
           "files": [
             "skills/story-long-write/references/character-relations.md#感情线阶段"
           ],
-          "budget": 24800
+          "budget": 24850
         }
       ],
       "stacking": {
@@ -1058,7 +1058,7 @@
           ]
         ]
       },
-      "why": "v0.8.2：没有子代理时的细纲时刻，也是日常补纲的加载。 补登：细纲模板要求章首、章尾钩子从「章首钩子 7 式」「章尾钩子 13 式」里选，workflow-outline 指向这两节，主会话自己出细纲时要读（+约 890）。 方法层重组：workflow-outline 让填目标情绪、主角选择、爽点、五段式时读 plot-core-methods（整份约 2.2K，计入基础）；前 3 章只读 opening-design「开篇规划」；有感情线时读 character-relations「感情线阶段」。 v0.10：细纲模板拆成 outline-template.md 单独登记，加各文件首行「谁读」，各分支 +~200。 细纲去术语（11-03 盲评后）：开篇规划与细纲模板各加一句「前 3 章立起够大的赌注」（评委给原生方案加分的主要理由之一，维护者点名要加），其余改名、挪排纲笔记、「这章不能说破」改可选等已删等量旧文本，只这一句净增。"
+      "why": "v0.8.2：没有子代理时的细纲时刻，也是日常补纲的加载。 补登：细纲模板要求章首、章尾钩子从「章首钩子 7 式」「章尾钩子 13 式」里选，workflow-outline 指向这两节，主会话自己出细纲时要读（+约 890）。 方法层重组：workflow-outline 让填目标情绪、主角选择、爽点、五段式时读 plot-core-methods（整份约 2.2K，计入基础）；前 3 章只读 opening-design「开篇规划」；有感情线时读 character-relations「感情线阶段」。 v0.10：细纲模板拆成 outline-template.md 单独登记，加各文件首行「谁读」，各分支 +~200。 细纲去术语（11-03 盲评后）：开篇规划与细纲模板各加一句「前 3 章立起够大的赌注」（评委给原生方案加分的主要理由之一，维护者点名要加），其余改名、挪排纲笔记、「这章不能说破」改可选等已删等量旧文本，只这一句净增。；v0.10 二轮：爽点写当面发生、程序一句带过（开书与短篇评委都指出爽点被核对留证稀释），细纲记账类字段挪进可选"
     },
     {
       "label": "写手去味审查（narrative-writer 审查调用）",
@@ -1472,14 +1472,14 @@
       "branches": [
         {
           "label": "世情打脸",
-          "budget": 26450,
+          "budget": 26500,
           "files": [
             "skills/story-short-write/references/genre-styles/世情打脸.md"
           ]
         },
         {
           "label": "双男主",
-          "budget": 25150,
+          "budget": 25200,
           "files": [
             "skills/story-short-write/references/genre-styles/双男主.md"
           ]
@@ -1493,21 +1493,21 @@
         },
         {
           "label": "宅斗宫斗",
-          "budget": 26150,
+          "budget": 26200,
           "files": [
             "skills/story-short-write/references/genre-styles/宅斗宫斗.md"
           ]
         },
         {
           "label": "总裁豪门",
-          "budget": 26750,
+          "budget": 26800,
           "files": [
             "skills/story-short-write/references/genre-styles/总裁豪门.md"
           ]
         },
         {
           "label": "悬疑",
-          "budget": 25600,
+          "budget": 25650,
           "files": [
             "skills/story-short-write/references/genre-styles/悬疑.md"
           ]
@@ -1521,7 +1521,7 @@
         },
         {
           "label": "沙雕脑洞",
-          "budget": 25850,
+          "budget": 25900,
           "files": [
             "skills/story-short-write/references/genre-styles/沙雕脑洞.md"
           ]
@@ -1535,35 +1535,35 @@
         },
         {
           "label": "追妻火葬场",
-          "budget": 26350,
+          "budget": 26400,
           "files": [
             "skills/story-short-write/references/genre-styles/追妻火葬场.md"
           ]
         },
         {
           "label": "冷门题材公式",
-          "budget": 28350,
+          "budget": 28400,
           "files": [
             "skills/story-short-write/references/genre-writing-formulas.md"
           ]
         },
         {
           "label": "有反派或真相揭露",
-          "budget": 23000,
+          "budget": 23050,
           "files": [
             "skills/story-short-write/references/villain-and-reveal.md"
           ]
         },
         {
           "label": "有对标",
-          "budget": 22500,
+          "budget": 22550,
           "files": [
             "skills/story-short-write/references/benchmark-recall.md"
           ]
         },
         {
           "label": "查节尾钩子",
-          "budget": 21900,
+          "budget": 21950,
           "files": [
             "skills/story-short-write/references/hooks-chapter.md#2. 节尾"
           ]
@@ -1596,7 +1596,7 @@
           ]
         ]
       },
-      "why": "迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +500：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。 v0.8.2：对标召回与参考索引只在有对标或选其他资料时读，改为条件分支；Phase 4 精修清单移入 workflow-revision。 v0.8.2：改名为作者时刻「构思」；构思交付把写正文要用的信息写进 设定.md，写正文时刻另计一条路径。 v0.8.2：场景写法迁出（构思不读）；腾出的字数给设定.md 模板的题材招式、人设速写与各处反转／贯穿道具／导语口径统一。 v0.8.x 短篇重组：writing-workflow 并入 workflow-design（构思各分支少 364 字），平台、导语、字数、付费点收进 submission-craft，short-craft、short-reversal、villain-and-reveal、冷门公式删去长篇和重复内容；各分支按实测用量收紧到约 100 字余量。 v0.8.x 短篇阶段 6 复核：平台「未定」、字数阿拉伯数字、揭露表按题材包拆行、受压规则收进 short-reversal，各分支约 +100～250，按实测重新校准；构思时付费点断点拿不准查 hooks-chapter「2. 节尾」一节（写正文不读），按这一节登记最重题材包与冷门含对标两条分支，对标召回和查节尾可能发生在同一次构思里，冷门那条把对标一并计入，是本时刻最重的组合。 0.10 短篇清理：路径与 SKILL.md「写前必读」总表一一对应（check-reference-routing 互查）；删文风裁决、跨书召回、参考索引；构思时读 emotional-methods「情感拉扯节奏设计」定整体走向（情绪走向唯一出处）；题材、反派、对标、节尾改成可叠加的槽位，按最坏组合计。；v0.10：short-craft 加「兑现当面发生，程序一两句带过」一句（短篇对照里原生胜出的主因是 skill 组爽点被核对、移交、走流程稀释）"
+      "why": "迁出文件保守全额计入（即使条件未命中）；拆分不计作同阶段总量节省。 路径预算显式 +500：迁移入口、路径修正和检查职责传递的路由文字；原技法未扩写。 v0.8.2：对标召回与参考索引只在有对标或选其他资料时读，改为条件分支；Phase 4 精修清单移入 workflow-revision。 v0.8.2：改名为作者时刻「构思」；构思交付把写正文要用的信息写进 设定.md，写正文时刻另计一条路径。 v0.8.2：场景写法迁出（构思不读）；腾出的字数给设定.md 模板的题材招式、人设速写与各处反转／贯穿道具／导语口径统一。 v0.8.x 短篇重组：writing-workflow 并入 workflow-design（构思各分支少 364 字），平台、导语、字数、付费点收进 submission-craft，short-craft、short-reversal、villain-and-reveal、冷门公式删去长篇和重复内容；各分支按实测用量收紧到约 100 字余量。 v0.8.x 短篇阶段 6 复核：平台「未定」、字数阿拉伯数字、揭露表按题材包拆行、受压规则收进 short-reversal，各分支约 +100～250，按实测重新校准；构思时付费点断点拿不准查 hooks-chapter「2. 节尾」一节（写正文不读），按这一节登记最重题材包与冷门含对标两条分支，对标召回和查节尾可能发生在同一次构思里，冷门那条把对标一并计入，是本时刻最重的组合。 0.10 短篇清理：路径与 SKILL.md「写前必读」总表一一对应（check-reference-routing 互查）；删文风裁决、跨书召回、参考索引；构思时读 emotional-methods「情感拉扯节奏设计」定整体走向（情绪走向唯一出处）；题材、反派、对标、节尾改成可叠加的槽位，按最坏组合计。；v0.10：short-craft 加「兑现当面发生，程序一两句带过」一句（短篇对照里原生胜出的主因是 skill 组爽点被核对、移交、走流程稀释）；v0.10 二轮：爽点写当面发生、程序一句带过（开书与短篇评委都指出爽点被核对留证稀释），细纲记账类字段挪进可选"
     },
     {
       "label": "短篇写正文与精修（Phase 3–4，主会话）",
@@ -1611,7 +1611,7 @@
       "branches": [
         {
           "label": "世情打脸",
-          "budget": 25950,
+          "budget": 26000,
           "files": [
             "skills/story-short-write/references/genre-styles/世情打脸.md"
           ]
@@ -1625,70 +1625,70 @@
         },
         {
           "label": "复仇打脸",
-          "budget": 25450,
+          "budget": 25500,
           "files": [
             "skills/story-short-write/references/genre-styles/复仇打脸.md"
           ]
         },
         {
           "label": "宅斗宫斗",
-          "budget": 25700,
+          "budget": 25750,
           "files": [
             "skills/story-short-write/references/genre-styles/宅斗宫斗.md"
           ]
         },
         {
           "label": "总裁豪门",
-          "budget": 26250,
+          "budget": 26300,
           "files": [
             "skills/story-short-write/references/genre-styles/总裁豪门.md"
           ]
         },
         {
           "label": "悬疑",
-          "budget": 25100,
+          "budget": 25150,
           "files": [
             "skills/story-short-write/references/genre-styles/悬疑.md"
           ]
         },
         {
           "label": "民俗怪谈",
-          "budget": 24850,
+          "budget": 24900,
           "files": [
             "skills/story-short-write/references/genre-styles/民俗怪谈.md"
           ]
         },
         {
           "label": "沙雕脑洞",
-          "budget": 25350,
+          "budget": 25400,
           "files": [
             "skills/story-short-write/references/genre-styles/沙雕脑洞.md"
           ]
         },
         {
           "label": "甜宠",
-          "budget": 24500,
+          "budget": 24550,
           "files": [
             "skills/story-short-write/references/genre-styles/甜宠.md"
           ]
         },
         {
           "label": "追妻火葬场",
-          "budget": 25850,
+          "budget": 25900,
           "files": [
             "skills/story-short-write/references/genre-styles/追妻火葬场.md"
           ]
         },
         {
           "label": "写羁绊或余韵",
-          "budget": 21350,
+          "budget": 21400,
           "files": [
             "skills/story-short-write/references/emotional-methods.md#情感虐心三板斧"
           ]
         },
         {
           "label": "对白驱动的博弈、审判、打脸",
-          "budget": 21350,
+          "budget": 21400,
           "files": [
             "skills/story-short-write/references/dialogue-mastery.md#什么时候读这份",
             "skills/story-short-write/references/dialogue-mastery.md#对话核心规则"
@@ -1696,7 +1696,7 @@
         },
         {
           "label": "主会话自己去味",
-          "budget": 22650,
+          "budget": 22700,
           "files": [
             "skills/story-short-write/references/short-deslop.md",
             "skills/story-short-write/references/banned-words.md#复合样本"
@@ -1704,14 +1704,14 @@
         },
         {
           "label": "交给写手（写正文或去味）",
-          "budget": 21450,
+          "budget": 21500,
           "files": [
             "skills/story-short-write/references/agent-calls.md"
           ]
         }
       ],
       "stacking": {
-        "budget": 31350,
+        "budget": 31400,
         "slots": [
           [
             "世情打脸",
@@ -1739,7 +1739,7 @@
           ]
         ]
       },
-      "why": "v0.8.2：取代「短篇执行指令（不含技法参考）」——那条没算写正文时真正读的格式、底座、题材包与去味清单。写正文是构思之后的新时刻：只读两份设计文件（项目资料，不计）、本条文件与一个题材包；反转、反派、平台基调、冷门公式、对标召回都从 设定.md 取，不重读构思方法论。去味交给写手时主会话不读 short-deslop；emotional-methods 只在写羁绊或余韵时读。参考索引列出的其他按需资料未登记。 v0.8.2：场景写法随写正文时刻读 scene-craft；派写手的 prompt 只在去味交给写手时读 agent-calls（该分支计入）。 三层重构：Phase 4 保留定点精修，只读短篇适配与范围协议；作者要求完整诊断时独立 /story-deslop 调用，按去味主会话完整路径计，不与初稿构思方法叠读。 方法层重组：短篇弧线与转折位置迁回短篇 emotional-methods（+250），情感桥段分支随之调高。 v0.8.x 短篇重组：short-prose-quality 并入 workflow-revision（+400），short-craft 和 emotional-methods 删去长篇比较与旧题材策略，平台表移出 short-format；各分支按实测用量收紧到约 100 字余量。 0.10 短篇清理：写正文与精修同一条路径（常在同一对话），与 SKILL.md 总表一一对应；删文风裁决与主会话的 deslop-gates 副本；补登记实际会读的 dialogue-mastery（「什么时候读这份」＋最大一节）、banned-words（拿不准时查一节，按最大一节计）；情感、对白、去味、交给写手改成可叠加槽位，按最坏组合计。；v0.10：short-craft 加「兑现当面发生，程序一两句带过」一句（短篇对照里原生胜出的主因是 skill 组爽点被核对、移交、走流程稀释）"
+      "why": "v0.8.2：取代「短篇执行指令（不含技法参考）」——那条没算写正文时真正读的格式、底座、题材包与去味清单。写正文是构思之后的新时刻：只读两份设计文件（项目资料，不计）、本条文件与一个题材包；反转、反派、平台基调、冷门公式、对标召回都从 设定.md 取，不重读构思方法论。去味交给写手时主会话不读 short-deslop；emotional-methods 只在写羁绊或余韵时读。参考索引列出的其他按需资料未登记。 v0.8.2：场景写法随写正文时刻读 scene-craft；派写手的 prompt 只在去味交给写手时读 agent-calls（该分支计入）。 三层重构：Phase 4 保留定点精修，只读短篇适配与范围协议；作者要求完整诊断时独立 /story-deslop 调用，按去味主会话完整路径计，不与初稿构思方法叠读。 方法层重组：短篇弧线与转折位置迁回短篇 emotional-methods（+250），情感桥段分支随之调高。 v0.8.x 短篇重组：short-prose-quality 并入 workflow-revision（+400），short-craft 和 emotional-methods 删去长篇比较与旧题材策略，平台表移出 short-format；各分支按实测用量收紧到约 100 字余量。 0.10 短篇清理：写正文与精修同一条路径（常在同一对话），与 SKILL.md 总表一一对应；删文风裁决与主会话的 deslop-gates 副本；补登记实际会读的 dialogue-mastery（「什么时候读这份」＋最大一节）、banned-words（拿不准时查一节，按最大一节计）；情感、对白、去味、交给写手改成可叠加槽位，按最坏组合计。；v0.10：short-craft 加「兑现当面发生，程序一两句带过」一句（短篇对照里原生胜出的主因是 skill 组爽点被核对、移交、走流程稀释）；v0.10 二轮：爽点写当面发生、程序一句带过（开书与短篇评委都指出爽点被核对留证稀释），细纲记账类字段挪进可选"
     },
     {
       "label": "短篇管理作者习惯（主会话）",
