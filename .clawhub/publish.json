@@ -279,7 +279,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "737082392b34c801f6a4717de742c16aee90dff26444bad2bc7f22d662ef9bd7",
+      "packageDigest": "33578c038d1e88372204c0c9ccec2b2d290ca6408370e44626e178842c211900",
       "path": "skills/story-long-write",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -351,7 +351,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "3876f2b700e034e781f78a1fb93ba79db6994aa8317ff258a9a1026bf39fce3e",
+      "packageDigest": "ca39756107c10f852a180dc13f8c263b13cb2513b4d98d73d617ae49d70aef48",
       "path": "skills/story-setup",
       "publisher": "worldwonderer",
       "rebuildOn": [],
