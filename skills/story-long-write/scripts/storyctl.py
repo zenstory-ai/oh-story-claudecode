@@ -53,12 +53,12 @@ HUMAN_NARRATIVE_SENTENCE_MEDIAN = 39
 HUMAN_SHORT_PARAGRAPH_RANGE = (0.02, 0.33)
 HUMAN_NARRATIVE_SENTENCE_RANGE = (27, 54)
 _QUOTED = re.compile(r"“[^”]*”")
-_COMMENT_LINE = re.compile(r"^\s*<!--.*-->\s*$")
+_HTML_COMMENT = re.compile(r"<!--.*?-->", re.S)
 
 
 def fragmentation(text: str) -> dict[str, Any]:
-    lines = [line.strip() for line in text.lstrip("\ufeff").splitlines()]
-    paragraphs = [line for line in lines if line and not line.startswith("#") and not _COMMENT_LINE.match(line)]
+    lines = [line.strip() for line in _HTML_COMMENT.sub("", text.lstrip("\ufeff")).splitlines()]
+    paragraphs = [line for line in lines if line and not line.startswith("#")]
     short = sum(1 for line in paragraphs if len(re.sub(r"\s", "", line)) < SHORT_PARAGRAPH_CHARS)
     narrative = _QUOTED.sub("", "\n".join(paragraphs))
     sentences = re.split(r"[。！？!?]", narrative)
