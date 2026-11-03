@@ -19,7 +19,7 @@
   文件落在拆文端会去找的 `扫榜/{YYYYMMDD}/`。
 - 派助手：路由派 story-explorer / story-researcher 的 prompt 字段和查询类型在助手模板里；
   审稿给短篇写「无追踪」时 consistency-checker 有短篇分支。
-- 导入短篇 → 短篇写作构思检查：导入的 `设定.md` 模板有写作端模板的全部小节和基本信息、设计校验字段；
+- 导入短篇 → 短篇写作构思检查：导入的 `设定.md` 模板有写作端模板（`template=短篇设定` 围栏）的全部小节和基本信息、构思要点字段；
   照导入模板填好的设定和小节大纲跑 check-phase2-contract.js，只剩导入约定留给构思时定的两项。
 - 导入长篇 → 长篇写作：导入卷纲模板原样落盘过写作端 outline_view.py 的严格检查，按单元取得到卡，
   卡里有写正文组装脚本要读的单元字段；细纲检查脚本回报的模板出处在各副本所在 skill 里真实存在。
@@ -675,10 +675,16 @@ IMPORT_FIXTURE_VALUES = {
     "- 目标字数：": "- 目标字数：6000 字",
     "- 目标平台：": "- 目标平台：知乎盐言",
     "- 反转类型：": "- 反转类型：身份反转",
-    "- 反转位置：": "- 反转位置：第 3 节 ÷ 共 4 节 = 75%",
+    "- 反转在：": "- 反转在：第 3 节（共 4 节）",
     "- 付费点：": "- 付费点：第 2 节末",
-    "- 反派设计：": "- 反派设计：不适用（家庭矛盾，没有单一反派）",
+    "- 反派：": "- 反派：没有（家庭矛盾，没有单一反派）",
 }
+
+
+def tagged_block(text: str, tag: str) -> str:
+    """参考文件里 ```markdown template={tag} 围栏的内容；找不到返回空串。"""
+    match = re.search(rf"^```[^\n]*template={re.escape(tag)}[^\n]*\n(.*?)^```\s*$", text, re.M | re.S)
+    return match.group(1) if match else ""
 
 
 def import_short_fixture(template: str, outline_header: str) -> tuple[str, str]:
@@ -699,26 +705,26 @@ def import_short_fixture(template: str, outline_header: str) -> tuple[str, str]:
 
 def check_import_short(repo: Repo) -> list[str]:
     failures: list[str] = []
-    design = fenced_block_after(repo.text(SHORT_DESIGN), r"^#### 设定\.md 模板")
+    design = tagged_block(repo.text(SHORT_DESIGN), "短篇设定")
     ours = fenced_block_after(repo.text(IMPORT_SHORT), r"^## 设定\.md 模板")
     if not design or not ours:
         return [f"{IMPORT_SHORT}: 没找到导入或写作端的 设定.md 模板代码块，确认写法后更新本测试"]
     have = set(headings(ours))
     for title in headings(design):
-        if "（" not in title and title not in have:  # 带括号的是选用小节（贯穿道具、对标摘要）
+        if "（" not in title and title not in have:  # 带括号的是选用小节（反复出现的物件、参考的书）
             failures.append(f"{IMPORT_SHORT}: 设定模板缺写作端的「{title}」小节，续写构思会当成没写")
-    for title in ("基本信息", "Phase 2 设计校验"):
+    for title in ("基本信息", "构思要点"):
         for label in re.findall(r"^- ([^：{\n]+)：", section_body(design, title), re.M):
             if not re.search(rf"^- {re.escape(label)}：", ours, re.M):
                 failures.append(f"{IMPORT_SHORT}: 设定模板缺写作端「{title}」的「{label}」字段")
 
     node = shutil.which("node")
-    header = re.search(r"^\| 结构段/五段功能 .*\|$", repo.text(IMPORT_SHORT), re.M)
+    header = re.search(r"^\| 在全篇哪一段 .*\|$", repo.text(IMPORT_SHORT), re.M)
     if node is None:
         print("跳过导入短篇构思检查夹具：没有 node")
         return failures
     if not header:
-        return failures + [f"{IMPORT_SHORT}: 没找到小节大纲 12 列表头，确认写法后更新本测试"]
+        return failures + [f"{IMPORT_SHORT}: 没找到小节大纲表头（以「在全篇哪一段」开头），确认写法后更新本测试"]
     settings, outline = import_short_fixture(ours, header.group(0))
     with tempfile.TemporaryDirectory(prefix="import-short-") as tmp:
         (Path(tmp) / "设定.md").write_text(settings, encoding="utf-8")
@@ -731,13 +737,17 @@ def check_import_short(repo: Repo) -> list[str]:
         return failures + [f"{PHASE2_CHECK}: 输出读不出来：{run.stderr.strip()[:200]}"]
     for check_id in sorted(failed - IMPORT_SHORT_LEFT_FOR_DESIGN):
         failures.append(f"{IMPORT_SHORT}: 照导入模板填好的设定过不了构思检查 {check_id}")
-    # 导入承诺续写构思只补缺项：写作端构思要认「本书续写基线」并只补 [待补充]，写正文从下一节接着写。
+    # 导入承诺续写构思只补缺项：写作端构思要认导入写的「已写部分的写法」（旧书叫「本书续写基线」）并只补 [待补充]，
+    # 写正文从下一节接着写。
     design_text = repo.text(SHORT_DESIGN)
-    if "只补缺项" in repo.text(IMPORT_SHORT) and not ("本书续写基线" in design_text and "[待补充]" in design_text):
-        failures.append(f"{SHORT_DESIGN}: 导入说续写构思只补缺项，构思步骤没写有「本书续写基线」时只补 [待补充]")
-    draft_line = next((line for line in repo.text(SHORT_DRAFT).splitlines() if "**导入项目续写基线**" in line), "")
+    baseline = re.search(r"^## (已写部分的写法)", repo.text(IMPORT_SHORT), re.M)
+    if not baseline:
+        failures.append(f"{IMPORT_SHORT}: 设定模板没有「## 已写部分的写法」，确认写法后更新本测试")
+    elif "只补缺项" in repo.text(IMPORT_SHORT) and not (f"有「{baseline.group(1)}」" in design_text and "[待补充]" in design_text):
+        failures.append(f"{SHORT_DESIGN}: 导入说续写构思只补缺项，构思步骤没写有「{baseline.group(1)}」时只补 [待补充]")
+    draft_line = next((line for line in repo.text(SHORT_DRAFT).splitlines() if "**导入的书**" in line), "")
     if "第 N+1 节" not in draft_line:
-        failures.append(f"{SHORT_DRAFT}: 导入的半成品要从下一节接着写，「导入项目续写基线」没写第 N+1 节")
+        failures.append(f"{SHORT_DRAFT}: 导入的半成品要从下一节接着写，「导入的书」一段没写第 N+1 节")
     return failures
 
 
@@ -1042,10 +1052,10 @@ NEGATIVE_CASES = (
      "（假设，`待拆文验证`）\n", "\n- 拆文状态：`待拆文验证`\n", "待拆文验证"),
     ("选题决策不再落在扫榜日期目录", TOPIC_DECISION,
      "`扫榜/{YYYYMMDD}/`", "`选题/{YYYYMMDD}/`", "扫榜/*/选题决策.md"),
-    ("导入短篇设定还用旧的核心反转小节", IMPORT_SHORT, "### 核心支点", "### 核心反转", "核心支点"),
+    ("导入短篇设定改了「这篇靠什么撑住」小节名", IMPORT_SHORT, "### 这篇靠什么撑住", "### 核心支点", "这篇靠什么撑住"),
     ("导入短篇设定丢了付费点字段", IMPORT_SHORT, "- 付费点：第 {N} 节末\n", "", "付费点"),
-    ("导入短篇设定没写反派设计", IMPORT_SHORT, "- 反派设计：不适用（{原因}）\n", "", "villain-contract"),
-    ("短篇构思不认导入的续写基线", SHORT_DESIGN, "有「本书续写基线」时只补标", "有续写基线时只补标", "只补缺项"),
+    ("导入短篇设定没写反派", IMPORT_SHORT, "- 反派：没有（{原因}）\n", "", "villain-contract"),
+    ("短篇构思不认导入的续写基线", SHORT_DESIGN, "有「已写部分的写法」", "有续写基线", "只补缺项"),
     ("短篇写正文不从导入的下一节接着写", SHORT_DRAFT, "正文从第 N+1 节接着写", "正文接着写", "第 N+1 节"),
     ("路由派查资料助手用了模板不认的字段", ROUTER, "查询参数：{", "查询内容：{", "查询内容"),
     ("资料研究助手模板丢了 cdp_port", RESEARCHER, "- `cdp_port`：CDP 端口号（可选，默认 9222）\n", "", "cdp_port"),

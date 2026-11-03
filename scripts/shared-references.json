@@ -5,7 +5,6 @@
       "name": "deslop-expression",
       "source": "skills/story-deslop/references/expression.md",
       "targets": [
-        "skills/story-short-write/references/expression.md",
         "skills/story-review/references/expression.md",
         "skills/story-setup/references/agent-references/expression.md"
       ]
@@ -14,7 +13,6 @@
       "name": "deslop-narrative-focus",
       "source": "skills/story-deslop/references/narrative-focus.md",
       "targets": [
-        "skills/story-short-write/references/narrative-focus.md",
         "skills/story-review/references/narrative-focus.md",
         "skills/story-setup/references/agent-references/narrative-focus.md"
       ]
@@ -23,7 +21,6 @@
       "name": "deslop-story-logic",
       "source": "skills/story-deslop/references/story-logic.md",
       "targets": [
-        "skills/story-short-write/references/story-logic.md",
         "skills/story-review/references/story-logic.md",
         "skills/story-setup/references/agent-references/story-logic.md"
       ]
@@ -158,7 +155,6 @@
       "name": "style-resolution",
       "source": "skills/story-deslop/references/style-resolution.md",
       "targets": [
-        "skills/story-short-write/references/style-resolution.md",
         "skills/story-review/references/style-resolution.md",
         "skills/story-setup/references/agent-references/style-resolution.md"
       ]
@@ -167,8 +163,14 @@
       "name": "deslop-gate-rules",
       "source": "skills/story-deslop/references/deslop-gates.md",
       "targets": [
-        "skills/story-setup/references/agent-references/deslop-gates.md",
-        "skills/story-short-write/references/deslop-gates.md"
+        "skills/story-setup/references/agent-references/deslop-gates.md"
+      ]
+    },
+    {
+      "name": "short-selling-point-protection",
+      "source": "skills/story-deslop/references/short-deslop.md",
+      "targets": [
+        "skills/story-short-write/references/short-deslop.md"
       ]
     },
     {

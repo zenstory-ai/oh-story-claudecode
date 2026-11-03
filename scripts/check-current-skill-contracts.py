@@ -831,9 +831,9 @@ def spawn_preflight_findings(
         fallback_pattern = (
             r"版本提示本身不触发降级；文件缺失或异常、工具不可用、递归限制或调用失败按 Phase 0 处理"
         )
-    # 长篇写作 0.10 起汇报不带技术备注行：版本不匹配只对作者说一句白话。
+    # 长短篇写作 0.10 起汇报不带技术备注行：版本不匹配只对作者说一句白话。
     notice_pattern = r"Notice: agents bundle 版本不匹配"
-    if path.as_posix().endswith("skills/story-long-write/SKILL.md"):
+    if path.as_posix().endswith(("skills/story-long-write/SKILL.md", "skills/story-short-write/SKILL.md")):
         notice_pattern = r"写作助手是旧版，运行 /story-setup"
     required = (
         (r"`agents_version:\s*{}`".format(current), "pin the current agents_version"),
@@ -870,9 +870,8 @@ def spawn_preflight_findings(
 
 # 作者可见文本只说白话：这些 Skill 的降级与版本提示原文只进汇报最后一行「技术备注：」，
 # 不再写成「报告 `Fallback: …`」「同时报告 `Notice: …`」让模型原样念给作者（v0.8.2）。
-# 长篇写作 0.10 起不再有技术备注行（版本提示、降级都说成一句白话），不在此列。
+# 长短篇写作 0.10 起不再有技术备注行（版本提示、降级都说成一句白话），不在此列。
 AUTHOR_NOTE_PREFLIGHT_SKILLS = (
-    "skills/story-short-write/SKILL.md",
     "skills/story-deslop/SKILL.md",
     "skills/story-review/SKILL.md",
     "skills/story-import/SKILL.md",
@@ -1443,7 +1442,6 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
         "skills/story-long-write/references/workflow-setup.md",
         "skills/story-short-write/references/benchmark-recall.md",
         "skills/story-long-write/references/cross-book-recall.md",
-        "skills/story-short-write/references/cross-book-recall.md",
     ):
         benchmark_discovery = repo_root / relative
         findings.extend(

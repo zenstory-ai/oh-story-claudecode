@@ -51,7 +51,7 @@ assert(shortGateLine > 0 && shortGateLine <= 20, `short 写前必读 gate must s
 
 // Check the Phase 2 route and completion gate in the stage reference.
 const shortGate = shortLines.slice(shortGateLine - 1, shortGateLine + 11).join('\n')
-assert(shortGate.includes('`references/workflow-design.md`'), 'Phase 2 gate must route workflow-design on the first screen')
+assert.match(shortGate, /^\| 构思[^\n]*`workflow-design\.md`/m, 'Phase 2 gate must route workflow-design on the first screen')
 const shortDesign = fs.readFileSync(path.join(repoRoot, 'skills/story-short-write/references/workflow-design.md'), 'utf8')
 assert.match(shortDesign, /check-phase2-contract\.js --json/)
 
@@ -64,8 +64,8 @@ function phaseSection(heading) {
   const next = short.indexOf('\n### Phase ', start + heading.length)
   return short.slice(start, next < 0 ? undefined : next)
 }
-assert.match(shortGate, /Phase 3 写正文前完整读取 `references\/workflow-draft\.md`/)
-assert.match(shortGate, /Phase 4 精修前完整读取 `references\/workflow-revision\.md`/)
+assert.match(shortGate, /^\| 写正文[^\n]*`workflow-draft\.md`/m)
+assert.match(shortGate, /^\| 精修[^\n]*`workflow-revision\.md`/m)
 assert(phaseSection('### Phase 3：').includes('(references/workflow-draft.md)'), 'Phase 3 must route workflow-draft.md')
 assert(phaseSection('### Phase 4：').includes('(references/workflow-revision.md)'), 'Phase 4 must route workflow-revision.md')
 

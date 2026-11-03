@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""check-reference-routing.py — 长篇参考文件的路由、子代理副本和模板标签三条守卫。
+"""check-reference-routing.py — 长短篇写作参考文件的路由、子代理副本和模板标签三条守卫。
 
-1. 路由与预算互查：story-long-write SKILL.md「写前必读」里的总表（含「本章技法」表）是唯一的
-   文件级路由。表里点名的每个 references 文件，必须出现在 scripts/doc-budget.json 的某条长篇路径里；
-   长篇路径里登记的每个 references 文件，也必须出现在总表里（例外见 ROUTING_EXCEPTIONS，写明原因）。
+1. 路由与预算互查：story-long-write、story-short-write 的 SKILL.md「写前必读」里的总表（长篇含「本章技法」表）
+   是各自唯一的文件级路由。表里点名的每个 references 文件，必须出现在 scripts/doc-budget.json 里该 skill 的某条路径里；
+   该 skill 路径里登记的每个 references 文件，也必须出现在总表里（例外见 ROUTED_SKILLS，写明原因）。
    只读得到一边的文件，要么是路由漏写（模型不知道什么时候读），要么是预算漏算（每次调用的加载量失真）。
 2. 子代理副本链接闭包：story-setup/references/agent-references/ 下每份文件里的 Markdown 链接、
    反引号路径和正文里点名的 *.md 文件名，都必须指向子代理那边存在的文件（同目录副本，或项目里的
@@ -27,14 +27,21 @@ import tempfile
 from pathlib import Path
 
 LONG = "skills/story-long-write"
+SHORT = "skills/story-short-write"
 AGENT_REFS = "skills/story-setup/references/agent-references"
 AGENT_PREFIX = "story-setup/references/agent-references/"
 
-# 预算里登记、总表里不逐个点名的文件：(相对 references 的路径前缀, 原因)。
-ROUTING_EXCEPTIONS = (
-    ("genre-prose-cards/",
-     "单张题材卡由组装脚本按「题材类型」匹配后在核对报告里点名（匹配不到给流派兜底卡），"
-     "总表只写「核对报告点名的卡」；预算里登记最大的两张和兜底卡算最坏情况。"),
+# 纳入路由互查的 skill，以及预算里登记、总表里不逐个点名的文件：(相对 references 的路径前缀, 原因)。
+ROUTED_SKILLS = (
+    (LONG, "长篇", (
+        ("genre-prose-cards/",
+         "单张题材卡由组装脚本按「题材类型」匹配后在核对报告里点名（匹配不到给流派兜底卡），"
+         "总表只写「核对报告点名的卡」；预算里登记最大的两张和兜底卡算最坏情况。"),
+    )),
+    (SHORT, "短篇", (
+        ("genre-styles/",
+         "题材包按 设定.md 的题材十选一，总表写 `genre-styles/{题材}.md`；预算里十个题材包各登记一条分支。"),
+    )),
 )
 
 MD_NAME = r"[A-Za-z0-9_][A-Za-z0-9_.-]*\.md"
@@ -68,14 +75,15 @@ def routing_table_files(skill_text: str) -> set[str]:
     return names
 
 
-def budget_long_files(budget: dict, refs_rel: str) -> dict[str, list[str]]:
-    """doc-budget 里长篇路径（任一文件在 story-long-write 下）登记的 references 文件 → 出现在哪些路径。"""
+def budget_skill_files(budget: dict, skill_rel: str) -> dict[str, list[str]]:
+    """doc-budget 里该 skill 的路径（任一文件在 skill 目录下）登记的 references 文件 → 出现在哪些路径。"""
+    refs_rel = f"{skill_rel}/references"
     found: dict[str, list[str]] = {}
     for path in budget.get("paths", []):
         files = list(path.get("files", []))
         for branch in path.get("branches", []):
             files += branch.get("files", [])
-        if not any(f.startswith(LONG + "/") for f in files):
+        if not any(f.startswith(skill_rel + "/") for f in files):
             continue
         for item in files:
             item = item.split("#", 1)[0]
@@ -85,25 +93,29 @@ def budget_long_files(budget: dict, refs_rel: str) -> dict[str, list[str]]:
 
 
 def check_routing(root: Path, out: Violations) -> None:
-    skill = root / LONG / "SKILL.md"
-    refs = root / LONG / "references"
-    table = routing_table_files(skill.read_text(encoding="utf-8"))
-    if not table:
-        out.add("路由", f"{skill.relative_to(root)} 的「写前必读」里没找到读取总表")
-        return
-    budget = budget_long_files(json.loads((root / "scripts/doc-budget.json").read_text(encoding="utf-8")),
-                               f"{LONG}/references")
-    for name in sorted(table):
-        if not (refs / name).is_file():
-            out.add("路由", f"SKILL.md 总表点名的 references/{name} 不存在")
-        elif name not in budget:
-            out.add("路由", f"SKILL.md 总表点名了 references/{name}，doc-budget.json 没有一条长篇路径登记它"
-                    "——加进对应时刻的路径或分支，否则这次读取不计入每次调用的加载量")
-    for name, labels in sorted(budget.items()):
-        if name in table or any(name.startswith(prefix) for prefix, _ in ROUTING_EXCEPTIONS):
+    budget_doc = json.loads((root / "scripts/doc-budget.json").read_text(encoding="utf-8"))
+    for skill_rel, kind, exceptions in ROUTED_SKILLS:
+        skill = root / skill_rel / "SKILL.md"
+        refs = root / skill_rel / "references"
+        if not skill.is_file():
+            out.add("路由", f"{skill_rel}/SKILL.md 不存在")
             continue
-        out.add("路由", f"doc-budget.json 的长篇路径（{labels[0]}）登记了 references/{name}，SKILL.md 总表里没有"
-                "——总表是唯一的读取清单，补进对应时刻那一行，或确实不该读就从预算里删掉")
+        table = routing_table_files(skill.read_text(encoding="utf-8"))
+        if not table:
+            out.add("路由", f"{skill.relative_to(root)} 的「写前必读」里没找到读取总表")
+            continue
+        budget = budget_skill_files(budget_doc, skill_rel)
+        for name in sorted(table):
+            if not (refs / name).is_file():
+                out.add("路由", f"{kind} SKILL.md 总表点名的 references/{name} 不存在")
+            elif name not in budget:
+                out.add("路由", f"{kind} SKILL.md 总表点名了 references/{name}，doc-budget.json 没有一条{kind}路径登记它"
+                        "——加进对应时刻的路径或分支，否则这次读取不计入每次调用的加载量")
+        for name, labels in sorted(budget.items()):
+            if name in table or any(name.startswith(prefix) for prefix, _ in exceptions):
+                continue
+            out.add("路由", f"doc-budget.json 的{kind}路径（{labels[0]}）登记了 references/{name}，{kind} SKILL.md 总表里没有"
+                    "——总表是唯一的读取清单，补进对应时刻那一行，或确实不该读就从预算里删掉")
 
 
 # ---------- 2. 子代理副本链接闭包 ----------
@@ -246,6 +258,12 @@ def self_test(repo: Path) -> int:
         (tmp / LONG / "SKILL.md").write_text(
             "# x\n\n## 写前必读\n\n| 时刻 | 必读 |\n|---|---|\n| 出细纲 | `workflow-outline.md`、`outline-template.md` |\n\n## 别的\n",
             encoding="utf-8")
+        (tmp / SHORT / "references/genre-styles").mkdir(parents=True)
+        (tmp / SHORT / "SKILL.md").write_text(
+            "# s\n\n## 写前必读\n\n| 时刻 | 必读 |\n|---|---|\n| 写正文 | `workflow-draft.md`、`genre-styles/{题材}.md` |\n",
+            encoding="utf-8")
+        (tmp / SHORT / "references/workflow-draft.md").write_text("# d\n", encoding="utf-8")
+        (tmp / SHORT / "references/genre-styles/甜宠.md").write_text("# g\n", encoding="utf-8")
         (refs / "workflow-outline.md").write_text("# w\n", encoding="utf-8")
         (refs / "outline-template.md").write_text("# t\n\n```markdown template=细纲\n- 核心事件：\n```\n", encoding="utf-8")
         (refs / "genre-prose-cards/年代.md").write_text("# 卡\n", encoding="utf-8")
@@ -254,7 +272,9 @@ def self_test(repo: Path) -> int:
         (tmp / AGENT_REFS / "genre-prose-cards/年代.md").write_text("# 卡\n", encoding="utf-8")
         (tmp / "scripts/doc-budget.json").write_text(json.dumps({"paths": [{"label": "长篇出细纲", "files": [
             f"{LONG}/SKILL.md", f"{LONG}/references/workflow-outline.md", f"{LONG}/references/outline-template.md"],
-            "branches": [{"label": "卡", "files": [f"{LONG}/references/genre-prose-cards/年代.md"]}]}]}),
+            "branches": [{"label": "卡", "files": [f"{LONG}/references/genre-prose-cards/年代.md"]}]},
+            {"label": "短篇写正文", "files": [f"{SHORT}/SKILL.md", f"{SHORT}/references/workflow-draft.md"],
+             "branches": [{"label": "甜宠", "files": [f"{SHORT}/references/genre-styles/甜宠.md"]}]}]}),
             encoding="utf-8")
         (tmp / "scripts/current-contract.json").write_text(json.dumps({"template_fences": ["细纲"]}), encoding="utf-8")
         (tmp / "scripts/shared-references.json").write_text(json.dumps({"groups": [], "tree_groups": []}), encoding="utf-8")
@@ -267,6 +287,10 @@ def self_test(repo: Path) -> int:
             (t / "scripts/doc-budget.json").read_text(encoding="utf-8").replace(
                 "outline-template.md\"]", "outline-template.md\", \"" + LONG + "/references/workflow-outline.md\", \"" + LONG + "/references/extra.md\"]"),
             encoding="utf-8"), "[路由]"),
+        ("短篇预算登记、总表没点名", lambda t: ((t / SHORT / "references/agent-calls.md").write_text("# a\n", encoding="utf-8"), (t / "scripts/doc-budget.json").write_text(
+            (t / "scripts/doc-budget.json").read_text(encoding="utf-8").replace(
+                "workflow-draft.md\"]", "workflow-draft.md\", \"" + SHORT + "/references/agent-calls.md\"]"),
+            encoding="utf-8")), "[路由]"),
         ("副本指向写作端文件", lambda t: (t / AGENT_REFS / "plot.md").write_text("按 workflow-outline.md「排纲方法」\n", encoding="utf-8"), "[子代理副本]"),
         ("副本不带 .md 点名写作端文件", lambda t: (t / AGENT_REFS / "plot.md").write_text("章数见 workflow-outline「排纲刻度」\n", encoding="utf-8"), "[子代理副本]"),
         ("副本指向 SKILL.md", lambda t: (t / AGENT_REFS / "plot.md").write_text("见 `SKILL.md`「本章技法」\n", encoding="utf-8"), "[子代理副本]"),
@@ -309,9 +333,9 @@ def main(argv=None) -> int:
     for violation in violations:
         print(violation)
     if violations:
-        print(f"FAIL: 长篇参考文件路由/副本/模板标签有 {len(violations)} 处问题")
+        print(f"FAIL: 长短篇参考文件路由/副本/模板标签有 {len(violations)} 处问题")
         return 1
-    print("OK: SKILL.md 总表与预算互相覆盖；子代理副本的链接都指向副本那边的文件；模板标签各恰好一处")
+    print("OK: 长短篇 SKILL.md 总表与预算互相覆盖；子代理副本的链接都指向副本那边的文件；模板标签各恰好一处")
     return 0
 
 
