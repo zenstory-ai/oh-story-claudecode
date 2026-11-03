@@ -277,8 +277,8 @@
     },
     {
       "path": "skills/story-long-write/references/outline-template.md",
-      "budget": 2850,
-      "why": "v0.10 从 workflow-outline 拆出：细纲与排纲笔记模板、字段说明（哪些字段被脚本按名读取）。主会话出细纲、写正文前补建点名章细纲时读；story-architect 细纲任务包整份带入。"
+      "budget": 2900,
+      "why": "v0.10 从 workflow-outline 拆出：细纲与排纲笔记模板、字段说明（哪些字段被脚本按名读取）。主会话出细纲、写正文前补建点名章细纲时读；story-architect 细纲任务包整份带入。；v0.10 三轮：钩子只写具体场面不写类型名、剧情段之外的小节不再写注释"
     },
     {
       "path": "skills/story-short-write/references/scene-craft.md",
@@ -920,7 +920,7 @@
         {
           "label": "首批含前 3 章（最重的包）",
           "files": [],
-          "budget": 15750
+          "budget": 15800
         },
         {
           "label": "对标登记 ≥2 本",
@@ -934,7 +934,7 @@
           "files": [
             "skills/story-long-write/references/character-relations.md#感情线阶段"
           ],
-          "budget": 16350
+          "budget": 16400
         }
       ],
       "stacking": {
@@ -948,7 +948,7 @@
           ]
         ]
       },
-      "why": "v0.8.2：细纲时刻的流程、模板与验收由 build_architect_brief.py 拼包，守卫按最重的首批（含开篇设计）运行计量；本书卷纲取段属项目资料不计。 细纲模板要求章首、章尾钩子从「章首7式」「章尾13式」里选，两张表只在 long-chapter-hooks.md，随包，只带名称与公式两列，示例列不进包（免得细纲照抄示例句形）。 方法层重组：包里只带 workflow-outline 的「排纲方法」一节；plot-core-methods 随包（首批整份，之后不含「噱头分类与开篇流程」）；opening-design 只带「开篇规划」；有感情线时在包外读 character-relations「感情线阶段」。 细纲去术语（11-03 盲评后）：开篇规划与细纲模板各加一句「前 3 章立起够大的赌注」（评委给原生方案加分的主要理由之一，维护者点名要加），其余改名、挪排纲笔记、「这章不能说破」改可选等已删等量旧文本，只这一句净增。"
+      "why": "v0.8.2：细纲时刻的流程、模板与验收由 build_architect_brief.py 拼包，守卫按最重的首批（含开篇设计）运行计量；本书卷纲取段属项目资料不计。 细纲模板要求章首、章尾钩子从「章首7式」「章尾13式」里选，两张表只在 long-chapter-hooks.md，随包，只带名称与公式两列，示例列不进包（免得细纲照抄示例句形）。 方法层重组：包里只带 workflow-outline 的「排纲方法」一节；plot-core-methods 随包（首批整份，之后不含「噱头分类与开篇流程」）；opening-design 只带「开篇规划」；有感情线时在包外读 character-relations「感情线阶段」。 细纲去术语（11-03 盲评后）：开篇规划与细纲模板各加一句「前 3 章立起够大的赌注」（评委给原生方案加分的主要理由之一，维护者点名要加），其余改名、挪排纲笔记、「这章不能说破」改可选等已删等量旧文本，只这一句净增。；v0.10 三轮：钩子只写具体场面不写类型名"
     },
     {
       "label": "长篇 story-architect 无任务包（long profile）",

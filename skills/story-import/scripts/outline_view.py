@@ -223,6 +223,13 @@ def parse(text):
             section.inline = True
             section.inherited = True
         stack.append(section)
+    # 新写法里全卷小节可以不写注释：文件里只要有剧情段用了标题尾注释，其余没标的段一律算全卷。
+    if any(section.inline for section in sections):
+        for section in sections:
+            if section.scope is None and section.unit is None:
+                section.scope = "全卷"
+                section.inline = True
+                classify(section)
     return lines, sections
 
 
