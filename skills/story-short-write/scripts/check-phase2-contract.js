@@ -20,18 +20,13 @@ const path = require('path')
 // 第一个名字是现行列名（workflow-design 的小节大纲模板），其余是旧名。
 const OUTLINE_COLUMNS = [
   { role: 'stage', names: ['在全篇哪一段', '结构段/五段功能'] },
-  { role: 'event', names: ['主事件'] },
   { role: 'progress', names: ['这节发生的事', '情节推进', '子事件×3-5'] },
   { role: 'emotion', names: ['情绪'] },
-  { role: 'relation', names: ['人物/关系变化'] },
-  { role: 'cause', names: ['前因后果', '因果/逻辑链'] },
-  { role: 'learn', names: ['读者新获知什么'] },
   { role: 'hook', names: ['节尾停在哪', '结尾承接/钩子'] },
-  { role: 'foreshadow', names: ['伏笔/物件'] },
   { role: 'words', names: ['目标字数'] },
 ]
-// 可选列：0.10 起「场景形态」「对白作用」不再必填，旧表头照认。
-const OPTIONAL_COLUMNS = ['这节靠什么推进', '对话改变了什么', '场景形态', '对白作用', '动静', '对话密度']
+// 可选列：0.10 起小节大纲只要五列，下面这些写了照认、不写不拦（老书的十二列表头照样过）。
+const OPTIONAL_COLUMNS = ['主事件', '人物/关系变化', '前因后果', '因果/逻辑链', '读者新获知什么', '伏笔/物件', '这节靠什么推进', '对话改变了什么', '场景形态', '对白作用', '动静', '对话密度']
 const OUTLINE_HEADERS = OUTLINE_COLUMNS.map((column) => column.names[0])
 const STAGE_NAMES = OUTLINE_COLUMNS[0].names
 
@@ -241,7 +236,7 @@ function verify(projectDir) {
     headerOk,
     '小节大纲.md',
     headerEvidence,
-    `表头含这十列：${OUTLINE_HEADERS.join(' | ')}；可另加「${OPTIONAL_COLUMNS.slice(0, 2).join('」「')}」`,
+    `表头含这五列：${OUTLINE_HEADERS.join(' | ')}；其余列可选`,
     ['references/workflow-design.md'],
     '只修表头和错位单元格，不改动各节已经成立的剧情内容。'
   ))

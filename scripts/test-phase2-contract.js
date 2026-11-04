@@ -11,8 +11,10 @@ const repoRoot = path.resolve(__dirname, '..')
 const verifier = path.join(repoRoot, 'skills/story-short-write/scripts/check-phase2-contract.js')
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'phase2-contract-'))
 
-// 现行列名（0.10 起，workflow-design 的小节大纲模板）。
-const headers = [
+// 现行列名（0.10 起，workflow-design 的小节大纲模板只要五列）。
+const headers = ['在全篇哪一段', '这节发生的事', '情绪', '节尾停在哪', '目标字数']
+// 0.10 早期草案的十列表头：多出的五列现在是可选列，照样通过。
+const tenColumnHeaders = [
   '在全篇哪一段', '主事件', '这节发生的事', '情绪', '人物/关系变化', '前因后果',
   '读者新获知什么', '节尾停在哪', '伏笔/物件', '目标字数',
 ]
@@ -26,21 +28,21 @@ const legacyHeaders = v09Headers.map(
   (name, index) => ({ 2: '子事件×3-5', 9: '动静', 10: '对话密度' }[index] || name)
 )
 
-function outlineRow(stage, index, hook, { width = headers.length, progression = (i) => `主角发现线索${i}，当场留下证据` } = {}) {
-  const row = [
-    stage,
-    `主角处理事件${index}`,
-    progression(index),
-    `疑惑→紧张${index}`,
-    `关系压力上升${index}`,
-    `发现异常${index}，决定继续查`,
-    `读者获知线索${index}`,
-    hook,
-    `旧钥匙${index}`,
-  ]
-  while (row.length < width - 1) row.push(index % 2 ? '行动' : '证据核验')
-  row.push('1000')
-  return row
+// 按列名填格子，表头怎么排都能对上。
+function outlineRow(stage, index, hook, { headerRow = headers, progression = (i) => `主角发现线索${i}，当场留下证据` } = {}) {
+  const byName = {
+    在全篇哪一段: stage, '结构段/五段功能': stage,
+    这节发生的事: progression(index), 情节推进: progression(index), '子事件×3-5': progression(index),
+    情绪: `疑惑→紧张${index}`,
+    节尾停在哪: hook, '结尾承接/钩子': hook,
+    目标字数: '1000',
+    主事件: `主角处理事件${index}`,
+    '人物/关系变化': `关系压力上升${index}`,
+    前因后果: `发现异常${index}，决定继续查`, '因果/逻辑链': `发现异常${index}，决定继续查`,
+    读者新获知什么: `读者获知线索${index}`,
+    '伏笔/物件': `旧钥匙${index}`,
+  }
+  return headerRow.map((name) => byName[name] ?? (index % 2 ? '行动' : '证据核验'))
 }
 
 function validSettings(overrides = {}) {
@@ -102,7 +104,7 @@ function v09Settings(overrides = {}) {
 }
 
 function validOutline({ includePaywall = true, headerRow = headers, ...rowOpts } = {}) {
-  const opts = { width: headerRow.length, ...rowOpts }
+  const opts = { headerRow, ...rowOpts }
   const rows = [
     outlineRow('开头', 1, '她决定去查监控', opts),
     outlineRow('铺垫', 2, '她收到没有寄件人的照片', opts),
@@ -173,13 +175,17 @@ try {
   const oldMath = run(writeCase('old-reversal-math', v09Settings({ reversal: '反转位置：第 6 节 ÷ 共 8 节 = 60%' }), validOutline()))
   assert.strictEqual(oldMath.status, 0, oldMath.stdout)
 
-  // 可选列加在后面照样通过；认不出的列、缺列都判表头错。
-  const withOptional = run(writeCase(
-    'optional-columns',
-    validSettings(),
-    validOutline({ headerRow: [...headers.slice(0, 9), '这节靠什么推进', '对话改变了什么', '目标字数'] })
-  ))
-  assert.strictEqual(withOptional.status, 0, withOptional.stdout + withOptional.stderr)
+  // 可选列加进来照样通过（十列草案、对话两列）；认不出的列、缺列都判表头错。
+  for (const [name, headerRow] of [
+    ['ten-columns', tenColumnHeaders],
+    ['dialogue-columns', [...headers.slice(0, 4), '这节靠什么推进', '对话改变了什么', '目标字数']],
+  ]) {
+    const withOptional = run(writeCase(`optional-${name}`, validSettings(), validOutline({ headerRow })))
+    assert.strictEqual(withOptional.status, 0, withOptional.stdout + withOptional.stderr)
+  }
+  const missingColumn = run(writeCase('missing-column', validSettings(), validOutline({ headerRow: headers.filter((name) => name !== '情绪') })))
+  assert.strictEqual(missingColumn.status, 1)
+  assert(failureIds(missingColumn).includes('phase2.outline-header'))
   const unknownColumn = run(writeCase(
     'unknown-column',
     validSettings(),
@@ -304,7 +310,7 @@ try {
   }
 
   const brokenOutline = validOutline().replace(
-    /\| 结尾 \| 主角处理事件8[^\n]+\| 1000 \|/,
+    /\| 结尾 \| 主角发现线索8[^\n]+\| 1000 \|/,
     (line) => line.replace(/\| 1000 \|$/, '|')
   )
   const badColumns = run(writeCase('bad-columns', validSettings(), brokenOutline))

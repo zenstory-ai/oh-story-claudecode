@@ -696,8 +696,8 @@ def import_short_fixture(template: str, outline_header: str) -> tuple[str, str]:
     cells = len(split_terms(outline_header, "|"))
     rows = []
     for section in range(1, 5):
-        row = ["开头", "主事件", "她发现账单{发现}", "平静→怀疑"] + ["原文证据"] * (cells - 5) + ["1500"]
-        row[7] = "付费点" if section == 2 else "下一节接上"
+        row = ["开头", "她发现账单{发现}", "平静→怀疑"] + ["原文证据"] * (cells - 4) + ["1500"]
+        row[split_terms(outline_header, "|").index("节尾停在哪")] = "付费点" if section == 2 else "下一节接上"
         rows.append("| " + " | ".join(row) + " |")
     outline = "\n".join([outline_header, "|" + "---|" * cells, *rows]) + "\n"
     return "\n".join(lines) + "\n", outline
