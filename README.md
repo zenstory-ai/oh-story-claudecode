@@ -11,6 +11,8 @@
 <p align="center">
   <a href="https://zenstory.ai/zh/oh-story"><b>项目主页</b></a>
   &nbsp;·&nbsp;
+  <a href="https://app.zenstory.ai/?utm_source=gh-oh-story&utm_medium=readme"><b>在线写作工作台</b></a>
+  &nbsp;·&nbsp;
   <a href="#安装"><b>安装</b></a>
   &nbsp;·&nbsp;
   <a href="#常见问题"><b>常见问题</b></a>
@@ -21,7 +23,7 @@
 <p align="center">
   <a href="https://github.com/zenstory-ai/oh-story-claudecode/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/zenstory-ai/oh-story-claudecode?style=flat-square&color=22D3EE&logo=github&logoColor=white&label=Stars"></a>
   <a href="https://github.com/zenstory-ai/oh-story-claudecode/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/zenstory-ai/oh-story-claudecode?style=flat-square&color=081431&label=Release"></a>
-  <img alt="Skills 13" src="https://img.shields.io/badge/Skills-13-081431?style=flat-square">
+  <img alt="Skills 14" src="https://img.shields.io/badge/Skills-14-081431?style=flat-square">
   <a href="./LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/License-MIT-1F6FEB?style=flat-square"></a>
 </p>
 
@@ -55,7 +57,7 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 
 `-g` 全局安装，所有目录可用；去掉 `-g` 则只装到当前目录。**更新时重新执行同一条命令即可。**
 
-也可以直接对 Agent 说一句话（支持导入 GitHub 仓库 / skill 的平台都适用）：
+也可以直接对 Agent 说一句话（支持导入 GitHub 仓库 / skill 的平台都适用，例如 WorkBuddy，见社区写的[开书实操](https://zhuanlan.zhihu.com/p/2087452622655592204)）：
 
 ```
 安装这个 skill https://github.com/zenstory-ai/oh-story-claudecode
@@ -395,6 +397,11 @@ oh-story-claudecode 内置适配 Claude Code、Google Antigravity、OpenCode、Z
 - [去AI味的具体做法](docs/how-to-remove-ai-flavor-from-web-fiction.md) — 仓库内文档
 - [扫榜和拆文的自动化做法](docs/scan-charts-and-deconstruct-bestsellers.md) — 仓库内文档
 - [Claude Code skills for writers](docs/claude-code-skills-for-writers.md) — 仓库内文档（英文）
+- [黄金三章怎么写：网文开头清单与改写示例](docs/web-novel-golden-three-chapters.md) — 仓库内文档
+- [网文断章技巧：章尾钩子怎么写、怎么选](docs/web-novel-chapter-ending-hooks.md) — 仓库内文档
+- [小说细纲怎么写：章节模板与填写范例](docs/novel-chapter-outline-template.md) — 仓库内文档
+- [网文大纲怎么写：长篇大纲模板与分卷范例](docs/web-novel-outline-template.md) — 仓库内文档
+- [开源 AI 写小说工具怎么选：10 个项目按使用方式对比](docs/open-source-ai-novel-writing-tools.md) — 仓库内文档
 
 ## 贡献
 

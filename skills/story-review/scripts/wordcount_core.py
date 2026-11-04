@@ -102,6 +102,26 @@ def require(condition: bool, message: str) -> None:
         raise WordcountError(message)
 
 
+BOOK_DIRS = ("设定", "大纲", "正文", "追踪")
+
+
+def resolve_book_dir(project: Path) -> Path:
+    """`--project` 给书目录或给放 `.active-book` 的工作区根都行：后者按 `.active-book`
+    第一行（相对工作区根的书路径）落到那本书。已经像书目录、或没有 `.active-book` 时原样返回。"""
+    root = Path(project)
+    marker = root / ".active-book"
+    if any((root / name).is_dir() for name in BOOK_DIRS) or not marker.is_file():
+        return root
+    lines = marker.read_text(encoding="utf-8").splitlines()
+    active = lines[0].strip() if lines else ""
+    book = root / active
+    real = book.resolve()
+    inside = real == root.resolve() or root.resolve() in real.parents
+    require(bool(active) and inside and book.is_dir(),
+            f"{marker} 没有指向工作区里的书目录（写的是「{active}」）；--project 直接传书目录")
+    return book
+
+
 def normalize_newlines(value: str) -> str:
     return value.replace("\r\n", "\n").replace("\r", "\n")
 

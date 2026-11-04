@@ -497,7 +497,7 @@ def _wordcount_command(args: argparse.Namespace, author_range: dict[str, int] | 
             # 与 chapter check 同一优先级：命令行上下限 > 细纲「字数范围」 > 默认带。
             try:
                 chapter = int(args.chapter or "")
-                _, outline = read_chapter_outline(args.project, chapter)
+                _, outline = read_chapter_outline(core.resolve_book_dir(args.project), chapter)
                 if target is None:
                     target = target_from_outline(outline)
                 author_range = effective_author_range(outline, author_range)
@@ -536,6 +536,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "wordcount":
         return _wordcount_command(args, author_range)
     try:
+        args.project = core.resolve_book_dir(args.project)
         if args.chapter_command == "check":
             fixed = fix_punctuation(args.project, args.chapter, author_range) if args.fix_punctuation else None
             result = chapter_check(args.project, args.chapter, author_range)

@@ -172,7 +172,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "7ee6493fe5945e6054bf6dcfb97026808c0d980bd200db0e225f5c528aed0199",
+      "packageDigest": "230b8c05325d69564cebf56d289a3d0158c8c8dc766b804e6749086584f2af67",
       "path": "skills/story-import",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -192,7 +192,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.0.36"
+      "version": "1.0.37"
     },
     {
       "catalogMigration": true,
@@ -279,7 +279,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "3aed4897687a6b610706e0dfb799c47c129dfcfbe8bdd499470f9f91b4cf14c1",
+      "packageDigest": "7f3cde104662cbf45b740da3f3dce4788e9270e0d16b54028e18cfca6536dd63",
       "path": "skills/story-long-write",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -299,7 +299,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.1.46"
+      "version": "1.1.47"
     },
     {
       "catalogMigration": true,
@@ -315,7 +315,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "f958d235da79b34b2db68aacf0ae9e1963409cd73894a1b0e5ce716ac8fbb7a2",
+      "packageDigest": "b772871e134a5a46651d86ca5a27358fc31b93de8fcb82a4903e63775d962c2c",
       "path": "skills/story-review",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -335,7 +335,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.1.42"
+      "version": "1.1.43"
     },
     {
       "catalogMigration": true,
@@ -351,7 +351,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "a42f3e6a52620383050aabfdf02f8801c722b5489e3b7c76e077a8dd5cfe6705",
+      "packageDigest": "59cd2dec5e37e0d0232c7e92750f0c3a88b34a330e595a058179ccae0c95455f",
       "path": "skills/story-setup",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -371,7 +371,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.1.45"
+      "version": "1.1.46"
     },
     {
       "catalogMigration": true,

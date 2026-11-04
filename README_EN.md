@@ -14,6 +14,8 @@
 <p align="center">
   <a href="https://zenstory.ai/oh-story"><b>Project page</b></a>
   &nbsp;·&nbsp;
+  <a href="https://app.zenstory.ai/?utm_source=gh-oh-story-en&utm_medium=readme"><b>Web workbench</b></a>
+  &nbsp;·&nbsp;
   <a href="#installation"><b>Install</b></a>
   &nbsp;·&nbsp;
   <a href="#faq"><b>FAQ</b></a>
@@ -24,7 +26,7 @@
 <p align="center">
   <a href="https://github.com/zenstory-ai/oh-story-claudecode/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/zenstory-ai/oh-story-claudecode?style=flat-square&color=22D3EE&logo=github&logoColor=white&label=Stars"></a>
   <a href="https://github.com/zenstory-ai/oh-story-claudecode/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/zenstory-ai/oh-story-claudecode?style=flat-square&color=081431&label=Release"></a>
-  <img alt="Skills 13" src="https://img.shields.io/badge/Skills-13-081431?style=flat-square">
+  <img alt="Skills 14" src="https://img.shields.io/badge/Skills-14-081431?style=flat-square">
   <a href="./LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/License-MIT-1F6FEB?style=flat-square"></a>
 </p>
 
@@ -58,7 +60,8 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 
 `-g` installs globally for every directory; drop it to install into the current directory only. **To update, run the same command again.**
 
-You can also just tell your agent (any platform that can import a GitHub repo or skill):
+You can also just tell your agent (any platform that can import a GitHub repo or skill, such as WorkBuddy;
+see a [community walkthrough](https://zhuanlan.zhihu.com/p/2087452622655592204), in Chinese):
 
 ```
 Install this skill https://github.com/zenstory-ai/oh-story-claudecode
