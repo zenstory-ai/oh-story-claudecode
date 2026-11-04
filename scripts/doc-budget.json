@@ -12,8 +12,8 @@
   "files": [
     {
       "path": "skills/story-publish/SKILL.md",
-      "budget": 3000,
-      "why": "发布资料准备入口：状态与定稿原则、作品材料定位、封面交接、输出模板与格式检查；番茄规则只在参考文件里写一次。发布资料文件是以后自动填表的格式契约（元信息、三种字段取值、文件名），随入口读。"
+      "budget": 3600,
+      "why": "发布资料准备入口：状态与定稿原则、作品材料定位、封面交接、输出模板与格式检查；番茄规则只在参考文件里写一次。发布资料文件是以后自动填表的格式契约（元信息、三种字段取值、文件名），随入口读。 2026-11-04：调用即保存缺项草案，短故事省略简介；显式更新预算。 每次调用必须交付资料，补齐写入失败、未适配及覆盖冲突的交付规则。"
     },
     {
       "path": "skills/story-publish/references/fanqie.md",
@@ -37,8 +37,8 @@
     },
     {
       "path": "skills/story-publish/references/fanqie-short.md",
-      "budget": 1300,
-      "why": "短故事分类候选、发布设置与输出替换，只在短故事时读。"
+      "budget": 1400,
+      "why": "短故事分类候选、发布设置与输出替换，只在短故事时读。 2026-11-04：调用即保存缺项草案，短故事省略简介；显式更新预算。"
     },
     {
       "path": "skills/story-long-write/SKILL.md",
@@ -334,21 +334,21 @@
           "files": [
             "skills/story-publish/references/fanqie-reading-male.md"
           ],
-          "budget": 5300
+          "budget": 5900
         },
         {
           "label": "女频阅读标签",
           "files": [
             "skills/story-publish/references/fanqie-reading-female.md"
           ],
-          "budget": 5400
+          "budget": 6000
         },
         {
           "label": "内容标签",
           "files": [
             "skills/story-publish/references/fanqie-content-tags.md"
           ],
-          "budget": 6100
+          "budget": 6600
         },
         {
           "label": "封面方案",
@@ -356,18 +356,18 @@
             "skills/story-cover/SKILL.md",
             "skills/story-cover/references/cover-styles.md"
           ],
-          "budget": 16100
+          "budget": 16700
         },
         {
           "label": "封面API回退",
           "files": [
             "skills/story-cover/references/api-fallback.md"
           ],
-          "budget": 7800
+          "budget": 8300
         }
       ],
       "stacking": {
-        "budget": 21800,
+        "budget": 22400,
         "slots": [
           [
             "男频阅读标签",
@@ -384,7 +384,7 @@
           ]
         ]
       },
-      "why": "男/女频互斥；内容标签、封面方案可同轮叠加，作者指定 API 时再加 API 回退。"
+      "why": "男/女频互斥；内容标签、封面方案可同轮叠加，作者指定 API 时再加 API 回退。 2026-11-04 按即时保存与可选简介规则重新核算，仍低于35K。"
     },
     {
       "label": "番茄发布准备（短故事）",
@@ -400,18 +400,18 @@
             "skills/story-cover/SKILL.md",
             "skills/story-cover/references/cover-styles.md"
           ],
-          "budget": 17300
+          "budget": 18000
         },
         {
           "label": "封面API回退",
           "files": [
             "skills/story-cover/references/api-fallback.md"
           ],
-          "budget": 9000
+          "budget": 9600
         }
       ],
       "stacking": {
-        "budget": 20600,
+        "budget": 21200,
         "slots": [
           [
             "封面方案"
@@ -421,7 +421,7 @@
           ]
         ]
       },
-      "why": "短故事与长篇互斥，只加短故事参考；封面方案与 API 回退可叠加。"
+      "why": "短故事与长篇互斥，只加短故事参考；封面方案与 API 回退可叠加。 2026-11-04 按即时保存与可选简介规则重新核算，仍低于35K。"
     },
     {
       "label": "长篇日更主会话（写手代写）",

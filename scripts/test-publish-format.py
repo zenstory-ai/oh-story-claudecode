@@ -85,7 +85,7 @@ SHORT = SHORT[:SHORT.index("## 阅读标签")] + """## 作品分类
 - 情绪：甜宠
 - 背景：现代
 
-""" + SHORT[SHORT.index("## 作品简介"):]
+""" + SHORT[SHORT.index("## 待作者确认"):]
 
 
 def errors(text):
@@ -113,6 +113,19 @@ class ContractTests(unittest.TestCase):
     def test_title_heading_first_and_may_be_pending(self):
         self.assertTrue(errors(LONG.replace("# 书本名称：春风：第2年", "# 番茄建书资料")))
         self.assertEqual(errors(LONG.replace("# 书本名称：春风：第2年", "# 书本名称：")), [])
+
+    def test_partial_materials_can_be_saved_with_empty_values(self):
+        import re
+        for document in (LONG, SHORT):
+            blank = re.sub(r"^# 书本名称：.*$", "# 书本名称：", document, flags=re.M)
+            blank = re.sub(r"^- ([^：]+)：.*$", r"- \1：", blank, flags=re.M)
+            self.assertEqual(errors(blank), [])
+
+    def test_short_has_no_synopsis(self):
+        self.assertNotIn("## 作品简介", SHORT)
+        self.assertEqual(errors(SHORT), [])
+        self.assertTrue(errors(SHORT.replace("## 待作者确认", "## 作品简介\n\n## 待作者确认")))
+        self.assertTrue(errors(LONG.replace("## 作品简介\n", "")))
 
     def test_placeholders_never_in_values(self):
         for before, after in (("- 主角1：江晨", "- 主角1：待作者确认"),
