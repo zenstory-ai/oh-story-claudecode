@@ -4,9 +4,17 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import re
 from pathlib import Path
 from typing import Any
+
+_storage_spec = importlib.util.spec_from_file_location(
+    "story_storage_layout", Path(__file__).with_name("storage_layout.py"))
+_storage = importlib.util.module_from_spec(_storage_spec)
+_storage_spec.loader.exec_module(_storage)
+StorageError = _storage.StorageError
+find_chapter = _storage.find_chapter
 
 
 WORDCOUNT_SCHEMA = "story-wordcount-result/v1"
@@ -298,7 +306,7 @@ def _chapter_number_from_name(name: str, *, outline: bool) -> int | None:
     # 改稿流程把原文备份为 第N章_章名_原稿_{日期}.md，与 hooks 一样不把它当本章正文。
     if not outline and "_原稿_" in name:
         return None
-    pattern = r"^细纲_第0*(\d+)章.*\.md$" if outline else r"^第0*(\d+)章(?:[_\- 　].*)?\.md$"
+    pattern = r"^细纲_第0*(\d+)章.*\.md$" if outline else r"^第0*(\d+)章(?:[：:._\- 　].*)?\.md$"
     match = re.match(pattern, name)
     return int(match.group(1)) if match else None
 
@@ -306,9 +314,19 @@ def _chapter_number_from_name(name: str, *, outline: bool) -> int | None:
 def find_chapter_file(directory: Path, chapter: int, *, outline: bool) -> Path:
     require(isinstance(chapter, int) and not isinstance(chapter, bool) and chapter >= 1, "chapter must be >= 1")
     require(directory.is_dir(), f"chapter directory is missing: {directory}")
+    if not outline:
+        try:
+            match = find_chapter(directory.parent, chapter)
+        except StorageError as error:
+            raise WordcountError(str(error)) from error
+        require(match is not None, f"chapter {chapter} must have exactly one body file")
+        return match
+    candidates = directory.glob("*.md")
     matches = sorted(
-        path for path in directory.iterdir()
-        if path.is_file() and _chapter_number_from_name(path.name, outline=outline) == chapter
+        (path for path in candidates
+         if path.is_file() and not path.is_symlink() and not path.parent.is_symlink()
+         and _chapter_number_from_name(path.name, outline=outline) == chapter),
+        key=lambda path: str(path),
     )
     label = "outline" if outline else "body"
     require(len(matches) == 1, f"chapter {chapter} must have exactly one {label} file")

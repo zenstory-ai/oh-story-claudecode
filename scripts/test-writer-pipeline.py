@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """公开 CLI 回归：取段闭包、存量卷纲、组装与召回降档。"""
 import json
+import importlib.util
 import os
 from pathlib import Path
 import shutil
@@ -21,6 +22,7 @@ class PipelineTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory(prefix='writer-pipeline-')
         self.addCleanup(self.tmp.cleanup)
         self.book = Path(self.tmp.name) / '雾港 来信'
+        self.put('.story/storage.json', json.dumps({'schema_version': 1, 'body_layout': 'flat'}))
         self.outline = self.put('大纲/细纲_第001章.md', '### 第 1 章：一封信\n- 单元ID/位置：L1-01；第1拍\n- 目标情绪：犹疑→决定替朋友保管信件\n')
         self.volume = self.put('大纲/卷纲_第一卷.md', self.volume_text())
         headings = ['当前位置', '长期约束', '核心角色状态', '活跃伏笔', '近三章速记', '下一章承诺', '连贯性风险']
@@ -44,6 +46,34 @@ class PipelineTests(unittest.TestCase):
 
     def build(self):
         return self.call('build_writer_prompt.py', '--project', self.book, '--chapter', 1)
+
+    def test_build_uses_configured_volume_output(self):
+        self.put('.story/storage.json', json.dumps({'schema_version': 1, 'body_layout': 'volumes',
+            'volumes': [{'directory': '卷一_重生归来', 'first_chapter': 1, 'last_chapter': 30}]}))
+        result = self.build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(str(self.book/'正文/卷一_重生归来/第001章_一封信.md'), result.stdout)
+
+    def test_build_missing_config_stops_without_creating_prose(self):
+        (self.book/'.story/storage.json').unlink()
+        result = self.build()
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('storage.json', result.stderr)
+        self.assertNotIn('Traceback', result.stderr)
+        self.assertFalse((self.book/'正文').exists())
+
+    def test_prompt_reads_previous_volume_chapter(self):
+        self.put('.story/storage.json', json.dumps({'schema_version': 1, 'body_layout': 'volumes',
+            'volumes': [{'directory': '卷一_重生归来', 'first_chapter': 1, 'last_chapter': 30}]}))
+        sys.path.insert(0, str(SCRIPTS))
+        self.addCleanup(lambda: sys.path.remove(str(SCRIPTS)))
+        spec = importlib.util.spec_from_file_location('build_writer_prompt', SCRIPTS / 'build_writer_prompt.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        chapter = self.put('正文/卷一_重生归来/第001章_来信.md', '# 第001章 来信\n他收到信了。')
+        self.assertEqual(module.find_chapter_file(self.book / '正文', 1, ''), chapter)
+        heading, _ = module.learn_heading_form(self.book, 2, '保管')
+        self.assertEqual(heading, '# 第002章 保管')
 
     def volume_text(self, unit='L1-01'):
         return f'''# 第一卷
@@ -983,6 +1013,108 @@ class VolumeTemplateContractTests(unittest.TestCase):
             self.assertEqual(unit.returncode, 0, unit.stderr)
             self.assertIn('### 第一段剧情：{一句话} <!-- L1-01 -->', unit.stdout)
             self.assertEqual(unit.stderr, '')
+
+
+class StorageLayoutTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix='storage-layout-')
+        self.addCleanup(self.tmp.cleanup)
+        self.book = Path(self.tmp.name)
+        sys.path.insert(0, str(SCRIPTS))
+        self.addCleanup(lambda: sys.path.remove(str(SCRIPTS)))
+        import storage_layout
+        self.storage = storage_layout
+        self.flat = {'schema_version': 1, 'body_layout': 'flat'}
+        self.volumes = {'schema_version': 1, 'body_layout': 'volumes', 'volumes': [
+            {'directory': '卷一_重生归来', 'first_chapter': 1, 'last_chapter': 30},
+            {'directory': '卷二_新的开始', 'first_chapter': 31, 'last_chapter': 60}]}
+
+    def put(self, relative):
+        file = self.book / relative
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_text('原正文不可改变。', encoding='utf-8')
+        return file
+
+    def test_flat_and_volume_paths_and_cross_volume_neighbors(self):
+        self.storage.initialize(self.book, self.volumes)
+        previous = self.put('正文/卷一_重生归来/第030章_旧名.md')
+        following = self.put('正文/卷二_新的开始/第031章_新名.md')
+        self.assertEqual(self.storage.find_chapter(self.book, 30), previous)
+        self.assertEqual(self.storage.find_chapter(self.book, 31), following)
+        self.assertEqual(self.storage.output_path(self.book, 31, '修订名'), following)
+        self.assertEqual(self.storage.output_path(self.book, 32, '新章'),
+                         self.book / '正文/卷二_新的开始/第032章_新章.md')
+        with self.assertRaises(self.storage.StorageError):
+            self.storage.output_path(self.book, 61, '没有所属卷')
+
+    def test_flat_cli_init_show_and_resolve(self):
+        proposal = self.book / 'proposal.json'
+        proposal.write_text(json.dumps(self.flat), encoding='utf-8')
+        def run(*args):
+            return subprocess.run([sys.executable, str(SCRIPTS / 'storage_layout.py'),
+                '--project', str(self.book), *args], capture_output=True, encoding='utf-8')
+        self.assertEqual(run('init', '--config', str(proposal)).returncode, 0)
+        self.assertEqual(json.loads(run('show').stdout)['result'], self.flat)
+        result = run('resolve', '--chapter', '1', '--title', '开端')
+        self.assertEqual(Path(json.loads(result.stdout)['result']), self.book/'正文/第001章_开端.md')
+        self.assertFalse((self.book/'正文').exists())
+        self.assertEqual(run('init', '--config', str(proposal)).returncode, 2)
+
+    def test_invalid_config_is_rejected(self):
+        invalid = [dict(self.flat, schema_version=True), dict(self.flat, outline_root='别处'),
+            dict(self.flat, body_layout='custom'), dict(self.flat, volumes=[])]
+        for directory, start, end in [('../大纲', 1, 30), ('卷一_名称/嵌套', 1, 30),
+                ('卷一_名称', True, 30), ('卷一_名称', 31, 30)]:
+            invalid.append({'schema_version': 1, 'body_layout': 'volumes', 'volumes': [
+                {'directory': directory, 'first_chapter': start, 'last_chapter': end}]})
+        overlap = json.loads(json.dumps(self.volumes))
+        overlap['volumes'][1]['first_chapter'] = 30
+        invalid.append(overlap)
+        for config in invalid:
+            with self.subTest(config=config), self.assertRaises(self.storage.StorageError):
+                self.storage.initialize(self.book, config)
+            self.assertFalse((self.book/'.story/storage.json').exists())
+
+    def test_conflicting_existing_layout_is_not_moved(self):
+        chapter = self.put('正文/卷一_重生归来/第001章_旧名.md')
+        with self.assertRaises(self.storage.StorageError):
+            self.storage.initialize(self.book, self.flat)
+        self.assertEqual(chapter.read_text(encoding='utf-8'), '原正文不可改变。')
+        self.assertFalse((self.book/'.story/storage.json').exists())
+
+    def test_duplicate_chapters_fail_in_both_consumers(self):
+        self.put('正文/第001章_直属.md')
+        self.put('正文/卷一_重生归来/第001章_重复.md')
+        import build_writer_prompt as prompt
+        import wordcount_core as core
+        with self.assertRaises(self.storage.StorageError):
+            prompt.find_chapter_file(self.book/'正文', 1, '')
+        with self.assertRaises(core.WordcountError):
+            core.find_chapter_file(self.book/'正文', 1, outline=False)
+
+    def test_missing_and_corrupt_config_never_fall_back_for_output(self):
+        chapter = self.put('正文/卷一_重生归来/第001章_旧名.md')
+        self.assertEqual(self.storage.find_chapter(self.book, 1), chapter)
+        with self.assertRaises(self.storage.StorageError):
+            self.storage.output_path(self.book, 2, '新章')
+        file = self.book/'.story/storage.json'
+        file.parent.mkdir()
+        file.write_text('{invalid', encoding='utf-8')
+        with self.assertRaises(self.storage.StorageError):
+            self.storage.find_chapter(self.book, 1)
+
+    def test_config_conflicts_backups_and_unsafe_titles(self):
+        self.storage.initialize(self.book, self.flat)
+        self.put('正文/.backup/第001章_备份.md')
+        self.put('正文/卷一_重生归来/草稿/第001章_深层.md')
+        self.assertIsNone(self.storage.find_chapter(self.book, 1))
+        self.put('正文/第001章_开端_原稿_日期.md')
+        for title in ('../逃逸', '目录\\逃逸', '非法:标题', ''):
+            with self.assertRaises(self.storage.StorageError):
+                self.storage.output_path(self.book, 1, title)
+        self.put('正文/卷一_重生归来/第001章_位置错误.md')
+        with self.assertRaises(self.storage.StorageError):
+            self.storage.find_chapter(self.book, 1)
 
 
 class ConvertOutlineFormatTests(unittest.TestCase):
