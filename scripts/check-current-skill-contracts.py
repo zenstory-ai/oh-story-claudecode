@@ -27,6 +27,7 @@ EXPECTED_MANIFEST_KEYS = {
     "progress_schema_version",
     "primary_benchmark_artifacts",
     "required_outline_sections",
+    "template_fences",
 }
 SEMVER_RE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
 ARTIFACT_PATH_RE = re.compile(r"(?:[^/\s]+/)+[^/\s]+\.md")
@@ -41,6 +42,9 @@ class ContractManifest:
     progress_schema_version: int
     primary_benchmark_artifacts: Tuple[str, ...]
     required_outline_sections: Tuple[Tuple[str, str], ...]
+    # 参考文件里带标签的模板围栏（```markdown template=细纲）：标签名的唯一清单，
+    # 运行时脚本按名取模板，check-reference-routing.py 核对每个标签恰好出现一次。
+    template_fences: Tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -244,6 +248,7 @@ LEGACY_RULES = (
         (
             "skills/story-long-write/references/workflow-volume.md",
             "skills/story-long-write/references/workflow-outline.md",
+            "skills/story-long-write/references/outline-template.md",
             "skills/story-long-write/references/artifact-protocols.md",
             "skills/story-setup/references/templates/rules/story-outline.md",
             "skills/story-setup/references/templates/agents/story-architect.md",
@@ -268,7 +273,7 @@ SPAWN_CAPABLE_SKILLS = (
 
 # 细纲结构容量的 canonical 副本与消费方：逐点只写语义义务，不填数字配额。
 OUTLINE_SEMANTIC_CAPACITY_CONSUMERS = (
-    "skills/story-long-write/references/workflow-outline.md",
+    "skills/story-long-write/references/outline-template.md",
     "skills/story-setup/references/templates/rules/story-outline.md",
 )
 
@@ -413,11 +418,27 @@ def load_manifest(path: Path) -> Tuple[Optional[ContractManifest], List[Finding]
             )
         )
 
+    fences = raw.get("template_fences")
+    if not isinstance(fences, list) or not fences or any(
+        not isinstance(item, str) or not item.strip() or any(ch.isspace() for ch in item)
+        for item in fences
+    ):
+        findings.append(
+            Finding(
+                "manifest-template-fences",
+                "template_fences must be a non-empty array of tag names without whitespace",
+                path,
+            )
+        )
+    elif len(set(fences)) != len(fences):
+        findings.append(Finding("manifest-template-fences", "template_fences must be unique", path))
+
     if findings:
         return None, findings
 
     assert isinstance(artifacts, list)
     assert isinstance(sections, list)
+    assert isinstance(fences, list)
     manifest = ContractManifest(
         manifest_version=raw["manifest_version"],
         setup_skill_version=raw["setup_skill_version"],
@@ -426,6 +447,7 @@ def load_manifest(path: Path) -> Tuple[Optional[ContractManifest], List[Finding]
         progress_schema_version=raw["progress_schema_version"],
         primary_benchmark_artifacts=tuple(artifacts),
         required_outline_sections=tuple((item["rule"], item["demo"]) for item in sections),
+        template_fences=tuple(fences),
     )
     return manifest, []
 
@@ -809,6 +831,10 @@ def spawn_preflight_findings(
         fallback_pattern = (
             r"版本提示本身不触发降级；文件缺失或异常、工具不可用、递归限制或调用失败按 Phase 0 处理"
         )
+    # 长短篇写作 0.10 起汇报不带技术备注行：版本不匹配只对作者说一句白话。
+    notice_pattern = r"Notice: agents bundle 版本不匹配"
+    if path.as_posix().endswith(("skills/story-long-write/SKILL.md", "skills/story-short-write/SKILL.md")):
+        notice_pattern = r"写作助手是旧版，运行 /story-setup"
     required = (
         (r"`agents_version:\s*{}`".format(current), "pin the current agents_version"),
         (
@@ -816,7 +842,7 @@ def spawn_preflight_findings(
             "state that a version mismatch does not block spawn",
         ),
         (
-            r"Notice: agents bundle 版本不匹配",
+            notice_pattern,
             "surface the version mismatch notice",
         ),
         (
@@ -844,9 +870,8 @@ def spawn_preflight_findings(
 
 # 作者可见文本只说白话：这些 Skill 的降级与版本提示原文只进汇报最后一行「技术备注：」，
 # 不再写成「报告 `Fallback: …`」「同时报告 `Notice: …`」让模型原样念给作者（v0.8.2）。
+# 长短篇写作 0.10 起不再有技术备注行（版本提示、降级都说成一句白话），不在此列。
 AUTHOR_NOTE_PREFLIGHT_SKILLS = (
-    "skills/story-long-write/SKILL.md",
-    "skills/story-short-write/SKILL.md",
     "skills/story-deslop/SKILL.md",
     "skills/story-review/SKILL.md",
     "skills/story-import/SKILL.md",
@@ -1417,7 +1442,6 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
         "skills/story-long-write/references/workflow-setup.md",
         "skills/story-short-write/references/benchmark-recall.md",
         "skills/story-long-write/references/cross-book-recall.md",
-        "skills/story-short-write/references/cross-book-recall.md",
     ):
         benchmark_discovery = repo_root / relative
         findings.extend(
@@ -1458,10 +1482,10 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
     )
     findings.extend(
         require_pattern(
-            repo_root / "skills/story-long-write/references/agent-calls.md",
+            repo_root / "skills/story-long-write/references/benchmark-recall.md",
             r"profile_missing[^\n]{0,60}custom_style[^\n]{0,40}继续",
             "daily-profile-missing-custom-style",
-            "the story-explorer recall gaps (agent-calls.md) must keep the profile_missing + custom_style continuation branch",
+            "the story-explorer recall gaps (benchmark-recall.md) must keep the profile_missing + custom_style continuation branch",
         )
     )
 
@@ -1484,38 +1508,8 @@ def validate_repository(repo_root: Path, manifest: ContractManifest) -> List[Fin
             "story-long-analyze must route the optional inspiration pipeline",
         )
     )
-    findings.extend(
-        require_pattern(
-            repo_root / "skills/story-long-write/references/cross-book-recall.md",
-            r"layer=跨书灵感聚合[^\n]*status=active",
-            "cross-book-active-cba-only",
-            "inspiration recall must retrieve only active cross-book aggregation cards",
-        )
-    )
-    findings.extend(
-        require_pattern(
-            repo_root / "skills/story-long-write/references/project-files.md",
-            r"Top 3[–-]8[^\n]*CBA[^\n]*不传 IA/NM",
-            "long-write-cba-budget",
-            "long writing must bound public inspiration retrieval to Top 3-8 CBA cards without IA/NM",
-        )
-    )
-    # 开书按时刻拆成三份文件（v0.8.2），三个灵感召回锚点各在自己的时刻文件里。
-    references_dir = repo_root / "skills/story-long-write/references"
-    for filename, pattern, code, message in (
-        ("workflow-setup.md", r"适用阶段=设定", "inspiration-hook-setup", "book setup must offer optional inspiration recall"),
-        ("workflow-volume.md", r"适用阶段=卷纲", "inspiration-hook-volume", "volume outlining must offer optional inspiration recall"),
-        ("workflow-outline.md", r"适用阶段=细纲", "inspiration-hook-outline", "chapter outlining must offer optional inspiration recall"),
-    ):
-        findings.extend(require_pattern(references_dir / filename, pattern, code, message))
-    findings.extend(
-        require_pattern(
-            repo_root / "skills/story-long-write/references/cross-book-recall.md",
-            r"独立于[^\n]*多对标触发条件",
-            "inspiration-decoupled-from-multi-benchmark",
-            "inspiration channel must not depend on the >=2 benchmark trigger",
-        )
-    )
+    # 0.10：长篇写作删掉了灵感库召回（设定、卷纲、细纲与跨书召回都不再查灵感库），
+    # 灵感库本身仍由 story-long-analyze 维护，上面的管道锚点保留。
 
     # 三处消费方都必须明确取消逐点字数，避免旧 Σ 契约从任一部署面回流。
     for relative in OUTLINE_SEMANTIC_CAPACITY_CONSUMERS:

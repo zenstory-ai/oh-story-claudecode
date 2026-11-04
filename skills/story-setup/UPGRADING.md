@@ -2,12 +2,12 @@
 
 ## 当前版本
 
-助手版本 38（v0.9.2）。已有项目更新技能包后，在项目根重跑 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或直接点名），再新开会话。
+助手版本 39（v0.10.0）。已有项目更新技能包后，在项目根重跑 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或直接点名），再新开会话。
 
-- `setup_skill_version: 1.3.6`
-- `agents_version: 38`
+- `setup_skill_version: 1.3.7`
+- `agents_version: 39`
 
-`.story-deployed` 字段不全，或 `agents_version` 不是整数、低于 38，都算待更新，重跑 story-setup 即可。项目里的 `agents_version` 大于 38，说明本机技能包比项目旧：先更新 oh-story-claudecode，不要用旧包覆盖。各版本改了什么见仓库根目录 `CHANGELOG.md`。
+`.story-deployed` 字段不全，或 `agents_version` 不是整数、低于 39，都算待更新，重跑 story-setup 即可。项目里的 `agents_version` 大于 39，说明本机技能包比项目旧：先更新 oh-story-claudecode，不要用旧包覆盖。各版本改了什么见仓库根目录 `CHANGELOG.md`。
 
 ## 升级步骤
 
@@ -17,7 +17,14 @@
 4. 正在写的长篇：确认每本书有 `追踪/_tracking-state.json`。没有就按下方「追踪模型迁移」重建，否则写下一章会被拦。
 5. 拆文成果或细纲不满足当前格式时，按检查提示定点补齐，不因单项缺口整本重拆。
 
-## 本次更新必须重跑 story-setup（v0.9.2，助手版本 38）
+## 本次更新必须重跑 story-setup（v0.10.0，助手版本 39）
+
+- 长篇写作的写手、排纲助手、项目规则都改了，重跑 story-setup 后新开会话才生效。
+- 书稿、设定、追踪不用迁移。老书的卷纲、细纲照样能读能写；想换成新写法（标题末尾注释代替「作用域」行、细纲用「属于哪段剧情」「这章怎么走」「可以放开写的地方」等白话字段、每章松紧用「爆发／推进／修炼／感情或关系戏／日常／过渡」，排纲笔记挪到书目录下的隐藏目录 `.story/排纲笔记/`），在书目录跑一次可选的转换：`.agents/skills/story-long-write/scripts/convert_outline_format.py {书目录}`（路径按宿主不同，先加 `--dry-run` 看会改哪些文件）。转换只换写法不改内容；刻度台阶、打脸债、压力线轮转三张表原样留着，由你决定删不删。
+- 作者记忆只用你确认过的条目。之前记下但没确认的写作习惯不再生效，想保留的再说一次。
+- 正文里引号内的省略号不再被替换；长篇、短篇一起生效。
+
+## v0.9.2 升级说明（助手版本 38）
 
 - 新增发布资料技能 `story-publish`。重跑 story-setup 后，项目里才会有这个技能（OpenClaw、Reasonix、通用模式复制到项目 `skills/`）、项目指令里的「发布资料」入口，以及 OpenCode、ZCode 的 `/story-publish` 命令。
 - 书稿、设定、追踪和作者记忆不用迁移。

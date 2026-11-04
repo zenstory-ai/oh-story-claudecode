@@ -1,5 +1,7 @@
 # workflow-revision.md：大修工作流
 
+> 谁读：主会话大修已写章时整份读。
+
 作者说「修改／回炉／重写第X章」时用本文件；只改细纲走 workflow-outline.md。作者只说读者反应或感受（拖、没追读、憋屈、变味），没指出改哪儿时，先读 [revision-diagnosis.md](revision-diagnosis.md)，作者选定章后再走 Step 1；其他情况须明确章节，无法推断就问。
 
 ---
@@ -33,16 +35,8 @@
 ## Step 3：改写与提交前检查
 
 1. **备份**：原文复制为 `正文/第{X}章_章名_原稿_{YYYYMMDD}.md`；用 `{PYTHON} {skill 根}/scripts/storyctl.py wordcount measure --file {正文文件}` 记下原字数。
-2. **改写**：已部署 narrative-writer 时按 [agent-calls.md](agent-calls.md)「改写一章」交给它；否则主会话自己改，读 `references/writing-craft.md` 与 `references/long-format.md`；改的是情绪对抗、打脸这类戏时，按 SKILL.md「本章技法」只读对应那一节。局部修改只动点到的段落，其余一字不改；不借改稿新增细纲外的剧情。
-3. **检测**：`{PYTHON} {skill 根}/scripts/storyctl.py chapter check --project {项目根} --chapter {X} --fix-punctuation`，按返回的 `status` 走：
-
-| 状态 | 处理 |
-|---|---|
-| `ready` | 往下走 |
-| `blocked` / `invalid` | 改到净再重跑（工程词泄漏也在报告里） |
-| `needs_decision`（字数出带） | 欠字不补；超字把删除区间交写手按 agent-calls「超字一次净删」删一次（自己改就同样只删不加），复检仍带外用下面的字数问法请作者选 |
-| `tool_unavailable`（退出码 3） | 停下，不提交，按 `quality.tool_errors` 告诉作者具体原因；缺 Node 时提示安装 Node.js 18 或更新版本 |
-| 退出码 2 | 按 `error_code` 修命令重跑 |
+2. **改写**：已部署 narrative-writer 时按 [agent-calls.md](agent-calls.md)「改写一章」交给它；否则主会话自己改（读什么见 SKILL.md「写前必读」总表「大修」一行）。局部修改只动点到的段落，其余一字不改；不借改稿新增细纲外的剧情。
+3. **检测**：`{PYTHON} {skill 根}/scripts/storyctl.py chapter check --project {项目根} --chapter {X} --fix-punctuation --plain`，按白话结论走：可以提交就往下；有必须改的（含工程词泄漏）改到净再重跑；字数出了范围时欠字不补，超字把删除区间交写手按 agent-calls「超字一次净删」删一次（自己改就同样只删不加），复检仍超用下面的字数问法请作者选；检查工具没跑起来就停下、不提交，把原因告诉作者（缺 Node 时提示安装 Node.js 18 或更新版本）；没查成按它说的修文件或命令重跑。
 4. **人物与节奏**：改后的角色行为与设定、前后章一致；改动没把这章的节奏打散。
 5. **篇幅**：与原文差异超过 30% 或 800 字（取较大）时告诉作者「改后约 X 字，比原来多/少 Y 字，比目标多/少 Z 字」；字数本身不触发再改一遍。
 6. 发现外部事实待核时先交 `story-researcher` 查证，再回到改写与检测；不可用则主会话查，不带未核实的事实提交。
@@ -82,7 +76,7 @@
 ```md
 第{X}章《{章名}》改好了，原稿留着，想退回随时说：
 - {改了什么，用故事话：原来怎样 → 现在怎样}
-- 篇幅：{差异超过步骤 3 第 5 条的阈值才写：约 X 字，比原来多/少约 Y 字；没超就删掉这行}
+- 篇幅：{差异超过 Step 3「篇幅」的阈值才写：约 X 字，比原来多/少约 Y 字；没超就删掉这行}
 {后面受影响的章：「第{X+1}章《{章名}》里{谁/什么}还按旧说法写，要一起改吗？1. 一起改（推荐）2. 先不动」；没有就写「后面的章不受影响」}
 ```
 

@@ -16,28 +16,19 @@
 const fs = require('fs')
 const path = require('path')
 
-const OUTLINE_HEADERS = [
-  '结构段/五段功能',
-  '主事件',
-  '情节推进',
-  '情绪',
-  '人物/关系变化',
-  '因果/逻辑链',
-  '读者新获知什么',
-  '结尾承接/钩子',
-  '伏笔/物件',
-  '场景形态',
-  '对白作用',
-  '目标字数',
+// 小节大纲按列名找列，不按位置：新旧列名都认，老书的 小节大纲.md 不迁移也能继续写。
+// 第一个名字是现行列名（workflow-design 的小节大纲模板），其余是旧名。
+const OUTLINE_COLUMNS = [
+  { role: 'stage', names: ['在全篇哪一段', '结构段/五段功能'] },
+  { role: 'progress', names: ['这节发生的事', '情节推进', '子事件×3-5'] },
+  { role: 'emotion', names: ['情绪'] },
+  { role: 'hook', names: ['节尾停在哪', '结尾承接/钩子'] },
+  { role: 'words', names: ['目标字数'] },
 ]
-
-const LEGACY_OUTLINE_HEADERS = new Map([
-  [2, '子事件×3-5'],
-  [9, '动静'],
-  [10, '对话密度'],
-])
-
-const FUNCTION_TAG = /\{(?:对话|冲突|伏笔|回忆|发现|递进)\}/
+// 可选列：0.10 起小节大纲只要五列，下面这些写了照认、不写不拦（老书的十二列表头照样过）。
+const OPTIONAL_COLUMNS = ['主事件', '人物/关系变化', '前因后果', '因果/逻辑链', '读者新获知什么', '伏笔/物件', '这节靠什么推进', '对话改变了什么', '场景形态', '对白作用', '动静', '对话密度']
+const OUTLINE_HEADERS = OUTLINE_COLUMNS.map((column) => column.names[0])
+const STAGE_NAMES = OUTLINE_COLUMNS[0].names
 
 function cleanCell(value) {
   return value.replace(/\*\*/g, '').replace(/`/g, '').trim()
@@ -107,43 +98,69 @@ function verify(projectDir) {
     platformMatch ? `目标平台：${platformMatch[1]}` : '未找到可识别的目标平台字段',
     '写明“目标平台：知乎盐言 / 番茄 / 七猫 / 黑岩 / 红果 / 小程序”之一；作者没定平台写“未定”',
     ['references/submission-craft.md'],
-    '只在 设定.md 的基本信息或 Phase 2 设计校验区补目标平台。'
+    '只在 设定.md 的基本信息补目标平台。'
   ))
 
-  const genreMatch = settings.match(/(?:题材参考|题材包)\s*[：:]\s*`?(references\/(?:genre-styles\/[^`\s|]+\.md|genre-writing-formulas\.md))`?/)
-  let genreEvidence = '未找到题材参考路径'
+  // 题材：现行写题材名（「题材：追妻火葬场」，冷门写「题材：冷门：公式名」），由脚本对到 genre-styles；
+  // 0.9.x 及更早写的是文件路径（「题材参考：`references/genre-styles/悬疑.md`」），照认。
+  const genreLine = settings.match(/^[ \t]*[-*]?[ \t]*(?:题材参考|题材包|题材)[ \t]*[：:][ \t]*([^\n]*)$/m)
+  const genreValue = genreLine ? genreLine[1].replace(/`/g, '').trim() : ''
+  const genreDir = path.join(skillRoot, 'references', 'genre-styles')
+  const genreNames = fs.existsSync(genreDir)
+    ? fs.readdirSync(genreDir).filter((name) => name.endsWith('.md')).map((name) => name.slice(0, -3))
+    : []
+  let genreEvidence = '未找到「题材：」一行'
   let genreOk = false
-  if (genreMatch) {
-    const resolved = path.resolve(skillRoot, genreMatch[1])
+  const pathMatch = genreValue.match(/references\/(?:genre-styles\/[^\s|]+\.md|genre-writing-formulas\.md)/)
+  if (pathMatch) {
+    const resolved = path.resolve(skillRoot, pathMatch[0])
     const insideSkill = resolved.startsWith(`${skillRoot}${path.sep}`)
     genreOk = insideSkill && fs.existsSync(resolved) && fs.statSync(resolved).isFile()
-    genreEvidence = genreOk ? `题材参考：${genreMatch[1]}` : `题材参考不可读：${genreMatch[1]}`
+    genreEvidence = genreOk ? `题材：${pathMatch[0]}` : `题材对不到文件：${pathMatch[0]}`
+  } else if (/^冷门/.test(genreValue)) {
+    genreOk = fs.existsSync(path.join(skillRoot, 'references', 'genre-writing-formulas.md'))
+    genreEvidence = `题材：${genreValue}（冷门题材公式）`
+  } else if (genreValue) {
+    const named = genreNames.filter((name) => genreValue.startsWith(name)).sort((a, b) => b.length - a.length)[0]
+    genreOk = Boolean(named)
+    genreEvidence = named ? `题材：${named}` : `题材「${genreValue}」不是现有题材包（${genreNames.join(' / ')}），冷门题材写「冷门：公式名」`
   }
   checks.push(makeCheck(
     'phase2.genre-reference-declared',
     genreOk,
     '设定.md',
     genreEvidence,
-    '写明一个真实存在的 references/genre-styles/{题材}.md；冷门题材写 references/genre-writing-formulas.md',
+    `「构思要点」写「题材：题材包名」（${genreNames.join(' / ')} 之一）；冷门题材写「题材：冷门：所用公式名」`,
     ['references/workflow-design.md', 'references/short-craft.md'],
-    '只补题材参考路径与从该参考选出的 2-3 个核心招式，不重写故事框架。'
+    '只补「题材：」一行与从该题材包选出的 2-3 个套路，不重写故事框架。'
   ))
 
+  // 套路：现行写在「### 这篇用的套路」下，一条一行；旧书在设计校验区写「核心招式：a；b」，照认。
   const movesMatch = settings.match(/核心招式\s*[：:]\s*([^\n]+)/)
-  const moves = movesMatch
-    ? movesMatch[1].split(/[；;]|\s\/\s/).map((item) => item.trim()).filter(Boolean)
-    : []
+  let moves = []
+  if (movesMatch) {
+    moves = movesMatch[1].split(/[；;]|\s\/\s/).map((item) => item.trim()).filter(Boolean)
+  } else {
+    const section = settings.match(/^#{2,6}[ \t]*这篇用的套路[^\n]*\n([\s\S]*?)(?=^#{1,6}[ \t]|(?![\s\S]))/m)
+    if (section) {
+      moves = section[1].split(/\r?\n/)
+        .map((line) => line.match(/^[ \t]*[-*][ \t]+(.+)$/))
+        .filter(Boolean)
+        .map((match) => match[1].trim())
+        .filter((item) => item && item !== '[待补充]')
+    }
+  }
   checks.push(makeCheck(
     'phase2.genre-moves-declared',
     moves.length >= 2 && moves.length <= 3,
     '设定.md',
-    moves.length ? `识别到 ${moves.length} 个核心招式` : '未找到核心招式字段',
-    '“核心招式：招式一；招式二[；招式三]”，共 2-3 个',
+    moves.length ? `识别到 ${moves.length} 个套路` : '「这篇用的套路」下没有条目',
+    '「这篇用的套路」下 2-3 条，一条一行（旧书的「核心招式：招式一；招式二」照认）',
     ['references/workflow-design.md'],
-    '只补或收敛核心招式字段到 2-3 个，并保持已选题材参考不变。'
+    '只补或收敛「这篇用的套路」到 2-3 条，并保持已选题材不变。'
   ))
 
-  const villainSkipped = /反派(?:设计)?\s*[：:]\s*(?:无|不适用)\s*[（(][^)）]+[)）]/.test(settings)
+  const villainSkipped = /反派(?:设计)?\s*[：:]\s*(?:无|不适用|没有)\s*[（(][^)）]+[)）]/.test(settings)
   const villainFields = ['身份', '动机', '作恶方式', '致命弱点', '报应']
   const missingVillainFields = villainFields.filter((field) => !new RegExp(`(?:^|\\n)\\s*[-*]?\\s*${field}\\s*[：:]`, 'm').test(settings))
   const villainOk = villainSkipped || missingVillainFields.length === 0
@@ -152,22 +169,26 @@ function verify(projectDir) {
     villainOk,
     '设定.md',
     villainSkipped ? '已明确反派不适用' : (villainOk ? '反派五字段齐全' : `缺字段：${missingVillainFields.join('、')}`),
-    '无反派时写“反派设计：不适用（原因）”；有反派时填写身份、动机、作恶方式、致命弱点、报应',
+    '无反派时写“反派：没有（原因）”；有反派时填写身份、动机、作恶方式、致命弱点、报应',
     ['references/villain-and-reveal.md'],
-    '只补反派缺失字段；若确无反派，改为带原因的不适用声明。'
+    '只补反派缺失字段；若确无反派，改为「反派：没有（原因）」。'
   ))
 
-  const placeholderFields = ['题材参考', '核心招式', '反派设计', '反转类型', '反转位置', '付费点', '目标平台', '目标字数']
-  const placeholderLines = settings.split(/\r?\n/)
-    .map((line, index) => ({ line: index + 1, text: line }))
-    .filter((entry) => placeholderFields.some((field) => entry.text.includes(`${field}：`) || entry.text.includes(`${field}:`)))
-    .filter((entry) => /\{[^}]*\}/.test(entry.text))
+  const placeholderFields = ['题材参考', '题材', '核心招式', '反派设计', '反派', '反转类型', '反转位置', '反转在', '付费点', '目标平台', '目标字数']
+  const fieldLine = new RegExp(`^[ \\t]*[-*]?[ \\t]*(?:${placeholderFields.join('|')})[ \\t]*[：:]`)
+  let inMoves = false
+  const placeholderLines = []
+  settings.split(/\r?\n/).forEach((text, index) => {
+    if (/^#{1,6}[ \t]/.test(text)) inMoves = /这篇用的套路/.test(text)
+    const watched = fieldLine.test(text) || (inMoves && /^[ \t]*[-*][ \t]/.test(text))
+    if (watched && /\{[^}]*\}/.test(text)) placeholderLines.push({ line: index + 1, text })
+  })
   checks.push(makeCheck(
     'phase2.no-template-placeholders',
     placeholderLines.length === 0,
     '设定.md',
-    placeholderLines.length ? `仍是模板占位符的行：${placeholderLines.map((entry) => entry.line).join('、')}` : '契约字段没有未填写的 {} 占位符',
-    'Phase 2 契约字段写实际设计内容，不保留 {} 模板占位符',
+    placeholderLines.length ? `仍是模板占位符的行：${placeholderLines.map((entry) => entry.line).join('、')}` : '构思要点与套路没有未填写的 {} 占位符',
+    '构思要点与「这篇用的套路」写实际设计内容，不保留 {} 模板占位符',
     ['references/workflow-design.md'],
     '只把报告行的占位符替换成本篇的实际设计，不重写其他字段。'
   ))
@@ -177,25 +198,45 @@ function verify(projectDir) {
   let headerCells = null
   for (let index = 0; index < lines.length; index++) {
     const cells = parseTableLine(lines[index])
-    if (cells && cells[0] === OUTLINE_HEADERS[0]) {
+    if (cells && STAGE_NAMES.includes(cells[0])) {
       headerAt = index
       headerCells = cells
       break
     }
   }
-  const currentHeader = Boolean(headerCells) && headerCells.length === OUTLINE_HEADERS.length &&
-    headerCells.every((cell, index) => cell === OUTLINE_HEADERS[index])
-  const legacyHeader = Boolean(headerCells) && headerCells.length === OUTLINE_HEADERS.length &&
-    headerCells.every((cell, index) => cell === (LEGACY_OUTLINE_HEADERS.get(index) || OUTLINE_HEADERS[index]))
-  const headerOk = currentHeader || legacyHeader
+  const column = {}
+  const unknownCells = []
+  const duplicateRoles = []
+  if (headerCells) {
+    headerCells.forEach((cell, index) => {
+      const spec = OUTLINE_COLUMNS.find((item) => item.names.includes(cell))
+      if (spec) {
+        if (spec.role in column) duplicateRoles.push(cell)
+        else column[spec.role] = index
+      } else if (!OPTIONAL_COLUMNS.includes(cell)) {
+        unknownCells.push(cell)
+      }
+    })
+  }
+  const missingColumns = OUTLINE_COLUMNS.filter((item) => !(item.role in column)).map((item) => item.names[0])
+  const legacyHeader = Boolean(headerCells) && headerCells.some((cell) =>
+    OUTLINE_COLUMNS.some((item) => item.names.indexOf(cell) > 0))
+  const headerOk = Boolean(headerCells) && missingColumns.length === 0 && unknownCells.length === 0 && duplicateRoles.length === 0
+  let headerEvidence = `未找到以“${STAGE_NAMES[0]}”开头的 Markdown 表格`
+  if (headerCells) {
+    const problems = []
+    if (missingColumns.length) problems.push(`缺列：${missingColumns.join('、')}`)
+    if (unknownCells.length) problems.push(`认不出的列：${unknownCells.join('、')}`)
+    if (duplicateRoles.length) problems.push(`重复的列：${duplicateRoles.join('、')}`)
+    headerEvidence = `表头 ${headerCells.length} 列：${headerCells.join(' | ')}` +
+      (problems.length ? `；${problems.join('；')}` : (legacyHeader ? '（旧列名，照认）' : ''))
+  }
   checks.push(makeCheck(
-    'phase2.outline-12-columns',
+    'phase2.outline-header',
     headerOk,
     '小节大纲.md',
-    headerCells
-      ? `表头 ${headerCells.length} 列：${headerCells.join(' | ')}${legacyHeader ? '（兼容旧项目；新建项目使用现行列名）' : ''}`
-      : '未找到以“结构段/五段功能”开头的 Markdown 表格',
-    `使用固定 12 列表头：${OUTLINE_HEADERS.join(' | ')}`,
+    headerEvidence,
+    `表头含这五列：${OUTLINE_HEADERS.join(' | ')}；其余列可选`,
     ['references/workflow-design.md'],
     '只修表头和错位单元格，不改动各节已经成立的剧情内容。'
   ))
@@ -212,37 +253,31 @@ function verify(projectDir) {
       rows.push({ line: index + 1, cells })
     }
   }
-  const rowShapeFailures = rows.filter((row) => row.cells.length !== OUTLINE_HEADERS.length)
+  const width = headerCells ? headerCells.length : 0
+  const rowShapeFailures = rows.filter((row) => row.cells.length !== width)
   checks.push(makeCheck(
     'phase2.outline-data-rows',
     rows.length > 0 && rowShapeFailures.length === 0,
     '小节大纲.md',
-    rows.length === 0 ? '固定表头下没有数据行' : (rowShapeFailures.length ? `列数错误行：${rowShapeFailures.map((row) => row.line).join('、')}` : `识别到 ${rows.length} 节，均为 12 列`),
-    '固定表头下至少一行数据，且每节恰好 12 列',
+    rows.length === 0 ? '表头下没有数据行' : (rowShapeFailures.length ? `列数错误行：${rowShapeFailures.map((row) => row.line).join('、')}` : `识别到 ${rows.length} 节，列数与表头一致`),
+    '表头下至少一行数据，每节的列数与表头一致',
     ['references/workflow-design.md'],
     '只补缺失节或修复报告行的列错位。'
   ))
 
-  const progressionFailures = []
-  const progressionRows = rows.filter((item) => item.cells.length === OUTLINE_HEADERS.length)
-  for (const row of progressionRows) {
-    const progression = row.cells[2].split(/\s*(?:->|→)\s*/).filter(Boolean)
-    if (progression.length < 1 || progression.some((item) => !FUNCTION_TAG.test(item))) {
-      progressionFailures.push(row.line)
-    }
-  }
+  const shapedRows = headerOk ? rows.filter((item) => item.cells.length === width) : []
+  const cell = (row, role) => (role in column ? (row.cells[column[role]] || '') : '')
+  const emptyProgress = shapedRows.filter((row) => !cell(row, 'progress').trim()).map((row) => row.line)
   checks.push(makeCheck(
     'phase2.outline-subevents',
-    rows.length > 0 && progressionFailures.length === 0,
+    shapedRows.length > 0 && emptyProgress.length === 0,
     '小节大纲.md',
-    progressionFailures.length
-      ? `情节推进为空或功能标签错误行：${progressionFailures.join('、')}`
-      : (progressionRows.length === rows.length
-          ? `所有 ${rows.length} 节均有至少一个带功能标签的真实推进`
-          : `已检查 ${progressionRows.length}/${rows.length} 行；其余行由 phase2.outline-data-rows 报告列错位`),
-    '每节至少一个真实推进；有先后关系时以 -> 连接，每个含 {对话/冲突/伏笔/回忆/发现/递进} 标签之一，不设固定数量',
-    ['references/workflow-design.md', 'references/short-craft.md'],
-    '只修报告行的“情节推进”单元格，不重写其他列或其他节；不要为数量补事件。'
+    emptyProgress.length
+      ? `「这节发生的事」为空的行：${emptyProgress.join('、')}`
+      : (shapedRows.length ? `所有 ${shapedRows.length} 节都写了这节发生的事` : '表头或列数有误，见前两项'),
+    '每节写一句这节发生的事，不设数量',
+    ['references/workflow-design.md'],
+    '只补报告行的「这节发生的事」，不重写其他列或其他节；不要为数量补事件。'
   ))
 
   // 「约 1-1.3 万」「1.1万字」这类写法先换成整数再解析。
@@ -256,8 +291,8 @@ function verify(projectDir) {
   const targetLow = targetMatch ? toNumber(targetMatch[1]) : null
   const targetHigh = targetMatch && targetMatch[2] !== undefined ? toNumber(targetMatch[2]) : targetLow
   const statedTarget = targetLow
-  const rowTargets = progressionRows.map((row) => {
-    const match = row.cells[11].match(/([\d,，]+)/)
+  const rowTargets = shapedRows.map((row) => {
+    const match = cell(row, 'words').match(/([\d,，]+)/)
     return match ? Number(match[1].replace(/[,，]/g, '')) : null
   })
   const targetSum = rowTargets.every((value) => Number.isFinite(value))
@@ -265,7 +300,7 @@ function verify(projectDir) {
     : null
   const isRange = targetHigh !== null && targetHigh !== targetLow
   const targetOk = statedTarget !== null && statedTarget >= 1000 && targetHigh <= 200000 &&
-    targetHigh >= targetLow && progressionRows.length === rows.length && targetSum !== null &&
+    targetHigh >= targetLow && shapedRows.length > 0 && shapedRows.length === rows.length && targetSum !== null &&
     (isRange
       ? targetSum >= targetLow && targetSum <= targetHigh
       : Math.abs(targetSum - statedTarget) <= statedTarget * 0.05)
@@ -279,43 +314,40 @@ function verify(projectDir) {
     '只修目标字数字段或各节“目标字数”单元格，使合计匹配；不要用增删剧情绕过数字错误。'
   ))
 
-  const reversalMatch = settings.match(/反转位置\s*[：:]\s*第?\s*(\d+)\s*节?\s*(?:÷|\/)\s*(?:共|全文)?\s*(\d+)\s*节?\s*=\s*(\d+(?:\.\d+)?)\s*%/)
+  // 反转位置只核节号在不在大纲范围内；百分比只供核对，不是通过线（0.10 起旧写法里的算式不再核算）。
+  const reversalMatch = settings.match(/反转(?:位置|在)\s*[：:]\s*第\s*(\d+)\s*节/)
   const noReversal = /反转类型\s*[：:]\s*无反转/.test(settings) &&
-    /反转位置\s*[：:]\s*不适用\s*[（(][^)）]+[)）]/.test(settings)
+    /反转(?:位置|在)\s*[：:]\s*不适用\s*[（(][^)）]+[)）]/.test(settings)
   let reversalOk = false
-  let reversalEvidence = '未找到“反转位置：第 X 节 ÷ 共 Y 节 = Z%”'
+  let reversalEvidence = '未找到“反转在：第 X 节（共 Y 节）”'
   if (noReversal) {
     reversalOk = true
     reversalEvidence = '反转类型为无反转，位置已带原因标为不适用'
   } else if (reversalMatch) {
     const reveal = Number(reversalMatch[1])
-    const total = Number(reversalMatch[2])
-    const stated = Number(reversalMatch[3])
-    const calculated = total > 0 ? (reveal / total) * 100 : NaN
-    reversalOk = reveal >= 1 && reveal <= total && total === rows.length &&
-      Math.abs(stated - calculated) <= 0.6
-    reversalEvidence = `声明第 ${reveal} 节 ÷ 共 ${total} 节 = ${stated}%；大纲识别 ${rows.length} 节`
+    reversalOk = reveal >= 1 && reveal <= rows.length
+    reversalEvidence = `声明反转在第 ${reveal} 节；大纲识别 ${rows.length} 节`
   }
   checks.push(makeCheck(
     'phase2.reversal-position',
     reversalOk,
     '设定.md',
     reversalEvidence,
-    '有反转时写明揭穿节号、全文总节数和计算百分比；总节数须与大纲一致，计算误差不超过 0.6%。无反转时写明“反转类型：无反转”和带原因的“反转位置：不适用（…）”',
+    '有反转时写“反转在：第 X 节（共 Y 节）”，X 在大纲节数之内；无反转时写“反转类型：无反转”和带原因的“反转在：不适用（…）”',
     ['references/workflow-design.md', 'references/short-reversal.md'],
-    '只修正反转位置计算或对应节次；位置质量按 short-reversal.md 的误判决策与揭示后果功能链判断，不为跨过固定百分比而搬节。'
+    '只修正反转所在节号；位置好坏按 short-reversal.md 的误判与揭示后果判断，不为凑比例搬节。'
   ))
 
   const paywallMatch = settings.match(/付费点\s*[：:]\s*第?\s*(\d+)\s*节末/)
   const paywallSection = paywallMatch ? Number(paywallMatch[1]) : null
   const paywallRows = rows
-    .map((row, index) => ({ section: index + 1, hook: row.cells[7] || '' }))
+    .map((row, index) => ({ section: index + 1, hook: cell(row, 'hook') }))
     .filter((row) => /付费点/.test(row.hook))
   const paywallOk = paywallSection !== null && paywallRows.length === 1 &&
     paywallRows[0].section === paywallSection
   let paywallEvidence = '设定.md 未按“付费点：第 X 节末”声明'
   if (paywallSection !== null && paywallRows.length === 0) {
-    paywallEvidence = `设定.md 声明第 ${paywallSection} 节末；大纲“结尾承接/钩子”列未标出付费点`
+    paywallEvidence = `设定.md 声明第 ${paywallSection} 节末；大纲“节尾停在哪”列未标出付费点`
   } else if (paywallSection !== null && paywallRows.length > 0) {
     paywallEvidence = `设定.md 声明第 ${paywallSection} 节末；大纲标在第 ${paywallRows.map((row) => row.section).join('、')} 节`
   }
@@ -324,9 +356,9 @@ function verify(projectDir) {
     paywallOk,
     '设定.md、小节大纲.md',
     paywallEvidence,
-    '设定.md 写“付费点：第 X 节末”，且小节大纲.md 第 X 行数据的“结尾承接/钩子”单元格只标一次“付费点”',
+    '设定.md 写“付费点：第 X 节末”，且小节大纲.md 第 X 行数据的“节尾停在哪”单元格只标一次“付费点”',
     ['references/submission-craft.md', 'references/workflow-design.md'],
-    '只在缺失的文件补同一个付费断点，并确保它位于对应节末的钩子单元格。'
+    '只在缺失的文件补同一个付费断点，并确保它位于对应节的「节尾停在哪」单元格。'
   ))
 
   return report(project, checks)
@@ -365,4 +397,4 @@ function main(argv) {
 
 if (require.main === module) process.exitCode = main(process.argv.slice(2))
 
-module.exports = { OUTLINE_HEADERS, verify }
+module.exports = { OUTLINE_HEADERS, OPTIONAL_COLUMNS, verify }

@@ -142,9 +142,9 @@
 ## 相关
 
 - 站点原文（含更多示例与相关指南）：https://zenstory.ai/zh/oh-story/chapter-outline-template
-- [细纲模板与可选字段](../skills/story-long-write/references/workflow-outline.md)
+- [细纲模板与可选字段](../skills/story-long-write/references/outline-template.md)
 - [大纲层级与倒推方法](../skills/story-long-write/references/outline-methods.md)
-- [作者文风与通用写法](../skills/story-long-write/references/style-resolution.md)
+- [作者文风与通用写法](../skills/story-long-write/references/writing-craft.md)
 - [当前操作与审查契约（2026-10-15）](../skills/story-long-write/references/workflow-outline.md)
 - [当前操作与审查契约（2026-10-15）](../skills/story-long-write/SKILL.md)
 - 仓库地址：https://github.com/zenstory-ai/oh-story-claudecode

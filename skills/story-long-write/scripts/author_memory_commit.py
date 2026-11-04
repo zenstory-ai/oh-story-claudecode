@@ -30,7 +30,6 @@ INPUT_SCHEMA_VERSION = 1
 STATE_SCHEMA_VERSION = 1
 STATE_MAX_BYTES = 2 * 1024 * 1024
 PROFILE_MAX_BYTES = 12288
-PENDING_MAX_BYTES = 12288
 JOURNAL_MAX_BYTES = 24576
 QUERY_MAX_BYTES = 2048
 ASSERTION_MAX_BYTES = 120  # 新建条目的断言限一句话；解释进 reason（不进 query 载荷）。
@@ -42,7 +41,7 @@ LEGACY_ASSERTION_MAX_BYTES = 768  # 存量条目的读取上限；强化老条�
 # 防「作者以为载入了、实际被静默挤掉」靠三层：①新建条目的断言限
 # ASSERTION_MAX_BYTES，从源头短（强化已有条目不受限，否则存量长断言再也无法
 # 被确认，只会派生重复条目）；②写入端按下列任务组合（与
-# references/author-memory-maintenance.md 的映射表同包跟版）估算最坏查询情形——
+# references/author-memory.md 的查询说明同包跟版）估算最坏查询情形——
 # 全局条目＋各 scope 维度上最重的单一切片（一次查询只带一个 book/genre/workflow，
 # 不同书的条目不会同现；切片按 casefold 归并，与 same_scope_value 同一口径，
 # 轻重按渲染后的行字节算，与真实载荷同一把尺），装不下时在返回的 warnings 里
@@ -66,13 +65,19 @@ KIND_TITLES = {
     "interaction": "协作方式",
 }
 SCOPE_LEVELS = ("global", "genre", "book", "workflow")
+# 0.10 起只记已确认（active）条目：不再写入待确认（pending）与冲突（conflict）候选，
+# 也不再有 decide。pending／conflict／rejected 只为存量 state 仍能通过校验而保留：
+# 它们不进查询、不进写手，作者把同一句话再说一次就强化成 active，也可 forget／replace。
 STATUSES = ("active", "pending", "conflict", "rejected", "superseded")
+LEGACY_LIVE_STATUSES = ("pending", "conflict")
+# 旧版派生的待确认视图；不再生成，写入时顺手删掉。
+LEGACY_PENDING_VIEW = "待确认.md"
 CONFIDENCE_LEVELS = ("low", "medium", "high")
 IMPORTANCE_LEVELS = ("low", "medium", "high")
 # 作者记忆只记作者明确表达的偏好。repeated_correction / inferred_pattern 两条
 # 由 agent 主动推断写入的管道已经移除（#436）：它们只在攒待确认清单的审阅负
 # 担，不是记忆质量；文档也明说不装全量消息 hook，隐式捕获本就承诺不了完整
-# 性。SOURCES 里保留这两个值只为存量 state 仍能通过校验、仍能 decide/forget，
+# 性。SOURCES 里保留这两个值只为存量 state 仍能通过校验、仍能 forget/replace，
 # 新写入一律按 WRITE_SOURCES 校验。
 SOURCES = (
     "explicit_user",
@@ -87,7 +92,7 @@ RANK = {"low": 0, "medium": 1, "high": 2}
 # 两级 store（#435）：项目级存 global/genre/workflow，ID 前缀 AP，位于
 # {工作区}/.story/作者记忆/；书级只存该书的 book 条目，ID 前缀 BP，位于
 # {书}/.story/作者记忆/，书归档、迁移时记忆随书走。ID 前缀就是路由键——
-# decide/forget 看 item_id 前缀，remember/replace 看 scope.level，一份事务
+# forget 看 item_id 前缀，remember/replace 看 scope.level，一份事务
 # 只写一个 store。项目级 store 里升级前写入的存量 book 条目不再参与查询与估算，
 # 用 migrate 搬进书目录后才回来——不做双读，双读会让迁移永远没人做。
 STORE_PREFIX = {"project": "AP", "book": "BP"}
@@ -570,27 +575,30 @@ def load_state(store: Store) -> dict[str, Any] | None:
     return validate_state(read_json(store.state_path), store=store)
 
 
+NO_CANDIDATES = (
+    "作者记忆只记作者确认过的习惯，不再记待确认或冲突候选：范围或说法含糊时先问作者一句，"
+    "确认了再记；与已有习惯相反时用 replace 换掉旧条；拿不准就只照做、不记"
+)
+
+
 def normalize_preference(value: object, label: str, *, allow_status: bool) -> dict[str, Any]:
     preference = as_mapping(value, label)
     allowed = {"kind", "scope", "assertion", "quote", "source_ref", "source", "confidence", "importance", "reason"}
     if allow_status:
+        # 旧事件里常带 status / conflicts_with；只接受 active 与空列表，其余按 NO_CANDIDATES 拒绝。
         allowed |= {"status", "conflicts_with"}
     require_known_keys(preference, allowed, label)
     raw_source = preference.get("source")
     require(
         raw_source not in {"repeated_correction", "inferred_pattern"},
         f"{label}.source「{raw_source}」已不再写入：作者记忆只记作者明确表达的偏好，"
-        f"不从重复修改或成稿轨迹推断；范围含糊的原话用 explicit_user 并置 status=pending",
+        f"不从重复修改或成稿轨迹推断；作者原话说的用 explicit_user",
     )
     source = choice(raw_source, WRITE_SOURCES, f"{label}.source")
-    status = choice(preference.get("status"), ("active", "pending", "conflict"), f"{label}.status") if allow_status else "active"
+    status = preference.get("status", "active") if allow_status else "active"
+    require(status == "active", f"{label}.status「{status}」：{NO_CANDIDATES}")
     conflicts = clean_id_list(preference.get("conflicts_with", []), f"{label}.conflicts_with") if allow_status else []
-    if status == "active":
-        require(not conflicts, f"{label}.conflicts_with must be empty for active status")
-    elif status == "conflict":
-        require(bool(conflicts), f"{label}.conflicts_with is required for conflict status")
-    else:
-        require(not conflicts, f"{label}.conflicts_with is only valid for conflict status")
+    require(not conflicts, f"{label}.conflicts_with：{NO_CANDIDATES}")
     return {
         "kind": choice(preference.get("kind"), KINDS, f"{label}.kind"),
         "scope": normalize_scope(preference.get("scope"), f"{label}.scope"),
@@ -624,14 +632,7 @@ def normalize_transaction(value: object) -> dict[str, Any]:
             require_known_keys(operation, {"action", "preference"}, label)
             normalized_operations.append({"action": action, "preference": normalize_preference(operation.get("preference"), f"{label}.preference", allow_status=True)})
         elif action == "decide":
-            require_known_keys(operation, {"action", "item_id", "decision", "quote", "reason"}, label)
-            normalized_operations.append({
-                "action": action,
-                "item_id": clean_id_list([operation.get("item_id")], f"{label}.item_id", maximum=1)[0],
-                "decision": choice(operation.get("decision"), ("activate", "reject"), f"{label}.decision"),
-                "quote": clean_text(operation.get("quote"), f"{label}.quote", max_bytes=768),
-                "reason": clean_text(operation.get("reason"), f"{label}.reason", max_bytes=480),
-            })
+            raise AuthorMemoryError(f"{label}.action decide 已移除：{NO_CANDIDATES}")
         elif action == "replace":
             require_known_keys(operation, {"action", "old_ids", "preference"}, label)
             old_ids = clean_id_list(operation.get("old_ids"), f"{label}.old_ids")
@@ -646,7 +647,7 @@ def normalize_transaction(value: object) -> dict[str, Any]:
                 "reason": clean_text(operation.get("reason"), f"{label}.reason", max_bytes=480),
             })
         else:
-            raise AuthorMemoryError(f"{label}.action must be one of: remember, decide, replace, forget")
+            raise AuthorMemoryError(f"{label}.action must be one of: remember, replace, forget")
     return {
         "schema_version": INPUT_SCHEMA_VERSION,
         "transaction_id": transaction_id,
@@ -684,17 +685,11 @@ def store_kind_label(kind: str) -> str:
 
 def operation_store_kind(operation: dict[str, Any], label: str) -> str:
     action = operation["action"]
-    if action in {"decide", "forget"}:
+    if action == "forget":
         return id_store(operation["item_id"])
     preference = operation["preference"]
     kind = scope_store_kind(preference["scope"])
     if action == "remember":
-        for conflict_id in preference["conflicts_with"]:
-            require(
-                id_store(conflict_id) == kind,
-                f"{label}.conflicts_with 只能引用同一 store 的条目（{conflict_id} 在{store_kind_label(id_store(conflict_id))}）："
-                f"本书例外不算与全局规则冲突，直接 remember 为 book 条目即可",
-            )
         return kind
     for old_id in operation["old_ids"]:
         require(
@@ -812,48 +807,23 @@ def require_item(state: dict[str, Any], item_id: str, label: str) -> dict[str, A
 
 def apply_remember(state: dict[str, Any], preference: dict[str, Any], revision: int) -> str:
     require_scope_fits_store(state, preference["scope"])
-    for conflict_id in preference["conflicts_with"]:
-        conflict = require_item(state, conflict_id, "remember")
-        require(conflict["status"] == "active", f"remember conflict {conflict_id} must be active")
     preference_fingerprint = fingerprint(preference)
     for item in state["items"].values():
-        if item["status"] not in {"active", "pending", "conflict"} or fingerprint(item) != preference_fingerprint:
+        if item["status"] not in {"active", *LEGACY_LIVE_STATUSES} or fingerprint(item) != preference_fingerprint:
             continue
-        require(not (item["status"] == "conflict" and preference["status"] == "active"), f"conflict item {item['id']} must be resolved with replace or rejected")
-        require(not (item["status"] == "active" and preference["status"] == "conflict"), f"active item {item['id']} cannot be recategorized as its own conflict")
+        require(item["status"] != "conflict", f"旧版冲突候选 {item['id']} 要用 replace 换掉它冲突的旧条，或 forget 掉它")
         add_evidence(item, preference["quote"], preference["source_ref"])
         item["confirmation_count"] += 1
         item["confidence"] = best_level(item["confidence"], preference["confidence"])
         item["importance"] = best_level(item["importance"], preference["importance"])
         item["updated_revision"] = revision
         item["reason"] = preference["reason"]
-        if item["status"] == "pending" and preference["status"] == "active":
-            item["status"] = "active"
-        elif item["status"] == "pending" and preference["status"] == "conflict":
-            item["status"] = "conflict"
-            item["conflicts_with"] = list(preference["conflicts_with"])
-        elif item["status"] == "conflict" and preference["status"] == "conflict":
-            item["conflicts_with"] = sorted(set(item["conflicts_with"]) | set(preference["conflicts_with"]))
+        # 旧版待确认条目：作者把同一句话再说一次就是确认。
+        item["status"] = "active"
         return f"强化 {item['id']}：{item['assertion']}"
     item = allocate_item(state, preference, revision)
     state["items"][item["id"]] = item
     return f"新增 {item['id']}（{item['status']}）：{item['assertion']}"
-
-
-def apply_decide(state: dict[str, Any], operation: dict[str, Any], revision: int) -> str:
-    item = require_item(state, operation["item_id"], "decide")
-    require(item["status"] in {"pending", "conflict"}, f"decide requires pending/conflict item, got {item['status']}")
-    if operation["decision"] == "activate":
-        require(item["status"] == "pending" and not item["conflicts_with"], "conflict candidates must be activated with replace")
-        item["status"] = "active"
-        verb = "确认"
-    else:
-        item["status"] = "rejected"
-        verb = "拒绝"
-    add_evidence(item, operation["quote"], None)
-    item["reason"] = operation["reason"]
-    item["updated_revision"] = revision
-    return f"{verb} {item['id']}：{item['assertion']}"
 
 
 def release_conflicts(state: dict[str, Any], removed_ids: set[str], revision: int) -> int:
@@ -950,8 +920,6 @@ def apply_transaction(state: dict[str, Any], transaction: dict[str, Any], digest
     for operation in transaction["operations"]:
         if operation["action"] == "remember":
             summaries.append(apply_remember(updated, operation["preference"], revision))
-        elif operation["action"] == "decide":
-            summaries.append(apply_decide(updated, operation, revision))
         elif operation["action"] == "replace":
             summaries.append(apply_replace(updated, operation, revision))
         else:
@@ -1005,34 +973,6 @@ def render_profile(state: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def render_pending(state: dict[str, Any]) -> str:
-    lines = [
-        "# 待确认的作者习惯",
-        "",
-        "<!-- 由 author_memory_commit.py 生成，请勿手改；修改请提交事务。 -->",
-        "",
-        f"> 状态修订：{state['state_revision']}。{store_caption(state)}待确认项不参与创作约束，也不应打断当前任务。",
-        "",
-    ]
-    items = sorted((item for item in state["items"].values() if item["status"] in {"pending", "conflict"}), key=lambda item: id_number(item["id"]))
-    if not items:
-        lines.extend(["暂无待确认项。", ""])
-    for item in items:
-        lines.extend([
-            f"## {item['id']} · {'冲突' if item['status'] == 'conflict' else '待确认'}",
-            "",
-            f"- 候选习惯：{item['assertion']}",
-            f"- 范围：{scope_label(item['scope'])}",
-            f"- 原话：“{item['evidence'][-1]['quote']}”",
-            f"- 依据：{item['reason']}",
-            f"- 置信度 / 重要度：{item['confidence']} / {item['importance']}",
-        ])
-        if item["conflicts_with"]:
-            lines.append(f"- 冲突对象：{', '.join(item['conflicts_with'])}")
-        lines.append("")
-    return "\n".join(lines).rstrip() + "\n"
-
-
 def render_journal(state: dict[str, Any]) -> str:
     lines = [
         "# 作者记忆变更记录",
@@ -1054,10 +994,9 @@ def render_journal(state: dict[str, Any]) -> str:
 def render_views(state: dict[str, Any]) -> dict[str, str]:
     views = {
         "作者画像.md": render_profile(state),
-        "待确认.md": render_pending(state),
         "变更记录.md": render_journal(state),
     }
-    limits = {"作者画像.md": PROFILE_MAX_BYTES, "待确认.md": PENDING_MAX_BYTES, "变更记录.md": JOURNAL_MAX_BYTES}
+    limits = {"作者画像.md": PROFILE_MAX_BYTES, "变更记录.md": JOURNAL_MAX_BYTES}
     for name, payload in views.items():
         require(len(payload.encode("utf-8")) <= limits[name], f"{name} exceeds {limits[name]} bytes; consolidate old memory first")
     return views
@@ -1069,6 +1008,9 @@ def write_snapshot(store: Store, state: dict[str, Any]) -> None:
     require(len(state_payload.encode("utf-8")) <= STATE_MAX_BYTES, f"_author-memory-state.json exceeds {STATE_MAX_BYTES} bytes")
     for name, payload in views.items():
         write_if_changed(store.root / name, payload)
+    legacy_view = store.root / LEGACY_PENDING_VIEW
+    if legacy_view.is_file():
+        legacy_view.unlink()
     # State is the authority and therefore the last commit point.
     write_if_changed(store.state_path, state_payload)
 
@@ -1413,7 +1355,7 @@ def command_query(
     prepare_workspace(workspace, book_root)
     require(
         bool(kinds),
-        "query 必须显式传 --kind（按调用方 skill 写好的 query 命令选类型，映射表见 references/author-memory-maintenance.md），不再默认返回全部类型",
+        "query 必须显式传 --kind（按调用方 skill 写好的 query 命令选类型，对照见 references/author-memory.md「查询」），不再默认返回全部类型",
     )
     project_state = load_state(project_store(workspace))
     book_state = load_state(book_store(workspace, book_root, book)) if book_root is not None else None
@@ -1470,7 +1412,7 @@ MIGRATE_PREFIX = "migrate:"
 
 def migration_digest(item: dict[str, Any]) -> str:
     """迁移事务的摘要只看条目不可变的身份：编号、类型、范围、断言。证据会随强化
-    增长、状态会随 decide/forget 变化，它们若进摘要，中途失败后作者动过条目就会
+    增长、状态会随 forget/replace 变化，它们若进摘要，中途失败后作者动过条目就会
     永远「already used with different content」。"""
     return transaction_digest({"id": item["id"], "kind": item["kind"], "scope": item["scope"], "assertion": item["assertion"]})
 
