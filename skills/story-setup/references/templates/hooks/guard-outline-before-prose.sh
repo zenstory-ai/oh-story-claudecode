@@ -145,9 +145,11 @@ case "$BASE" in
     ;;
   *)
     # 长篇分章正文：正文/ 直属或下一层卷目录，文件名形如 第N章...
+    case "$BASE" in *_原稿_*) exit 0 ;; esac
     if [ "$PARENT" = "正文" ]; then
       BOOK_DIR="$(dirname "$(dirname "$ABS")")"
     elif [ "$(basename "$(dirname "$(dirname "$ABS")")")" = "正文" ]; then
+      printf '%s' "$PARENT" | grep -Eiq '^(\.|.*_原稿_|备份|临时|草稿|_?(backups?|bak|tmp|temp|drafts?)($|[_ -]))' && exit 0
       BOOK_DIR="$(dirname "$(dirname "$(dirname "$ABS")")")"
     else
       exit 0

@@ -54,7 +54,8 @@ def load(project, required=False):
     file = project / ".story" / "storage.json"
     require(not file.is_symlink() and not file.parent.is_symlink(), "storage metadata cannot be a symlink")
     if not file.exists():
-        require(not required, "missing .story/storage.json; confirm and initialize body layout first")
+        if required:
+            return initialize_legacy_layout(project)
         return None
     try:
         return validate(json.loads(file.read_text(encoding="utf-8-sig")))
@@ -69,6 +70,12 @@ def chapter_number(name):
     return int(match[1]) if match and int(match[1]) > 0 else None
 
 
+def ignored_chapter_directory(name):
+    return (name.startswith(".") or "_原稿_" in name
+            or bool(re.match(r"^(?:备份|临时|草稿)", name))
+            or bool(re.match(r"^_?(?:backups?|bak|tmp|temp|drafts?)(?:$|[_ -])", name, re.I)))
+
+
 def body_directory(project, chapter, config):
     require(positive(chapter), "chapter must be >= 1")
     if config["body_layout"] == "flat":
@@ -76,7 +83,7 @@ def body_directory(project, chapter, config):
     for volume in config["volumes"]:
         if volume["first_chapter"] <= chapter <= volume["last_chapter"]:
             return Path(project) / "正文" / volume["directory"]
-    raise StorageError(f"chapter {chapter} has no configured volume")
+    raise StorageError(f"chapter {chapter} has no configured volume；请向作者确认所属卷和章节范围，不擅自延长最后一卷。")
 
 
 def chapter_files(project, config=None):
@@ -85,21 +92,41 @@ def chapter_files(project, config=None):
         config = load(project)
     body = project / "正文"
     require(not body.is_symlink(), "body directory cannot be a symlink")
-    files = sorted((*body.glob("*.md"), *body.glob("*/*.md")), key=str)
+    def read(directory, optional=False):
+        try:
+            return sorted(directory.iterdir(), key=str)
+        except FileNotFoundError as error:
+            if optional:
+                return []
+            raise StorageError(f"正文目录读取失败：{directory}；可重试读取，不要据此调整章节位置。") from error
+        except OSError as error:
+            raise StorageError(f"正文目录读取失败：{directory}；可重试读取，不要据此调整章节位置。") from error
+
+    files = []
+    for entry in read(body, optional=True):
+        if ignored_chapter_directory(entry.name):
+            continue
+        if entry.is_dir():
+            require(not entry.is_symlink(), f"volume directory cannot be a symlink: {entry}")
+            files.extend(read(entry))
+        else:
+            files.append(entry)
     result, seen = [], {}
     for file in files:
         number = chapter_number(file.name)
-        if number is None or file.parent.name.startswith("."):
+        if number is None:
             continue
         require(not file.is_symlink() and not file.parent.is_symlink(),
                 f"chapter cannot be a symlink: {file}")
         if not file.is_file():
             continue
-        require(number not in seen, f"duplicate chapter {number}: {seen.get(number)} / {file}")
+        require(number not in seen, f"duplicate chapter {number}: {seen.get(number)} / {file}；"
+                "请向作者确认保留哪份，按作者决定修正后重试；不要自动移动或删除。")
         seen[number] = file
         if config is not None:
             require(file.parent == body_directory(project, number, config),
-                    f"chapter {number} is outside configured layout: {file}; migrate before writing")
+                    f"chapter {number} is outside configured layout: {file}；"
+                    "请向作者说明实际位置与配置的差异，确认后再修正；不要自动移动文件或修改配置。")
         result.append(file)
     return sorted(result, key=lambda file: chapter_number(file.name))
 
@@ -107,6 +134,35 @@ def chapter_files(project, config=None):
 def find_chapter(project, chapter):
     require(positive(chapter), "chapter must be >= 1")
     return next((file for file in chapter_files(project) if chapter_number(file.name) == chapter), None)
+
+
+def initialize_legacy_layout(project):
+    """Only register an unambiguous existing body; never invent future volume ranges."""
+    project = Path(project)
+    files = chapter_files(project)
+    require(files, "missing .story/storage.json; 没有可判断布局的正式章节，请向作者确认不分卷或分卷后初始化。")
+    body = project / "正文"
+    parents = {file.parent for file in files}
+    if parents == {body}:
+        config = {"schema_version": 1, "body_layout": "flat"}
+    else:
+        require(body not in parents, "正文同时存在直属章节和分卷章节，请向作者确认目标布局后再登记；不要自动移动。")
+        volumes = []
+        for directory in parents:
+            numbers = [chapter_number(file.name) for file in files if file.parent == directory]
+            volumes.append({"directory": directory.name, "first_chapter": min(numbers), "last_chapter": max(numbers)})
+        config = {"schema_version": 1, "body_layout": "volumes",
+                  "volumes": sorted(volumes, key=lambda item: item["first_chapter"])}
+        try:
+            validate(config)
+        except StorageError as error:
+            raise StorageError(f"已有卷目录或章节范围无法唯一登记（{error}）；请向作者确认目录与范围，不自动改名或移动。") from error
+    try:
+        initialize(project, config)
+    except FileExistsError:
+        # Another invocation may have initialized the same book; read and validate it.
+        return load(project, required=True)
+    return config
 
 
 def output_path(project, chapter, title):

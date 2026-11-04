@@ -442,25 +442,70 @@ def prose_net_findings(text: str, whitelist=(), rescan: str | None = None) -> li
     return findings
 
 
+def chapter_number(name: str) -> int | None:
+    if "_原稿_" in name:
+        return None
+    match = re.fullmatch(r"第0*(\d+)章.*\.md", name, flags=re.ASCII)
+    number = int(match[1]) if match else 0
+    return number if 0 < number <= 9007199254740991 else None
+
+
+def ignored_chapter_directory(name: str) -> bool:
+    return (name.startswith(".") or "_原稿_" in name
+            or bool(re.match(r"^(?:备份|临时|草稿)", name))
+            or bool(re.match(r"^_?(?:backups?|bak|tmp|temp|drafts?)(?:$|[_ -])", name, re.I)))
+
+
+def duplicate_chapter_issue(book: Path, number: int, files: list[Path]) -> str:
+    paths = "、".join(safe_rel(book, file) for file in files)
+    return (f"第 {number} 章存在多个文件：{paths}。请向作者确认保留哪份或如何调整目录，"
+            "按作者决定修正后重试；不要自动移动或删除。")
+
+
 def long_chapter_book(abs_path: Path) -> Path | None:
-    if not re.match(r"^第0*\d+章.*\.md$", abs_path.name):
+    if chapter_number(abs_path.name) is None:
         return None
     if abs_path.parent.name == "正文":
         return abs_path.parent.parent
-    if abs_path.parent.parent.name == "正文":
+    if abs_path.parent.parent.name == "正文" and not ignored_chapter_directory(abs_path.parent.name):
         return abs_path.parent.parent.parent
     return None
 
 
-def chapter_files(body_dir: Path) -> list[Path]:
-    if not body_dir.is_dir():
-        return []
-    candidates = (*body_dir.glob("第*章*.md"), *body_dir.glob("*/第*章*.md"))
-    return sorted(
-        path for path in candidates
-        if path.is_file() and not path.is_symlink() and not path.parent.is_symlink()
-        and re.match(r"^第0*\d+章.*\.md$", path.name) and "_原稿_" not in path.name
-    )
+def chapter_files(body_dir: Path, issues: list[str] | None = None) -> list[Path]:
+    def report(message):
+        if issues is not None:
+            issues.append(message)
+        else:
+            print(message, file=sys.stderr)
+
+    def read(directory, optional=False):
+        try:
+            return list(directory.iterdir())
+        except OSError as error:
+            if not (optional and isinstance(error, FileNotFoundError)):
+                import errno
+                code = errno.errorcode.get(error.errno, "UNKNOWN")
+                report(f"正文目录读取失败：{directory}（{code}）。本次检查不完整，可重试读取；不要据此新建、移动或删除章节。")
+            return []
+
+    files = []
+    for entry in read(body_dir, optional=True):
+        if entry.is_symlink():
+            continue
+        if entry.is_file() and chapter_number(entry.name) is not None:
+            files.append(entry)
+        elif entry.is_dir() and not ignored_chapter_directory(entry.name):
+            files.extend(child for child in read(entry) if not child.is_symlink()
+                         and child.is_file() and chapter_number(child.name) is not None)
+    files.sort(key=lambda file: (chapter_number(file.name), str(file)))
+    seen = {}
+    for file in files:
+        seen.setdefault(chapter_number(file.name), []).append(file)
+    for number, matches in seen.items():
+        if len(matches) > 1:
+            report(duplicate_chapter_issue(body_dir.parent, number, matches))
+    return files
 
 
 def _is_prose_path(root: Path, abs_path: Path) -> bool:
@@ -592,21 +637,23 @@ def continuity_findings(root: Path) -> list[str]:
     msgs: list[str] = []
     for book in _discover_all_books(root):
         body_dir = book / "正文"
-        chapters = chapter_files(body_dir)
+        scan_issues = []
+        chapters = chapter_files(body_dir, scan_issues)
+        msgs.extend(f"[continuity] {safe_rel(root, book)}：{issue}" for issue in scan_issues)
         # ① 追踪 staleness（仅长篇：有 追踪/上下文.md）
         ctx = book / "追踪" / "上下文.md"
         checkpoint_issue = tracking_checkpoint_issue(book, require_state=bool(chapters))
         if checkpoint_issue:
             msgs.append(f"[continuity] {safe_rel(root, book)}：{checkpoint_issue}。")
         if chapters and ctx.exists():
-            newest = max((c.stat().st_mtime for c in chapters), default=0)
             try:
+                newest = max((c.stat().st_mtime for c in chapters), default=0)
                 ctx_m = ctx.stat().st_mtime
-            except Exception:
-                ctx_m = 0
-            if newest > ctx_m + 1:
-                latest = max(chapters, key=lambda c: c.stat().st_mtime).name
-                msgs.append(f"[continuity] {safe_rel(root, book)}：正文已更新到「{latest}」但续写状态卡更早——为该章提交 tracking_commit.py 事务、check 通过后再续写，禁止分别手改 上下文.md/伏笔.md。")
+                if newest > ctx_m + 1:
+                    latest = max(chapters, key=lambda c: c.stat().st_mtime).name
+                    msgs.append(f"[continuity] {safe_rel(root, book)}：正文已更新到「{latest}」但续写状态卡更早——为该章提交 tracking_commit.py 事务、check 通过后再续写，禁止分别手改 上下文.md/伏笔.md。")
+            except OSError as error:
+                msgs.append(f"[continuity] {safe_rel(root, book)}：章节时间读取失败，可重试读取：{error}")
         # ①b 续写状态卡预算：上下文.md 由事务工具整份重建，硬上限 12288 字节。
         # 若不处理，每章读取量会随章节数增长，最终达到 O(N^2)。这里只提醒、不阻止；应把超出规定的区块移到 追踪/逐章记录/。
         if ctx.exists():
@@ -1399,11 +1446,12 @@ def prose_block_reason(root: Path, abs_path: Path) -> str | None:
             # iterdir 顺序在 ext4/overlayfs 上是哈希序：不排序就可能挑中同章号的原稿备份
             # （workflow-revision 的「备份原稿」产物），拿早已被改写掉的旧文本报欠账。
             # 显式排除 _原稿_ 备份并排序，保证四端与各文件系统上取到同一个「上一章」。
-            candidates = sorted(
+            candidates = [
                 c for c in chapter_files(book_dir / "正文")
-                if re.match(r"^第0*(\d+)章.*\.md$", c.name)
-                and int(re.match(r"^第0*(\d+)章", c.name).group(1)) == prev_num
-            )
+                if chapter_number(c.name) == prev_num
+            ]
+            if len(candidates) > 1:
+                return f"⛔ 写正文暂缓：{duplicate_chapter_issue(book_dir, prev_num, candidates)}"
             prev_file = candidates[0] if candidates else None
         except OSError:
             prev_file = None

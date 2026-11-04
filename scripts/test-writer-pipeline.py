@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / 'skills/story-long-write/scripts'
@@ -61,6 +62,16 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('storage.json', result.stderr)
         self.assertNotIn('Traceback', result.stderr)
         self.assertFalse((self.book/'正文').exists())
+
+    def test_build_registers_legacy_flat_layout_without_changing_prose(self):
+        (self.book/'.story/storage.json').unlink()
+        chapter = self.put('正文/第1章_一封信.md', '# 第1章 一封信\n原有正文。')
+        result = self.build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(str(chapter), result.stdout)
+        self.assertEqual(chapter.read_text(encoding='utf-8'), '# 第1章 一封信\n原有正文。')
+        self.assertEqual(json.loads((self.book/'.story/storage.json').read_text(encoding='utf-8')),
+                         {'schema_version': 1, 'body_layout': 'flat'})
 
     def test_prompt_reads_previous_volume_chapter(self):
         self.put('.story/storage.json', json.dumps({'schema_version': 1, 'body_layout': 'volumes',
@@ -1092,13 +1103,14 @@ class StorageLayoutTests(unittest.TestCase):
         with self.assertRaises(core.WordcountError):
             core.find_chapter_file(self.book/'正文', 1, outline=False)
 
-    def test_missing_and_corrupt_config_never_fall_back_for_output(self):
+    def test_legacy_volume_detection_does_not_invent_future_ranges_or_replace_corrupt_config(self):
         chapter = self.put('正文/卷一_重生归来/第001章_旧名.md')
         self.assertEqual(self.storage.find_chapter(self.book, 1), chapter)
         with self.assertRaises(self.storage.StorageError):
             self.storage.output_path(self.book, 2, '新章')
+        self.assertEqual(self.storage.load(self.book)['volumes'],
+                         [{'directory': '卷一_重生归来', 'first_chapter': 1, 'last_chapter': 1}])
         file = self.book/'.story/storage.json'
-        file.parent.mkdir()
         file.write_text('{invalid', encoding='utf-8')
         with self.assertRaises(self.storage.StorageError):
             self.storage.find_chapter(self.book, 1)
@@ -1106,6 +1118,8 @@ class StorageLayoutTests(unittest.TestCase):
     def test_config_conflicts_backups_and_unsafe_titles(self):
         self.storage.initialize(self.book, self.flat)
         self.put('正文/.backup/第001章_备份.md')
+        self.put('正文/backup_旧稿/第001章_备份.md')
+        self.put('正文/草稿_候选/第001章_临时.md')
         self.put('正文/卷一_重生归来/草稿/第001章_深层.md')
         self.assertIsNone(self.storage.find_chapter(self.book, 1))
         self.put('正文/第001章_开端_原稿_日期.md')
@@ -1115,6 +1129,140 @@ class StorageLayoutTests(unittest.TestCase):
         self.put('正文/卷一_重生归来/第001章_位置错误.md')
         with self.assertRaises(self.storage.StorageError):
             self.storage.find_chapter(self.book, 1)
+
+    def test_legacy_layout_ambiguities_ask_author_without_moving_files(self):
+        for relatives in [
+                ['正文/第1章_直属.md', '正文/卷一_混合/第2章_分卷.md'],
+                ['正文/卷一_交错/第1章_开端.md', '正文/卷一_交错/第3章_结尾.md', '正文/卷二_交错/第2章_中间.md'],
+                ['正文/第一卷/第1章_旧目录.md']]:
+            with tempfile.TemporaryDirectory() as tmp, self.subTest(relatives=relatives):
+                book = Path(tmp)
+                for relative in relatives:
+                    file = book / relative
+                    file.parent.mkdir(parents=True, exist_ok=True)
+                    file.write_text('原文。', encoding='utf-8')
+                with self.assertRaisesRegex(self.storage.StorageError, '作者确认'):
+                    self.storage.load(book, required=True)
+                self.assertFalse((book/'.story/storage.json').exists())
+                self.assertTrue(all((book/relative).read_text(encoding='utf-8') == '原文。' for relative in relatives))
+
+    def test_legacy_volumes_register_existing_ranges_and_ignore_auxiliary_directories(self):
+        first = self.put('正文/卷一_旧事/第1章_开端.md')
+        self.put('正文/卷二_新程/第2章_起步.md')
+        self.put('正文/临时稿/第1章_不应冲突.md')
+        config = self.storage.load(self.book, required=True)
+        self.assertEqual(config['volumes'], [
+            {'directory': '卷一_旧事', 'first_chapter': 1, 'last_chapter': 1},
+            {'directory': '卷二_新程', 'first_chapter': 2, 'last_chapter': 2}])
+        self.assertEqual(self.storage.output_path(self.book, 1, '修订'), first)
+        before = (self.book/'.story/storage.json').read_bytes()
+        self.storage.load(self.book, required=True)
+        self.assertEqual((self.book/'.story/storage.json').read_bytes(), before)
+
+
+class HookChapterPathTests(unittest.TestCase):
+    """同一批实际目录同时交给 JS 和 Codex Python，锁住排序、排除与可恢复诊断。"""
+    def setUp(self):
+        if not shutil.which('node'):
+            self.skipTest('node unavailable')
+        self.tmp = tempfile.TemporaryDirectory(prefix='hook-chapter-paths-')
+        self.addCleanup(self.tmp.cleanup)
+        self.book = Path(self.tmp.name)
+        spec = importlib.util.spec_from_file_location('hook_path_tests',
+            ROOT/'skills/story-setup/references/codex/hooks/story_codex_hook.py')
+        self.hook = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.hook)
+
+    def put(self, relative):
+        file = self.book/relative
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_text('原正文。', encoding='utf-8')
+        return file
+
+    def js_scan(self, denied=''):
+        script = r'''
+const fs = require('node:fs'), path = require('node:path')
+const core = require(process.argv[1]), book = process.argv[2], denied = process.argv[3]
+const original = fs.readdirSync
+fs.readdirSync = function(directory, ...args) {
+  if (denied && path.basename(directory) === denied) {
+    const error = new Error('simulated permission denial'); error.code = 'EACCES'; throw error
+  }
+  return original.call(this, directory, ...args)
+}
+const issues = []
+const files = core.chapterFiles(path.join(book, '正文'), issues)
+console.log(JSON.stringify({files: files.map(file => path.relative(book, file).replace(/\\/g, '/')), issues,
+  identified: files.map(file => core.chapterBook(file) === book)}))
+'''
+        result = subprocess.run(['node', '-e', script,
+            str(ROOT/'skills/story-setup/references/templates/hooks/story_hook_core.js'), str(self.book), denied],
+            capture_output=True, encoding='utf-8')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_numeric_sort_and_auxiliary_exclusion_match_across_hosts(self):
+        for relative in ['正文/卷二_后卷/第10章_最后.md', '正文/卷一_前卷/第2章_中间.md',
+                         '正文/卷一_前卷/第1章_开端.md']:
+            self.put(relative)
+        excluded = ['正文/第1章_开端_原稿_日期.md', '正文/.backup/第1章_备份.md',
+                    '正文/backup_旧稿/第1章_备份.md', '正文/草稿_候选/第1章_临时.md',
+                    '正文/temp/第1章_临时.md', '正文/卷一_前卷/额外嵌套/第1章_深层.md']
+        for relative in excluded:
+            file = self.put(relative)
+            self.assertIsNone(self.hook.long_chapter_book(file))
+        js = self.js_scan()
+        py = self.hook.chapter_files(self.book/'正文', [])
+        self.assertEqual(js['files'], [file.relative_to(self.book).as_posix() for file in py])
+        self.assertEqual([self.hook.chapter_number(file.name) for file in py], [1, 2, 10])
+        self.assertEqual(js['issues'], [])
+        self.assertTrue(all(js['identified']))
+
+    def test_unreadable_volume_reports_and_preserves_other_volumes(self):
+        self.put('正文/卷一_不可读/第1章_跳过读取.md')
+        good = self.put('正文/卷二_仍可读/第2章_应保留.md')
+        original = Path.iterdir
+        def denied(directory):
+            if directory.name == '卷一_不可读':
+                raise PermissionError(13, 'simulated permission denial')
+            return original(directory)
+        issues = []
+        with mock.patch.object(Path, 'iterdir', denied):
+            py = self.hook.chapter_files(self.book/'正文', issues)
+        js = self.js_scan('卷一_不可读')
+        self.assertEqual(py, [good])
+        self.assertEqual(js['files'], [good.relative_to(self.book).as_posix()])
+        for diagnostics in (issues, js['issues']):
+            self.assertEqual(len(diagnostics), 1)
+            self.assertIn('EACCES', diagnostics[0])
+            self.assertIn('检查不完整', diagnostics[0])
+            self.assertIn('可重试读取', diagnostics[0])
+
+    def test_duplicate_chapters_ask_author_and_keep_both_files(self):
+        first = self.put('正文/卷一_重复章号/第1章_版本甲.md')
+        second = self.put('正文/卷二_重复章号/第001章_版本乙.md')
+        issues = []
+        self.hook.chapter_files(self.book/'正文', issues)
+        js = self.js_scan()
+        self.assertEqual(js['issues'], issues)
+        self.assertIn('请向作者确认', issues[0])
+        self.assertIn('不要自动移动或删除', issues[0])
+        self.assertTrue(first.exists() and second.exists())
+        self.put('大纲/细纲_第002章.md').write_text('有内容的细纲。' * 10, encoding='utf-8')
+        self.put('追踪/_tracking-state.json').write_text(json.dumps({
+            'schema_version': 4, 'state_revision': 0, 'last_committed_chapter': 1}), encoding='utf-8')
+        self.put('追踪/上下文.md').write_text('> 状态修订：0', encoding='utf-8')
+        target = self.book/'正文/卷二_重复章号/第2章_暂缓写作.md'
+        with mock.patch('sys.stderr'):
+            reason = self.hook.prose_block_reason(self.book, target)
+        result = subprocess.run(['node', '-e',
+            "const c=require(process.argv[1]);console.log(c.proseBlockReason(process.argv[2],process.argv[3]))",
+            str(ROOT/'skills/story-setup/references/templates/hooks/story_hook_core.js'), str(self.book), str(target)],
+            capture_output=True, encoding='utf-8')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), reason)
+        self.assertIn('请向作者确认', reason)
+        self.assertFalse(target.exists())
 
 
 class ConvertOutlineFormatTests(unittest.TestCase):

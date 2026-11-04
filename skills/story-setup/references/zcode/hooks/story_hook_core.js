@@ -152,7 +152,9 @@ function continuityFindings(root) {
   const messages = []
   for (const book of discoverAllBooks(root)) {
     const bodyDir = path.join(book, "正文")
-    const chapters = chapterFiles(bodyDir)
+    const scanIssues = []
+    const chapters = chapterFiles(bodyDir, scanIssues)
+    messages.push(...scanIssues.map((issue) => `[continuity] ${safeRelative(root, book)}：${issue}`))
 
     const context = path.join(book, "追踪", "上下文.md")
     const checkpointIssue = trackingCheckpointIssue(book, chapters.length > 0)
@@ -737,8 +739,11 @@ function proseBlockReason(root, absolute) {
       // readdir 顺序在 ext4/overlayfs 上是哈希序：不排序就可能挑中同章号的原稿备份
       // （workflow-revision 的「备份原稿」产物），拿早已被改写掉的旧文本报欠账。
       // 显式排除 _原稿_ 备份并排序，保证四端与各文件系统上取到同一个「上一章」。
-      prevFile = chapterFiles(path.join(book, "正文"))
-        .find((file) => Number(path.basename(file).match(/^第0*(\d+)章/)[1]) === prevNum) || null
+      const candidates = chapterFiles(path.join(book, "正文"))
+        .filter((file) => chapterNumber(path.basename(file)) === prevNum)
+      // 同章号有多份时不替作者选择；诊断交给 Agent 询问作者后处理。
+      if (candidates.length > 1) return `⛔ 写正文暂缓：${duplicateChapterIssue(book, prevNum, candidates)}`
+      prevFile = candidates[0] || null
     } catch {}
     if (prevFile) {
       let prevText = null
@@ -1040,31 +1045,64 @@ function proseNetFindings(text, whitelist = [], rescan = toxicRescanHint("")) {
   return findings
 }
 
+function chapterNumber(name) {
+  if (name.includes("_原稿_")) return null
+  const match = name.match(/^第0*(\d+)章.*\.md$/)
+  const number = match ? Number(match[1]) : 0
+  return Number.isSafeInteger(number) && number > 0 ? number : null
+}
+
+function ignoredChapterDirectory(name) {
+  return name.startsWith(".") || name.includes("_原稿_") || /^(?:备份|临时|草稿)/.test(name)
+    || /^_?(?:backups?|bak|tmp|temp|drafts?)(?:$|[_ -])/i.test(name)
+}
+
+function duplicateChapterIssue(book, number, files) {
+  return `第 ${number} 章存在多个文件：${files.map((file) => safeRelative(book, file)).join("、")}。请向作者确认保留哪份或如何调整目录，按作者决定修正后重试；不要自动移动或删除。`
+}
+
 function chapterBook(absolute) {
-  if (!/^第0*\d+章.*\.md$/.test(path.basename(absolute))) return null
+  if (chapterNumber(path.basename(absolute)) === null) return null
   const parent = path.dirname(absolute)
   if (path.basename(parent) === "正文") return path.dirname(parent)
   const bodyDir = path.dirname(parent)
-  return path.basename(bodyDir) === "正文" ? path.dirname(bodyDir) : null
+  return path.basename(bodyDir) === "正文" && !ignoredChapterDirectory(path.basename(parent)) ? path.dirname(bodyDir) : null
 }
 
-function chapterFiles(bodyDir) {
+function chapterFiles(bodyDir, issues = null) {
   const files = []
-  try {
-    for (const entry of fs.readdirSync(bodyDir, { withFileTypes: true })) {
-      if (entry.isFile() && /^第0*\d+章.*\.md$/.test(entry.name) && !entry.name.includes("_原稿_")) {
-        files.push(path.join(bodyDir, entry.name))
-      } else if (entry.isDirectory()) {
-        const volume = path.join(bodyDir, entry.name)
-        for (const child of fs.readdirSync(volume, { withFileTypes: true })) {
-          if (child.isFile() && /^第0*\d+章.*\.md$/.test(child.name) && !child.name.includes("_原稿_")) {
-            files.push(path.join(volume, child.name))
-          }
-        }
+  const report = (message) => { if (issues) issues.push(message); else console.error(message) }
+  const read = (directory, optional = false) => {
+    try { return fs.readdirSync(directory, { withFileTypes: true }) }
+    catch (error) {
+      if (!(optional && error.code === "ENOENT")) {
+        report(`正文目录读取失败：${directory}（${error.code || "UNKNOWN"}）。本次检查不完整，可重试读取；不要据此新建、移动或删除章节。`)
+      }
+      return []
+    }
+  }
+  for (const entry of read(bodyDir, true)) {
+    if (entry.isFile() && chapterNumber(entry.name) !== null) {
+      files.push(path.join(bodyDir, entry.name))
+    } else if (entry.isDirectory() && !ignoredChapterDirectory(entry.name)) {
+      const volume = path.join(bodyDir, entry.name)
+      for (const child of read(volume)) {
+        if (child.isFile() && chapterNumber(child.name) !== null) files.push(path.join(volume, child.name))
       }
     }
-  } catch {}
-  return files.sort()
+  }
+  files.sort((a, b) => chapterNumber(path.basename(a)) - chapterNumber(path.basename(b)) || (a < b ? -1 : a > b ? 1 : 0))
+  const seen = new Map()
+  for (const file of files) {
+    const number = chapterNumber(path.basename(file))
+    const matches = seen.get(number) || []
+    matches.push(file)
+    seen.set(number, matches)
+  }
+  for (const [number, matches] of seen) {
+    if (matches.length > 1) report(duplicateChapterIssue(path.dirname(bodyDir), number, matches))
+  }
+  return files
 }
 
 function isProsePath(absolute) {
@@ -1081,8 +1119,9 @@ function duplicateTitleFindings(absolute) {
   const book = chapterBook(absolute)
   if (!book) return []
   const titles = new Map()
+  const findings = []
   try {
-    for (const file of chapterFiles(path.join(book, "正文"))) {
+    for (const file of chapterFiles(path.join(book, "正文"), findings)) {
       const name = path.basename(file)
       const match = name.replace(/\.md$/, "").match(/^第0*\d+章[_\- 　]+(.+)$/)
       if (!match) continue
@@ -1090,7 +1129,6 @@ function duplicateTitleFindings(absolute) {
       if (title) titles.set(title, [...(titles.get(title) || []), name])
     }
   } catch {}
-  const findings = []
   for (const [title, files] of titles.entries()) {
     if (files.length > 1) findings.push(`${files.length} 章标题重复「${title}」（${files.join("、").slice(0, 60)}），建议改名。`)
   }
@@ -1349,4 +1387,6 @@ module.exports = {
   toxicPhraseFindings,
   toxicRescanHint,
   loadStyleWhitelist,
+  chapterBook,
+  chapterFiles,
 }
