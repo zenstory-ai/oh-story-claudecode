@@ -400,6 +400,7 @@ oh-story-claudecode 内置适配 Claude Code、Google Antigravity、OpenCode、Z
 - [黄金三章怎么写：网文开头清单与改写示例](docs/web-novel-golden-three-chapters.md) — 仓库内文档
 - [网文断章技巧：章尾钩子怎么写、怎么选](docs/web-novel-chapter-ending-hooks.md) — 仓库内文档
 - [小说细纲怎么写：章节模板与填写范例](docs/novel-chapter-outline-template.md) — 仓库内文档
+- [小说人物设定集怎么整理：角色、时间线与人物已知信息模板](docs/novel-story-bible-template.md) — 仓库内文档
 - [网文大纲怎么写：长篇大纲模板与分卷范例](docs/web-novel-outline-template.md) — 仓库内文档
 - [开源 AI 写小说工具怎么选：10 个项目按使用方式对比](docs/open-source-ai-novel-writing-tools.md) — 仓库内文档
 
