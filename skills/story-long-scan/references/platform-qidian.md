@@ -44,7 +44,7 @@ node scripts/qidian-rank-scraper.js --type library --pages 3 --outdir {outdir}  
 ## 采不到时
 
 - 手机版读取失败后改用 Chrome，若遇到验证码：脚本会停下等你在 Chrome 窗口里手动完成验证，最长 120 秒。告诉作者去 Chrome 里点验证。
-- 文件头「数据质量」标了问题：看「问题摘要」。题材、字数大面积缺失多半是手机版页面改版，先 `/browser-cdp` 启动 Chrome，再加 `--mode cdp` 重采一次。
+- 文件头「数据质量」标了问题：看「问题摘要」。题材、字数大面积缺失多半是手机版页面改版，总推荐缺失是手机版榜单不带这一项，先 `/browser-cdp` 启动 Chrome，再加 `--mode cdp` 重采一次。
 
 ## 分析维度
 
