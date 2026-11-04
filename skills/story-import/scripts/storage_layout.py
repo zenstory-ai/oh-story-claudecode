@@ -20,6 +20,11 @@ def positive(value):
     return type(value) is int and value > 0
 
 
+def volume_number(name):
+    match = re.match(r"卷([1-9][0-9]*)_", name) if isinstance(name, str) else None
+    return int(match[1]) if match else None
+
+
 def validate(config):
     require(isinstance(config, dict), "storage config must be an object")
     mode = config.get("body_layout")
@@ -31,7 +36,7 @@ def validate(config):
     if mode == "volumes":
         volumes = config["volumes"]
         require(isinstance(volumes, list) and volumes, "volumes must be a nonempty list")
-        names, ranges = set(), []
+        names, numbers, ranges = set(), set(), []
         for item in volumes:
             require(isinstance(item, dict) and set(item) == {
                 "directory", "first_chapter", "last_chapter"}, "invalid volume fields")
@@ -41,11 +46,19 @@ def validate(config):
                 and not name.endswith((".", " ")), "invalid volume directory")
             require(name.casefold() not in names, "duplicate volume directory")
             names.add(name.casefold())
+            number = volume_number(name)
+            if number is not None:
+                require(number not in numbers, "duplicate volume number")
+                numbers.add(number)
             start, end = item["first_chapter"], item["last_chapter"]
             require(positive(start) and positive(end) and start <= end, "invalid chapter range")
             require(all(end < low or start > high for low, high in ranges),
                     "overlapping volume chapter ranges")
             ranges.append((start, end))
+        # 新格式按卷号数值排序，不能让卷10排在卷2前；旧中文目录仍按全书章号排序。
+        return {**config, "volumes": sorted(volumes, key=lambda item: (
+            volume_number(item["directory"]) if volume_number(item["directory"]) is not None
+            else item["first_chapter"]))}
     return config
 
 
@@ -158,7 +171,7 @@ def initialize_legacy_layout(project):
         except StorageError as error:
             raise StorageError(f"已有卷目录或章节范围无法唯一登记（{error}）；请向作者确认目录与范围，不自动改名或移动。") from error
     try:
-        initialize(project, config)
+        initialize(project, config, legacy=True)
     except FileExistsError:
         # Another invocation may have initialized the same book; read and validate it.
         return load(project, required=True)
@@ -177,10 +190,13 @@ def output_path(project, chapter, title):
     return existing or directory / f"第{chapter:03d}章_{title}.md"
 
 
-def initialize(project, config):
+def initialize(project, config, *, legacy=False):
     project = Path(project).resolve()
     require(project.is_dir(), "book directory must exist")
     config = validate(config)
+    if config["body_layout"] == "volumes" and not legacy:
+        require(all(volume_number(item["directory"]) is not None for item in config["volumes"]),
+                "新建卷目录须使用阿拉伯数字，例如 卷1_重生归来、卷2_新的开始；已有目录不自动改名。")
     file = project / ".story" / "storage.json"
     require(not file.parent.is_symlink(), "storage metadata cannot be a symlink")
     require(not file.exists() and not file.is_symlink(), "storage config already exists; migration required to change it")

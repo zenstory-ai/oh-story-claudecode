@@ -48,8 +48,8 @@ expect_silent "$TMP/游离/正文/第005章.md"
 # ② 真正文（极短→落盘信号）必须触发
 expect_fire "$TMP/某书/正文/第001章_截断.md"
 # 合法分卷与过深目录各放一个测试文件；章号相同，以路径层级区分场景。
-VOLUME_PLACEHOLDER="$TMP/某书/正文/卷一_合法分卷/第002章_应检出占位正文.md"
-DEEP_PLACEHOLDER="$TMP/某书/正文/卷一_合法分卷/额外嵌套_应忽略/第002章_不应作为正文章节.md"
+VOLUME_PLACEHOLDER="$TMP/某书/正文/卷1_合法分卷/第002章_应检出占位正文.md"
+DEEP_PLACEHOLDER="$TMP/某书/正文/卷1_合法分卷/额外嵌套_应忽略/第002章_不应作为正文章节.md"
 mkdir -p "$(dirname "$VOLUME_PLACEHOLDER")" "$(dirname "$DEEP_PLACEHOLDER")"
 printf '# 第2章\nTODO 待补充正文。\n' > "$VOLUME_PLACEHOLDER"
 expect_fire "$VOLUME_PLACEHOLDER"

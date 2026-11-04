@@ -838,7 +838,7 @@ run_bash_guard_parity() {
   local tmp; tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' RETURN
 
   # scenario|last_committed|ctx_revision|schema|outline_ch|target_ch|target_exists|拆文库|state|prev[|outline_kind]
-  # volume_* 各自使用独立工程，写到 正文/卷一_分卷守卫检查/；volume_deep 再多一层，应被排除。
+  # volume_* 各自使用独立工程，写到 正文/卷1_分卷守卫检查/；volume_deep 再多一层，应被排除。
   # state=none 时 last/ctx/schema 无意义。target_exists=1 走续写路径（不判细纲，仍判追踪）。
   # outline_kind 缺省 filled（旧书式自由文本 ≥30 字）；empty=0 字节、heading=只有标题、
   # short29=差 1 字、exact30=恰好 30 字、bomcrlf=BOM+CRLF+全角空格的空壳、dup=一空一满两份。
@@ -925,7 +925,7 @@ volume_deep|0|0|4|-|1|0|0|yes|-
     fi
     local body_dir="$book/正文"
     case "$name" in
-      volume_*) body_dir="$body_dir/卷一_分卷守卫检查"; mkdir -p "$body_dir" ;;
+      volume_*) body_dir="$body_dir/卷1_分卷守卫检查"; mkdir -p "$body_dir" ;;
     esac
     [ "$name" = "volume_deep" ] && body_dir="$body_dir/额外嵌套_应忽略" && mkdir -p "$body_dir"
     local abs="$body_dir/第00${target}章_测试.md"
