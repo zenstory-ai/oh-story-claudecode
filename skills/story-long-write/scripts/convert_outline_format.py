@@ -260,7 +260,7 @@ def convert_chapter(text: str, located: str | None = None) -> str:
         field = re.match(r"^([ \t>]*[-*+][ \t]*\**)单元ID/位置(\**[ \t]*[：:][ \t]*)(.*?)\s*$", line)
         if field:
             value = field.group(3)
-            found = re.search(r"(?<![\w-])([LD])\d+-(\d+)(?![\w-])", value)
+            found = re.search(r"(?<![\w-])([A-Za-z])\d+-(\d+)(?![\w-])", value)
             if found:
                 unit = found.group(0)
                 rest = re.sub(r"^[\s；;，,、/|｜]+", "", value.replace(unit, "", 1)).strip()
@@ -336,16 +336,17 @@ def main(argv=None) -> int:
     changed: list[str] = []
     leftovers: list[str] = []
     volumes = sorted(outline_dir.glob("卷纲_*.md"))
+    converted: list[str] = []
     for path in volumes:
         old = read(path)
         new, left = convert_volume(old)
+        converted.append(new)
         leftovers += [f"{path.name}「{title}」" for title in left]
         if new != old:
             changed.append(path.name)
             if not args.dry_run:
                 path.write_text(new, encoding="utf-8")
-    # 按章号定位剧情段用转换后的卷纲（dry-run 时用内存里的转换结果）
-    converted = [convert_volume(read(path))[0] for path in volumes]
+    # 按章号定位剧情段用转换后的卷纲（dry-run 时也用内存里的转换结果）
     for path in sorted(outline_dir.glob("细纲_*.md")):
         number = re.match(r"^细纲_第0*(\d+)章", path.name)
         located = None

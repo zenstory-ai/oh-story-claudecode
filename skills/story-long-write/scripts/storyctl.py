@@ -44,7 +44,7 @@ WORK_ROOT = (".story", "work")
 
 # ---- 碎度（只提示，不拦）----
 # 与 0.10 对照实验的统计同一算法：先去掉 # 开头的行；短段＝非空行里去空白后不到 20 字的占比（对话段也算）；
-# 叙述句＝去掉“…”里的对话后按 。！？!? 切句，取每句去空白后的字数求中位数。
+# 叙述句＝去掉“…”（或「…」）里的对话后按 。！？!? 切句，取每句去空白后的字数求中位数。
 # 真人参照：七猫三本完结书（玄幻、古言、现言）前 30 章，平均短段约 19%、叙述句长中位约 39 字；
 # 分章 P10–P90 为短段 2%–33%、句长 27–54 字。原生模型短段约 42%，0.9.2 约 45%。
 SHORT_PARAGRAPH_CHARS = 20
@@ -52,7 +52,7 @@ HUMAN_SHORT_PARAGRAPH_RATIO = 0.19
 HUMAN_NARRATIVE_SENTENCE_MEDIAN = 39
 HUMAN_SHORT_PARAGRAPH_RANGE = (0.02, 0.33)
 HUMAN_NARRATIVE_SENTENCE_RANGE = (27, 54)
-_QUOTED = re.compile(r"“[^”]*”")
+_QUOTED = re.compile(r"“[^”]*”|「[^」]*」")
 _HTML_COMMENT = re.compile(r"<!--.*?-->", re.S)
 
 

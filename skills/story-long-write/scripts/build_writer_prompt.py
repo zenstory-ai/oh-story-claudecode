@@ -523,9 +523,8 @@ def build(project: Path, chapter: int, report: list):
     # 无对标：登记为无，或登记缺失且目录里没有别的书（benchmark-recall.md 唯一定义）。
     # 排除本书自己（与 benchmark-recall、workflow-setup 同一判据）：导入时拆文库里留的同名拆文目录、
     # 老项目里误建的 对标/{本书}/；名字按书目录名与题材定位「书名」两处认。
-    def is_benchmark(base: Path, d: Path) -> bool:
-        return d.is_dir() and d.name not in own_names(project)
-    has_books = any(is_benchmark(base, d)
+    mine = own_names(project)
+    has_books = any(d.is_dir() and d.name not in mine
                     for base in (project / "对标", project / "拆文库", project.parent / "拆文库")
                     if base.is_dir() for d in base.iterdir())
     no_benchmark = registry == "none" or (registry == "missing" and not has_books)
