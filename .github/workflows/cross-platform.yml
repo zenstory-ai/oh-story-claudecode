@@ -49,6 +49,10 @@ jobs:
         run: python3 scripts/test-agent-permissions.py
       - name: Check hot-path doc budget
         run: bash scripts/check-doc-budget.sh
+      - name: Check long-form reference routing, agent copies and template tags
+        run: |
+          python3 scripts/check-reference-routing.py --self-test
+          python3 scripts/check-reference-routing.py
       - name: Document budget behavior regression
         run: python3 scripts/test-doc-budget.py
       - name: Check hook-regex sync

@@ -5,7 +5,6 @@
       "name": "deslop-expression",
       "source": "skills/story-deslop/references/expression.md",
       "targets": [
-        "skills/story-short-write/references/expression.md",
         "skills/story-review/references/expression.md",
         "skills/story-setup/references/agent-references/expression.md"
       ]
@@ -14,7 +13,6 @@
       "name": "deslop-narrative-focus",
       "source": "skills/story-deslop/references/narrative-focus.md",
       "targets": [
-        "skills/story-short-write/references/narrative-focus.md",
         "skills/story-review/references/narrative-focus.md",
         "skills/story-setup/references/agent-references/narrative-focus.md"
       ]
@@ -23,7 +21,6 @@
       "name": "deslop-story-logic",
       "source": "skills/story-deslop/references/story-logic.md",
       "targets": [
-        "skills/story-short-write/references/story-logic.md",
         "skills/story-review/references/story-logic.md",
         "skills/story-setup/references/agent-references/story-logic.md"
       ]
@@ -33,13 +30,6 @@
       "source": "skills/story-long-write/references/author-memory.md",
       "targets": [
         "skills/story-short-write/references/author-memory.md"
-      ]
-    },
-    {
-      "name": "author-memory-maintenance-reference",
-      "source": "skills/story-long-write/references/author-memory-maintenance.md",
-      "targets": [
-        "skills/story-short-write/references/author-memory-maintenance.md"
       ]
     },
     {
@@ -71,16 +61,6 @@
         "skills/story-short-write/references/dialogue-mastery.md",
         "skills/story-setup/references/agent-references/dialogue-mastery.md"
       ]
-    },
-    {
-      "name": "emotion-on-page",
-      "source": "skills/story-long-write/references/emotion-on-page.md",
-      "targets": ["skills/story-setup/references/agent-references/emotion-on-page.md"]
-    },
-    {
-      "name": "emotional-arc-design",
-      "source": "skills/story-long-write/references/emotional-arc-design.md",
-      "targets": ["skills/story-setup/references/agent-references/emotional-arc-design.md"]
     },
     {
       "name": "short-emotional-methods",
@@ -165,11 +145,6 @@
       "targets": ["skills/story-setup/references/agent-references/style-combat-face.md"]
     },
     {
-      "name": "style-genre-modules",
-      "source": "skills/story-long-write/references/style-genre-modules.md",
-      "targets": ["skills/story-setup/references/agent-references/style-genre-modules.md"]
-    },
-    {
       "name": "tracking-transaction-reference",
       "source": "skills/story-long-write/references/tracking-transaction.md",
       "targets": [
@@ -178,10 +153,8 @@
     },
     {
       "name": "style-resolution",
-      "source": "skills/story-long-write/references/style-resolution.md",
+      "source": "skills/story-deslop/references/style-resolution.md",
       "targets": [
-        "skills/story-short-write/references/style-resolution.md",
-        "skills/story-deslop/references/style-resolution.md",
         "skills/story-review/references/style-resolution.md",
         "skills/story-setup/references/agent-references/style-resolution.md"
       ]
@@ -190,8 +163,14 @@
       "name": "deslop-gate-rules",
       "source": "skills/story-deslop/references/deslop-gates.md",
       "targets": [
-        "skills/story-setup/references/agent-references/deslop-gates.md",
-        "skills/story-short-write/references/deslop-gates.md"
+        "skills/story-setup/references/agent-references/deslop-gates.md"
+      ]
+    },
+    {
+      "name": "short-selling-point-protection",
+      "source": "skills/story-deslop/references/short-deslop.md",
+      "targets": [
+        "skills/story-short-write/references/short-deslop.md"
       ]
     },
     {
@@ -255,6 +234,7 @@
         "抗战谍战.md",
         "星光璀璨.md",
         "民国言情.md",
+        "流派兜底.md",
         "游戏体育.md",
         "玄幻脑洞.md",
         "玄幻言情.md",

@@ -295,6 +295,20 @@ if (!dlg || dlg.severity !== 'advisory') throw new Error('tier1 在对话行应�
 if (!nar || nar.severity !== 'blocking') throw new Error('tier1 在叙述行应为 blocking: ' + JSON.stringify(nar));
 NODE
 
+# --- tier1 新旧细纲字段名：0.10 起「这章不能说破」等白话字段名同样算工程词 ---
+TIER1_NEW="$TMP_DIR/tier1-new-fields.md"
+cat > "$TIER1_NEW" <<'EOF'
+这章不能说破的事，他一个字也没提。
+EOF
+set +e
+node "$SCRIPT" --json "$TIER1_NEW" > "$OUT"
+set -e
+node - "$OUT" <<'NODE'
+const fs = require('fs');
+const meta = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')).findings.filter((f) => f.type === 'meta-leak');
+if (!meta.some((f) => f.severity === 'blocking' && /这章不能说破/.test(f.message))) throw new Error('「这章不能说破」漏进正文应判 blocking: ' + JSON.stringify(meta));
+NODE
+
 # --- tier1 引号范围：只降级实际落在成对引号内的匹配，不因同一行别处有引号而整行降级 ---
 TIER1_MIXED="$TMP_DIR/tier1-mixed-quote.md"
 TIER1_QUOTED="$TMP_DIR/tier1-pure-quote.md"

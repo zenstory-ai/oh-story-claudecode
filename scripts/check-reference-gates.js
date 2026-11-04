@@ -26,14 +26,23 @@ const longLines = long.split(/\r?\n/)
 const longGateLine = longLines.findIndex((line) => line.includes('## 写前必读')) + 1
 assert(longGateLine > 0 && longGateLine <= 20, `long 写前必读 gate must stay in first screen, got line ${longGateLine}`)
 for (const reference of [
-  'workflow-setup.md', 'workflow-volume.md', 'workflow-outline.md', 'workflow-chapter.md', 'workflow-daily.md', 'workflow-revision.md', 'long-format.md',
-  'writing-craft.md', 'long-chapter-quality.md', 'long-chapter-hooks.md', 'long-suspense.md',
+  'workflow-setup.md', 'workflow-volume.md', 'workflow-outline.md', 'outline-template.md', 'workflow-chapter.md', 'workflow-daily.md', 'workflow-revision.md', 'long-format.md',
+  'writing-craft.md', 'long-chapter-quality.md', 'style-combat-face.md', 'long-suspense.md',
   'long-reversal.md',
 ]) {
   assert(long.includes(reference), `long gate must route ${reference}`)
 }
 // 写前原样记录本轮明确约束（字数、必发生、禁止发生、停笔点）的行为锚点。
 assert.match(long, /记下本轮约束/)
+// 首屏总表是唯一的文件级路由；按节读只允许任务包切好的节或总表、文件内「什么时候读这份」点名的节。
+assert.match(long, /按节读只允许两种/)
+// 细纲模板单独成文件，出细纲与写前补建细纲都按它；文件内的模板围栏带标签，脚本按标签取。
+const outlineTemplate = fs.readFileSync(path.join(repoRoot, 'skills/story-long-write/references/outline-template.md'), 'utf8')
+assert.match(outlineTemplate, /^```markdown template=细纲$/m, 'outline-template.md must keep the tagged 细纲 fence')
+for (const workflow of ['workflow-outline.md', 'workflow-chapter.md']) {
+  const text = fs.readFileSync(path.join(repoRoot, `skills/story-long-write/references/${workflow}`), 'utf8')
+  assert(text.includes('outline-template.md'), `${workflow} must route the outline template to outline-template.md`)
+}
 
 const short = readSkill('story-short-write')
 const shortLines = short.split(/\r?\n/)
@@ -42,7 +51,7 @@ assert(shortGateLine > 0 && shortGateLine <= 20, `short 写前必读 gate must s
 
 // Check the Phase 2 route and completion gate in the stage reference.
 const shortGate = shortLines.slice(shortGateLine - 1, shortGateLine + 11).join('\n')
-assert(shortGate.includes('`references/workflow-design.md`'), 'Phase 2 gate must route workflow-design on the first screen')
+assert.match(shortGate, /^\| 构思[^\n]*`workflow-design\.md`/m, 'Phase 2 gate must route workflow-design on the first screen')
 const shortDesign = fs.readFileSync(path.join(repoRoot, 'skills/story-short-write/references/workflow-design.md'), 'utf8')
 assert.match(shortDesign, /check-phase2-contract\.js --json/)
 
@@ -55,8 +64,8 @@ function phaseSection(heading) {
   const next = short.indexOf('\n### Phase ', start + heading.length)
   return short.slice(start, next < 0 ? undefined : next)
 }
-assert.match(shortGate, /Phase 3 写正文前完整读取 `references\/workflow-draft\.md`/)
-assert.match(shortGate, /Phase 4 精修前完整读取 `references\/workflow-revision\.md`/)
+assert.match(shortGate, /^\| 写正文[^\n]*`workflow-draft\.md`/m)
+assert.match(shortGate, /^\| 精修[^\n]*`workflow-revision\.md`/m)
 assert(phaseSection('### Phase 3：').includes('(references/workflow-draft.md)'), 'Phase 3 must route workflow-draft.md')
 assert(phaseSection('### Phase 4：').includes('(references/workflow-revision.md)'), 'Phase 4 must route workflow-revision.md')
 

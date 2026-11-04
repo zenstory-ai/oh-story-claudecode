@@ -12,6 +12,7 @@
 #   bash scripts/test-charcount-portable.sh --stub     # 模拟 Store 占位程序(exit 49)
 #
 # 命令直接从 story-short-write/references/short-format.md「字数统计」节的第一个 bash 块
+# （探测解释器 + 逐节统计；0.10 起整篇字数只认交付检查，文档只留逐节命令）
 # 抽取执行，不手抄：文档改了命令，本测试跑的就是新命令。check-python-invocation.sh
 # 守卫文档不回退成裸 python3；本脚本守卫这条命令真的能跑出正确结果。
 set -euo pipefail
@@ -33,9 +34,9 @@ trap 'rm -rf "$WORK"' EXIT
 # 中文目录 + 中文文件名，复现 issue #121 的路径场景
 BOOK_DIR="$WORK/小说项目/第一卷"
 mkdir -p "$BOOK_DIR"
-# 12 个码位：中文字数测试(6) + ABC(3) + 123(3)，无结尾换行
-printf '%s' '中文字数测试ABC123' > "$BOOK_DIR/正文.md"
-EXPECT=12
+# 两节：「中文字数测试」6 个码位，「ABC 123」去掉空白后 6 个码位；无结尾换行
+printf '%s' $'###1.\n中文字数测试\n###2.\nABC 123' > "$BOOK_DIR/正文.md"
+EXPECT=$'###1. 6\n###2. 6'
 
 # 先记住一个真正可用的解释器。stub 必须自给自足，不假设当前机器
 # 同时安装了 python3 和 python/py（某些 macOS 环境只有 python3）。
@@ -67,7 +68,7 @@ fi
 # 相对路径按子进程真实 cwd 解析，三平台一致。末行回报命令选中的解释器，供 stub 断言。
 OUT="$(cd "$BOOK_DIR" && eval "$COUNT_BLOCK"; printf '\n__PYBIN=%s\n' "${PYBIN:-}")"
 PYBIN="$(printf '%s\n' "$OUT" | sed -n 's/^__PYBIN=//p')"
-GOT="$(printf '%s\n' "$OUT" | sed '/^__PYBIN=/d;/^$/d')"
+GOT="$(printf '%s\n' "$OUT" | tr -d '\r' | sed '/^__PYBIN=/d;/^$/d')"
 
 echo "selected interpreter: $PYBIN"
 echo "char count: $GOT (expect $EXPECT)"

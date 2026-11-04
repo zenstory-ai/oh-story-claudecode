@@ -40,7 +40,7 @@ REQUIRED = {
     "skills/story-long-scan/SKILL.md": 1,
     "skills/story-short-scan/SKILL.md": 1,
     "skills/story-cover/SKILL.md": 1,
-    "skills/story-long-write/references/workflow-volume.md": 1,
+    # 开书、大纲、卷纲、细纲、补纲共用一份规划汇报模板，只在 workflow-outline（0.10 起 workflow-volume 指过去）。
     "skills/story-long-write/references/workflow-outline.md": 1,
     "skills/story-long-write/references/workflow-chapter.md": 4,
     "skills/story-long-write/references/workflow-daily.md": 1,

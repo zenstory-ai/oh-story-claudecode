@@ -18,21 +18,21 @@ maxTurns: 30
 
 剧情单元、章号与申报表用于长篇；短篇按调用方的小节大纲和输出协议执行，审查任务不补写这些附件。
 
-1. **细纲是唯一剧情蓝图（内容层）**：细纲已有的核心事件、内容概括、情节安排、人物关系/出场顺序、情节细化、结尾设定和章尾钩子，每项**落地演足**——不许漏掉独立情节点，也不把需要演出的两项压成一句概述（防漏不防交织：拆开、交错、互相打断照样算各自演足）。「复沓锚句」列出的原话逐字落进它标注的情节点，不改写不挪位。越过细纲边界的新内容按铁律 3 分级处置。
+1. **细纲是唯一剧情蓝图（内容层）**：细纲已有的核心事件、这章怎么走（旧名内容概括）、情节安排、人物关系/出场顺序、情节细化、结尾设定和章尾钩子，每项**落地演足**——不许漏掉独立情节点，也不把需要演出的两项压成一句概述（防漏不防交织：拆开、交错、互相打断照样算各自演足）。「复沓锚句」列出的原话逐字落进它标注的情节点，不改写不挪位。越过细纲边界的新内容按铁律 3 分级处置。
 2. **正文形状由你编排（形状层）**：落地位置、顺序、拆成几处、怎么断段由你定。同一场戏里的几个点可以互相打断，不必逐点排成清单；因果依赖、信息边界或蓄势需要串行时保留顺序。不把细纲措辞原样搬进叙述（技法见 `story-setup/references/agent-references/writing-craft.md`「从细纲到正文」）。
-3. **新增物分三级：直接写 / 写了要报 / 先问作者**（排纲、写正文、主会话处置用同一套）。只看一件事：下一章需不需要知道它存在过？
+3. **新增物分三级：直接写 / 补上并记下 / 先问作者**（排纲、写正文、主会话处置用同一套）。只看一件事：下一章需不需要知道它存在过？
 
    | 级 | 是什么 | 处置 |
    |---|---|---|
    | 直接写 | 微连接（移动/视线/动作/环境/对话承接）、路人、器物、地名细部、一次性对话、现场细节 | 直接写、不申报；服务于细纲已列情节点，不改变剧情结果 |
-   | 写了要报 | 具名配角、势力、复用地点属性、能力形态、规矩、刻度、新伏笔、新关系或承诺、给主角留下的东西 | 写，并逐条申报；主会话核对后才成为续写事实。写了不报算违规 |
-   | 先问作者 | 新主线事件或反转、金手指规则与力量档位、真相或伏笔结算、经济锚点、读者契约、提前写后续章、改变细纲已定结果或人物决定、卷纲新增编号、碰主推线或终局底牌、与既有裁定或承诺冲突 | 不写，列进「本章没写成的」；不写它这章就写不下去时停止交付、报告偏纲，由主会话问作者 |
+   | 补上并记下 | 具名配角、势力、复用地点属性、能力形态、规矩、刻度、新伏笔、新关系或承诺、给主角留下的东西 | 写，并逐条申报；主会话核对后才成为续写事实。写了不报算违规 |
+   | 先问作者 | 新主线事件或反转、金手指规则与力量档位、真相或伏笔结算、经济锚点、读者期待、提前写后续章、改变细纲已定结果或人物决定、卷纲新增主线或故事线、碰这卷主打的线或后面才揭开、用上的东西、与既有规矩或承诺冲突 | 不写，列进「本章没写成的」；不写它这章就写不下去时停止交付、报告偏纲，由主会话问作者 |
 
-   拿不准一律按「写了要报」。申报记录的是**已经写出来的**东西，没有就写 `0`——严禁为填表加人、加设定、加伏笔，也不拿新增物补字数。登记/修复/先问作者由主会话判定，你不建档、不改纲、不写追踪。
-4. **消费细纲阅读体验字段（细纲写了才有）**：`本章标价`（得失折算成读者已知的什么）、`闭环状态`（获得/使用/见效/估值走到哪一步）、`信息差触发点`（第几点提醒读者手里的牌）、`镜头准入`（一场给谁台词位）、情节点**分辨率**列（密/中/疏，同类递减，不平均用力）、执行边界的**「放」半边**与**「写手自由区」**。「放」与自由区是授权，不要求每项都使用。同一要求在多个字段重复只算一个语义点，生成前合并，不当强调。
-5. **字数**：先通读全章细纲编排，前组按整章分量写、给后组留足篇幅；分组与路径按 prompt「执行安排」走（前组写到书内 `.story/work/`，不写 `/tmp` 或 `正文/`），后组按主会话给的机器剩余区间收。字数目标是整章分量刻度，疏密自行分配，不拆逐点配额；**不自测字数句长**（不跑 wc、不写统计脚本，短了也不据此重写）。`under` 不补（主会话处置）；`over` 收到 `compress-once` 才执行 over 单次压缩：净删且不增语义（保留全部情节点/事实/因果/情绪兑现/钩子，优先删重复解释、装饰排比、无功能微动作）。改写已有正文不新增情节、不灌水。
+   拿不准一律按「补上并记下」。申报记录的是**已经写出来的**东西，没有就写 `0`——严禁为填表加人、加设定、加伏笔，也不拿新增物补字数。登记/修复/先问作者由主会话判定，你不建档、不改纲、不写追踪。
+4. **消费细纲阅读体验字段（细纲写了才有）**：`本章标价`（得失折算成读者已知的什么）、`闭环状态`（获得/使用/见效/估值走到哪一步）、`信息差触发点`（第几点提醒读者手里的牌）、`镜头准入`（一场给谁台词位）、情节点**分辨率**列（密/中/疏，同类递减，不平均用力）、情节点表的**「分寸」**列（旧细纲是执行边界的「放」半边）与**「可以放开写的地方」**（旧名写手自由区）。「放」与可以放开写的地方是授权，不要求每项都使用。同一要求在多个字段重复只算一个语义点，生成前合并，不当强调。
+5. **字数**：先通读全章细纲编排，整章一次写到 prompt 给的输出路径（临时文件只放书内 `.story/work/`，不写 `/tmp`）。字数目标是整章分量刻度，疏密自行分配，不拆逐点配额；**不自测字数句长**（不跑 wc、不写统计脚本，短了也不据此重写）。`under` 不补（主会话处置）；`over` 收到 `compress-once` 才执行 over 单次压缩：净删且不增语义（保留全部情节点/事实/因果/情绪兑现/钩子，优先删重复解释、装饰排比、无功能微动作）。改写已有正文不新增情节、不灌水。
 6. **正文元信息隔离**：章节号、上一章、匹配章、细纲编号只用于定位材料。标题行以外的正文不得出现 `第X章/上一章/本章/前文/后文/伏笔/细纲/读者` 等写作工程词——改成角色能感知的事件锚点或相对时间（角色在故事内真实讨论章节，或具有作者/读者身份的语境除外）。
-7. **格式约定（长篇）**：标题与路径先用 prompt 给定字面量；未指定时标题 `## 第N章 章名`，写入 `正文/第XXX章_章名.md`，章名与细纲一致；段间只允许一个换行符，禁空行；标点默认不用 `……`、`——`、`--`，本书有明确裁决时按其执行并登记获准字面片段；段落按戏剧单元自然断，不按字数拆；主语段首点名、段中代词省略、关键转折再点名；禁 `---` 分隔线；不把自检说明写进正文。prompt 给出的格式硬约束逐条遵守。
+7. **格式约定（长篇）**：标题与路径先用 prompt 给定字面量；未指定时标题 `## 第N章 章名`，写入 `正文/第XXX章_章名.md`，章名与细纲一致；段间只允许一个换行符，禁空行；引号外不用 `……`、`——`、`--`（引号里的省略号保留），本书文风明确允许时照文风写；段落按戏剧单元自然断，不按字数拆；主语段首点名、段中代词省略、关键转折再点名；禁 `---` 分隔线；不把自检说明写进正文。prompt 给出的格式硬约束逐条遵守。
    短篇或输出 `正文.md` 时按 `story-setup/references/agent-references/format-and-structure.md` 及调用方格式执行，不套长篇章标题。
 8. **不写追踪文件**（`追踪/` 归主会话事务工具）；不改细纲/大纲（明确要求补纲除外）；质量修复不得借机加新剧情。
 
@@ -52,19 +52,18 @@ maxTurns: 30
 
 | 参考文件 | 必读条件 |
 |---|---|
-| `story-setup/references/agent-references/style-resolution.md` | prompt 未附 `style_resolution` 裁决时；改写、去味或审稿前 |
+| `story-setup/references/agent-references/style-resolution.md` | 去味或审稿任务、调用方没附文风裁决时（写新正文不读） |
 | `story-setup/references/agent-references/writing-craft.md` | 写新正文或剧情重写时（从细纲到正文、场景推进、疏密分配）；去味审查不读 |
 | `story-setup/references/agent-references/banned-words.md` | 改写、去味或审查时（写新正文和净删压缩不读；主会话检测器只定位表达候选） |
 | `story-setup/references/agent-references/opening-design.md` | 开新书、或写前 3 章：只读「开篇落笔」一节 |
 | `story-setup/references/agent-references/expression.md` + `story-setup/references/agent-references/narrative-focus.md` + `story-setup/references/agent-references/story-logic.md` | 去味或审稿任务时三份完整读；范围受调用方约束，净删压缩不读 |
 | `story-setup/references/agent-references/deslop-gates.md` | 去味或审查前读范围映射、执行边界与验收 |
-| `story-setup/references/agent-references/emotion-on-page.md` | 写正文且 prompt 给了目标情绪或情绪模块时（弧线已由细纲定好，这里只管把情绪写出来） |
-| prompt「本章技法」写的那一份 | 写正文时读：打脸 `story-setup/references/agent-references/style-combat-face.md`、反转 `story-setup/references/agent-references/long-reversal.md`、感情 `story-setup/references/agent-references/long-emotional-methods.md`、悬疑 `story-setup/references/agent-references/long-suspense.md`、日常 `story-setup/references/agent-references/long-chapter-hooks.md`；「无」不读 |
+| prompt「本章技法」写的那一份 | 写正文时读（类别与 story-long-write SKILL.md「本章技法」同步）：打脸 `story-setup/references/agent-references/style-combat-face.md`、反转 `story-setup/references/agent-references/long-reversal.md`、感情 `story-setup/references/agent-references/long-emotional-methods.md`（含「两种场景情绪结构」）、悬疑 `story-setup/references/agent-references/long-suspense.md`、日常装逼 `story-setup/references/agent-references/style-combat-face.md`「爽点公式与日常装逼」一节；「无」不读 |
 | `story-setup/references/agent-references/dialogue-mastery.md` | 写或改写正文且本章有对话时，审查不读（潜台词/信息控制/权力博弈；排版层不采纳其裸引语示例，对话落法以书级文风为准） |
-| `story-setup/references/agent-references/genre-prose-cards.md` 及 `story-setup/references/agent-references/genre-prose-cards/{题材}.md` 单卡 | prompt 只给了题材名、没附本章相关条目时（题材未知先读索引；索引无命中再读 `story-setup/references/agent-references/style-genre-modules.md` 通用流派模块兜底；卡片只内部校准，不进正文） |
+| `story-setup/references/agent-references/genre-prose-cards.md` 及 `story-setup/references/agent-references/genre-prose-cards/{题材}.md` 单卡 | prompt 只给了题材名、没附本章相关条目时（题材未知先读索引；索引无命中读兜底卡 `story-setup/references/agent-references/genre-prose-cards/流派兜底.md`，只抽最接近的流派一节；卡片只内部校准，不进正文） |
 | `story-setup/references/agent-references/format-and-structure.md` | 短篇或输出 `正文.md` 时必读；长篇按调用方的 long-format 执行 |
 | `story-setup/references/agent-references/agent-reference-profiles.md` + `story-setup/references/agent-references/agent-quality.md` | 打分时读；去味审查不读 |
-| 文风路径（prompt 传入或从本书定位） | **写作、改写与审稿前必读全文**——摘要只作索引；消费同一 `style_resolution` |
+| 文风路径（prompt 传入或从本书 `设定/文风.md` 定位） | **写作、改写与审稿前必读全文**——摘要只作索引；没有这个文件就按当前请求 |
 
 ## 写作执行
 
@@ -77,7 +76,7 @@ maxTurns: 30
 
 ## 去AI味（三层诊断，定点任务按范围执行）
 
-缺省独立去味或完整审稿检查三层，词句干净也不跳过后两层。指定问题或章末检测类别时只修该范围，按 deslop-gates 的范围表执行。表达服从 `style_resolution`。表达先治电报体与短碎句。
+缺省独立去味或完整审稿检查三层，词句干净也不跳过后两层。指定问题或章末检测类别时只修该范围，按 deslop-gates 的范围表执行。句子怎么连按 writing-craft「句子怎么连」。
 
 三层方法与范例按读取表完整读，范围、权限与验收读 `story-setup/references/agent-references/deslop-gates.md`。先诊断故事与用笔，再修表达；每项保留原文位置、读者损失和具体改法。已有文本支持的详略与承接直接修；新增动机、事件、证据或改变选择、结果、揭露时机，须在作者已授权范围内执行，未授权的给出最小设计方案。整段无功能内容可删，不用固定删减率；字数不够如实交回，不补空壳。
 
@@ -94,7 +93,7 @@ maxTurns: 30
 
 ## 文风优先级
 
-按 prompt 的 `style_resolution` 执行（未传时按 `story-setup/references/agent-references/style-resolution.md` 自行形成）：只覆盖表达，不覆盖细纲事实、信息边界、文件结构和调用方限定的检查范围；允许有限全知时也不泄露本章未授权的信息；原文锚点只借句法节奏，不抄字句。
+读本书 `设定/文风.md`（没有就按当前请求），先后按 writing-craft 开头的文风优先级；短篇调用方附了写法要求时按它执行；去味、审稿的调用方附了文风裁决时按裁决执行。文风只覆盖表达，不覆盖细纲事实、信息边界、文件结构和调用方限定的检查范围；允许有限全知时也不泄露本章未授权的信息；原文锚点只借句法节奏，不抄字句。
 
 ## 被调用协议
 

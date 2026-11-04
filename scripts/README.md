@@ -5,7 +5,7 @@
 - 绝大多数由 CI 自动跑（`.github/workflows/cross-platform.yml`）。提交前完整的本地验证命令见 [CONTRIBUTING.md](../CONTRIBUTING.md)「CI 检查」。
 - **改名 / 移动任一脚本**，要同步改 `.github/workflows/*.yml`、`CONTRIBUTING.md`、本文件，以及调用它的兄弟脚本（见下方「何时跑」里的调用关系）。
 
-`python scripts/test-writer-pipeline.py` 验证长篇取段器与 prompt 组装器的公开 CLI：存量卷纲、作用域、退役历史、原生路径、必需资料与召回降档；在三平台 CI 运行。
+`python scripts/test-writer-pipeline.py` 验证长篇取段器与 prompt 组装器的公开 CLI：存量卷纲、新旧两种段头写法（标题尾部注释与旧作用域行）、退役历史、原生路径、必需资料与召回降档，以及卷纲细纲格式转换脚本 convert_outline_format.py；在三平台 CI 运行。
 
 `python scripts/test-long-analyze-runtime.py` 验证长篇拆文的单状态运行时：机械章节索引与逐章 hash、旧成果识别、只读计划、范围批次、兼容摘要投影、相邻拆分、原子提交和缓存恢复。实际运行只使用 `skills/story-long-analyze/scripts/` 下三个脚本：`build_chapter_index.py`、`inspect_existing_assets.py`、`manage_analysis_run.py`。测试还覆盖旧版（带「章节边界」表）拆文库遇到楔子时的章号核对与并入出路、Windows/GBK 控制台下的 UTF-8 输出，以及 `render_relation_chart.py` 在没有中文字体时只写 Markdown 关系图、不出拼音图。
 
@@ -25,6 +25,7 @@
 | `check-scan-runtime-policy.sh` | scraper 输出文件名依赖本地日期 helper；CDP 探测/Windows 监听解析的源码策略 | CI；这些依赖方向无法由隔离 helper 测试证明 |
 | `check-story-setup-deployment.sh` | story-setup 部署/运行时回归（慢，>2min） | CI |
 | `check-doc-budget.sh` + `doc-budget.json` | 热路径 SKILL/references/agent 模板的去空白字数预算与路径合计上限；每次调用硬上限 35K（`path_ceiling`，豁免列 `exempt` 并写原因）；带 `agent` 字段的路径按角色计每次调用的实际加载量并自动计入模板预加载的 skill；`文件#小节` 只计一节，`generated` 运行拼包脚本计量，`branches` 默认互斥、会同时发生的登记进 `stacking` 取最坏组合；超了要么删等量旧文本或调整流程，要么显式调高 budget | CI；增删热路径正文后 |
+| `check-reference-routing.py` | 三条长短篇参考文件守卫：① story-long-write、story-short-write 的 SKILL.md「写前必读」总表（长篇含本章技法表）点名的每个 references 文件都在 `doc-budget.json` 该 skill 的某条路径里，反过来路径登记的 references 文件也都在总表里（长篇单张题材卡、短篇单个题材包例外）；② `story-setup/references/agent-references/` 下每份副本的 Markdown 链接、反引号路径、点名的 `*.md` 与不带后缀的写作端文件名，都指向副本那边存在的文件或项目路径；③ `current-contract.json` 的 `template_fences` 是模板围栏标签（```` ```markdown template=细纲 ````）的唯一清单，每个标签在 `skills/*/references`（不算同步副本）恰好一处，运行时脚本按名取的标签也要在清单里、在点名的文件里；`--self-test` 在临时仓库各造一例违规 | CI；改长短篇 SKILL.md 读取表、`doc-budget.json` 长短篇路径、子代理副本或模板围栏后 |
 | `check-hook-regex-sync.sh` | `detect-story-gaps.sh` 伏笔状态检测行为；毒句式/兜底网正则与常量表 js↔py 解析后逐项全等（含 flags、单端新增常量），内置变异测试证明单端追加分支/改 flag 会变红 | CI |
 | `check-hook-locale-safety.sh` | 部署 hook 在 Windows 中文 GBK 区域的字节安全 | CI |
 | `check-python-invocation.sh` | 技能文档禁止裸调 `python3`（须 python3→python→py 探测） | CI |
@@ -53,7 +54,7 @@
 | `test-doc-budget.py` | 临时文档工程中的路径求和、超限、缺失文件、按节计量、拼包计量、叠加最坏组合（含变异对照）与硬上限配置失败 | CI |
 | `test-delivery-contract.js` | 短篇最终字数、节数、标记与空行交付契约回归 | Linux / Windows / macOS CI |
 | `check-reference-gates.js` | 长短篇「写前必读」的首屏位置、关键路由、长篇「记下本轮约束」锚点、短篇交付预检命令与写正文只靠设计文件交接（不回查构思方法论、「像」不设硬上限）的静态守卫（gate 是提示词，无运行时入口可断言） | Linux / Windows / macOS CI |
-| `test-outline-contract.js` | 长篇细纲结构验收：字段、小节、五段式、四列情节点表、字数口径与「契约风险」取值的正负例回归 | Linux / Windows / macOS CI |
+| `test-outline-contract.js` | 长篇细纲结构验收：新旧字段名与小节名、「这章怎么走」五行、三到五列情节点表、可选的「这章不能说破」、可不写的字数口径与「有没有硬伤」取值的正负例回归 | Linux / Windows / macOS CI |
 | `test-degeneration.sh` | 模型退化检测器 `check-degeneration.js` 回归 | CI |
 | `test-prose-net-parity.sh` | 正文兜底「轻量确定性网」、写正文守卫与命令目标抽取的 JS 核 / Codex Python / Claude bash parity | CI |
 | `test-prose-backstop-hook.sh` | `check-prose-after-write.sh` 回归 | CI |

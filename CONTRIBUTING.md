@@ -81,6 +81,7 @@ PR 自动运行 `.github/workflows/cross-platform.yml`。static-check job 跑以
 - `python3 scripts/test-current-skill-contracts.py` — current-contract manifest 与主产物 fail-fast 语义回归
 - `python3 scripts/test-handoff-contracts.py` — 跨 skill 交接契约（拆文、扫榜、导入产物到写作端，写作端平台到审稿，派助手与派写手去味的字段和标签）：小节、字段、列名、平台取值，含反向自检
 - `scripts/check-doc-budget.sh` — 热路径 SKILL/references/agent 模板的字数预算（按 `scripts/doc-budget.json`），防每次会话都要付的规则文本无声膨胀
+- `python3 scripts/check-reference-routing.py` — 长篇、短篇 SKILL.md 首屏读取总表与 `doc-budget.json` 各自的路径互相覆盖；子代理副本（`agent-references/`）里的链接、反引号路径和点名的文件都指向副本那边存在的文件；`current-contract.json` 的 `template_fences` 每个模板标签在参考文件里恰好一处（`--self-test` 为其正反例回归）
 - `scripts/check-hook-regex-sync.sh` — hook 伏笔状态检测行为
 - `scripts/check-shared-files.sh` — 共享 runtime 资产清单 + 跨 skill reference 副本一致性
 - `scripts/check-scan-runtime-policy.sh` — scraper 本地日期依赖与 CDP 源码策略守卫
@@ -118,6 +119,8 @@ bash scripts/check-current-skill-contracts.sh
 python3 scripts/test-current-skill-contracts.py
 python3 scripts/test-handoff-contracts.py
 bash scripts/check-doc-budget.sh
+python3 scripts/check-reference-routing.py --self-test
+python3 scripts/check-reference-routing.py
 bash scripts/check-hook-regex-sync.sh
 bash scripts/check-shared-files.sh
 python3 scripts/test-shared-assets.py

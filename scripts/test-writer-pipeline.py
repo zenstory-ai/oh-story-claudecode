@@ -11,6 +11,9 @@ import unittest
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / 'skills/story-long-write/scripts'
+sys.path.insert(0, str(SCRIPTS))
+from template_fence import TemplateNotFound, template_block  # noqa: E402
+sys.path.pop(0)
 
 
 class PipelineTests(unittest.TestCase):
@@ -106,7 +109,7 @@ class PipelineTests(unittest.TestCase):
             result = self.view(*mode)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('终局真相不能揭示', result.stdout)
-            self.assertIn('未声明', result.stderr)
+            self.assertIn('没标全卷或单元编号', result.stderr)
         self.assertEqual(self.view('--check').returncode, 0)
         self.assertEqual(self.view('--check', '--strict').returncode, 1)
 
@@ -151,7 +154,7 @@ class PipelineTests(unittest.TestCase):
     def test_builder_injects_author_memory_query(self):
         result = self.build()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('author_preferences（作者记忆', result.stdout)
+        self.assertIn('作者偏好（作者记下的写作习惯', result.stdout)
         self.assertIn('作者记忆：无相关 active 条目', result.stdout)
         (self.book / '.story-deployed').write_text('agents_version: 34\n', encoding='utf-8')
         event = {'schema_version': 1, 'event_id': 'e1', 'operation': {'action': 'remember', 'preference': {
@@ -442,8 +445,14 @@ class PipelineTests(unittest.TestCase):
                     self.assertNotIn(str(cards / loser), out)
                 else:
                     self.assertIn(f"辅题材 {cards / '玄幻言情.md'}", out)
+        # 匹配不到时给流派兜底卡，和命中走同一条路（同一行点名卡的路径）。
         self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：蒸汽朋克考古\n')
-        self.assertIn('题材卡无匹配', self.build().stdout)
+        out = self.build().stdout
+        self.assertIn('题材卡无匹配', out)
+        self.assertIn(f"主题材 {cards / '流派兜底.md'}（置信度 low）", out)
+        # 兜底卡不参与按名匹配：它的名字写进题材类型也不会被当成真题材卡。
+        self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：都市日常\n')
+        self.assertNotIn('流派兜底.md', self.build().stdout)
 
     def test_bare_out_archives_into_book_work_dir(self):
         result = self.call('build_writer_prompt.py', '--project', self.book, '--chapter', 1, '--out')
@@ -453,9 +462,9 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(archived.is_file())
         self.assertIn(f'留档：{archived}', result.stdout)
         prompt = archived.read_text(encoding='utf-8')
-        # Segment paths are concrete, book-local and never under 正文/ or /tmp.
-        self.assertIn(str(work / '前组.md'), prompt)
-        self.assertIn(str(work / '后组.md'), prompt)
+        # The scratch dir is concrete and book-local; the chapter is written in one pass (no segments).
+        self.assertIn(str(work), prompt)
+        self.assertNotIn('前组', prompt)
         self.assertFalse((self.book / '正文').exists() and any((self.book / '正文').iterdir()))
 
     def test_incomplete_replacements_keep_full_recall(self):
@@ -543,13 +552,65 @@ class PipelineTests(unittest.TestCase):
         digest = self.put('设定/_文风摘要.md', '旧规则：深度限知，不得进入他人内心。')
         result = self.build()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('custom_style=true', result.stdout)
+        self.assertIn('文风：本书有 设定/文风.md', result.stdout)
         self.assertIn(str(style), result.stdout)
         self.assertNotIn(str(digest), result.stdout)
         self.assertNotIn('旧规则', result.stdout)
         for stub in ['', '# 文风', '# 文风\n[待补充]', '# 文风\n<!-- 作者稍后填写 -->']:
             style.write_text(stub, encoding='utf-8')
-            self.assertIn('custom_style=false', self.build().stdout)
+            self.assertNotIn('文风：本书有 设定/文风.md', self.build().stdout)
+
+    def test_outline_two_lines_are_reported_not_blocked(self):
+        # 写前两行缺了只在核对报告点名，不拒写；占位写法都算缺，新旧字段名都认。
+        result = self.build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('细纲两行：缺 主角目标/关键选择', result.stdout)
+        for value in ['[待补充]', '无', '待定', '{主角本章要什么}']:
+            with self.subTest(value=value):
+                self.outline.write_text('### 第 1 章：一封信\n- 单元ID/位置：L1-01\n- 目标情绪：犹疑→决定\n'
+                                        f'- 主角目标/关键选择：{value}\n', encoding='utf-8')
+                self.assertIn('细纲两行：缺 主角目标/关键选择', self.build().stdout)
+        self.outline.write_text('### 第 1 章：一封信\n- 属于哪段剧情：第一段剧情：接信（L1-01）\n'
+                                '- 目标情绪：犹疑→决定替朋友保管信件\n- 主角目标/关键选择：决定替朋友保管信件\n',
+                                encoding='utf-8')
+        result = self.build()
+        self.assertIn('细纲两行：目标情绪、主角目标/关键选择都有', result.stdout)
+        self.assertIn('单元 L1-01', result.stdout)
+        # 新细纲只写段名、不写编号：按章号落在卷纲哪段剧情的章节范围里定位。
+        self.outline.write_text('### 第 1 章：一封信\n- 属于哪段剧情：第一段剧情：接信，第一步：接下托付\n'
+                                '- 目标情绪：犹疑→决定替朋友保管信件\n- 主角目标/关键选择：决定替朋友保管信件\n',
+                                encoding='utf-8')
+        self.assertIn('单元 L1-01', self.build().stdout)
+
+    def test_chapter_lookup_by_range(self):
+        # --chapter：按章号找本章落在哪段剧情的章节范围里，取那一段（同 --unit）；找不到不静默降级。
+        hit = self.view('--chapter', '2')
+        self.assertEqual(hit.returncode, 0, hit.stderr)
+        self.assertIn('犹疑→朋友托付→决定保管', hit.stdout)
+        self.assertNotIn('不能串卡', hit.stdout)
+        self.assertIn('L1-01', hit.stderr)
+        miss = self.view('--chapter', '9')
+        self.assertEqual(miss.returncode, 1)
+        self.assertIn('第 9 章', miss.stderr)
+
+    def test_benchmark_registered_as_none_wins_over_library(self):
+        # 「无对标」唯一定义：登记为无，或登记缺失且目录里没有别的书。
+        (self.book / '设定' / '文风.md').unlink()
+        (self.book.parent / '拆文库' / '别的书').mkdir(parents=True)
+        self.assertIn('召回降档：不成立', self.build().stdout)
+        self.put('设定/题材定位.md', '# 题材定位\n## 对标登记\n- 主对标书：无（作者 11 月 3 日定）\n')
+        result = self.build()
+        self.assertIn('召回降档：成立，无对标', result.stdout)
+        self.assertIn('按作者这次的要求和通用写法写', result.stdout)
+        self.put('设定/题材定位.md', '# 题材定位\n## 对标登记\n- 主对标书：别的书\n')
+        result = self.build()
+        self.assertIn('召回降档：不成立', result.stdout)
+        self.assertIn('［主会话填］ 本书没有 设定/文风.md', result.stdout)
+        # 排除本书自己按书目录名与题材定位「书名」两处认，对标/ 里误建的自对标同样不算。
+        self.put('设定/题材定位.md', '# 题材定位\n- 书名：《雾港旧信》（暂定）\n')
+        (self.book.parent / '拆文库' / '别的书').rmdir()
+        (self.book / '对标' / '雾港旧信').mkdir(parents=True)
+        self.assertIn('召回降档：成立，无对标', self.build().stdout)
 
     def test_unreadable_utf8_is_reported(self):
         self.volume.write_bytes(b'\xff')
@@ -595,11 +656,11 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('**先问作者**：新主线事件或反转', text)
         self.assertIn(f"{refs / 'long-reversal.md'}` 「反转类型」一节", text)
         self.assertNotIn('## 情感虐心三板斧', text)
-        # 卷纲排法每次随包；八节点、情绪模块公式、换地图按条件在包外读。
+        # 卷纲排法每次随包；常见的八步结构、情绪模块公式、换地图按条件在包外读。
         self.assertIn('### 剧情单元设计', text)
-        self.assertNotIn('## 八节点故事结构', text)
+        self.assertNotIn('## 常见的八步结构', text)
         self.assertNotIn('## 情绪模块公式', text)
-        self.assertIn(f"{refs / 'outline-methods.md'}` 「八节点故事结构」一节", text)
+        self.assertIn(f"{refs / 'outline-methods.md'}` 「常见的八步结构」一节", text)
         self.assertIn(f"{refs / 'character-relations.md'}` 「感情线阶段」一节", text)
         # 流程文件只截「排纲方法」：主会话的读取清单与作者汇报模板不进包。
         self.assertIn('## 排纲方法', text)
@@ -619,9 +680,11 @@ class PipelineTests(unittest.TestCase):
         self.assertFalse(any(name.startswith('opening-design.md') for name in later['includes']))
         self.assertIn('plot-core-methods.md', first['includes'])
         self.assertIn('plot-core-methods.md（不含开篇噱头）', later['includes'])
-        self.assertTrue(any('单元 L1-01' in name for name in first['includes']))
-        self.assertTrue(any('单元 L1-02' in name for name in later['includes']))
-        self.assertFalse(any('单元 L1-01' in name for name in later['includes']))
+        self.assertTrue(any('剧情段 L1-01' in name for name in first['includes']))
+        self.assertTrue(any('剧情段 L1-02' in name for name in later['includes']))
+        self.assertFalse(any('剧情段 L1-01' in name for name in later['includes']))
+        # 排纲笔记写进书目录的隐藏目录，任务包点明路径
+        self.assertTrue(any('.story/排纲笔记/L1-01.md' in name for name in first['includes']))
         outline_text = Path(first['brief']).read_text(encoding='utf-8')
         self.assertIn('卷首约束', outline_text)  # 卷级常任随闭包进包
         self.assertIn('你不执行命令', outline_text)
@@ -632,11 +695,11 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(both_text.count('信件内容本卷不揭示'), 1)  # 跨两个单元，卷级常任只给一次
         uncovered = self.call('build_architect_brief.py', '--project', self.book, '--task', 'outline', '--chapters', '30-31')
         self.assertEqual(uncovered.returncode, 2)
-        self.assertIn('找不到覆盖第30-31章的剧情单元', uncovered.stderr)
+        self.assertIn('找不到覆盖第30-31章的剧情段', uncovered.stderr)
         # 单元只覆盖请求的一部分：不能静默只给一半，点名缺的章。
         partial = self.call('build_architect_brief.py', '--project', self.book, '--task', 'outline', '--chapters', '10-14')
         self.assertEqual(partial.returncode, 2, partial.stdout)
-        self.assertIn('剧情单元只覆盖了一部分，缺覆盖第13-14章', partial.stderr)
+        self.assertIn('剧情段只覆盖了一部分，缺覆盖第13-14章', partial.stderr)
         rules = json.loads(self.call('build_architect_brief.py', '--project', self.book, '--task', 'outline',
                                      '--chapters', '30-31', '--rules-only').stdout)
         self.assertFalse(any('卷纲取段' in name for name in rules['includes']))
@@ -657,8 +720,12 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('| 13 | 留白钩子 | 只展示反应，不揭示发生了什么 |\n', outline_text)
         self.assertNotIn('他看了信', outline_text)
         self.assertIn('long-chapter-hooks.md（章尾钩子 13 式、章首钩子 7 式）', later['includes'])
-        self.assertIn('第1节：主角卡', outline_text)
+        # 角色卡按围栏标签只取模板本身：反派设计等方法不进细纲任务包。
+        self.assertIn('### 设定/角色/{名}.md（主角）', outline_text)
+        self.assertIn('角色定位：', outline_text)
         self.assertNotIn('第3节：反派设计', outline_text)
+        self.assertIn('outline-template.md', first['includes'])  # 细纲与排纲笔记模板整份进包
+        self.assertIn('## 排纲笔记（', outline_text)
         world = json.loads(self.call('build_architect_brief.py', '--project', self.book, '--task', 'world').stdout)
         world_text = Path(world['brief']).read_text(encoding='utf-8')
         self.assertIn('## 作者已定', world_text)  # 设定模板随包，定方向落盘的作者决定有处可读
@@ -670,7 +737,19 @@ class PipelineTests(unittest.TestCase):
         self.assertNotIn('全书体量与阶段总览', world_text)
         self.assertNotIn('主会话自己定设定时读', world_text)  # 主会话的读取清单不进包
         self.assertIn(f"{refs / 'female-audience-writing.md'}` 整份", world_text)
-        self.assertIn('按下附「新增物三级」属先问作者', world_text)
+        self.assertIn('按下附「新增物三级」属问作者', world_text)
+        # 定设定多一份全书梗概：任务包点名要写它，模板随包，结局一节写明可空。
+        self.assertIn('`设定/全书梗概.md`', world_text)
+        self.assertIn('## 结局（目前的设想，可空）', world_text)
+        # 细纲模板是新写法：「这章怎么走」、默认三列情节点表，「这章不能说破」挪进可选块，不再写字数口径。
+        self.assertIn('#### 这章怎么走', outline_text)
+        self.assertIn('| # | 情节点（谁做了什么） | 作用 |\n', outline_text)
+        self.assertIn('- 这章不能说破：{这章确有一件具体的事要压住时才写一行', outline_text)
+        self.assertNotIn('- 字数口径：', outline_text)
+        self.assertNotIn('<!-- {单元编号', outline_text)  # 「属于哪段剧情」不再写编号注释
+        # 前 3 章细纲要排一次正面冲突、立起够大的赌注。
+        self.assertIn('正面冲突', outline_text)
+        self.assertIn('够大的赌注', outline_text)
         too_many = self.call('build_architect_brief.py', '--project', self.book, '--task', 'outline', '--chapters', '1-11')
         self.assertEqual(too_many.returncode, 2)
         self.assertIn('一批细纲最多 10 章', too_many.stderr)
@@ -681,8 +760,19 @@ class PipelineTests(unittest.TestCase):
         self.volume.write_text('# 第一卷\n### 剧情单元 L1-01\n- 章节范围：第1-3章\n', encoding='utf-8')
         result = self.call('build_architect_brief.py', '--project', self.book, '--task', 'outline', '--chapters', '1-3')
         self.assertEqual(result.returncode, 2, result.stdout)
-        self.assertIn('缺「> 作用域：单元级 {单元ID}」声明行：卷纲_第一卷.md「剧情单元 L1-01」', result.stderr)
+        self.assertIn('标题末尾缺单元编号注释（如 <!-- L1-01 -->）：卷纲_第一卷.md「剧情单元 L1-01」', result.stderr)
         self.assertIn('--check --strict', result.stderr)
+        # 新写法：编号在标题尾部注释里，任务包照样取得到这段剧情（老写法见上面几条用例）。
+        self.volume.write_text('# 第一卷\n## 全卷规矩 <!-- 全卷 -->\n1. 信不拆\n'
+                               '### 第一段剧情：码头 <!-- L1-01 -->\n- 章节范围：第1-3章\n'
+                               '#### 备注\n- 子标题跟着这一段\n', encoding='utf-8')
+        fresh = self.call('build_architect_brief.py', '--project', self.book, '--task', 'outline', '--chapters', '1-3')
+        self.assertEqual(fresh.returncode, 0, fresh.stderr)
+        info = json.loads(fresh.stdout)
+        self.assertTrue(any('剧情段 L1-01' in name for name in info['includes']))
+        text = Path(info['brief']).read_text(encoding='utf-8')
+        self.assertIn('子标题跟着这一段', text)
+        self.assertIn('信不拆', text)
 
 
 class ImportOutlineBriefTests(unittest.TestCase):
@@ -811,7 +901,7 @@ class ImportOutlineBriefTests(unittest.TestCase):
         self.put('大纲/卷纲_第1卷.md', '# 第一卷\n\n### 剧情单元 L1-01\n- 章节范围：第1-12章\n')
         missing_scope = self.call('1-12')
         self.assertEqual(missing_scope.returncode, 2)
-        self.assertIn('作用域：单元级', missing_scope.stderr)
+        self.assertIn('单元编号注释', missing_scope.stderr)
         self.put('大纲/卷纲_第1卷.md', '# 第一卷\n\n## 剧情单元（反推）\n| 单元ID | 章节范围 |\n|---|---|\n| L1-1 | 第1-12章 |\n')
         table = self.call('1-12')
         self.assertEqual(table.returncode, 2)
@@ -832,9 +922,9 @@ class ImportOutlineBriefTests(unittest.TestCase):
         self.assertIn('问题 0 ／ 告警 0', check.stdout)
         unit = view('--unit', 'L1-01')
         self.assertEqual(unit.returncode, 0, unit.stderr)
-        self.assertIn('单元情绪引擎', unit.stdout)
+        self.assertIn('这段让读者图什么', unit.stdout)
         _, text = self.brief('1-12')
-        self.assertIn('### 剧情单元 L1-01', text)
+        self.assertIn('### 第一段剧情：{一句话} <!-- L1-01 -->', text)
         # 导入带的取段器副本与写作端是同一份，两边解析不会分叉。
         self.assertEqual((ROOT / 'skills/story-import/scripts/outline_view.py').read_bytes(),
                          (SCRIPTS / 'outline_view.py').read_bytes())
@@ -860,13 +950,25 @@ class ImportOutlineBriefTests(unittest.TestCase):
         self.assertIn('没有卷纲', result.stderr)
 
 
+class TemplateFenceTests(unittest.TestCase):
+    """按围栏标签取模板：只取那一块，不在或重复都报错，围栏里的围栏不算新围栏。"""
+
+    def test_template_block(self):
+        doc = ('# 文件\n\n````markdown template=细纲\n## 细纲\n```text\n示例\n```\n- 核心事件：\n````\n\n'
+               '```markdown\n未标的模板\n```\n')
+        self.assertEqual(template_block(doc, '细纲'), '## 细纲\n```text\n示例\n```\n- 核心事件：')
+        with self.assertRaises(TemplateNotFound):
+            template_block(doc, '卷纲')
+        with self.assertRaises(TemplateNotFound):
+            template_block(doc + '```md template=细纲\nx\n```\n', '细纲')
+
+
 class VolumeTemplateContractTests(unittest.TestCase):
     """artifact-protocols.md 的卷纲模板原样落盘，必须过取段器的严格校验。"""
 
     def test_template_passes_strict_check(self):
         doc = (ROOT / 'skills/story-long-write/references/artifact-protocols.md').read_text(encoding='utf-8')
-        after = doc.split('\n## 大纲/卷纲_第X卷.md\n', 1)[1]
-        template = after.split('```markdown\n', 1)[1].split('\n```\n', 1)[0]
+        template = template_block(doc, '卷纲')  # 与任务包同一取法：按围栏标签取
         with tempfile.TemporaryDirectory(prefix='volume-template-') as tmp:
             volume = Path(tmp) / '大纲' / '卷纲_第一卷.md'
             volume.parent.mkdir()
@@ -879,8 +981,147 @@ class VolumeTemplateContractTests(unittest.TestCase):
             self.assertIn('问题 0 ／ 告警 0', check.stdout)
             unit = run('--unit', 'L1-01')
             self.assertEqual(unit.returncode, 0, unit.stderr)
-            self.assertIn('### 剧情单元 L1-01', unit.stdout)
+            self.assertIn('### 第一段剧情：{一句话} <!-- L1-01 -->', unit.stdout)
             self.assertEqual(unit.stderr, '')
+
+
+class ConvertOutlineFormatTests(unittest.TestCase):
+    """convert_outline_format.py：老卷纲、细纲、排纲底稿换成 0.10 写法，只换格式不改内容；新旧两种都能过检查。"""
+
+    OLD_VOLUME = (
+        '# 第一卷 卷纲\n\n'
+        '## 卷契约与终局储备\n> 作用域：卷级常任\n\n- 卷契约：读者等主角翻身\n- 契约风险：需补强——补一段交换\n\n'
+        '## 全卷常任裁定\n> 作用域：卷级常任\n\n1. 信不拆\n\n'
+        '## 剧情单元卡\n> 作用域：卷级常任\n\n'
+        '### 剧情单元 L1-03：码头\n> 作用域：单元级 L1-03\n\n- 单元ID：L1-03\n- 章节范围：第21-27章\n'
+        '- 单元情绪引擎：憋屈→翻身\n- 单元节拍/章功能分配：铺垫→兑现\n- 禁止提前释放：信的内容\n'
+        '- 终局底牌边界：宿敌身份\n\n'
+        '#### 供给自查\n> 作用域：批次底稿 L1-03｜状态：在用\n\n- 对手供给：无缺口\n\n'
+        '## 压力线轮转\n> 作用域：卷级常任\n\n| 压力线 |\n|---|\n| 时限 |\n\n'
+        '## 情绪弧线\n> 作用域：卷级常任\n\n| 章节 | 章节定位 | 情绪 |\n|---|---|---|\n| 第21章 | 高压 | 热血 |\n'
+        '| 第22章 | 关系回收 | 温馨 |\n\n'
+        '## 对标结构坐标\n> 作用域：卷级常任\n\n无对标，按八节点自排\n\n'
+        '```md\n## 围栏里的示例\n> 作用域：单元级 L9-99\n```\n'
+    )
+    OLD_CHAPTER = (
+        '## 细纲（第 21 章）\n\n### 第 21 章：码头\n- 核心事件：江晨接下托付\n- 字数目标：2300 字\n'
+        '- 字数口径：visible_chars_v1\n- 单元ID/位置：L1-03；单元内第1拍\n- 目标情绪：期待→沉重\n'
+        '- 主角目标/关键选择：要素材；先去听故事\n- 章首钩子：悬念前置 — 铁盒\n- 爽点：无显性爽点，功能是托付\n'
+        '- 本章禁止提前释放：铁盒内容\n- 契约风险：契约安全\n- 章节定位：信息整理\n- 写手自由区：屋内陈设\n\n'
+        '#### 内容概括（五段式）\n- 起因：a\n- 发展：b\n- 转折：c\n- 高潮：d\n- 结尾：e\n\n'
+        '#### 情节安排（多线）\n- 主线推进：x\n\n#### 人物关系和出场顺序\n- 出场顺序：江晨\n\n#### 情节细化\n'
+        '| # | 情节点（谁做了什么） | 功能标签 | 执行边界（禁＋放） |\n|---|---|---|---|\n'
+        '| 1 | 老人推过铁盒 | 高潮 | 禁：不开盒。放：允许老人说他留了几十年 |\n'
+        '- 复沓锚句：\n  - 点1：立此为凭\n'
+    )
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix='convert-outline-')
+        self.book = Path(self.tmp.name) / '书'
+        (self.book / '大纲').mkdir(parents=True)
+        self.volume = self.book / '大纲' / '卷纲_第1卷.md'
+        self.chapter = self.book / '大纲' / '细纲_第021章.md'
+        self.volume.write_text(self.OLD_VOLUME, encoding='utf-8')
+        self.chapter.write_text(self.OLD_CHAPTER, encoding='utf-8')
+        (self.book / '大纲' / '排纲底稿_L1-03.md').write_text(
+            '# L1-03 排纲底稿\n\n## 供给自查\n- 场景与底图：码头\n\n## 建纲追加\n无追加\n', encoding='utf-8')
+        # 卷纲里没有剧情段覆盖第 30 章：转换时编号留在行末注释里，不丢定位。
+        self.orphan = self.book / '大纲' / '细纲_第030章.md'
+        self.orphan.write_text(self.OLD_CHAPTER.replace('21', '30'), encoding='utf-8')
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def run_py(self, script, *args):
+        return subprocess.run([sys.executable, str(SCRIPTS / script), *map(str, args)], capture_output=True,
+                              encoding='utf-8', env={**os.environ, 'PYTHONIOENCODING': 'utf-8'})
+
+    def contract(self, *args):
+        return subprocess.run(['node', str(SCRIPTS / 'check-outline-contract.js'), '--json', *map(str, args)],
+                              capture_output=True, encoding='utf-8')
+
+    def unit_view(self):
+        result = self.run_py('outline_view.py', '--unit', 'L1-03', self.volume)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout
+
+    def test_old_and_converted_files_give_the_same_reads(self):
+        # 转之前：老写法照样能取段、过细纲检查、过查缺检查。
+        before = self.unit_view()
+        self.assertIn('信不拆', before)
+        self.assertEqual(self.contract(self.chapter).returncode, 0)
+        self.assertEqual(self.contract('--supply', self.volume, 'L1-03').returncode, 0)
+        dry = self.run_py('convert_outline_format.py', self.book, '--dry-run')
+        self.assertEqual(dry.returncode, 0, dry.stderr)
+        self.assertIn('会改 4 个文件', dry.stdout)
+        self.assertEqual(self.volume.read_text(encoding='utf-8'), self.OLD_VOLUME)  # 试跑不写
+
+        done = self.run_py('convert_outline_format.py', self.book)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn('问题 0', done.stdout)
+        self.assertIn('压力线轮转', done.stdout)  # 新模板不要的表只列出来，不删
+        volume = self.volume.read_text(encoding='utf-8')
+        self.assertNotIn('> 作用域：', volume.split('```')[0])
+        self.assertIn('## 这卷读者等着看什么 <!-- 全卷 -->', volume)
+        self.assertIn('### 第三段剧情：码头 <!-- L1-03 -->', volume)
+        self.assertIn('#### 写纲前查缺 <!-- 批次底稿 L1-03｜状态：在用 -->', volume)
+        self.assertIn('- 这段让读者图什么：憋屈→翻身', volume)
+        self.assertIn('- 这段怎么排：铺垫→兑现', volume)
+        self.assertIn('- 有没有硬伤：要补——补一段交换', volume)
+        self.assertIn('- 这段先不能揭开、不能用上的：宿敌身份', volume)
+        self.assertIn('| 第21章 | 爆发 | 热血 |', volume)
+        self.assertIn('| 第22章 | 感情或关系戏 | 温馨 |', volume)
+        self.assertIn('没有对标书，按常见的八步结构排', volume)
+        self.assertNotIn('大牌', volume)
+        self.assertIn('## 全卷规矩 <!-- 全卷 -->', volume)
+        self.assertIn('| 时限 |', volume)
+        self.assertNotIn('- 单元ID：', volume)
+        self.assertIn('> 作用域：单元级 L9-99', volume)  # 围栏里的示例不动
+        strict = self.run_py('outline_view.py', '--check', '--strict', self.volume)
+        self.assertEqual(strict.returncode, 0, strict.stdout)
+        after = self.unit_view()
+        for kept in ('信不拆', '憋屈→翻身', '铺垫→兑现'):
+            self.assertIn(kept, after)
+        self.assertNotIn('对手供给', after)  # 批次底稿写正文不给，转前转后一样
+        staged = self.run_py('outline_view.py', '--unit', 'L1-03', '--stage', 'outline', self.volume)
+        self.assertIn('对手供给：无缺口', staged.stdout)
+
+        chapter = self.chapter.read_text(encoding='utf-8')
+        self.assertNotIn('字数口径', chapter)
+        self.assertIn('- 属于哪段剧情：第三段剧情，单元内第1拍\n', chapter)
+        self.assertIn('#### 这章怎么走\n', chapter)
+        self.assertIn('- 松紧：过渡', chapter)
+        self.assertIn('- 可以放开写的地方：屋内陈设', chapter)
+        self.assertIn('- 属于哪段剧情：第三段剧情，单元内第1拍 <!-- L1-03 -->', self.orphan.read_text(encoding='utf-8'))
+        self.assertIn('- 这章不能说破：铁盒内容', chapter)
+        self.assertIn('- 有没有硬伤：没问题', chapter)
+        self.assertIn('| # | 情节点（谁做了什么） | 作用 | 分寸 |', chapter)
+        self.assertIn('禁：不开盒。放：允许老人说他留了几十年', chapter)  # 内容不改
+        self.assertIn('- 原样出现的原话：', chapter)
+        report = self.contract(self.chapter)
+        self.assertEqual(report.returncode, 0, report.stdout)
+        sys.path.insert(0, str(SCRIPTS))
+        try:
+            from outline_view import chapter_unit, chapter_unit_in_volume
+        finally:
+            sys.path.pop(0)
+        self.assertIsNone(chapter_unit(chapter))  # 新细纲不写编号，按章号定位
+        self.assertEqual(chapter_unit_in_volume(volume, 21), 'L1-03')
+        self.assertIsNone(chapter_unit_in_volume(volume, 30))
+        self.assertEqual(chapter_unit(self.OLD_CHAPTER), 'L1-03')
+
+        notes = self.book / '.story' / '排纲笔记' / 'L1-03.md'
+        self.assertFalse((self.book / '大纲' / '排纲底稿_L1-03.md').exists())
+        self.assertFalse((self.book / '大纲' / '排纲笔记_L1-03.md').exists())
+        self.assertIn('## 写纲前查缺', notes.read_text(encoding='utf-8'))
+        self.assertIn('## 写纲时补的', notes.read_text(encoding='utf-8'))
+        self.assertIn('- 场景与布局：码头', notes.read_text(encoding='utf-8'))
+        supply = self.contract('--supply', self.volume, 'L1-03')
+        self.assertEqual(supply.returncode, 0, supply.stdout)
+        self.assertEqual(Path(json.loads(supply.stdout)['file']).resolve(), notes.resolve())
+
+        again = self.run_py('convert_outline_format.py', self.book)
+        self.assertIn('改了 0 个文件', again.stdout)  # 再跑不再改
 
 
 if __name__ == '__main__':

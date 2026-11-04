@@ -168,7 +168,7 @@ GRAMMAR_CASES: list[tuple[str, int | None, dict[str, int] | None]] = [
     ("- 字数目标：2300 字\n- 字数范围：按作者要求\n", 2300, None),
     ("- 字数目标：2300 字\n- 字数范围：2000-2600\n- 字数范围：看情况\n", 2300, {"min": 2000, "max": 2600}),
 ]
-# 「字数口径」行：两边用同一套行语法（列表/加粗/引用前缀、行尾括注可有），值只能是 visible_chars_v1。
+# 「字数口径」行可不写；写了两边用同一套行语法（列表/加粗/引用前缀、行尾括注可有），值只能是 visible_chars_v1。
 METRIC_CASES: list[tuple[str, bool]] = [
     ("- 字数口径：visible_chars_v1\n", True),
     ("字数口径：visible_chars_v1\n", True),
@@ -180,8 +180,10 @@ METRIC_CASES: list[tuple[str, bool]] = [
     ("- 字数口径：visible_chars_v1 按可见字符\n", False),
     ("- 字数口径：VISIBLE_CHARS_V1\n", False),
     ("- 字数口径：visible_chars_v1\n- 字数口径：visible_chars_v2\n", False),
-    ("- 说明：字数口径：visible_chars_v1\n", False),
-    ("- 核心事件：没写口径\n", False),
+    # 0.10 起口径可不写：没有这一行（或只在别的字段里提到）按默认口径。
+    ("- 说明：字数口径：visible_chars_v1\n", True),
+    ("- 核心事件：没写口径\n", True),
+    ("", True),
 ]
 
 
@@ -584,6 +586,49 @@ class OutlineRangeOverrideTests(unittest.TestCase):
             )
             self.assertEqual(completed.returncode, 2)
             self.assertEqual(result["invalid_reason"], "INVALID_OUTLINE")
+
+class FragmentationTests(unittest.TestCase):
+    def test_short_paragraphs_count_dialogue_and_sentences_skip_quotes(self) -> None:
+        text = ("## 第1章 雨夜\n"
+                "“谁来过？”\n"
+                "他把伞靠在门边，雨水顺着伞骨往下滴，在地板上积了一小摊。他盯着那摊水看了很久。\n"
+                "没人回答。\n")
+        result = storyctl.fragmentation(text)
+        # # 开头的行不算段；对话段算段。
+        self.assertEqual(result["paragraphs"], 3)
+        self.assertEqual(result["short_paragraphs"], 2)
+        self.assertAlmostEqual(result["short_paragraph_ratio"], 0.667)
+        # 去掉“…”里的话，按 。！？!? 切句，每句去空白后数字数（标点也算）：26、10、4，中位数 10。
+        self.assertEqual(result["narrative_sentences"], 3)
+        self.assertEqual(result["narrative_sentence_median"], 10)
+        self.assertEqual(result["human_reference"]["short_paragraph_ratio"], 0.19)
+        self.assertEqual(result["human_reference"]["narrative_sentence_median"], 39)
+
+    def test_plain_report_speaks_plainly_and_never_blocks_on_fragmentation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="storyctl-plain-") as directory:
+            project = Path(directory)
+            (project / "大纲").mkdir()
+            (project / "正文").mkdir()
+            (project / "大纲/细纲_第001章.md").write_text(
+                "- 字数目标：1000 字\n- 字数口径：visible_chars_v1\n", encoding="utf-8")
+            (project / "正文/第001章_测试.md").write_text("# 第一章\n" + "短。\n" * 10, encoding="utf-8")
+            _init_tracking(project)
+            with unittest.mock.patch.object(storyctl, "check_blocking_quality", return_value={
+                "status": "pass", "blocking_findings": [], "advisories": [], "semantic_advisories": 0, "tool_errors": []}):
+                result = storyctl.chapter_check(project, 1)
+            lines = storyctl.plain_report(result)
+            text = "\n".join(lines)
+            self.assertIn("字数不在范围里，要请作者定", lines[0])
+            self.assertIn("少了约", text)
+            self.assertIn("短段占 100%（真人平均约 19%，多数章在 2%–33%）", text)
+            self.assertIn("只作参考，不拦", text)
+            for jargon in ("needs_decision", "blocking", "status", "advisory"):
+                self.assertNotIn(jargon, text)
+            completed = subprocess.run(
+                [sys.executable, str(STORYCTL_PATH), "chapter", "check", "--project", str(project), "--chapter", "9", "--plain"],
+                text=True, encoding="utf-8", capture_output=True, check=False)
+            self.assertEqual(completed.returncode, 2)
+            self.assertIn("第 9 章没有细纲", completed.stdout)
 
 if __name__ == "__main__":
     unittest.main()

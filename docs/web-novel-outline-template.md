@@ -90,6 +90,6 @@
 - 站点原文（含更多示例与相关指南）：https://zenstory.ai/zh/oh-story/novel-outline-template
 - [本文方法来源](../skills/story-long-write/references/outline-methods.md)
 - [已定事实与后续规划](../skills/story-long-write/references/workflow-volume.md)
-- [作者选择与默认方法](../skills/story-long-write/references/style-resolution.md)
+- [作者选择与默认方法](../skills/story-long-write/references/writing-craft.md)
 - [正文前补齐并检查本章细纲](../skills/story-long-write/references/workflow-chapter.md)
 - 仓库地址：https://github.com/zenstory-ai/oh-story-claudecode

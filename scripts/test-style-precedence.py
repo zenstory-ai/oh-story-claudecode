@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Book-local expression exceptions through the public scanners and both hook runtimes."""
+"""Book-local expression exceptions through the public scanners and both hook runtimes.
+
+0.10 删掉了文风裁决（style_resolution 槽与长篇的 style-resolution.md），但书级白名单
+`.deslop-whitelist` 仍在用（规则在 long-format「书级白名单」一节），本测试守的是它的运行时行为，保留。
+"""
 import importlib.util
 import json
 from pathlib import Path
