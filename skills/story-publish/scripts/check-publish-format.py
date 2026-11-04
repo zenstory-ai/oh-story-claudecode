@@ -143,7 +143,8 @@ def check(text):
     if title and not errors:
         warnings += title_warnings(title, spec["title"])
 
-    sections = ["封面", *spec["tag_sections"], *TAIL]
+    has_synopsis = spec.get("synopsis", True)
+    sections = ["封面", *spec["tag_sections"], *(TAIL if has_synopsis else TAIL[1:])]
     if [(level, name) for _, level, name in headings[1:]] != [(2, name) for name in sections]:
         errors.append("小节必须依次为：" + " → ".join(sections) + "，都用二级标题。")
         return errors, warnings
@@ -192,7 +193,7 @@ def check(text):
         if rule.get("total") and total > rule["total"]:
             errors.append(f"{section}合计 {total} 个，最多 {rule['total']} 个。")
 
-    synopsis = "\n".join(block(lines, headings, len(spec["tag_sections"]) + 2)).strip()
+    synopsis = "\n".join(block(lines, headings, len(spec["tag_sections"]) + 2)).strip() if has_synopsis else BLANK
     if synopsis != BLANK:
         check_value("作品简介", "正文", synopsis, errors)
         limit = spec.get("max_length", {}).get("作品简介")
