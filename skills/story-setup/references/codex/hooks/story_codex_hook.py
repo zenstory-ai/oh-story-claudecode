@@ -297,7 +297,7 @@ def _toxic_match_sentence(line: str) -> tuple[str, str, str] | None:
 
 def load_style_whitelist(file: Path) -> list[str]:
     parent = file.resolve().parent
-    book = parent.parent if parent.name == "正文" else parent
+    book = long_chapter_book(file) or parent
     try:
         lines = (book / ".deslop-whitelist").read_text(encoding="utf-8").splitlines()
     except FileNotFoundError:
@@ -318,7 +318,7 @@ def mask_style_text(text: str, whitelist: list[str]) -> str:
 def toxic_rescan_hint(abs_path: Path | None = None) -> str:
     """毒句式末行的完整复扫指引（与 JS core toxicRescanHint 同文案）：长篇分章正文指 storyctl
     chapter check，其余（短篇 正文.md、调用方没给路径）指 check-ai-patterns.js。"""
-    if abs_path is not None and abs_path.parent.name == "正文":
+    if abs_path is not None and long_chapter_book(abs_path) is not None:
         m = re.match(r"^第0*(\d+)章.*\.md$", abs_path.name)
         if m:
             return f"完整检查：{{PYTHON}} <story-long-write>/scripts/storyctl.py chapter check --project <书目录> --chapter {m.group(1)}"
@@ -442,17 +442,36 @@ def prose_net_findings(text: str, whitelist=(), rescan: str | None = None) -> li
     return findings
 
 
+def long_chapter_book(abs_path: Path) -> Path | None:
+    if not re.match(r"^第0*\d+章.*\.md$", abs_path.name):
+        return None
+    if abs_path.parent.name == "正文":
+        return abs_path.parent.parent
+    if abs_path.parent.parent.name == "正文":
+        return abs_path.parent.parent.parent
+    return None
+
+
+def chapter_files(body_dir: Path) -> list[Path]:
+    if not body_dir.is_dir():
+        return []
+    candidates = (*body_dir.glob("第*章*.md"), *body_dir.glob("*/第*章*.md"))
+    return sorted(
+        path for path in candidates
+        if path.is_file() and not path.is_symlink() and not path.parent.is_symlink()
+        and re.match(r"^第0*\d+章.*\.md$", path.name) and "_原稿_" not in path.name
+    )
+
+
 def _is_prose_path(root: Path, abs_path: Path) -> bool:
     """正文文件判定（与 check-prose-after-write.sh 的 over-capture 门一致）：
-    短篇 {书}/正文.md 且同目录有 设定.md；长篇 {书}/正文/第N章*.md 且 {书} 有 大纲/追踪/设定。"""
+    短篇 {书}/正文.md 且同目录有 设定.md；长篇 {书}/正文/[卷目录/]第N章*.md 且 {书} 有 大纲/追踪/设定。"""
     base = abs_path.name
-    parent = abs_path.parent.name
     if base == "正文.md":
         return (abs_path.parent / "设定.md").exists()
-    if parent == "正文" and re.match(r"^第.*章.*\.md$", base):
-        book = abs_path.parent.parent
-        return (book / "大纲").is_dir() or (book / "追踪").is_dir() or (book / "设定").is_dir() or (book / "设定.md").exists()
-    return False
+    book = long_chapter_book(abs_path)
+    return bool(book and ((book / "大纲").is_dir() or (book / "追踪").is_dir()
+                          or (book / "设定").is_dir() or (book / "设定.md").exists()))
 
 
 def find_changed_prose_files(root: Path) -> list[Path]:
@@ -573,7 +592,7 @@ def continuity_findings(root: Path) -> list[str]:
     msgs: list[str] = []
     for book in _discover_all_books(root):
         body_dir = book / "正文"
-        chapters = sorted(body_dir.glob("第*章*.md")) if body_dir.is_dir() else []
+        chapters = chapter_files(body_dir)
         # ① 追踪 staleness（仅长篇：有 追踪/上下文.md）
         ctx = book / "追踪" / "上下文.md"
         checkpoint_issue = tracking_checkpoint_issue(book, require_state=bool(chapters))
@@ -1311,7 +1330,6 @@ def _outline_is_empty(file: Path) -> bool:
 
 def prose_block_reason(root: Path, abs_path: Path) -> str | None:
     base = abs_path.name
-    parent = abs_path.parent.name
     if base == "正文.md":
         if abs_path.exists():
             return None
@@ -1324,15 +1342,13 @@ def prose_block_reason(root: Path, abs_path: Path) -> str | None:
             # 文案对齐 JS core proseBlockReason（py↔js 由 test-prose-net-parity.sh Part E 锁 parity）
             return f"⛔ 写正文被拦截：{safe_rel(root, abs_path)} 缺少同目录 小节大纲.md。先按 story-short-write 完成「小节大纲.md」再写正文。"
         return None
-    if parent != "正文":
-        return None
-    if not re.match(r"^第.*章.*\.md$", base):
+    book_dir = long_chapter_book(abs_path)
+    if book_dir is None:
         return None
     m = re.match(r"^第0*(\d+)章", base)
     if not m:
         return None
     num = m.group(1)
-    book_dir = abs_path.parent.parent
     # 新书可能在任何大纲/追踪/设定脚手架存在前就首建正文；核心守卫必须 fail closed。
     # 相对路径由 HOOK_CWD 解析，不能靠削弱这条 canonical guard 来掩盖 cwd 语义。
     state = book_dir / "追踪" / "_tracking-state.json"
@@ -1384,10 +1400,9 @@ def prose_block_reason(root: Path, abs_path: Path) -> str | None:
             # （workflow-revision 的「备份原稿」产物），拿早已被改写掉的旧文本报欠账。
             # 显式排除 _原稿_ 备份并排序，保证四端与各文件系统上取到同一个「上一章」。
             candidates = sorted(
-                c for c in abs_path.parent.iterdir()
+                c for c in chapter_files(book_dir / "正文")
                 if re.match(r"^第0*(\d+)章.*\.md$", c.name)
                 and int(re.match(r"^第0*(\d+)章", c.name).group(1)) == prev_num
-                and "_原稿_" not in c.name
             )
             prev_file = candidates[0] if candidates else None
         except OSError:

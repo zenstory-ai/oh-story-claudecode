@@ -152,12 +152,7 @@ function continuityFindings(root) {
   const messages = []
   for (const book of discoverAllBooks(root)) {
     const bodyDir = path.join(book, "正文")
-    let chapters = []
-    try {
-      chapters = fs.readdirSync(bodyDir)
-        .filter((file) => /^第.*章.*\.md$/.test(file))
-        .map((file) => path.join(bodyDir, file))
-    } catch {}
+    const chapters = chapterFiles(bodyDir)
 
     const context = path.join(book, "追踪", "上下文.md")
     const checkpointIssue = trackingCheckpointIssue(book, chapters.length > 0)
@@ -680,7 +675,6 @@ function outlineIsEmpty(file) {
 
 function proseBlockReason(root, absolute) {
   const base = path.basename(absolute)
-  const parent = path.basename(path.dirname(absolute))
   if (base === "正文.md") {
     if (fs.existsSync(absolute)) return null
     const book = path.dirname(absolute)
@@ -691,11 +685,11 @@ function proseBlockReason(root, absolute) {
     }
     return null
   }
-  if (parent !== "正文" || !/^第.*章.*\.md$/.test(base)) return null
+  const book = chapterBook(absolute)
+  if (!book) return null
   const match = base.match(/^第0*(\d+)章/)
   if (!match) return null
   const chapter = match[1]
-  const book = path.dirname(path.dirname(absolute))
   const state = path.join(book, "追踪", "_tracking-state.json")
   // 这是守卫的 canonical case：agent 可能在任何脚手架存在前就首建 {书}/正文/第N章.md。
   // 是否“像一本书”不能作为放行条件；相对路径误判应在宿主 adapter 按 cwd 正确解析，而不是
@@ -743,13 +737,8 @@ function proseBlockReason(root, absolute) {
       // readdir 顺序在 ext4/overlayfs 上是哈希序：不排序就可能挑中同章号的原稿备份
       // （workflow-revision 的「备份原稿」产物），拿早已被改写掉的旧文本报欠账。
       // 显式排除 _原稿_ 备份并排序，保证四端与各文件系统上取到同一个「上一章」。
-      const candidates = fs.readdirSync(path.dirname(absolute))
-        .filter((file) => {
-          const pm = file.match(/^第0*(\d+)章.*\.md$/)
-          return pm && Number(pm[1]) === prevNum && !file.includes("_原稿_")
-        })
-        .sort()
-      if (candidates.length) prevFile = path.join(path.dirname(absolute), candidates[0])
+      prevFile = chapterFiles(path.join(book, "正文"))
+        .find((file) => Number(path.basename(file).match(/^第0*(\d+)章/)[1]) === prevNum) || null
     } catch {}
     if (prevFile) {
       let prevText = null
@@ -888,7 +877,7 @@ function codePointSlice(value, start, end) {
 // Book-local only: never inherit an unrelated workspace or another book's choices.
 function loadStyleWhitelist(file) {
   const parent = path.dirname(path.resolve(file));
-  const book = path.basename(parent) === '正文' ? path.dirname(parent) : parent;
+  const book = chapterBook(file) || parent;
   try {
     return fs.readFileSync(path.join(book, '.deslop-whitelist'), 'utf8')
       .split(/\r?\n/).map(line => line.trim())
@@ -924,7 +913,7 @@ function maskStyleText(text, whitelist) {
 // codex py toxic_rescan_hint 同文案，由 test-prose-net-parity.sh C 段锁 parity。
 function toxicRescanHint(absolute) {
   const match = absolute ? path.basename(absolute).match(/^第0*(\d+)章.*\.md$/) : null
-  if (match && path.basename(path.dirname(absolute)) === "正文") {
+  if (match && chapterBook(absolute)) {
     return `完整检查：{PYTHON} <story-long-write>/scripts/storyctl.py chapter check --project <书目录> --chapter ${match[1]}`
   }
   return "完整扫描：node <skill>/scripts/check-ai-patterns.js --check <正文文件>"
@@ -1051,27 +1040,54 @@ function proseNetFindings(text, whitelist = [], rescan = toxicRescanHint("")) {
   return findings
 }
 
+function chapterBook(absolute) {
+  if (!/^第0*\d+章.*\.md$/.test(path.basename(absolute))) return null
+  const parent = path.dirname(absolute)
+  if (path.basename(parent) === "正文") return path.dirname(parent)
+  const bodyDir = path.dirname(parent)
+  return path.basename(bodyDir) === "正文" ? path.dirname(bodyDir) : null
+}
+
+function chapterFiles(bodyDir) {
+  const files = []
+  try {
+    for (const entry of fs.readdirSync(bodyDir, { withFileTypes: true })) {
+      if (entry.isFile() && /^第0*\d+章.*\.md$/.test(entry.name) && !entry.name.includes("_原稿_")) {
+        files.push(path.join(bodyDir, entry.name))
+      } else if (entry.isDirectory()) {
+        const volume = path.join(bodyDir, entry.name)
+        for (const child of fs.readdirSync(volume, { withFileTypes: true })) {
+          if (child.isFile() && /^第0*\d+章.*\.md$/.test(child.name) && !child.name.includes("_原稿_")) {
+            files.push(path.join(volume, child.name))
+          }
+        }
+      }
+    }
+  } catch {}
+  return files.sort()
+}
+
 function isProsePath(absolute) {
   const base = path.basename(absolute)
-  const parent = path.basename(path.dirname(absolute))
   if (base === "正文.md") return fs.existsSync(path.join(path.dirname(absolute), "设定.md"))
-  if (parent !== "正文" || !/^第.*章.*\.md$/.test(base)) return false
-  const book = path.dirname(path.dirname(absolute))
+  const book = chapterBook(absolute)
+  if (!book) return false
   // 大纲/追踪/设定 must be directories; 设定.md a file — matches the bash oracle
   // check-prose-after-write.sh (`[ -d 大纲 ] || … || [ -f 设定.md ]`).
   return ["大纲", "追踪", "设定"].some((name) => existingDir(path.join(book, name))) || fs.existsSync(path.join(book, "设定.md"))
 }
 
 function duplicateTitleFindings(absolute) {
-  const bodyDir = path.dirname(absolute)
-  if (path.basename(bodyDir) !== "正文") return []
+  const book = chapterBook(absolute)
+  if (!book) return []
   const titles = new Map()
   try {
-    for (const file of fs.readdirSync(bodyDir)) {
-      const match = file.replace(/\.md$/, "").match(/^第0*\d+章[_\- 　]+(.+)$/)
+    for (const file of chapterFiles(path.join(book, "正文"))) {
+      const name = path.basename(file)
+      const match = name.replace(/\.md$/, "").match(/^第0*\d+章[_\- 　]+(.+)$/)
       if (!match) continue
       const title = match[1].trim()
-      if (title) titles.set(title, [...(titles.get(title) || []), file])
+      if (title) titles.set(title, [...(titles.get(title) || []), name])
     }
   } catch {}
   const findings = []

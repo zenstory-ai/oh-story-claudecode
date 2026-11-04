@@ -59,7 +59,7 @@ PARENT="$(basename "$(dirname "$ABS")")"
 
 # 只对「正文」文件兜底，绝不碰代码/细纲/设定/大纲等非正文文件：
 #   - 短篇：{书}/正文.md，且同目录有 设定.md（真短篇工程信号，排除 docs/正文.md 之类）
-#   - 长篇：{书}/正文/第N章*.md（父目录必须是「正文」），且 {书} 有 大纲/追踪/设定（真书结构）
+#   - 长篇：{书}/正文/[卷目录/]第N章*.md，且 {书} 有 大纲/追踪/设定（真书结构）
 # case 模式锚定首字：细纲_第N章.md（首字「细」）、卷纲_第1卷.md、check-ai-patterns.js、
 # 设定.md、大纲.md 等天然都不匹配 `正文.md`/`第*章*.md`，不会被捕获。
 IS_PROSE=false
@@ -70,9 +70,13 @@ case "$BASE" in
   第*章*.md)
     if [ "$PARENT" = "正文" ]; then
       BOOK="$(dirname "$(dirname "$ABS")")"
-      if [ -d "$BOOK/大纲" ] || [ -d "$BOOK/追踪" ] || [ -d "$BOOK/设定" ] || [ -f "$BOOK/设定.md" ]; then
-        IS_PROSE=true
-      fi
+    elif [ "$(basename "$(dirname "$(dirname "$ABS")")")" = "正文" ]; then
+      BOOK="$(dirname "$(dirname "$(dirname "$ABS")")")"
+    else
+      BOOK=""
+    fi
+    if [ -n "$BOOK" ] && { [ -d "$BOOK/大纲" ] || [ -d "$BOOK/追踪" ] || [ -d "$BOOK/设定" ] || [ -f "$BOOK/设定.md" ]; }; then
+      IS_PROSE=true
     fi
     ;;
 esac

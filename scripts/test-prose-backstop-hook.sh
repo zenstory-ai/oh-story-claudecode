@@ -47,6 +47,11 @@ expect_silent "$TMP/docs/正文.md"
 expect_silent "$TMP/游离/正文/第005章.md"
 # ② 真正文（极短→落盘信号）必须触发
 expect_fire "$TMP/某书/正文/第001章_截断.md"
+mkdir -p "$TMP/某书/正文/第一卷/草稿"
+printf '# 第2章\nTODO 待补充正文。\n' > "$TMP/某书/正文/第一卷/第002章_占位.md"
+expect_fire "$TMP/某书/正文/第一卷/第002章_占位.md"
+printf '# 第3章\nTODO 待补充正文。\n' > "$TMP/某书/正文/第一卷/草稿/第003章_占位.md"
+expect_silent "$TMP/某书/正文/第一卷/草稿/第003章_占位.md"
 
 # ③ 内容网：真正文里的硬信号必须被抓，且抓对类型；干净正文（排比+AI角色对话+悬念收尾）静默。
 expect_fire_kw() {
@@ -55,6 +60,7 @@ expect_fire_kw() {
     echo "FAIL: 内容网未抓到「$2」: $1" >&2; printf '%s\n' "$out" | head -4 >&2; fails=$((fails+1))
   fi
 }
+expect_fire_kw "$TMP/某书/正文/第一卷/第002章_占位.md" 占位符
 # bash 字符串重复填充正文（不走 python stdout：Windows runner 上 python<3.15 的文本 stdout
 # 是 cp1252，写中文会 UnicodeEncodeError；printf 直出脚本里的 UTF-8 字节字面量才稳）。
 PAD() { local s='江晨握紧拳头慢慢走向门口心里盘算着接下来的每一步棋。'; printf '%s' "$s$s$s$s$s$s$s$s"; }
