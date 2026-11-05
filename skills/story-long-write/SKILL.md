@@ -10,12 +10,12 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ## 写前必读（强制，先读后写）
 
-创建或修改长篇故事文件前，按下表读完当前时刻的文件（这张表是唯一的读取清单）；只读本文件、`rg` 检索或摘读都不算。**按节读只允许两种**：任务包切好的节，或本表、文件内「什么时候读这份」点名的节；其余文件整份读到结尾。缺文件或没读完就停，报准确路径，**不得先写正文再补读**；每个任务、每个会话重新读。
+创建或修改长篇文件前，读完下表文件（唯一清单）；只读本文件、`rg` 检索或摘读不算。按节读只允许两种：任务包切好的节或本表、文件「什么时候读这份」指定节；其余读全文。缺文件或未读完即停并报路径，**不得先写正文再补读**；每任务、每会话重读。
 
 | 时刻 | 必读 | 条件满足才读 |
 |---|---|---|
-| 定方向 | `workflow-setup.md` | 没方向：`long-genre-catalog.md`（特殊题材只读对应一节）；女频改读 `female-audience-writing.md`；平台、赛道、暂定书名：`genre-readers.md`；派子代理：`agent-calls.md` |
-| 定设定 | `workflow-setup.md`；自己做加 `character-basics.md`、`reader-contract-and-progression.md`、`long-genre-mechanics.md`「核心梗三层递进设计」「金手指」、`character-relations.md`「人物关系类型」 | 女频：`female-audience-writing.md`；有感情线：`character-relations.md`「感情线阶段」；对标登记 ≥2 本：`cross-book-recall.md` |
+| 定方向 | `workflow-setup.md`、`storage-layout.md` | 没方向：`long-genre-catalog.md`（特殊题材只读对应一节）；女频改读 `female-audience-writing.md`；平台、赛道、暂定书名：`genre-readers.md`；派子代理：`agent-calls.md` |
+| 定设定 | `workflow-setup.md`、`storage-layout.md`；自己做加 `character-basics.md`、`reader-contract-and-progression.md`、`long-genre-mechanics.md`「核心梗三层递进设计」「金手指」、`character-relations.md`「人物关系类型」 | 女频：`female-audience-writing.md`；有感情线：`character-relations.md`「感情线阶段」；对标登记 ≥2 本：`cross-book-recall.md` |
 | 出卷纲 | `workflow-volume.md`；自己排加 `artifact-protocols.md`、`outline-methods.md`「卷纲排法」、`reader-contract-and-progression.md` | 没有主对标：outline-methods「常见的八步结构」；有自创剧情段：「情绪模块公式」；换地图：「换地图」；有反转：`long-reversal.md`「反转类型」；感情线、对标同上 |
 | 出细纲、补纲 | `workflow-outline.md`；自己出加 `outline-template.md`、`plot-core-methods.md`、`character-basics.md`、`long-chapter-hooks.md`「章尾钩子 13 式」「章首钩子 7 式」 | 含前 3 章：`opening-design.md`「开篇规划」；感情线、对标同上 |
 | 写一章 | `workflow-chapter.md`；交写手加 `agent-calls.md`；自己写加 `long-format.md`、`writing-craft.md`、本章技法 | 新书第 1 章：`tracking-initialization.md`、`genre-prose-cards.md`「全书题材正文提示卡」与核对报告点名的卡；召回降档不成立：`benchmark-recall.md`；缺文件、找产物放哪：`project-files.md`；自己写第 1-3 章：`opening-design.md`「开篇落笔」；排查单章问题：`long-chapter-quality.md` |

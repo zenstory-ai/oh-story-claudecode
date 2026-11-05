@@ -318,7 +318,7 @@ class FinalChapterFlowTests(unittest.TestCase):
         # 用桩检测器替身跑真实 storyctl：finding 原样透传，review 缺省按语义类计数。
         runtime = self.root / "runtime"
         runtime.mkdir()
-        for name in ("storyctl.py", "wordcount_core.py", "tracking_commit.py"):
+        for name in ("storyctl.py", "wordcount_core.py", "storage_layout.py", "tracking_commit.py"):
             shutil.copy2(STORYCTL.parent / name, runtime / name)
         findings = [
             {"type": "voice", "severity": "advisory", "review": "semantic", "line": 1},
