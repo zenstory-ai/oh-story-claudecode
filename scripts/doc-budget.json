@@ -691,7 +691,7 @@
         {
           "label": "常规",
           "files": [],
-          "budget": 20950
+          "budget": 20970
         },
         {
           "label": "女频",
@@ -712,7 +712,7 @@
           "files": [
             "skills/story-long-write/references/character-relations.md#感情线阶段"
           ],
-          "budget": 21550
+          "budget": 21570
         }
       ],
       "stacking": {
@@ -920,7 +920,7 @@
         {
           "label": "首批含前 3 章（最重的包）",
           "files": [],
-          "budget": 16150
+          "budget": 16185
         },
         {
           "label": "对标登记 ≥2 本",
@@ -934,7 +934,7 @@
           "files": [
             "skills/story-long-write/references/character-relations.md#感情线阶段"
           ],
-          "budget": 16750
+          "budget": 16785
         }
       ],
       "stacking": {
@@ -1182,7 +1182,7 @@
             "skills/story-long-write/references/genre-prose-cards/流派兜底.md#升级流/爽文",
             "skills/story-long-write/references/tracking-initialization.md"
           ],
-          "budget": 25150
+          "budget": 25180
         },
         {
           "label": "缺文件停下修（本轮不写，不与写作叠加）",
@@ -1237,7 +1237,7 @@
           "files": [
             "skills/story-long-write/references/long-chapter-quality.md"
           ],
-          "budget": 23850
+          "budget": 23875
         }
       ],
       "stacking": {
@@ -1346,7 +1346,7 @@
           "files": [
             "skills/story-long-write/references/long-chapter-quality.md"
           ],
-          "budget": 27000
+          "budget": 27035
         }
       ],
       "stacking": {
