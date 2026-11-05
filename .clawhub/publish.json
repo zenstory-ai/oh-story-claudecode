@@ -243,7 +243,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "df0b5acabb055c19d3ce8341e9d8c8716f0ef51933bc100b33373387981c88de",
+      "packageDigest": "c2024d9efae6241dc1387b5863416ba82b4c87053cc29b5c7d023fe5695861d4",
       "path": "skills/story-long-scan",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -263,7 +263,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.1.24"
+      "version": "1.1.25"
     },
     {
       "catalogMigration": true,
