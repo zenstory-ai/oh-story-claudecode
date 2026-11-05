@@ -41,6 +41,19 @@ printf '%s' "$out" | grep -q '续写状态卡更早' || { echo "FAIL: 追踪 sta
 printf '%s' "$out" | grep -q '标题重复' || { echo "FAIL: 标题去重 未触发"; echo "$out" >&2; fails=$((fails+1)); }
 rm -rf "$T1"
 
+# 分卷目录中的章节同样参与追踪滞后与跨卷重名检查。
+T_VOL="$(mktemp -d)"; make_book "$T_VOL"
+mkdir -p "$T_VOL/某书/正文/卷1_跨卷重名检查" "$T_VOL/某书/正文/卷2_跨卷重名检查"
+printf '旧上下文\n' > "$T_VOL/某书/追踪/上下文.md"
+sleep 1
+# 每卷仅一章，故意同名；同时验证跨卷重名与追踪滞后。
+printf '# 第1章 决战\n正文。\n' > "$T_VOL/某书/正文/卷1_跨卷重名检查/第001章_决战.md"
+printf '# 第2章 决战\n正文。\n' > "$T_VOL/某书/正文/卷2_跨卷重名检查/第002章_决战.md"
+out="$(run "$T_VOL")"
+printf '%s' "$out" | grep -q '续写状态卡更早' || { echo "FAIL: 分卷章节未触发追踪 staleness" >&2; fails=$((fails+1)); }
+printf '%s' "$out" | grep -q '标题重复' || { echo "FAIL: 跨卷重名未触发" >&2; fails=$((fails+1)); }
+rm -rf "$T_VOL"
+
 # ③ mismatched/malformed/missing state 都必须告警
 for kind in mismatch malformed missing; do
   T_META="$(mktemp -d)"; make_book "$T_META"

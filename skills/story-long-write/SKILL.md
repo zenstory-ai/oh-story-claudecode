@@ -10,18 +10,19 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ## 写前必读（强制，先读后写）
 
-创建或修改长篇故事文件前，按下表读完当前时刻的文件（这张表是唯一的读取清单）；只读本文件、`rg` 检索或摘读都不算。**按节读只允许两种**：任务包切好的节，或本表、文件内「什么时候读这份」点名的节；其余文件整份读到结尾。缺文件或没读完就停，报准确路径，**不得先写正文再补读**；每个任务、每个会话重新读。
+创建或修改长篇文件前，读完下表文件（唯一清单）；只读本文件、`rg` 检索或摘读不算。按节读只允许两种：任务包切好的节或本表、文件「什么时候读这份」指定节；其余读全文。缺文件或未读完即停并报路径，**不得先写正文再补读**；每任务、每会话重读。
 
 | 时刻 | 必读 | 条件满足才读 |
 |---|---|---|
-| 定方向 | `workflow-setup.md` | 没方向：`long-genre-catalog.md`（特殊题材只读对应一节）；女频改读 `female-audience-writing.md`；平台、赛道、暂定书名：`genre-readers.md`；派子代理：`agent-calls.md` |
-| 定设定 | `workflow-setup.md`；自己做加 `character-basics.md`、`reader-contract-and-progression.md`、`long-genre-mechanics.md`「核心梗三层递进设计」「金手指」、`character-relations.md`「人物关系类型」 | 女频：`female-audience-writing.md`；有感情线：`character-relations.md`「感情线阶段」；对标登记 ≥2 本：`cross-book-recall.md` |
+| 定方向 | `workflow-setup.md`、`storage-layout.md` | 没方向：`long-genre-catalog.md`（特殊题材只读对应一节）；女频改读 `female-audience-writing.md`；平台、赛道、暂定书名：`genre-readers.md`；派子代理：`agent-calls.md` |
+| 定设定 | `workflow-setup.md`、`storage-layout.md`；自己做加 `character-basics.md`、`reader-contract-and-progression.md`、`long-genre-mechanics.md`「核心梗三层递进设计」「金手指」、`character-relations.md`「人物关系类型」 | 女频：`female-audience-writing.md`；有感情线：`character-relations.md`「感情线阶段」；对标登记 ≥2 本：`cross-book-recall.md` |
 | 出卷纲 | `workflow-volume.md`；自己排加 `artifact-protocols.md`、`outline-methods.md`「卷纲排法」、`reader-contract-and-progression.md` | 没有主对标：outline-methods「常见的八步结构」；有自创剧情段：「情绪模块公式」；换地图：「换地图」；有反转：`long-reversal.md`「反转类型」；感情线、对标同上 |
 | 出细纲、补纲 | `workflow-outline.md`；自己出加 `outline-template.md`、`plot-core-methods.md`、`character-basics.md`、`long-chapter-hooks.md`「章尾钩子 13 式」「章首钩子 7 式」 | 含前 3 章：`opening-design.md`「开篇规划」；感情线、对标同上 |
 | 写一章 | `workflow-chapter.md`；交写手加 `agent-calls.md`；自己写加 `long-format.md`、`writing-craft.md`、本章技法 | 新书第 1 章：`tracking-initialization.md`、`genre-prose-cards.md`「全书题材正文提示卡」与核对报告点名的卡；召回降档不成立：`benchmark-recall.md`；缺文件、找产物放哪：`project-files.md`；自己写第 1-3 章：`opening-design.md`「开篇落笔」；排查单章问题：`long-chapter-quality.md` |
 | 日更 | 先 `workflow-daily.md`，每章同「写一章」 | 同「写一章」 |
 | 大修 | `workflow-revision.md`；交写手加 `agent-calls.md`；自己改加 `long-format.md`、`writing-craft.md`，改情绪对抗戏加本章技法 | 只说读者反应：`revision-diagnosis.md`；追踪提交报错：`tracking-transaction.md` |
 | 管理作者习惯 | `author-memory.md`；完成即停，不建书、不写正文 | — |
+| 改正文存法、卷目录或范围 | `storage-migration.md`；不拆成多本，不只改卷纲 | — |
 
 交给 story-architect 时主会话只读时刻文件和 `agent-calls.md`，方法随任务包；交给 narrative-writer 时它按自己的读取表读，不得用没读参考的临时 prompt 替代。去味走检测器，不预读。写正文、改稿前读本书 `设定/文风.md`（没有就按作者当前请求）。
 
@@ -60,7 +61,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | **结构讨论** | "只讨论/推敲故事结构" | 只交付结构方案，不建工程、不自动落盘；不要求先填完设定或细纲 |
 | **大纲规划** | "写大纲/规划剧情/规划全书/规划第X卷/开新卷" | 按需取 Phase 1→3，交付所请求大纲/卷纲及必要设定；不自动展开细纲或初始化追踪 |
 | **细纲规划** | "出细纲/补纲/扩纲/补细纲/写或修改第N章细纲" | Phase 3：既有单元内只补/改点名章；需要新单元才走「中途补纲/扩纲小流程」。指定范围不扩到整单元；未指定时按剧情批建纲 |
-| **开书** | "帮我开书"，未限定规划层级 | 按确认点逐个走：定方向→定设定→卷纲→前 10 章细纲，每个确认点作者说继续才往下；**最远停在细纲交付，不自动写正文** |
+| **开书** | "帮我开书"，未限定规划层级 | 先问正文平铺或分卷，再走：定方向→定设定→卷纲→前 10 章细纲，每个确认点作者说继续才往下；**最远停在细纲交付，不自动写正文** |
 | **定设定** | "定设定"，或已有题材定位、还没有角色与关系 | Phase 2，交付设定后停 |
 | **写指定章** | "写第 N 章" / "写第1章" / "开书并写首章"，对象是正文 | Phase 4→5，只写点名章后停止；缺前置时先补必要设定、卷纲和点名章细纲，不套用完整开书的 10 章默认 |
 | **日更续写** | 关键词（"日更"/"续写"/"继续写"）**且**项目已有正文+追踪 | 按 workflow-daily 控制批次 |

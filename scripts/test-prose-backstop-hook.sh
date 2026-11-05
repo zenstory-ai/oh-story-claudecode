@@ -47,6 +47,14 @@ expect_silent "$TMP/docs/正文.md"
 expect_silent "$TMP/游离/正文/第005章.md"
 # ② 真正文（极短→落盘信号）必须触发
 expect_fire "$TMP/某书/正文/第001章_截断.md"
+# 合法分卷与过深目录各放一个测试文件；章号相同，以路径层级区分场景。
+VOLUME_PLACEHOLDER="$TMP/某书/正文/卷1_合法分卷/第002章_应检出占位正文.md"
+DEEP_PLACEHOLDER="$TMP/某书/正文/卷1_合法分卷/额外嵌套_应忽略/第002章_不应作为正文章节.md"
+mkdir -p "$(dirname "$VOLUME_PLACEHOLDER")" "$(dirname "$DEEP_PLACEHOLDER")"
+printf '# 第2章\nTODO 待补充正文。\n' > "$VOLUME_PLACEHOLDER"
+expect_fire "$VOLUME_PLACEHOLDER"
+printf '# 第2章\nTODO 待补充正文。\n' > "$DEEP_PLACEHOLDER"
+expect_silent "$DEEP_PLACEHOLDER"
 
 # ③ 内容网：真正文里的硬信号必须被抓，且抓对类型；干净正文（排比+AI角色对话+悬念收尾）静默。
 expect_fire_kw() {
@@ -55,6 +63,7 @@ expect_fire_kw() {
     echo "FAIL: 内容网未抓到「$2」: $1" >&2; printf '%s\n' "$out" | head -4 >&2; fails=$((fails+1))
   fi
 }
+expect_fire_kw "$VOLUME_PLACEHOLDER" 占位符
 # bash 字符串重复填充正文（不走 python stdout：Windows runner 上 python<3.15 的文本 stdout
 # 是 cp1252，写中文会 UnicodeEncodeError；printf 直出脚本里的 UTF-8 字节字面量才稳）。
 PAD() { local s='江晨握紧拳头慢慢走向门口心里盘算着接下来的每一步棋。'; printf '%s' "$s$s$s$s$s$s$s$s"; }

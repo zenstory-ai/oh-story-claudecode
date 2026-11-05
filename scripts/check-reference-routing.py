@@ -212,7 +212,7 @@ def check_template_fences(root: Path, out: Violations) -> None:
         if doc.resolve() in copies:
             continue
         for tag, line, _ in fence.template_blocks(doc.read_text(encoding="utf-8")):
-            where.setdefault(tag, []).append(f"{doc.relative_to(root)}:{line}")
+            where.setdefault(tag, []).append(f"{doc.relative_to(root).as_posix()}:{line}")
     for tag in tags:
         hits = where.get(tag, [])
         if not hits:

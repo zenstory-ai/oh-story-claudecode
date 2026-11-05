@@ -838,6 +838,7 @@ run_bash_guard_parity() {
   local tmp; tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' RETURN
 
   # scenario|last_committed|ctx_revision|schema|outline_ch|target_ch|target_exists|拆文库|state|prev[|outline_kind]
+  # volume_* 各自使用独立工程，写到 正文/卷1_分卷守卫检查/；volume_deep 再多一层，应被排除。
   # state=none 时 last/ctx/schema 无意义。target_exists=1 走续写路径（不判细纲，仍判追踪）。
   # outline_kind 缺省 filled（旧书式自由文本 ≥30 字）；empty=0 字节、heading=只有标题、
   # short29=差 1 字、exact30=恰好 30 字、bomcrlf=BOM+CRLF+全角空格的空壳、dup=一空一满两份。
@@ -873,6 +874,12 @@ outline_dup|0|0|4|1|1|0|0|yes|-|dup
 outline_headcontent|0|0|4|1|1|0|0|yes|-|headcontent
 outline_gbk|0|0|4|1|1|0|0|yes|-|gbk
 outline_empty_existing|1|0|4|1|1|1|0|yes|-|empty
+volume_nooutline|0|0|4|-|1|0|0|yes|-
+volume_valid|0|0|4|1|1|0|0|yes|-
+volume_empty|0|0|4|1|1|0|0|yes|-|empty
+volume_debt|1|0|4|2|2|0|0|yes|toxic
+volume_existing|1|0|4|1|1|1|0|yes|-
+volume_deep|0|0|4|-|1|0|0|yes|-
 "
   local out_bash="$tmp/bash.txt" out_js="$tmp/js.txt"
   : > "$out_bash"; : > "$out_js"
@@ -916,7 +923,12 @@ outline_empty_existing|1|0|4|1|1|1|0|yes|-|empty
         > "$book/追踪/_tracking-state.json"
       printf '> 状态修订：%s。\n' "$ctx" > "$book/追踪/上下文.md"
     fi
-    local abs="$book/正文/第00${target}章_测试.md"
+    local body_dir="$book/正文"
+    case "$name" in
+      volume_*) body_dir="$body_dir/卷1_分卷守卫检查"; mkdir -p "$body_dir" ;;
+    esac
+    [ "$name" = "volume_deep" ] && body_dir="$body_dir/额外嵌套_应忽略" && mkdir -p "$body_dir"
+    local abs="$body_dir/第00${target}章_测试.md"
     [ "$exists" = "1" ] && printf '# 第%s章 测试\n正文。\n' "$target" > "$abs"
 
     # bash 侧：exit 2 = 拦，0 = 放行
@@ -967,7 +979,13 @@ outline_bomcrlf block
 outline_dup pass
 outline_headcontent pass
 outline_gbk pass
-outline_empty_existing pass"
+outline_empty_existing pass
+volume_nooutline block
+volume_valid pass
+volume_empty block
+volume_debt block
+volume_existing pass
+volume_deep pass"
   while read -r want_name want_verdict; do
     [ -n "$want_name" ] || continue
     grep -qx "$want_name :: $want_verdict" "$out_bash" || {
@@ -1025,7 +1043,7 @@ run_bash_guard_parity
 rc_guard=$?
 set -e
 case "$rc_guard" in
-  0) echo "写正文守卫 parity：Claude bash guard == JS core（26 组工程场景：无 state/缺细纲/空细纲各形态（含 GBK 细纲）/导入窗口/跳章/续写/派生修订不一致/坏 schema/回炉备份/上一章毒句式欠账、豁免标记语法与窗口、书级白名单，含 node 缺席时追踪门 fail-open、空细纲门照拦）。" ;;
+  0) echo "写正文守卫 parity：Claude bash guard == JS core（32 组工程场景，含分卷路径、跨卷欠账与过深目录边界）。" ;;
   1) echo "写正文守卫 parity：跳过（无 node/python3 运行时）。" ;;
   *) fails=$((fails + 1)) ;;
 esac

@@ -274,6 +274,26 @@ class AuthorRangeTests(unittest.TestCase):
             self.assertEqual(result["invalid_reason"], "INVALID_ARGUMENT")
 
 
+class VolumeChapterPathsTests(unittest.TestCase):
+    def test_body_lookup_accepts_one_volume_level_and_rejects_ambiguity(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="storyctl-volume-") as directory:
+            body = Path(directory) / "正文"
+            volume = body / "第一卷"
+            volume.mkdir(parents=True)
+            chapter = volume / "第001章：开端.md"
+            chapter.write_text("# 第一章\n正文。", encoding="utf-8")
+            (volume / "第001章：开端_原稿_20261025.md").write_text("旧稿", encoding="utf-8")
+            self.assertEqual(storyctl.find_chapter_file(body, 1, outline=False), chapter)
+            deep = volume / "草稿"
+            deep.mkdir()
+            (deep / "第002章_草稿.md").write_text("草稿", encoding="utf-8")
+            with self.assertRaises(storyctl.WordcountError):
+                storyctl.find_chapter_file(body, 2, outline=False)
+            (body / "第001章_另一份.md").write_text("重复", encoding="utf-8")
+            with self.assertRaises(storyctl.WordcountError):
+                storyctl.find_chapter_file(body, 1, outline=False)
+
+
 class CheckpointTests(unittest.TestCase):
     def test_checkpoint_reports_only_current_count_and_remaining_user_range(self) -> None:
         result = storyctl.checkpoint_wordcount("字" * 558, 2200, chapter=28)

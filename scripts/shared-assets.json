@@ -44,6 +44,14 @@
       ]
     },
     {
+      "name": "story-storage-layout",
+      "source": "skills/story-long-write/scripts/storage_layout.py",
+      "targets": [
+        "skills/story-import/scripts/storage_layout.py",
+        "skills/story-review/scripts/storage_layout.py"
+      ]
+    },
+    {
       "name": "story-wordcount-core",
       "source": "skills/story-long-write/scripts/wordcount_core.py",
       "targets": [

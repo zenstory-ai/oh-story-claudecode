@@ -42,6 +42,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from storage_layout import StorageError, find_chapter, chapter_files as body_files, output_path
 from outline_view import CHAPTER_UNIT_FIELDS, UNIT_FIELD_NAMES as UNIT_CARD_FIELDS, chapter_unit_in_volume, is_unit_card, parse as parse_volume
 from wordcount_core import WordcountError, resolve_book_dir
 
@@ -90,13 +91,30 @@ def has_custom_style(text):
 
 
 def find_chapter_file(directory: Path, chapter: int, prefix: str):
+    if not prefix:
+        return find_chapter(directory.parent, chapter)
     if not directory.is_dir():
         return None
-    pattern = re.compile(rf"^{prefix}第0*{chapter}章.*\.md$")
-    for entry in sorted(directory.iterdir()):
-        if entry.is_file() and pattern.match(entry.name) and "_原稿_" not in entry.name:
+    pattern = re.compile(rf"^{re.escape(prefix)}第0*{chapter}章.*\.md$")
+    for entry in chapter_files(directory, nested=not prefix):
+        if pattern.match(entry.name) and "_原稿_" not in entry.name:
             return entry
     return None
+
+
+def chapter_files(directory: Path, *, nested: bool) -> list[Path]:
+    if nested:
+        return body_files(directory.parent)
+    if not directory.is_dir():
+        return []
+    candidates = directory.glob("*.md")
+    return sorted(
+        (entry for entry in candidates
+         if entry.is_file() and not entry.is_symlink() and not entry.parent.is_symlink()
+         and (not nested or (re.match(r"^第0*\d+章.*\.md$", entry.name)
+                             and "_原稿_" not in entry.name))),
+        key=lambda entry: str(entry),
+    )
 
 
 def extract_field(outline_text: str, field: str):
@@ -433,7 +451,7 @@ def learn_heading_form(project: Path, chapter: int, title: str):
         return None, "正文/ 目录不存在"
     pattern = re.compile(r"^(#+)([ \t　]*)第(0*\d+)章([ \t　]*)(.*)$")
     best = None
-    for entry in sorted(body.glob("*.md")):
+    for entry in chapter_files(body, nested=True):
         num = re.match(r"^第(\d+)章", entry.name)
         if not num or int(num.group(1)) == chapter:
             continue
@@ -480,9 +498,10 @@ def build(project: Path, chapter: int, report: list):
         "命中即必读，未命中不预加载；交付摘要里报出读了哪几个。")
 
     parts.append(f"项目目录：{project}")
+    parts.append(f"正文布局配置：{project / '.story' / 'storage.json'}")
     parts.append(f"章节：第 {chapter} 章")
     if title:
-        out_path = project / "正文" / f"第{chapter:03d}章_{title}.md"
+        out_path = output_path(project, chapter, title)
     else:
         return None, [f"细纲缺章名：{outline_file}，需要 ### 第 N 章：章名"]
     if any(char in title for char in '/\\'):
@@ -720,7 +739,11 @@ def main(argv=None):
         return 2
 
     report = []
-    prompt, errors = build(project, args.chapter, report)
+    try:
+        prompt, errors = build(project, args.chapter, report)
+    except StorageError as error:
+        sys.stderr.write(f"正文存储配置错误：{error}\n")
+        return 2
     if prompt is None:
         sys.stderr.write("组装中止，先修数据再重跑（这不是回落手拼的理由）：\n")
         for item in errors:
@@ -733,7 +756,7 @@ def main(argv=None):
     if outline_file:
         title = extract_title(read_text(outline_file) or "", args.chapter)
     if title:
-        clashes = [p.name for p in sorted((project / "正文").glob("*.md"))
+        clashes = [p.name for p in chapter_files(project / "正文", nested=True)
                    if p.name.endswith(f"_{title}.md")
                    and not p.name.startswith(f"第{args.chapter:03d}章")]
         report.append(
