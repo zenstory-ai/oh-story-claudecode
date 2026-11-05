@@ -35,6 +35,7 @@
 | [long-suspense.md](long-suspense.md) | 编排短期、中期、远期悬念与回收周期 |
 | [long-reversal.md](long-reversal.md) | 设计单元、卷级或全书反转，不采用全文百分比铁律 |
 | [long-quality.md](long-quality.md) | 黄金三章、连载节奏、读者契约与终局储备审查 |
+| [cross-book-recall.md](cross-book-recall.md) | 任务包按条件点名时读；没有任务包时不读 |
 
 Long profile 禁止读取 `short-*` 文件，不得采用“6 章”“每节 500–800 字”“每两节一钩”“全文 70–85% 必须高潮”等短篇默认口径。
 

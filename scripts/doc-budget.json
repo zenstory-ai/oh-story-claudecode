@@ -920,7 +920,7 @@
         {
           "label": "首批含前 3 章（最重的包）",
           "files": [],
-          "budget": 16150
+          "budget": 16180
         },
         {
           "label": "对标登记 ≥2 本",
@@ -934,7 +934,7 @@
           "files": [
             "skills/story-long-write/references/character-relations.md#感情线阶段"
           ],
-          "budget": 16750
+          "budget": 16780
         }
       ],
       "stacking": {
@@ -983,7 +983,7 @@
             "skills/story-setup/references/agent-references/outline-methods.md#常见的八步结构",
             "skills/story-setup/references/agent-references/character-relations.md#感情线阶段"
           ],
-          "budget": 11700
+          "budget": 11740
         },
         {
           "label": "新书开篇",
@@ -991,7 +991,7 @@
             "skills/story-setup/references/agent-references/opening-design.md#开篇规划",
             "skills/story-setup/references/agent-references/plot-core-methods.md"
           ],
-          "budget": 9700
+          "budget": 9740
         },
         {
           "label": "结构审查（审稿 full/lean）",
