@@ -1185,6 +1185,108 @@ class StorageLayoutTests(unittest.TestCase):
         self.assertEqual((self.book/'.story/storage.json').read_bytes(), before)
 
 
+class StorageMigrationTests(unittest.TestCase):
+    setUp = StorageLayoutTests.setUp
+    put = StorageLayoutTests.put
+    def prepare(self, count=4):
+        self.storage.initialize(self.book, self.flat)
+        for number in range(1, count+1):
+            self.put(f'正文/第{number:03d}章_原文.md')
+        return {'schema_version': 1, 'body_layout': 'volumes', 'volumes': [
+            {'directory': '卷1_前卷', 'first_chapter': 1, 'last_chapter': 2},
+            {'directory': '卷2_后卷', 'first_chapter': 3, 'last_chapter': count}]}
+
+    def test_both_directions_backup_docs_and_require_reference_review(self):
+        target = self.prepare()
+        guide = self.put('测试说明.md')
+        guide.write_text('目录结构：平铺\n正文/第001章_原文.md\n', encoding='utf-8')
+        plan = self.storage.plan_migration(self.book, target)
+        result = self.storage.migrate(self.book, plan)
+        self.assertEqual(result['status'], 'needs_reference_review')
+        backup = Path(result['backup'])
+        self.assertEqual((backup/'正文/第001章_原文.md').read_bytes(),
+                         (self.book/'正文/卷1_前卷/第001章_原文.md').read_bytes())
+        self.assertIn('正文/卷1_前卷/第001章_原文.md', guide.read_text(encoding='utf-8'))
+        self.assertEqual(json.loads((backup/'storage.json').read_text(encoding='utf-8')), self.flat)
+        guide.write_text('目录结构：分卷存储\n正文/卷1_前卷/第001章_原文.md\n', encoding='utf-8')
+        self.assertEqual(self.storage.acknowledge_references(self.book, backup, ['测试说明.md'])['status'], 'complete')
+        reverse = self.storage.migrate(self.book, self.storage.plan_migration(self.book, self.flat))
+        self.assertEqual(reverse['status'], 'needs_reference_review')
+        # Merely acknowledging cannot bypass a precise old path elsewhere.
+        guide.write_text('目录结构：平铺\n正文/第001章_原文.md\n', encoding='utf-8')
+        self.assertEqual(self.storage.acknowledge_references(self.book, reverse['backup'], ['测试说明.md'])['status'], 'complete')
+        self.assertEqual(len(list((self.book/'正文').glob('第*章*.md'))), 4)
+        self.assertFalse((self.book/'正文/卷1_前卷').exists())
+
+    def test_large_migration_preserves_every_chapter(self):
+        target = self.prepare(167)
+        result = self.storage.migrate(self.book, self.storage.plan_migration(self.book, target))
+        self.assertEqual(result['status'], 'complete')
+        self.assertEqual(result['chapter_count'], 167)
+        self.assertEqual(len(list((self.book/'正文').glob('第*章*.md'))), 0)
+        self.assertEqual(len(list((self.book/'正文').glob('*/第*章*.md'))), 167)
+        self.assertEqual(self.storage.find_chapter(self.book, 3).parent.name, '卷2_后卷')
+
+    def test_stale_plan_and_collision_never_move_body(self):
+        target = self.prepare()
+        plan = self.storage.plan_migration(self.book, target)
+        (self.book/'正文/第001章_原文.md').write_text('作者刚改的正文。', encoding='utf-8')
+        with self.assertRaisesRegex(self.storage.StorageError, '文件已改变'):
+            self.storage.migrate(self.book, plan)
+        self.assertEqual(self.storage.load(self.book), self.flat)
+        self.put('正文/卷1_前卷/第001章_原文.md')
+        with self.assertRaises(self.storage.StorageError):
+            self.storage.plan_migration(self.book, target)
+
+    def test_reference_rescan_discovers_new_guide_and_excludes_benchmark_source(self):
+        target = self.prepare()
+        sample = self.put('对标/其他书/原始说明.md')
+        sample.write_text('正文/第001章_原文.md；目录结构：平铺', encoding='utf-8')
+        result = self.storage.migrate(self.book, self.storage.plan_migration(self.book, target))
+        self.assertEqual(result['status'], 'complete')
+        guide = self.put('后补指南.md')
+        guide.write_text('目录结构：平铺；正文/第001章_原文.md', encoding='utf-8')
+        check = self.storage.verify_migration(self.book, result['backup'])
+        self.assertEqual(check['reference_review'], ['后补指南.md'])
+        check = self.storage.acknowledge_references(self.book, result['backup'], ['后补指南.md'])
+        self.assertEqual(check['status'], 'needs_reference_review')
+        guide.write_text('目录结构：分卷存储；正文/卷1_前卷/第001章_原文.md', encoding='utf-8')
+        check = self.storage.acknowledge_references(self.book, result['backup'], ['后补指南.md'])
+        self.assertEqual(check['status'], 'complete')
+        self.assertIn('正文/第001章_原文.md', sample.read_text(encoding='utf-8'))
+
+    def test_failed_write_rolls_back_body_config_and_documents(self):
+        target = self.prepare()
+        guide = self.put('README.md')
+        guide.write_text('正文/第001章_原文.md', encoding='utf-8')
+        plan = self.storage.plan_migration(self.book, target)
+        real_write = self.storage.atomic_bytes
+        def fail_config(file, raw):
+            if Path(file).name == 'storage.json':
+                raise OSError('simulated storage failure')
+            real_write(file, raw)
+        with mock.patch.object(self.storage, 'atomic_bytes', fail_config), self.assertRaises(OSError):
+            self.storage.migrate(self.book, plan)
+        self.assertEqual(self.storage.load(self.book), self.flat)
+        self.assertEqual(len(list((self.book/'正文').glob('第*章*.md'))), 4)
+        self.assertEqual(guide.read_text(encoding='utf-8'), '正文/第001章_原文.md')
+        self.assertFalse((self.book/'.story/storage-migration.lock').exists())
+
+    def test_active_workspace_guide_is_included_and_backed_up(self):
+        # Keep workspace outside the book but inside the test's temporary directory.
+        self.book = self.book/'当前书'
+        self.book.mkdir()
+        (self.book.parent/'.active-book').write_text(self.book.name, encoding='utf-8')
+        guide = self.book.parent/'测试说明.md'
+        guide.write_text('正文/第001章_原文.md\n目录结构：平铺', encoding='utf-8')
+        target = self.prepare()
+        plan = self.storage.plan_migration(self.book, target)
+        self.assertIn('@workspace/测试说明.md', plan['reference_review'])
+        result = self.storage.migrate(self.book, plan)
+        self.assertTrue((Path(result['backup'])/'关联资料/@workspace/测试说明.md').exists())
+        self.assertIn('正文/卷1_前卷/第001章_原文.md', guide.read_text(encoding='utf-8'))
+
+
 class HookChapterPathTests(unittest.TestCase):
     """同一批实际目录同时交给 JS 和 Codex Python，锁住排序、排除与可恢复诊断。"""
     def setUp(self):

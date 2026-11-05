@@ -5,7 +5,7 @@
 - 绝大多数由 CI 自动跑（`.github/workflows/cross-platform.yml`）。提交前完整的本地验证命令见 [CONTRIBUTING.md](../CONTRIBUTING.md)「CI 检查」。
 - **改名 / 移动任一脚本**，要同步改 `.github/workflows/*.yml`、`CONTRIBUTING.md`、本文件，以及调用它的兄弟脚本（见下方「何时跑」里的调用关系）。
 
-`python scripts/test-writer-pipeline.py` 验证长篇取段器与 prompt 组装器的公开 CLI：存量卷纲、新旧段头写法、退役历史、原生路径、必需资料与召回降档、卷纲细纲格式转换，以及存储配置初始化、分卷落点、跨卷读取、重复章号与冲突拒绝；在三平台 CI 运行。
+`python scripts/test-writer-pipeline.py` 验证长篇取段器与 prompt 组装器的公开 CLI：存量卷纲、新旧段头写法、退役历史、原生路径、必需资料与召回降档、卷纲细纲格式转换，以及存储配置初始化、分卷落点、跨卷读取、重复章号、布局互转、备份回滚与关联说明复扫；在三平台 CI 运行。
 
 `python scripts/test-long-analyze-runtime.py` 验证长篇拆文的单状态运行时：机械章节索引与逐章 hash、旧成果识别、只读计划、范围批次、兼容摘要投影、相邻拆分、原子提交和缓存恢复。实际运行只使用 `skills/story-long-analyze/scripts/` 下三个脚本：`build_chapter_index.py`、`inspect_existing_assets.py`、`manage_analysis_run.py`。测试还覆盖旧版（带「章节边界」表）拆文库遇到楔子时的章号核对与并入出路、Windows/GBK 控制台下的 UTF-8 输出，以及 `render_relation_chart.py` 在没有中文字体时只写 Markdown 关系图、不出拼音图。
 
