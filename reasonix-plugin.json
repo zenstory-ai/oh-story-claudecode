@@ -1,6 +1,6 @@
 {
   "name": "oh-story",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "网络小说创作工具箱：扫榜、拆文、写作、审查、去 AI 味和封面生成。",
   "skills": "skills"
 }
