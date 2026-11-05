@@ -389,6 +389,8 @@ function rankQualityLines(books) {
     const missing = books.filter((b) => !b[field]).length;
     if (missing > books.length * RANK_FIELD_MISSING_RATIO) problems.push(`${label}缺失 ${missing} / ${books.length} 条`);
   }
+  const noHeat = books.filter((b) => !b.totalRecommendations && !b.rankValue).length;
+  if (noHeat > books.length * RANK_FIELD_MISSING_RATIO) problems.push(`总推荐缺失 ${noHeat} / ${books.length} 条`);
   return [
     `- 数据质量：${problems.length ? "[存在问题]" : "[OK]"}`,
     `- 问题摘要：${problems.length ? problems.join("；") : "无"}`,
