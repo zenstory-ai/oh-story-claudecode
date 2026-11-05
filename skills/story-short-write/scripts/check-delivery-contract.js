@@ -137,18 +137,21 @@ function verify(projectDir, contract) {
 
   const markerLines = new Set(markers.map((entry) => entry.line - 1))
   const invalidBlankLines = []
-  for (let index = 0; index < lines.length; index++) {
-    if (lines[index].trim() !== '') continue
-    const isEdge = index === 0 || index === lines.length - 1
-    const touchesMarker = markerLines.has(index - 1) || markerLines.has(index + 1)
-    if (!isEdge && !touchesMarker) invalidBlankLines.push(index + 1)
+  for (let index = 0; index < lines.length;) {
+    if (lines[index].trim() === '') { index++; continue }
+    let next = index + 1
+    while (next < lines.length && lines[next].trim() === '') next++
+    if (next < lines.length && !markerLines.has(index) && !markerLines.has(next) && next - index !== 2) {
+      invalidBlankLines.push(`${index + 1}-${next + 1}`)
+    }
+    index = next
   }
   checks.push(makeCheck(
     'delivery.blank-lines',
     invalidBlankLines.length === 0,
-    invalidBlankLines.length ? `正文段落间空行：${invalidBlankLines.join('、')}` : '正文段落间无空行',
-    '只允许文件边缘或小节标记相邻处出现空行，正文段落之间紧密单换行',
-    '只删除报告行的多余空行。'
+    invalidBlankLines.length ? `正文段落间距错误：${invalidBlankLines.join('、')}` : '正文段落间均空一行',
+    '相邻正文段落之间恰好一个空行（两个换行符）；小节标记相邻处另算',
+    '仅在报告的相邻段落之间补齐或删减空行。'
   ))
 
   return report(project, contract, checks)
