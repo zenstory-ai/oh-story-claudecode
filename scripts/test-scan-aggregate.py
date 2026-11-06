@@ -37,6 +37,7 @@ def run(script: Path, *args: str) -> subprocess.CompletedProcess:
         text=True,
         encoding="utf-8",
         timeout=60,
+        env={**os.environ, "TZ": "Asia/Shanghai"},
     )
 
 
@@ -913,6 +914,17 @@ def test_short_copy_identical() -> None:
     check(SHORT.read_bytes() == LONG.read_bytes(), "short-scan copy must stay byte-identical (shared-assets)")
 
 
+def test_collect_date_is_local(tmp: Path) -> None:
+    """北京时间清晨采的榜，采集情况写当天日期，和文件名一致。"""
+    case = tmp / "local-date"
+    case.mkdir()
+    (case / "起点月票榜_20261106.md").write_text(
+        qidian("月票榜", [("甲", "某人", "玄幻", "12万", "300", "")]).replace("2026-09-25T10:00", "2026-11-05T17:00"),
+        encoding="utf-8")
+    md = run(LONG, str(case)).stdout
+    check("起点 · 月票榜：1 条，2026-11-06" in md, f"a 01:00 Beijing scrape reads as that local day in 采集情况: {md[:400]}")
+
+
 def main() -> int:
     if not NODE:
         print("SKIP: node not found")
@@ -940,6 +952,7 @@ def main() -> int:
         test_per_genre_cap_noted(tmp)
         test_new_list_names(tmp)
         test_ciweimao_manual_and_sparse(tmp)
+        test_collect_date_is_local(tmp)
         test_short_copy_identical()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
