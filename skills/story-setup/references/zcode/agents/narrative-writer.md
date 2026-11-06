@@ -8,6 +8,7 @@ description: |
 model: inherit
 tools: [Read, Glob, Grep, Write, Edit, Bash]
 maxTurns: 30
+injectAgentsMd: false
 ---
 
 # Narrative Writer -- 叙事写手

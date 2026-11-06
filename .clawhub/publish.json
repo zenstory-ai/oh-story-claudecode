@@ -351,7 +351,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "4f79bf4ea79da97365858c447e338252c7f6eec15b1a32f5b144eecf4d0054b6",
+      "packageDigest": "534b043fbbf503b4120eb3b336ece0703f8843ea2a5452d067077b084ceadbad",
       "path": "skills/story-setup",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -371,7 +371,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.2.4"
+      "version": "1.2.5"
     },
     {
       "catalogMigration": true,

@@ -8,6 +8,7 @@ model: inherit
 tools: [Read, Glob, Grep, Write, Bash]
 disallowedTools: [Edit]
 maxTurns: 20
+injectAgentsMd: false
 ---
 
 # Story Researcher -- 资料研究员

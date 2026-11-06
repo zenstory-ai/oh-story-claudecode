@@ -128,6 +128,7 @@ hooks:
             "tools": "[Read, Glob]",
             "disallowedTools": "[Write, Bash]",
             "maxTurns": "9",
+            "injectAgentsMd": "false",
         }, data
         assert "hooks" not in data
         assert ".zcode/skills/story/SKILL.md" in body

@@ -377,7 +377,7 @@ ZCode 采用「原生 plugin + `story-setup` workspace 部署」双入口：
 - `skills/story-setup/references/zcode/` 是 workspace 部署模板，包含 `AGENTS.md.tmpl`、Commands、生成的插件 Agents、`config.json.patch` 与无第三方依赖的 Node Hook runner。
 - ZCode 3.3.4 只支持 `SessionStart`、`UserPromptSubmit`、`PreToolUse`、`PermissionRequest`、`PostToolUse`、`PostToolUseFailure`、`Stop`。不要复制 Claude 的 `PreCompact`、`PostCompact`、`SessionEnd`、`SubagentStop` 或 `Notification`。
 - Hook stdout 为空表示放行；只要非空就必须满足严格 JSON schema。诊断只写 stderr，异常 fail-open；优先使用 `process` + `node`，不要引入 shell/Python launcher 的跨平台分支。
-- 当前 ZCode 支持插件子代理，`.zcode-plugin/plugin.json` 的 `agents` 指向 `references/zcode/agents/`；用 `python3 scripts/generate-zcode-agents.py` 从 Claude 真源生成并提交，检查脚本验证生成一致性与权限回归。模型继承当前会话，保留工具白名单与禁止工具；不照搬 Claude inline hooks，拆文角色的路径范围仍是提示约束，不宣称强隔离。官方依据：[Plugin](https://zcode.z.ai/en/docs/plugin)、[Subagents](https://zcode.z.ai/en/docs/subagents)。
+- 当前 ZCode 支持插件子代理，`.zcode-plugin/plugin.json` 的 `agents` 指向 `references/zcode/agents/`；用 `python3 scripts/generate-zcode-agents.py` 从 Claude 真源生成并提交，检查脚本验证生成一致性与权限回归。模型继承当前会话，保留工具白名单与禁止工具，并显式设置 `injectAgentsMd: false`（ZCode 3.7.1+ 默认向子代理注入工作区 `AGENTS.md`，显式关闭以免把主会话路由总控注入子代理）；不照搬 Claude inline hooks，拆文角色的路径范围仍是提示约束，不宣称强隔离。ZCode 3.7+ 出于安全限制会整块忽略项目级 `.zcode/config.json` 中的 `hooks`（`config_project_hooks_ignored`），运行时写前守卫与写后检查依赖启用 `oh-story` 插件或用户级 `~/.zcode/cli/config.json`。官方依据：[Plugin](https://zcode.z.ai/en/docs/plugin)、[Subagents](https://zcode.z.ai/en/docs/subagents)、[Hooks](https://zcode.z.ai/en/docs/hooks)。
 - 不生成 `.zcode/agents/` / `.zcode/rules/` 或写入用户 home。Skills-only 安装不注册插件角色；提示启用/更新插件，而不是固定 solo 或反复部署项目。
 
 ### ZCode 检查步骤
@@ -393,17 +393,18 @@ bash scripts/test-prose-net-parity.sh
 
 ## Reasonix 适配维护
 
-Reasonix（DeepSeek-Reasonix CLI）当前支持 skills + 原生 plugin manifest + skills-only 的项目级 `story-setup` 部署；hooks 与 custom agents 留待后续阶段（涉及专业 Agent 的 Skill 走 solo/direct fallback）：
+Reasonix（DeepSeek-Reasonix CLI）当前支持 skills + 原生 plugin manifest（Manifest v2）+ skills-only 的项目级 `story-setup` 部署；hooks 与 custom agents 留待后续阶段（涉及专业 Agent 的 Skill 走 solo/direct fallback）：
 
-- 根 `reasonix-plugin.json` 是 plugin manifest；`version` 必须与 `skills/story/VERSION` 同步（`check-reasonix-adapter.sh` 守卫）。
+- 根 `reasonix-plugin.json` 是 Manifest v2 plugin manifest（必须声明 `"apiVersion": "reasonix.io/plugin/v2"`）；`version` 必须与 `skills/story/VERSION` 同步（`check-plugin-packaging.py` 与 `check-reasonix-adapter.sh` 共同守卫）。
 - Reasonix 原生扫描项目 skill root（`.agents/skills` 等，指向 `skills/` 的 symlink，与 Codex 共用）发现 14 个 skill。
 - `story-setup` 的 `target_cli=reasonix` 走 skills-only 部署：复制 14 个 skill 到项目 `skills/`、写入 `references/reasonix/AGENTS.md.tmpl`，不部署 hooks/agents（与 OpenClaw / generic 同构，由 `check-story-setup-deployment.sh` 守卫）。改动 Reasonix 部署路径或模板时同步该守卫。
-- 真实 CLI 校验 `reasonix doctor capabilities` 不在 CI 内，发版前可手动跑。
+- `cli-compat.yml` 安装 `reasonix@latest` 并运行 `REASONIX_REAL_CHECK=1 bash scripts/check-reasonix-adapter.sh`，在隔离 `REASONIX_HOME` 中验证 `reasonix plugin install`、`reasonix plugin doctor oh-story` 与 `reasonix doctor capabilities --json`。
 
 ### Reasonix 检查步骤
 
 ```bash
 bash scripts/check-reasonix-adapter.sh
+REASONIX_REAL_CHECK=1 bash scripts/check-reasonix-adapter.sh  # 本机安装 reasonix 时可选
 ```
 
 ## Codex 适配维护

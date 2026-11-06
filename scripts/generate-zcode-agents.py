@@ -106,7 +106,15 @@ def render_file(source: Path) -> tuple[str, str]:
     output.append(f"tools: {inline_list(tools)}")
     if "disallowedTools" in meta:
         output.append(f"disallowedTools: {inline_list(denied_tools)}")
-    output.extend((f"maxTurns: {int(raw_turns)}", "---", "", adapt_body(body, name)))
+    output.extend(
+        (
+            f"maxTurns: {int(raw_turns)}",
+            "injectAgentsMd: false",
+            "---",
+            "",
+            adapt_body(body, name),
+        )
+    )
     return f"{name}.md", "\n".join(output).rstrip() + "\n"
 
 

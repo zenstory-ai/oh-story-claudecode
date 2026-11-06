@@ -12,7 +12,7 @@
 
 ## Reasonix skills-only 部署算法
 
-Reasonix（DeepSeek-Reasonix CLI）当前只部署 skills 与 `AGENTS.md`，不部署 Reasonix hooks/custom agents（hook I/O 契约与子代理行为缺少可校验的真实 CLI，留待后续阶段）。
+Reasonix（DeepSeek-Reasonix CLI）项目部署只含 skills 与 `AGENTS.md`，不部署 hooks/custom agents（原生插件用根 `reasonix-plugin.json` Manifest v2：`apiVersion: "reasonix.io/plugin/v2"`；hooks 与子代理留待后续阶段）。
 
 1. 复制仓库当前 `skills/` 下所有含 `SKILL.md` 的 story skill 目录（14 个：`browser-cdp` 与 `story*`）到目标项目 `skills/{skill-name}/`；仅替换这些 story-setup 管理的已知 skill 目录，保留用户其他目录。项目副本是整份 skill 拷贝，agent references 只使用当前规范前缀 `skills/`。
 2. 在项目根创建 `.agents/skills → ../skills` 相对 symlink（与 Codex 共用的 skill root），使 Reasonix 原生扫描 `.agents/skills` 时发现这些 skill；若已是指向 `skills/` 的 symlink 则保留，若被占用为普通目录则不覆盖并在安装报告提示。Windows 未启用 symlink 时跳过本步，改用安装源仓库根的 `reasonix-plugin.json` 执行 `reasonix plugin install`。
