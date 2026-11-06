@@ -4,11 +4,15 @@ import * as path from "node:path"
 import { execSync } from "node:child_process"
 import {
   discoverActiveBook,
+  safeRelative,
   resolveTarget,
+  continuityFindings,
   extractProseTargets,
   extractPatchTargets,
   proseBlockReason,
   proseAfterWrite,
+  isGitCommitCommand,
+  stagedMarkdownWarnings,
 } from "./lib/story_hook_core.js"
 
 // 只支持 OpenCode 2.x 插件 API（default export `{ id, setup }`）。1.x 的 loader 读不了这个形状，
@@ -83,6 +87,16 @@ function text(input: ToolInput, key: string): string {
   return typeof value === "string" ? value : ""
 }
 
+const STORY_SUBAGENTS = new Set([
+  "chapter-extractor",
+  "character-designer",
+  "consistency-checker",
+  "narrative-writer",
+  "story-architect",
+  "story-explorer",
+  "story-researcher",
+])
+
 // 文件变更类工具的落盘目标。patch 是 edit 类工具（permission 与 write/edit 同为 edit），
 // 部分模型只暴露它、隐藏 write/edit——不接这个分支等于守卫整场失效。目标抽取（*** Add/Update File:
 // 与 *** Move to: 的目的地）复用共享核，与 ZCode/Codex adapter 同一份判据；Move 必须走目的地，
@@ -94,6 +108,43 @@ function mutationTargets(tool: string, input: ToolInput): string[] {
   }
   if (tool === "patch") return extractPatchTargets(text(input, "patchText"))
   return []
+}
+
+function proseTargets(tool: string, input: ToolInput): string[] {
+  return tool === "shell" ? extractProseTargets(text(input, "command")) : mutationTargets(tool, input)
+}
+
+function sessionContextOutput(directory: string): string {
+  const root = projectRoot(directory)
+  const messages: string[] = []
+  const sentinel = path.join(root, ".story-deployed")
+  if (fs.existsSync(sentinel)) {
+    let content = ""
+    try {
+      content = fs.readFileSync(sentinel, "utf-8")
+    } catch {}
+    const match = content.match(/^target_cli:\s*(.+)$/m)
+    if (!match) {
+      messages.push("[story-setup] .story-deployed 缺少 target_cli；建议重新运行 /story-setup。")
+    } else if (!match[1].split(",").map((item) => item.trim()).includes("opencode")) {
+      messages.push(
+        "[story-setup] 当前部署标记未包含 opencode；如需 OpenCode 项目适配，请重新运行 /story-setup 并选择 OpenCode。"
+      )
+    }
+  }
+  const bookDir = discoverActiveBook(root)
+  if (bookDir) {
+    const ctxPath = path.join(bookDir, "追踪", "上下文.md")
+    if (fs.existsSync(ctxPath)) {
+      messages.push(
+        `[story context] 当前书目：${safeRelative(root, bookDir)}。继续长篇写作前先读取 ${safeRelative(root, ctxPath)}。`
+      )
+    } else {
+      messages.push(`[story context] 检测到写作项目：${safeRelative(root, bookDir)}。`)
+    }
+  }
+  messages.push(...continuityFindings(root))
+  return messages.join("\n")
 }
 
 function preCompactOutput(directory: string): string {
@@ -123,6 +174,22 @@ function preCompactOutput(directory: string): string {
   return lines.join("\n")
 }
 
+function resultContains(
+  result: { content?: string | ReadonlyArray<unknown>; output?: unknown },
+  needle: string
+): boolean {
+  if (typeof result.content === "string") return result.content.includes(needle)
+  if (Array.isArray(result.content)) {
+    return result.content.some(
+      (part) =>
+        Boolean(part && typeof part === "object" && typeof (part as { text?: unknown }).text === "string") &&
+        (part as { text: string }).text.includes(needle)
+    )
+  }
+  const output = typeof result.output === "string" ? result.output : JSON.stringify(result.output ?? "")
+  return output.includes(needle)
+}
+
 // 把发现追加到模型读到的工具返回内容后面。content 缺省时 OpenCode 会把 output 序列化成文本给模型，
 // 这里照同一规则补齐再追加，不吞掉原结果。
 function appendNote(
@@ -142,6 +209,20 @@ export default {
   id: "oh-story.story-hooks",
   async setup(ctx) {
     const directory = ctx.location.directory
+    const seenSessions = new Set<string>()
+    const pendingCommitWarnings = new Map<string, string>()
+
+    // 会话首轮模型请求前注入部署状态、当前书目上下文与连续性缺口提醒（子代理与同会话后续轮次跳过）。
+    await ctx.session.hook("context", (event) => {
+      if (typeof event.agent === "string" && STORY_SUBAGENTS.has(event.agent)) return
+      const sessionID = typeof event.sessionID === "string" ? event.sessionID : ""
+      if (sessionID) {
+        if (seenSessions.has(sessionID)) return
+        seenSessions.add(sessionID)
+      }
+      const contextMsg = sessionContextOutput(directory)
+      if (contextMsg) event.system.push({ type: "text", text: contextMsg })
+    })
 
     // 压缩前把当前写作上下文位置写进摘要请求的 system，摘要才会带上「接着写哪本、状态文件在哪」。
     // OpenCode 无压缩后 hook，不注入 post-compact 信息。
@@ -152,38 +233,57 @@ export default {
 
     await ctx.tool.hook("execute.before", (event) => {
       const input = asInput(event.input)
-      const targets =
-        event.tool === "shell" ? extractProseTargets(text(input, "command")) : mutationTargets(event.tool, input)
+      const command = event.tool === "shell" ? text(input, "command") : ""
+      const targets = proseTargets(event.tool, input)
+      const isCommit = event.tool === "shell" && isGitCommitCommand(command)
 
-      // 非写类工具（read/grep/glob/…）到这里 targets 为空直接返回：projectRoot() 是同步 execSync，
-      // 插件常驻在 OpenCode 服务进程里，只有确认有目标要查时才 fork git。
-      if (targets.length === 0) return
+      // 非写类工具（read/grep/glob/…）且非 git commit 到这里直接返回：projectRoot() 是同步 execSync，
+      // 插件常驻在 OpenCode 服务进程里，只有确认有目标或暂存提交要查时才 fork git。
+      if (targets.length === 0 && !isCommit) return
 
       const root = projectRoot(directory)
-      const base = targetBase(root, directory, input)
-      for (const target of [...new Set(targets)]) {
-        const reason = proseBlockReason(root, resolveTarget(root, target, base))
-        if (reason) {
-          const source = event.tool === "shell" ? "已从 Shell 命令识别到正文写入目标。" : "已识别到正文写入目标。"
-          throw new Error(`${reason}（${source}）`)
+      if (targets.length > 0) {
+        const base = targetBase(root, directory, input)
+        for (const target of [...new Set(targets)]) {
+          const reason = proseBlockReason(root, resolveTarget(root, target, base))
+          if (reason) {
+            const source = event.tool === "shell" ? "已从 Shell 命令识别到正文写入目标。" : "已识别到正文写入目标。"
+            throw new Error(`${reason}（${source}）`)
+          }
         }
+      }
+
+      if (isCommit) {
+        const callKey = typeof event.id === "string" && event.id ? event.id : "__default__"
+        const warning = stagedMarkdownWarnings(root)
+        if (warning) pendingCommitWarnings.set(callKey, warning)
+        else pendingCommitWarnings.delete(callKey)
       }
     })
 
-    // 正文落盘兜底：写正文后跑轻量确定性网（截断/拒绝语/工程词/复读 + 落盘/字数/标题去重），
-    // 把发现追加进写工具的返回内容让模型读到。非正文文件、无发现一律不动结果（静默放行）。
+    // 正文落盘兜底与 git commit 暂存提醒：写正文后（含 write/edit/patch 与 shell 重定向）跑轻量确定性网
+    // （截断/拒绝语/工程词/复读 + 落盘/字数/标题去重），并把提交前捕获的暂存区警告（若 pre-commit
+    // 未输出过）追加进工具返回内容让模型读到。非目标调用、无发现一律不动结果（静默放行）。
     await ctx.tool.hook("execute.after", (event) => {
+      const callKey = typeof event.id === "string" && event.id ? event.id : "__default__"
+      const commitWarning = pendingCommitWarnings.get(callKey) ?? ""
+      pendingCommitWarnings.delete(callKey)
       if (event.status !== "completed") return
       const input = asInput(event.input)
-      const targets = mutationTargets(event.tool, input)
-      if (targets.length === 0) return
-      const root = projectRoot(directory)
-      const base = targetBase(root, directory, input)
+      const targets = proseTargets(event.tool, input)
+      if (targets.length === 0 && !commitWarning) return
       try {
         const notes: string[] = []
-        for (const target of [...new Set(targets)]) {
-          const note = proseAfterWrite(root, resolveTarget(root, target, base))
-          if (note) notes.push(note)
+        if (targets.length > 0) {
+          const root = projectRoot(directory)
+          const base = targetBase(root, directory, input)
+          for (const target of [...new Set(targets)]) {
+            const note = proseAfterWrite(root, resolveTarget(root, target, base))
+            if (note) notes.push(note)
+          }
+        }
+        if (commitWarning && !resultContains(event.result, "Story Commit Warnings")) {
+          notes.push(commitWarning)
         }
         if (notes.length) {
           event.result = { ...event.result, content: appendNote(event.result, notes.join("\n\n")) }
