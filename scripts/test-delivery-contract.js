@@ -92,13 +92,15 @@ try {
   const paragraphs = body().replace('字\n###2.', '字\n\n另一段\n###2.')
   assert.strictEqual(run(writeCase('paragraphs', paragraphs)).status, 0)
   for (const [name, text] of [
-    ['missing-blank', paragraphs.replace('字\n\n另一段', '字\n另一段')],
+    ['missing-blank', paragraphs.replace('字\n\n另一段', '字\n另一段').replace('另一段\n###2.', '另一段\n\n再一段\n###2.')],
     ['extra-blank', paragraphs.replace('字\n\n另一段', '字\n\n\n另一段')],
   ]) {
     const result = run(writeCase(name, text))
     assert.strictEqual(result.status, 1)
     assert(failureIds(result).includes('delivery.blank-lines'))
   }
+  const legacy = body().replace('字\n###2.', '字\n另一段\n###2.')
+  assert.strictEqual(run(writeCase('legacy-single-newline', legacy)).status, 0)
 
   // 文件末尾的空行只是落盘习惯，不算段间空行。
   const trailingBlank = run(writeCase('trailing-blank', `${body()}\n\n`))

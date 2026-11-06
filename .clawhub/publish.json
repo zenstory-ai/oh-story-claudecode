@@ -55,7 +55,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "d0c1235b610a53c718c668d38a1b6f103a0994db741dbf99468d4de5e8f9bdb9",
+      "packageDigest": "65ab3c8c3c092fe6530fb91c3aef549449d10fdd1486be6076b8a42a502a62ca",
       "path": "skills/story",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -67,15 +67,15 @@
         "bin:node",
         "skill:worldwonderer/story-cover@1.1.14",
         "skill:worldwonderer/story-deslop@1.1.40",
-        "skill:worldwonderer/story-import@1.0.38",
+        "skill:worldwonderer/story-import@1.0.39",
         "skill:worldwonderer/story-long-analyze@1.1.35",
         "skill:worldwonderer/story-long-scan@1.1.23",
-        "skill:worldwonderer/story-long-write@1.2.1",
-        "skill:worldwonderer/story-review@1.1.44",
-        "skill:worldwonderer/story-setup@1.2.1",
+        "skill:worldwonderer/story-long-write@1.2.2",
+        "skill:worldwonderer/story-review@1.1.45",
+        "skill:worldwonderer/story-setup@1.2.2",
         "skill:worldwonderer/story-short-analyze@1.1.27",
         "skill:worldwonderer/story-short-scan@1.1.20",
-        "skill:worldwonderer/story-short-write@1.2.1"
+        "skill:worldwonderer/story-short-write@1.2.2"
       ],
       "slug": "story",
       "supportedRuntimes": [],
@@ -85,7 +85,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.0.32"
+      "version": "1.0.33"
     },
     {
       "catalogMigration": true,
@@ -172,7 +172,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "7183b88161456090155bcbb191a0971cb5fbb2165656bdc6bd88e2d0ea0347db",
+      "packageDigest": "ecca0c860cac390f01dfaf533aa04c5ab63daf2738e178e2df3763b04a59d095",
       "path": "skills/story-import",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -192,7 +192,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.0.38"
+      "version": "1.0.39"
     },
     {
       "catalogMigration": true,
@@ -279,7 +279,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "696ddf0b3cef1cf2d87822a2d2c944867c27f669a37650354135d59a711f8c0a",
+      "packageDigest": "a4d8983d87c2ff03e0888d9141de702b950bbb7b20606f5e4f3347e18d00308d",
       "path": "skills/story-long-write",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -299,7 +299,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.2.1"
+      "version": "1.2.2"
     },
     {
       "catalogMigration": true,
@@ -315,7 +315,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "32d9af5e5fa09ca2dcc58ef38788cde3ef2293f8b43979f7d7c045d1e0b63713",
+      "packageDigest": "be71d221a26401fba447a1e9b81cf2e0fd2093d226e9602dea271b16cd95fe2c",
       "path": "skills/story-review",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -335,7 +335,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.1.44"
+      "version": "1.1.45"
     },
     {
       "catalogMigration": true,
@@ -351,7 +351,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "fc8f0bf2f1cb1a2724adc9a24ad2b8870319530d19b4d80bcc698edc969e8832",
+      "packageDigest": "72eb77c7a4ee6c6999d66f83fbd4ff2b8c19f519c07a5c3004d0bd3f0b3a2663",
       "path": "skills/story-setup",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -371,7 +371,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.2.1"
+      "version": "1.2.2"
     },
     {
       "catalogMigration": true,
@@ -455,7 +455,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "88f032cad889a9cc6b74741b8cb9a1f247e5dda2b29b9f1e57f599db6520ddf0",
+      "packageDigest": "e43aa3cc0d2344d69e5c56887424d46aeb28031cb6fbef6e2fab19774d0d7150",
       "path": "skills/story-short-write",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -475,7 +475,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.2.1"
+      "version": "1.2.2"
     },
     {
       "categories": [

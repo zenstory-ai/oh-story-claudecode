@@ -136,21 +136,25 @@ function verify(projectDir, contract) {
   ))
 
   const markerLines = new Set(markers.map((entry) => entry.line - 1))
-  const invalidBlankLines = []
+  const paragraphGaps = []
   for (let index = 0; index < lines.length;) {
     if (lines[index].trim() === '') { index++; continue }
     let next = index + 1
     while (next < lines.length && lines[next].trim() === '') next++
-    if (next < lines.length && !markerLines.has(index) && !markerLines.has(next) && next - index !== 2) {
-      invalidBlankLines.push(`${index + 1}-${next + 1}`)
-    }
+    if (next < lines.length && !markerLines.has(index) && !markerLines.has(next))
+      paragraphGaps.push({ from: index + 1, to: next + 1, gap: next - index })
     index = next
   }
+  // 历史短篇使用单换行；交付检查不追溯阻断。只要正文已有空行，就按新格式检查一致性。
+  const legacySpacing = paragraphGaps.every((entry) => entry.gap === 1)
+  const invalidBlankLines = legacySpacing ? [] : paragraphGaps
+    .filter((entry) => entry.gap !== 2)
+    .map((entry) => `${entry.from}-${entry.to}`)
   checks.push(makeCheck(
     'delivery.blank-lines',
     invalidBlankLines.length === 0,
-    invalidBlankLines.length ? `正文段落间距错误：${invalidBlankLines.join('、')}` : '正文段落间均空一行',
-    '相邻正文段落之间恰好一个空行（两个换行符）；小节标记相邻处另算',
+    invalidBlankLines.length ? `正文段落间距错误：${invalidBlankLines.join('、')}` : (legacySpacing ? '历史单换行正文沿用原格式' : '正文段落间均空一行'),
+    '新正文段间恰好一个空行；历史单换行正文可继续交付，小节标记相邻处另算',
     '仅在报告的相邻段落之间补齐或删减空行。'
   ))
 
