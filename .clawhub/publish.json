@@ -455,7 +455,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "caa1ed87418eb4f5044807c4f51087bf13711739ae4f1c56e7a020cfec5a8bff",
+      "packageDigest": "7efae1fa68f55aeca9c44295cd2f0a5c968d54b14e0c9659affa4f12aceccf73",
       "path": "skills/story-short-write",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -475,7 +475,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.2.2"
+      "version": "1.2.3"
     },
     {
       "categories": [
