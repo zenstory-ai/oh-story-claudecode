@@ -13,7 +13,7 @@
 | 读者已知 | 正文已经揭示的内容 | 一章写完时 |
 | 世界规则 | 适用条件、例外、代价 | 规则建立或修订时 |
 
-每条事实只认一个权威位置，其他文件引用它或只记当前结果。
+每条事实只在一个地方定准，其他文件要么引用它，要么只记最新结果。
 
 ## 可复制的角色状态模板
 
@@ -64,18 +64,18 @@
 
 ## 用本仓库的 skill 怎么做
 
-上面是手工维护的做法。用 Oh Story 写长篇时，这些状态由 [story-long-write](../skills/story-long-write/SKILL.md) 维护：每写完一章，Agent 只提交这一章的变化，工具据此更新唯一的状态文件，再生成书目录 `追踪/` 下的角色状态、伏笔、作者时间线和读者已知等视图。这些视图不手改，改了会在核对时报错。四层文件怎么分工，见 [AI 写长篇小说怎么不崩人设](ai-long-novel-character-consistency.md)。
+上面是手工维护的做法。用 Oh Story 写长篇时，这些状态由 [story-long-write](../skills/story-long-write/SKILL.md) 维护：每写完一章，Agent 只提交这一章的变化，脚本据此更新唯一的底账文件，再自动生成书目录 `追踪/` 下的角色状态、伏笔、作者时间线和读者已知等文件。这些自动生成的文件不要手改，手改后会在核对时报错。四层文件怎么分工，见 [AI 写长篇小说怎么不崩人设](ai-long-novel-character-consistency.md)。
 
 书稿不是在 Oh Story 里写的，先用 `/story-import` 导入，它会把已有章节整理成带设定、大纲和追踪的项目。已经在 Oh Story 项目里、想对着正文核一遍设定时，在 Claude Code 里可以这样说（Codex 里把 `/` 换成 `$`）：
 
 > 用 /story-long-write 对照已写的正文核对设定集，分成稳定设定、截至第 12 章的完整状态、客观事件和各方已知。每项变化都引用正文，只更新变了的部分，其他仍然成立的事实保留。本轮不写正文。
 
-核对工具能证明视图和状态文件一致，但证明不了小说本身没有漏写或记错，最后仍要作者读一遍。
+核对工具能确认各个追踪文件和底账一致，但不能替你判断小说本身有没有漏写或记错，最后仍要作者读一遍。
 
 ## 相关
 
 - 站点原文（含更多示例与相关指南）：https://zenstory.ai/zh/oh-story/story-bible-template
-- [追踪状态协议：唯一状态与生成视图](../skills/story-long-write/references/tracking-transaction.md)
+- [追踪状态更新说明](../skills/story-long-write/references/tracking-transaction.md)
 - [改稿后从改动处往后核对状态](../skills/story-long-write/references/workflow-revision.md)
 - [把已定的变化写成连贯场景](../skills/story-long-write/references/writing-craft.md)
 - 仓库地址：https://github.com/zenstory-ai/oh-story-claudecode

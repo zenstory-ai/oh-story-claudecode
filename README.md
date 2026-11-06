@@ -111,12 +111,12 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
              ├ check-degeneration.js    0 命中
              └ normalize-punctuation    0 命中
 追踪提交   storyctl.py chapter commit  tracking_committed=true · state_revision 0 → 1
-派生视图   tracking_commit.py check    上下文.md / 伏笔.md / 角色状态/ / 时间线/ / 逐章记录/ 全部由 state 重生成，逐字一致
+追踪文件   tracking_commit.py check    上下文.md / 伏笔.md / 角色状态/ / 时间线/ / 逐章记录/ 全部由 state 重生成，逐字一致
 ```
 
 动笔前先过细纲与追踪门禁，细纲验收通过后，由 `narrative-writer` 分两段写正文。单章交稿前核对设定与伏笔（日更连写则在整批写完后集中核对），读感发虚或 AI 味重时再做去味润色，最后跑完本地收尾脚本与 `chapter check`。
 
-提交之后，追踪状态是工具从 `_tracking-state.json` 整份重新渲染的，**手改派生文件会被 `check` 拒绝**。
+提交之后，追踪状态是工具从 `_tracking-state.json` 整份重新生成的，**手改自动生成的追踪文件会被 `check` 拒绝**。
 对照上面的状态卡，回写实际改了什么（节选，省略了同批滚动的近三章速记与角色状态）：
 
 ```diff
@@ -138,7 +138,7 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 
 新角色谭守义有了自己的设定卡和角色状态文件；他那个「讲了五十年没人听全过」的故事，真相候选（E015）记在
 `时间线/作者真相.md` 并标为未揭示，`读者已知.md` 那一栏只有江晨看到的那句话。被退役的那条风险写进了
-`逐章记录/第021章.md` 的「本章退役登记」——**状态不会静默消失**。
+`逐章记录/第021章.md` 的「本章退役登记」——**状态不会无声漏掉**。
 
 成品：[`正文/第021章_离别怎么会开花.md`](demo/长篇/让你管账号，你高燃混剪炸全网/正文/第021章_离别怎么会开花.md)
 · [`大纲/细纲_第021章.md`](demo/长篇/让你管账号，你高燃混剪炸全网/大纲/细纲_第021章.md)
@@ -390,7 +390,7 @@ oh-story-claudecode 内置适配 Claude Code、Google Antigravity、OpenCode、Z
 - [提示词、技能包、插件与 MCP 怎么分](https://zenstory.ai/zh/oh-story/agent-skills-for-writers) — 网文作者怎么选趁手的 AI 写作工具
 - [导入 10–20 章后接着写](https://zenstory.ai/zh/oh-story/import-and-continue) — 旧稿反推设定与无缝续写实操
 - [分开角色已知、承诺与线索](https://zenstory.ai/zh/oh-story/long-novel-continuity) — 避免长篇连载前后矛盾或角色未卜先知
-- [把剧情规格写成可见变化](https://zenstory.ai/zh/oh-story/outline-to-chapter) — 细纲怎么写成有画面感的正文冲突
+- [把细纲要求写成看得见的场面变化](https://zenstory.ai/zh/oh-story/outline-to-chapter) — 细纲怎么写成有画面感的正文冲突
 - [用具体改稿减少“AI 味”](https://zenstory.ai/zh/oh-story/revise-ai-prose) — 删掉总结腔和套话，把戏落回动作与细节
 - [分开文风选择与本书事实](https://zenstory.ai/zh/oh-story/preserve-author-voice) — 让 AI 学你的行文腔调而不串戏
 - [AI 写长篇小说怎么不崩人设：Oh Story 的做法](docs/ai-long-novel-character-consistency.md) — 仓库内文档
@@ -432,7 +432,7 @@ Oh Story 是 [ZenStory AI](https://zenstory.ai/zh) 的一部分——一组开�
 | --- | --- |
 | [oh-story-claudecode](https://github.com/zenstory-ai/oh-story-claudecode) | 网文写作 skill 包（本仓库） |
 | [drama-skills](https://github.com/zenstory-ai/drama-skills) | AI 短剧 / 漫剧创作 skill 合集：剧本、资产、分镜、图片/视频提示词、独立审查 |
-| [novel-to-game](https://github.com/zenstory-ai/novel-to-game) | 小说改编游戏 skill 合集：忠于原著设定改编、可运行工程构建与实机验收 |
+| [novel-to-game](https://github.com/zenstory-ai/novel-to-game) | 小说改编游戏 skill 合集：原著拆解、目标运行环境构建与实机运行验收 |
 | [video-recap-skills](https://github.com/zenstory-ai/video-recap-skills) | 将支持的视频文件制作成中文解说，可选导出可编辑的剪映/CapCut 草稿 |
 | [oh-story-dsh](https://github.com/zenstory-ai/oh-story-dsh) | DeepSeek Harness 社区插件，提供小说、短剧、游戏和视频解说工作台 |
 | [zenstory](https://github.com/zenstory-ai/zenstory) | 对话即创作的 AI 小说写作工作台（[app.zenstory.ai](https://app.zenstory.ai)） |

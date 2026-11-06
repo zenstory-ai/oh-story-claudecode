@@ -143,7 +143,7 @@ OpenClaw、Reasonix 和通用模式把 skill 放在项目 `skills/` 里，重跑
 |------|------|
 | `追踪/_tracking-state.json` 存在且 `check` 通过 | 正常，无需处理 |
 | 缺 `_tracking-state.json` 但已有正文 | 日更停止；Claude Code、Codex、OpenCode、ZCode、Antigravity 上写正文会被 hook 直接拦下，其他工具由写作流程自己停下 |
-| 存在但派生视图被手改 | `check` 报 `derived view differs from _tracking-state.json` |
+| 存在但自动生成的追踪文件被手改 | `check` 报 `derived view differs from _tracking-state.json` |
 
 迁移**不需要重跑全书拆解**：正文、`设定/`、`大纲/`、`拆文库/` 都不受影响，只重建 `追踪/`。执行 `/story-import` 的「旧追踪项目迁移」——数出最后完整章号 `N`，从旧追踪文件与最近几章正文重建当前状态，构造 `last_chapter=N` 的初始化事务跑 `tracking_commit.py init`。旧追踪结构会被按原样整体移入 `追踪/_旧追踪存档/`，不删除、不参与解析。
 

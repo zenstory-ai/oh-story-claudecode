@@ -7,7 +7,7 @@
 **缺文件先修，本轮不写**（修好再从「检查细纲」开始；告诉作者用下方「写不下去、要停下时」的问法）：
 - `tracking_commit.py check` 不过：按它的提示修。
 - 已有正文却缺 `_tracking-state.json`：请作者走 `/story-import`「旧追踪项目迁移」；新书还没有正文时不算缺，按下方初始化。
-- 派生视图与 state 不一致：按 [tracking-transaction.md](tracking-transaction.md) 为该章提交 `mode=revision` 事务重建，不手改、不继续下一章。
+- 自动生成的视图与 state 不一致：按 [tracking-transaction.md](tracking-transaction.md) 为该章提交 `mode=revision` 事务重建，不手改、不继续下一章。
 - 有对标却缺情绪模块／节奏／文风：请作者用 `/story-long-analyze` 补拆。本书有自定义文风时不缺文风；无对标（判定见 [benchmark-recall.md](benchmark-recall.md)）或召回降档成立时都不算缺。
 
 **缺细纲**：写指定章时按 [outline-template.md](outline-template.md) 补建点名章细纲（目标情绪、主角目标/关键选择须明确，其余未知写 `[待补充]`），跑 `check-outline-contract.js` 验收再写，汇报里说补了什么；日更批内停在该章前问作者。

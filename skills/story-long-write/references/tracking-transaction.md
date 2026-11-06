@@ -4,13 +4,13 @@
 
 `追踪/` 以结构化 state 为权威，由脚本生成各 Markdown 视图。模型只提交一份语义 JSON，不分别 `Write/Edit/echo >>` 多个追踪文件。
 
-## 权威层与派生层
+## 底账与自动生成的视图
 
 | 层级 | 文件 | 语义 |
 |---|---|---|
-| 唯一权威 | `_tracking-state.json` | schema、最后提交章、导入截止章、状态修订号、上下文结构、角色/伏笔/时间线，以及已提交章节的简短字数记录 |
+| 唯一底账 | `_tracking-state.json` | schema、最后提交章、导入截止章、状态修订号、上下文结构、角色/伏笔/时间线，以及已提交章节的简短字数记录 |
 | 章节记录 | `逐章记录/第NNN章.md` | 本章对未来连续性有用的紧凑变化；目标 ≤1536 字节，硬上限 3072 字节；导入范围内修订写成覆盖记录 |
-| 派生视图 | `上下文.md`、`角色状态/{角色名}.md`、`伏笔.md`、`时间线/作者真相.md`、`时间线/读者已知.md` | 完全从 `_tracking-state.json` 生成；禁止手改，不作为程序输入 |
+| 自动生成的视图 | `上下文.md`、`角色状态/{角色名}.md`、`伏笔.md`、`时间线/作者真相.md`、`时间线/读者已知.md` | 完全从 `_tracking-state.json` 自动生成；禁止手改，不作为程序输入 |
 
 Markdown 只负责给作者和 Agent 阅读，工具不再反向解析 Markdown。`check` 直接从 `_tracking-state.json` 重渲染并逐文件比较。未来“第几章揭示”的计划写在卷纲/细纲，不写成时间线既成事实。
 逐章记录只是便于人阅读的紧凑变化记录，不承诺单独无损重建全部当前状态；完整当前语义以 `_tracking-state.json` 为准。
@@ -35,13 +35,13 @@ Markdown 只负责给作者和 Agent 阅读，工具不再反向解析 Markdown�
 - `chapter check`：重新读取当前正文与细纲目标，返回确定性长度状态、现有 blocking quality、`state_revision` 和当前可执行动作，不保存 approval。顶层 `status`：`ready`（可提交，exit 0）/ `needs_decision`（长度带外，按 `available_actions` 交作者，exit 0）/ `blocked`（有 blocking 正文问题，exit 1）/ `invalid`（正文为空等，exit 1）/ `tool_unavailable`（找不到 node 或检测脚本，见 `quality.tool_errors`，不是正文问题，exit 3）。参数错误或文件缺失输出 `story-chapter-error/v1`（`status: error`，exit 2）。加 `--plain` 改用白话输出同一结论（含本章碎度两个数：短段占比、叙述句长中位数，附真人参照，只提示不拦），退出码不变。`under` 不提供自动补写；`over` 额外返回一次净删型 `compress-once` 及回到生效区间所需的删除字数。`quality.semantic_advisories` 是语义类 advisory 条数（检测器标 `review: mechanical` 的不计）。
 - `chapter commit`：再次读取当前文件、重新计数并重跑 blocking quality；只接受生效区间内的章节，把简短字数记录与逐章事务一起原子提交。新章与修订都走它。
 - `chapter accept-current-length`：只接受带外但 quality pass 的章节；接受动作发生时重新读取、重新计数并立即原子提交，不保存可陈旧的历史决议。低于字数目标一半（`BELOW_ACCEPT_FLOOR`），或超长却还没做过那一次压缩（`COMPRESSION_REQUIRED`），都拒绝；作者明确拍板时加 `--force`。
-- `check`：严格验证 state schema、逐章记录连续性/规范名/体积、固定 7 栏、角色快照硬上限、派生文件集合，以及所有派生视图与 state 的逐字一致性。
+- `check`：严格验证 state schema、逐章记录连续性/规范名/体积、固定 7 栏、角色快照硬上限、自动生成的文件集合，以及各视图与 state 的逐字一致性。
 
 每本书由 `追踪/.tracking-commit.lock` 串行写事务，`expected_state_revision` 再拒绝基于旧状态构造的 stale transaction。两个不同事务并发时至多一个修订成功。字数记录也在锁内对当前正文和目标重新验证，正文或目标变化会让预先构造的记录直接失败。
 
 事务 JSON 是临时输入，不是项目产物：只写在书目录 `.story/work/` 下（逐章事务放 `.story/work/第NNN章/tracking.json`），不写系统 `/tmp`、书根、`大纲/` 或 `正文/`；成功前必须保留，提交成功后即可删除（`storyctl.py chapter commit` / `accept-current-length` 成功时自动删除该章目录；直接调用 `tracking_commit.py commit` 时由调用方删除。已有字数记录的章节正文或目标改过后，`tracking_commit.py commit` 拒绝修订事务，须走 `storyctl.py chapter commit`）——之后 `check` 失败按下文提交 `mode=revision` 新事务修复，不需要原事务。若文件写入失败，`_tracking-state.json` 尚未推进；修正环境后直接重跑**同一份** `commit`。append 重跑只接受内容完全相同的既有逐章记录，不维护 `dirty/pending/repair` 状态机。
 
-校验失败与写入失败处理方式不同：校验失败（字段非法、退役结构、容量超限）要按报错改事务本身，重跑同一份结果不变。派生视图被手改或外部改动导致 `check` 报 `derived view differs from _tracking-state.json` 时，重新提交**该章**的 `mode=revision` 事务让工具整份重建，`expected_state_revision` 取 `追踪/_tracking-state.json` 的 `state_revision` 字段——`check` 失败时只往 stderr 打 ERROR，不输出 JSON；不手改派生文件，也不删 `_tracking-state.json` 重来。手写出的逐章记录会让同章 `append` 永久报 `chapter delta N already exists with different content`——删掉那个手写文件后重跑原事务即可。
+校验失败与写入失败处理方式不同：校验失败（字段非法、退役结构、容量超限）要按报错改事务本身，重跑同一份结果不变。自动生成的视图被手改或外部改动导致 `check` 报 `derived view differs from _tracking-state.json` 时，重新提交**该章**的 `mode=revision` 事务让工具整份重建，`expected_state_revision` 取 `追踪/_tracking-state.json` 的 `state_revision` 字段——`check` 失败时只往 stderr 打 ERROR，不输出 JSON；不手改自动生成的文件，也不删 `_tracking-state.json` 重来。手写出的逐章记录会让同章 `append` 永久报 `chapter delta N already exists with different content`——删掉那个手写文件后重跑原事务即可。
 
 本工具不解析旧 `_tracking-meta.json`、`时间线/事件库.json` 或更早追踪结构，不提供语义兼容层。`init` 遇到这类旧文件时，先把它们按原样整体移入 `追踪/_旧追踪存档/`，再在原地建当前协议：旧内容留给作者查阅，不参与解析，当前状态完全以 init 输入为准。校验失败的 `init` 不移动任何文件。`commit` 与 `check` 仍直接拒绝旧结构——它们只在已建协议的项目上运行。
 
@@ -120,7 +120,7 @@ Markdown 只负责给作者和 Agent 阅读，工具不再反向解析 Markdown�
 约束：
 
 - 构造事务前运行 `check`，把当前 `state_revision` 原样写入 `expected_state_revision`；若状态已经变化，重新读取 state 并重构事务。
-- `context` 的允许字段随子命令不同：`init` 收 `position`、`long_term_constraints`、`active_character_names`、`continuity_risks`、`recent_chapters`、`next_chapter_commitments` 六项；`commit` 只收前四项。`recent_chapters` 与 `next_chapter_commitments` 在 commit 时由工具从当前视图和本章 `delta` 派生，手填会在任何写入前被拒（`context contains unsupported fields: ...`，exit 2）。commit 事务须使用自身允许字段，不能照搬 init 示例。
+- `context` 的允许字段随子命令不同：`init` 收 `position`、`long_term_constraints`、`active_character_names`、`continuity_risks`、`recent_chapters`、`next_chapter_commitments` 六项；`commit` 只收前四项。`recent_chapters` 与 `next_chapter_commitments` 在 commit 时由工具从当前视图和本章 `delta` 自动算出，手填会在任何写入前被拒（`context contains unsupported fields: ...`，exit 2）。commit 事务须使用自身允许字段，不能照搬 init 示例。
 - `character_snapshots` 中出现的角色视为核心复用角色，必须同时出现在 `character_changes`；已经建立快照的核心角色再次变化时必须提交新快照。
 - 角色快照的四个列表不限制条数，只限制单项长度和最终文件总字节：目标 ≤4096 字节，超过警告；硬上限 8192 字节，超过则在任何写入前拒绝。
 - 没有快照的角色变化视为临时角色，不建立状态文件；`context.active_character_names` 是下一章的活跃角色，不是核心角色总数或主角数：最多 20 人且必须已有当前快照，只列下一章出场或被直接牵动的核心角色，其余核心角色保留快照，需要时读 `追踪/角色状态/{名}.md`。

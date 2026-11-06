@@ -4,7 +4,7 @@
 
 使用当前运行时的 Agent 工具并行调用（Codex 原生子代理使用 `agent_type`，Claude Code 使用 `subagent_type`，OpenCode 使用 `subagent` 工具的 `agent` 参数，Antigravity 使用 `invoke_subagent` + 同名 `TypeName`，ZCode 用 `Agent` 派发注册角色；实际字段以当前 CLI 暴露的工具为准）。每个 Agent 不继承父对话上下文，prompt 必须自包含项目路径、审查范围、文件路径、必要摘录和统一 Findings Schema。结构、角色、文字三个视角的 prompt 还要内联审查基准包摘要与 Rubric Source，使子 Agent 能直接开审；prompt 不写本 Skill 的资料路径，各 reviewer 按自己模板里的读取表加载方法资料。consistency-checker 按自己的检查项核对事实，不带内容评分基准包。所有 reviewer 只读：不改任何文件，只输出结果。
 
-**追踪修订号**：长篇工程（有 `追踪/_tracking-state.json`）派 consistency-checker 前，先跑本 skill 的 `scripts/tracking_commit.py check --project {项目根}`，把输出的 `last_committed_chapter`、`state_revision` 填进它的 prompt；check 报错时这一栏写「check 失败，派生视图不可信：{报错首行}」，报告「没法判断的地方」用白话写明追踪记录和正文对不上、这次没据它核对。短篇不填。
+**追踪修订号**：长篇工程（有 `追踪/_tracking-state.json`）派 consistency-checker 前，先跑本 skill 的 `scripts/tracking_commit.py check --project {项目根}`，把输出的 `last_committed_chapter`、`state_revision` 填进它的 prompt；check 报错时这一栏写「check 失败，追踪文件不可信：{报错首行}」，报告「没法判断的地方」用白话写明追踪记录和正文对不上、这次没据它核对。短篇不填。
 
 **story-explorer 预查询（可选）**。仅当 `Effective Mode` 仍为 `full`/`lean`、当前允许 spawn 且当前运行时的 Agent 工具可用时，才可按 Phase 0 的当前宿主来源确认 `story-explorer` 可用并 spawn（ZCode 查插件注册角色）；Antigravity 检查 `.agents/agents/story-explorer/agent.md`，用 `invoke_subagent` + `TypeName: "story-explorer"`。`solo` 或子代理递归保护场景下不得 spawn，只能直接读取/检索。Prompt 示例：
 
@@ -124,7 +124,7 @@
   审查范围：{文件路径/章节/必要摘录}
   已知角色：{从设定文件提取角色列表}
   last_committed_chapter：{check 输出；短篇写「无追踪」}
-  state_revision：{check 输出；check 失败写「check 失败，派生视图不可信：{报错首行}」}
+  state_revision：{check 输出；check 失败写「check 失败，追踪文件不可信：{报错首行}」}
   继承的开放项（分批审查必填，无则写「无」）：{从 追踪/伏笔.md 提取的、预计回收章 ≤ 本批末章的已埋未回收伏笔，连同上一批未解决 findings 摘要}
   检查项：
   1. 角色属性是否前后一致？
