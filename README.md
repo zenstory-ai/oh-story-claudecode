@@ -32,22 +32,22 @@
   <a href="https://github.com/zenstory-ai/oh-story-claudecode/discussions"><img alt="GitHub Discussions" src="https://img.shields.io/badge/GitHub%20Discussions-181717?style=for-the-badge&logo=github&logoColor=white"></a>
 </p>
 
-<video src="https://github.com/user-attachments/assets/8f9cc11b-1fb8-4cc5-a084-e0deb05ec791" controls muted playsinline width="100%"></video>
+https://github.com/user-attachments/assets/8f9cc11b-1fb8-4cc5-a084-e0deb05ec791
 
 ## 这是什么
 
 Oh Story 覆盖长篇与短篇网络小说的全流程：**扫榜选材 → 拆解爆款 → 搭大纲写正文 → 去AI味 → 生成封面图**。
 它以 14 个 skill 的形式装进你已经在用的编程 Agent，写作用的模型就是该 Agent 的模型，不需要 GPU，也不需要另外配模型。
 
-- **用文件系统当记忆** — 设定、大纲、正文、追踪各自独立维护，压缩上下文或更换会话后，从文件恢复当前进度、伏笔和未完承诺。
-- **确定性检查与门禁** — 长篇写前检查细纲和追踪，写后检查截断、工程词和常见 AI 句式。支持 hooks 的宿主自动执行对应检查，其他环境按 skill 流程执行。
+- **用文件系统当记忆** — 设定、大纲、正文、追踪分目录落盘。几十万字的长篇不靠对话记忆硬撑，压缩上下文或换新会话后，照样从文件读回当前进度、人物状态、伏笔和待填的坑。
+- **写前守卫与写后去味** — 长篇没写细纲不直接动笔，写完自动扫半截断章、大纲词漏进正文和常见 AI 腔。支持 hooks 的宿主自动拦截和巡检，其他环境按 skill 流程走完检查。
 - **适配 7 款编程 Agent** — Claude Code · Codex CLI · Google Antigravity · OpenCode · ZCode · OpenClaw · Reasonix；能读取项目文件的通用 Web AI / Agent 环境也可使用。
 - **面向的平台** — 起点、番茄、晋江、七猫、知乎盐言等长短篇平台。
 
 > **套路 = 确定性的情绪满足**
 
-先**扫榜**找题材、人设与切入点，再**拆文**分析节奏和剧情素材，最后用钩子、爽感和期待感组织自己的故事。
-设定、正文和追踪分别落盘，作者决定方向，Agent 按确认后的方案推进。
+先**扫榜**摸清题材风口、人设与开篇切入点，再**拆文**扒出爆款的黄金三章、爽点节奏与钩子写法，最后用钩子、爽点和期待感搭自己的书。
+设定、正文和追踪各自落盘，剧情方向由作者拍板，Agent 按敲定的方案推进。
 
 ## 安装
 
@@ -72,13 +72,13 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 
 ## 看看它的输出
 
-以下展示 skill 的真实产出，以及一份专门构造的 AI 腔测试样例，完整文件在 **[demo/](demo/README.md)**。
+下面每一份都是 skill 跑出来的真实文件（外加一段专门构造的 AI 腔反例），完整文件在 **[demo/](demo/README.md)**。
 
-### 续写状态卡：把当前状态写进文件
+### 续写状态卡：为什么连载几百章不崩盘
 
-下面这本是项目作者自己的长篇，用 `/story-import` 把已发布的前 20 章反向重建成可续写工程。
-下面是**写第 21 章之前**的状态卡。`/story-long-write` 从
-`追踪/上下文.md` 读取连续性摘要，固定 7 栏、上限 12 KiB；主会话筛出本章相关状态交给写手，卡片全文不注入写手 prompt。细纲、相关设定和必要角色卡仍按任务读取：
+下面这本是项目作者自己的长篇，用 `/story-import` 把已发的前 20 章反向重建成可续写工程。
+下面是**开写第 21 章之前**的状态卡。`/story-long-write` 靠
+`追踪/上下文.md` 记账（固定 7 栏、上限 12 KiB），动笔前只挑本章用得上的状态交给写手，不把整张卡硬塞进正文提示词；本章细纲、相关设定和出场角色卡按需读取：
 
 ```markdown
 ## 当前位置
@@ -97,7 +97,7 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 - 先补第21章细纲，再承接老兵邀请、新歌伴奏和钢琴能力。
 ```
 
-**「作者真相」和「读者已知」分开记录**，用于检查角色是否提前知道答案、伏笔是否已揭示。
+**「作者底牌（作者真相）」和「读者已知」分开记账**——专门防角色开上帝视角、还没揭晓的伏笔提前说漏嘴。
 完整文件：[`demo/长篇/.../追踪/上下文.md`](demo/长篇/让你管账号，你高燃混剪炸全网/追踪/上下文.md)
 
 ### 续写第 21 章：从门禁到回写，一条链走完
@@ -105,7 +105,7 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 上面的视频录的就是这一段。`/story-long-write 写第21章` 在一次真实会话里的产出与每一道检查：
 
 ```text
-细纲       细纲_第021章.md              追踪里写着「第21章尚无细纲」，skill 先补纲：单元 L1-03、目标情绪、本章标价、闭环状态、10 个情节点四列表格（外加可选的分辨率列）
+细纲       细纲_第021章.md              追踪里写着「第21章尚无细纲」，skill 先补纲：单元 L1-03、目标情绪、本章标价、闭环状态、10 个情节点四列表格（外加可选的展开粒度列）
 章级检查   storyctl.py chapter check   ready · 字数 2068 / 目标 2300
              ├ check-ai-patterns.js     0 命中
              ├ check-degeneration.js    0 命中
@@ -114,7 +114,7 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 派生视图   tracking_commit.py check    上下文.md / 伏笔.md / 角色状态/ / 时间线/ / 逐章记录/ 全部由 state 重生成，逐字一致
 ```
 
-写正文前先检查细纲与追踪，细纲过结构验收后，由 `narrative-writer` 分两批写正文。单章提交前核对事实与伏笔，日更批次中未逐章检查的在批末核对；读感需要额外审读时再调用去味审查。交付前统一跑确定性收尾脚本与 `chapter check`。
+动笔前先过细纲与追踪门禁，细纲验收通过后，由 `narrative-writer` 分两段写正文。单章交稿前核对设定与伏笔（日更连写则在整批写完后集中核对），读感发虚或 AI 味重时再做去味润色，最后跑完本地收尾脚本与 `chapter check`。
 
 提交之后，追踪状态是工具从 `_tracking-state.json` 整份重新渲染的，**手改派生文件会被 `check` 拒绝**。
 对照上面的状态卡，回写实际改了什么（节选，省略了同批滚动的近三章速记与角色状态）：
@@ -208,18 +208,18 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 
 ## 安装后的第一条请求
 
-按当前任务选一条请求，把〈占位内容〉换成自己的信息。
+复制下面对应的一条，把〈括号里的内容〉换成你的书就能开干：
 
-1. **开一本新书**
-   > 我想开一部〈类型/题材〉新书。先从我提供的材料中分开已确定事实与待决问题；只规划一个有边界的开篇，交付核心冲突、视角/信息释放限制、前三章变化和待决项。不要自动写正文；题材取舍、角色动机和长期方向留给我确认。
-2. **导入已有书稿**
-   > 请把这份书稿整理成可续写项目。第 1–〈N〉章完整，〈文件名〉是第〈N+1〉章残稿；保留原文，不覆盖完整章节，不把残稿算作完整章，推断出的设定单列待确认。先交付识别范围、重建事实、冲突/歧义和待我确认的决定，供我审阅；暂不续写。
-3. **修一段不满意的正文**
-   > 这段读起来〈空泛/重复/过度解释〉。先指出具体读感问题，保留故事事实、角色已知和未揭示边界；只交付这一段的修订建议、前后对照与理由，不全书改写。哪些建议采用由我决定。
+1. **开一本新书（先盘黄金三章与人设）**
+   > 我想开一本〈番茄男频都市脑洞 / 晋江古言穿书〉新书，核心卖点是〈一句话脑洞或金手指〉。先帮我把已想好的设定和还没定下来的地方理出来，搭一个黄金三章的开篇框架（核心冲突、主角视角限制、前三章怎么起钩子和兑现爽点）。先别直接写正文，题材取舍、人物动机和后续走向等我拍板再动笔。
+2. **导入已有书稿接着写**
+   > 把这份旧稿导进来整理成连载项目（`/story-import`）。第 1–〈N〉章是定稿，〈文件名〉是第〈N+1〉章没写完的残稿；保留原稿别覆盖，残稿先别算成正式章节，反推出来的人物设定和伏笔单列出来等我确认。先把章节范围、人物状态、吃书风险和待敲定的地方列给我过目，先不续写。
+3. **改一段不得劲或 AI 味重的正文**
+   > 这段戏读着太〈水 / 像总结陈词 / 解释味太重〉了（`/story-deslop`）。别改剧情走向和人物当下知道的信息，也别把后面才揭晓的底牌提前漏出来；先帮我指出哪几句出戏，给一版改前改后对照和改法说明，不要全书通改，改哪几处由我定。
 
 ## 流程总览
 
-扫榜和拆文按需选用，也可以直接讨论结构、大纲；正式写入正文前，先完成项目部署。
+扫榜和拆文按需选用，有脑洞也可以直接聊人设和大纲；正式写正文前，先跑一次 `/story-setup` 部署项目。
 
 ```mermaid
 flowchart LR
@@ -310,21 +310,21 @@ flowchart LR
 - 「这篇太 AI 了」→ `story-deslop`
 - 「把我的书导进来」→ `story-import`
 - 「打开工作台」→ `story dashboard`（本机浏览拆文库与写作项目，可轻量编辑）
-- 「记住我的写作习惯」→ `story` 路由到对应写作 skill，由它管理作者记忆（原话证据、待确认、冲突替代）
+- 「记住我的写作习惯」→ `story` 转交对应写作 skill 记进作者习惯卡（保留原话、确认后生效、改主意可覆盖）
 - 「沈栀现在什么状态」→ 检索项目资料，宿主支持时交给 `story-explorer`
 
 ## 工作原理
 
-文件、专业 Agent 与 hooks 共同支持写作，细节见 **[工作原理：Agent、Hooks 与项目结构](docs/architecture.md)**。
+文件、专职助手与 hooks 配合跑完写书闭环，细节见 **[工作原理：Agent、Hooks 与项目结构](docs/architecture.md)**。
 
 **① 文件系统当记忆** — 一部长篇动辄几十万字。设定、大纲、正文、追踪拆成独立目录各自维护，
-对话只负责创作，不负责记忆。`追踪/` 下的 `_tracking-state.json` 是唯一结构化权威，
-派生出上下文卡、伏笔视图、角色状态和「作者真相 / 读者已知」双时间线。
+对话只负责创作，不负责记账。`追踪/` 下的 `_tracking-state.json` 是唯一底账，
+自动生成上下文卡、伏笔账本、角色状态和「作者底牌 / 读者已知」双时间线。
 
-**② 7 个专业 Agent 分工** — story-architect 负责架构，narrative-writer 写正文，consistency-checker 查一致性，
-其余负责角色设计、资料研究、项目检索和逐章抽取。支持项目 Agent 的宿主由 `/story-setup` 部署，**部署后新开会话**；不支持的环境由主会话完成对应工作。
+**② 7 个专职助手分工** — `story-architect` 排大纲与细纲，`narrative-writer` 写正文，`consistency-checker` 抓吃书与伏笔漏洞，
+其余分别管人物设定、考据查资料、书稿检索和拆书抽取。支持项目 Agent 的宿主由 `/story-setup` 部署，**部署后新开会话**；不支持的环境由主会话接管。
 
-**③ 写前门禁与写后校验** — 已接入正文守卫的宿主会在首次写正文缺对应大纲、或长篇追踪检查点不成立时拦截写入；写后检查截断和常见 AI 句式，确定性阻断问题会使章级检查无法通过。各宿主的 hooks、提醒和回退方式见[部署说明](docs/hosts.md)。
+**③ 写前守卫与写后巡检** — 已接入正文守卫的宿主会在没写细纲就开写新章、或上一章追踪还没入账时直接拦下；写完自动扫半截断章和常见 AI 腔，命中硬伤时章级检查不放行。各宿主的 hooks 与回退方式见[部署说明](docs/hosts.md)。
 
 各 skill 的 `references/` 按当前任务加载，未读取的资料不占上下文。全部主题清单见 **[知识体系](docs/knowledge-base.md)**。
 
@@ -354,24 +354,24 @@ oh-story-claudecode 内置适配 Claude Code、Google Antigravity、OpenCode、Z
 
 ### 去AI味之后，朱雀等 AI 检测还是判定为 AI 怎么办？
 
-`story-deslop`（`/去AI味`）用本地脚本检测已知句式、标点和退化痕迹，再由 Agent 结合上下文审读、改写。优化目标是读感；朱雀等外部检测只作自测参考。
-可按[这份具体改稿指南](https://zenstory.ai/zh/oh-story/revise-ai-prose)把空泛情绪、重复句式、拔高议论和过度解释分别处理，同时保留场景任务与作者设定；本仓库的实现细节见[去AI味的具体做法](docs/how-to-remove-ai-flavor-from-web-fiction.md)。
+`story-deslop`（`/去AI味`）先用本地脚本抓出已知的 AI 高频句式、破折号泛滥和复读截断，再由 Agent 顺着上下文把总结腔、空泛情绪和强行拔高改回具体动作与细节。核心目标是让读者读着顺畅不出戏；朱雀等外部检测工具仅作自测参考。
+具体改法见[去 AI 味改稿指南](https://zenstory.ai/zh/oh-story/revise-ai-prose)，仓库内的规则说明见[去AI味的具体做法](docs/how-to-remove-ai-flavor-from-web-fiction.md)。
 
 ### 已经写了一部分的小说，能导入后继续写吗？
 
-可以。先在写作项目根运行 `/story-setup`，新开或刷新会话后运行 `/story-import`（`/导入小说`）把已有小说反向解析成标准项目结构，审阅反推结果，再用 `/story-long-write 写第N章` 续写（N 是导入后的下一章，会先补这一章的细纲）；短篇导入后先补完构思再接着写。[导入与续写指南](https://zenstory.ai/zh/oh-story/import-and-continue)说明了为什么书稿证据应优先于模型猜测。
+可以。先在写作项目根运行 `/story-setup`，新开或刷新会话后运行 `/story-import`（`/导入小说`）把已有书稿反向拆成设定、大纲和追踪文件，核对一遍反推结果，再用 `/story-long-write 写第N章` 续写（N 是导入后的下一章，会先补这一章细纲）；短篇导入后先补完构思再接着写。详见[旧稿导入与续写指南](https://zenstory.ai/zh/oh-story/import-and-continue)（一切以原稿写过的为准，不让模型瞎脑补）。
 
-### 长篇续写怎样减少忘伏笔或角色提前知道答案？
+### 长篇连载怎么防止吃书、忘伏笔或角色开上帝视角？
 
-续写前分开故事客观事实、角色已知和读者已见，只带上本章相关的当前状态与未完承诺。[长篇连续性指南](https://zenstory.ai/zh/oh-story/long-novel-continuity)给出三章示例，[AI 写长篇小说怎么不崩人设：Oh Story 的做法](docs/ai-long-novel-character-consistency.md)说明本仓库的连续性机制。
+把「作者底牌」「读者已知」和「角色当下的认知」拆开记账，每章动笔前只带本章用得上的状态与待回收伏笔。三章实操示例见[长篇连载防吃书指南](https://zenstory.ai/zh/oh-story/long-novel-continuity)，本仓库的实现机制见[AI 写长篇小说怎么不崩人设：Oh Story 的做法](docs/ai-long-novel-character-consistency.md)。
 
-### 章纲齐全，为什么写出来还是在复述设定？
+### 细纲写得很全，为什么成文还是像大纲扩写、干巴巴复述设定？
 
-把章纲当作“本章必须发生什么变化”的规格，再把目标、阻碍、证据、选择和代价转成视角人物可感知的行动与结果。[章纲到章节指南](https://zenstory.ai/zh/oh-story/outline-to-chapter)给出编辑示例。
+因为细纲不能只列静态设定，得写清「这一章局面发生了什么变化」——主角想要什么、卡在哪、拿什么破局、付了什么代价，全落到视角人物眼皮底下的动作、对话和当场反应上。拆解示例见[细纲怎么落成正文场面](https://zenstory.ai/zh/oh-story/outline-to-chapter)。
 
-### 怎样保留我的文风，又不把另一本书的情节带进来？
+### 怎么让 AI 顺着我的文风写，又不把样章里的人物和剧情串进来？
 
-把你自己写的或获准使用的短样本拆成表达维度，与当前书的事实分开讨论；样本推断不自动成为长期偏好。[作者文风指南](https://zenstory.ai/zh/oh-story/preserve-author-voice)说明如何裁决当前要求、本书文风与作者偏好；样本只作表达参考，不复制原句。
+从你自己的旧作或参考片段里只抽句式节奏、叙述腔调和用词习惯，跟新书的人物设定分开存；样章只学行文味道，不抄原句、也不把旧书设定带进新书。详见[保留个人文风指南](https://zenstory.ai/zh/oh-story/preserve-author-voice)。
 
 ### Windows 上安装报 `ENOENT ... mkdir`，但末尾显示 Done，正常吗？
 
@@ -387,12 +387,12 @@ oh-story-claudecode 内置适配 Claude Code、Google Antigravity、OpenCode、Z
 
 ## 延伸阅读
 
-- [提示词、技能包、插件与 MCP 怎么分](https://zenstory.ai/zh/oh-story/agent-skills-for-writers) — 先选写作任务，再选 Agent 与流程
-- [导入 10–20 章后接着写](https://zenstory.ai/zh/oh-story/import-and-continue) — 审阅反推结果，以书稿证据为准
-- [分开角色已知、承诺与线索](https://zenstory.ai/zh/oh-story/long-novel-continuity) — 别把未来计划当成已发生事实
-- [把剧情规格写成可见变化](https://zenstory.ai/zh/oh-story/outline-to-chapter) — 用行动、选择、代价和结果推进
-- [用具体改稿减少“AI 味”](https://zenstory.ai/zh/oh-story/revise-ai-prose) — 改读感，不追求鉴定分数
-- [分开文风选择与本书事实](https://zenstory.ai/zh/oh-story/preserve-author-voice) — 用自有或获准样本，不复制原句
+- [提示词、技能包、插件与 MCP 怎么分](https://zenstory.ai/zh/oh-story/agent-skills-for-writers) — 网文作者怎么选趁手的 AI 写作工具
+- [导入 10–20 章后接着写](https://zenstory.ai/zh/oh-story/import-and-continue) — 旧稿反推设定与无缝续写实操
+- [分开角色已知、承诺与线索](https://zenstory.ai/zh/oh-story/long-novel-continuity) — 长篇连载防吃书、防角色开上帝视角
+- [把剧情规格写成可见变化](https://zenstory.ai/zh/oh-story/outline-to-chapter) — 细纲怎么写成有画面感的正文冲突
+- [用具体改稿减少“AI 味”](https://zenstory.ai/zh/oh-story/revise-ai-prose) — 删掉总结腔和套话，把戏落回动作与细节
+- [分开文风选择与本书事实](https://zenstory.ai/zh/oh-story/preserve-author-voice) — 让 AI 学你的行文腔调而不串戏
 - [AI 写长篇小说怎么不崩人设：Oh Story 的做法](docs/ai-long-novel-character-consistency.md) — 仓库内文档
 - [去AI味的具体做法](docs/how-to-remove-ai-flavor-from-web-fiction.md) — 仓库内文档
 - [扫榜和拆文的自动化做法](docs/scan-charts-and-deconstruct-bestsellers.md) — 仓库内文档
@@ -426,13 +426,13 @@ oh-story-claudecode 内置适配 Claude Code、Google Antigravity、OpenCode、Z
 
 ## ZenStory AI 项目
 
-Oh Story 是 [ZenStory AI](https://zenstory.ai/zh) 的一部分——一组开源、面向 agent 的故事创作、改编与生产工具（GitHub 组织：[zenstory-ai](https://github.com/zenstory-ai)）。同组织项目：
+Oh Story 是 [ZenStory AI](https://zenstory.ai/zh) 的一部分——一组开源的 AI 故事创作、改编与生产工具（GitHub 组织：[zenstory-ai](https://github.com/zenstory-ai)）。同组织项目：
 
 | 项目 | 用途 |
 | --- | --- |
 | [oh-story-claudecode](https://github.com/zenstory-ai/oh-story-claudecode) | 网文写作 skill 包（本仓库） |
 | [drama-skills](https://github.com/zenstory-ai/drama-skills) | AI 短剧 / 漫剧创作 skill 合集：剧本、资产、分镜、图片/视频提示词、独立审查 |
-| [novel-to-game](https://github.com/zenstory-ai/novel-to-game) | 面向原著改编、指定运行环境构建与运行证据 QA 的 agent skills |
+| [novel-to-game](https://github.com/zenstory-ai/novel-to-game) | 小说改编游戏 skill 合集：忠于原著设定改编、可运行工程构建与实机验收 |
 | [video-recap-skills](https://github.com/zenstory-ai/video-recap-skills) | 将支持的视频文件制作成中文解说，可选导出可编辑的剪映/CapCut 草稿 |
 | [oh-story-dsh](https://github.com/zenstory-ai/oh-story-dsh) | DeepSeek Harness 社区插件，提供小说、短剧、游戏和视频解说工作台 |
 | [zenstory](https://github.com/zenstory-ai/zenstory) | 对话即创作的 AI 小说写作工作台（[app.zenstory.ai](https://app.zenstory.ai)） |

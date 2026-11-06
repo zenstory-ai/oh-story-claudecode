@@ -1,4 +1,4 @@
-<!-- Last synced with README.md: 2026-10-15 -->
+<!-- Last synced with README.md: 2026-11-06 -->
 
 
 <p align="center">
@@ -35,7 +35,7 @@
   <a href="https://github.com/zenstory-ai/oh-story-claudecode/discussions"><img alt="GitHub Discussions" src="https://img.shields.io/badge/GitHub%20Discussions-181717?style=for-the-badge&logo=github&logoColor=white"></a>
 </p>
 
-<video src="https://github.com/user-attachments/assets/8f9cc11b-1fb8-4cc5-a084-e0deb05ec791" controls muted playsinline width="100%"></video>
+https://github.com/user-attachments/assets/8f9cc11b-1fb8-4cc5-a084-e0deb05ec791
 
 ## What it is
 
