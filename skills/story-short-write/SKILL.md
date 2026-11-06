@@ -106,8 +106,8 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 - [ ] 节数 = 小节大纲规划节数（不得合并/省略；某节确实不需要独立存在，回构思改大纲，不在写正文时偷减）
 - [ ] 身体细节按叙事功能判断，不设次数上限；不对“手、眼、心”等单字计数改稿
 - [ ] 「像/好像/仿佛/如同」不成片堆叠；超过 10 处需逐处复核功能，不机械全删
-- [ ] `node scripts/check-ai-patterns.js --check --fail-on=blocking 正文.md` 无 blocking 命中；其余提示先通读，确属问题再改
-- [ ] `node scripts/check-degeneration.js --check 正文.md` 无 blocking 退化命中（复读/截断/工程词泄漏）
+- [ ] `node {skill 根}/scripts/check-ai-patterns.js --check --fail-on=blocking {短篇目录}/正文.md` 无 blocking 命中；其余提示先通读，确属问题再改
+- [ ] `node {skill 根}/scripts/check-degeneration.js --check {短篇目录}/正文.md` 无 blocking 退化命中（复读/截断/工程词泄漏）
 
 **不通过 → 回退补足，不得进入精修。**
 
