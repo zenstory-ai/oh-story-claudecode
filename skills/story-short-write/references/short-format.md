@@ -113,8 +113,9 @@ for line in Path('正文.md').read_text(encoding='utf-8').splitlines():
         buf.append(line)
 out.append((cur, buf))
 for name, body in out:
-    if name is not None:
-        print(name, len(''.join(''.join(body).split())))
+    n = len(''.join(''.join(body).split()))
+    if name is not None or n:
+        print(name or '导语', n)
 "
 ```
 
