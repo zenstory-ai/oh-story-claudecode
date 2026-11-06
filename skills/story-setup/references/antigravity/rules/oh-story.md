@@ -36,9 +36,14 @@ Read the selected skill's `SKILL.md` first, then load references as it directs.
 - After prose is written, resolve every deterministic finding injected by the
   oh-story Antigravity hooks before continuing to another chapter.
 - Prefer the seven deployed custom agents in `.agents/agents/` for specialist
-  work. Call `invoke_subagent` with the agent's `TypeName`; if the runtime cannot
-  start them, use the skill's documented solo/direct fallback instead of
-  failing the workflow.
+  work. Call `invoke_subagent` with `TypeName`, a concise `Role`, and `Prompt`
+  (include concrete file paths in `Prompt` so read-only subagents in `agy` CLI
+  can read them directly via `read_file`/`view_file` when `find_by_name` or
+  `grep_search` is unavailable). Because `invoke_subagent` runs asynchronously
+  in the background, end the turn to wait for the subagent's `send_message`
+  wakeup before running dependent steps such as `manage_analysis_run.py commit`
+  or review synthesis; if the runtime cannot start custom subagents, use the
+  skill's documented solo/direct fallback instead of failing the workflow.
 
 ## Working with the author
 
