@@ -26,6 +26,15 @@
 const fs = require("fs");
 const path = require("path");
 
+// 采集脚本写的是 UTC 时间戳，文件名用的是本地日期；采集情况跟文件名一致，按本地日期显示。
+function localDay(stamp) {
+  const text = stamp || "";
+  const d = /T\d/.test(text) ? new Date(text) : null;
+  if (!d || Number.isNaN(d.getTime())) return text.slice(0, 10);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 const OWN_OUTPUT_PREFIXES = ["扫榜聚合", "选题决策", "短篇扫榜结论"];
 const SHORT_PLATFORMS = new Set(["点众", "黑岩", "知乎盐言", "盐言", "番茄短篇", "七猫短篇"]);
 const METRIC_PRIORITY = ["在读", "热度", "收藏", "赞同", "点赞", "阅读", "月票", "总推荐", "榜单值", "营养液", "积分", "评分"];
@@ -559,7 +568,7 @@ function aggregate(parsedFiles, opts) {
       platform: f.platform,
       list: f.list,
       duplicateOf: f.duplicateOf || "",
-      time: (f.header["抓取时间"] || "").slice(0, 10),
+      time: localDay(f.header["抓取时间"]),
       entries: f.entries.length,
       quality: quality || "未标注",
       problems,
