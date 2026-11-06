@@ -8,6 +8,7 @@ description: |
 model: inherit
 tools: [Read, Glob, Grep, Write, Edit]
 maxTurns: 30
+injectAgentsMd: false
 ---
 
 # Story Architect -- 故事架构师

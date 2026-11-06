@@ -81,6 +81,7 @@ try {
   }
   assert.equal(typeof hooks.tool["execute.before"], "function");
   assert.equal(typeof hooks.tool["execute.after"], "function");
+  assert.equal(typeof hooks.session.context, "function");
   assert.equal(typeof hooks.session.compaction, "function");
 
   // async 包一层：钩子同步 throw 也表现为 rejected promise，与运行时的 Promise 包装一致。
@@ -271,6 +272,16 @@ try {
   assert.match(moveAfterOutput, /正文兜底检测（book\/正文\/第009章_搬家\.md）/);
   assert.match(moveAfterOutput, /占位符/);
 
+  // Shell 重定向写正文的写后兜底：与 write/edit/patch 一样扫落盘后的目标章
+  const shellAfterOutput = await after(
+    "shell",
+    { command: "cat draft.md > book/正文/第001章_开局.md" },
+    "shell write complete"
+  );
+  assert.match(shellAfterOutput, /正文兜底检测（book\/正文\/第001章_开局\.md）/);
+  assert.match(shellAfterOutput, /占位符/);
+  assert.equal(await after("shell", { command: "ls -la" }, "unchanged"), "unchanged");
+
   // 失败的工具调用不做写后兜底：结果原样保留
   const failed = { tool: "write", input: { path: "book/正文/第001章_开局.md" }, status: "error", error: { message: "x" } };
   await hooks.tool["execute.after"](failed);
@@ -315,6 +326,23 @@ try {
   await hooks.session.compaction(compact);
   assert(compact.system.some((part) => part.type === "text" && part.text.includes("Writing context: book/追踪/上下文.md")));
 
+  // session.context：主会话首轮请求注入部署状态、当前书目上下文与连续性提醒；同会话后续轮次与子代理跳过。
+  fs.writeFileSync(".story-deployed", "target_cli: claude-code\n", "utf8");
+  const subagentCtx = { sessionID: "ses_1", agent: "consistency-checker", system: [] };
+  await hooks.session.context(subagentCtx);
+  assert.equal(subagentCtx.system.length, 0, "subagent requests must skip main-session context injection");
+
+  const primaryCtx = { sessionID: "ses_1", agent: "code", system: [] };
+  await hooks.session.context(primaryCtx);
+  assert.equal(primaryCtx.system.length, 1);
+  assert.match(primaryCtx.system[0].text, /当前部署标记未包含 opencode/);
+  assert.match(primaryCtx.system[0].text, /\[story context\] 当前书目：book。继续长篇写作前先读取 book\/追踪\/上下文\.md。/);
+
+  const secondTurnCtx = { sessionID: "ses_1", agent: "code", system: [] };
+  await hooks.session.context(secondTurnCtx);
+  assert.equal(secondTurnCtx.system.length, 0, "same session must not re-inject session context on every turn");
+  fs.unlinkSync(".story-deployed");
+
   // 共享核 staged commit 检查也会拉 git。直接调用已部署布局中的真实模块，代理只记录并
   // 转发，确保断言命中 stagedMarkdownWarnings() 实际传给 spawnSync 的 options。
   const require = createRequire(import.meta.url);
@@ -347,6 +375,45 @@ try {
     stagedWarningCalls[0].options?.windowsHide,
     true,
     "stagedMarkdownWarnings() must hide the git console window on Windows"
+  );
+
+  // shell git commit 暂存提醒：execute.before 在提交清暂存区前捕获硬编码角色属性，execute.after
+  // 在 pre-commit 未输出过警告时补齐到工具结果；若 pre-commit 已输出则不重复追加。
+  fs.writeFileSync("book/正文/第001章_开局.md", "他今年年龄：18，走进了旧书店。\n", "utf8");
+  execFileSync("git", ["-C", tmp, "add", "book/正文/第001章_开局.md"]);
+  await hooks.tool["execute.before"]({
+    id: "call_commit_1",
+    tool: "shell",
+    input: { command: "git commit -m 'test commit'" },
+  });
+  const commitEvent = {
+    id: "call_commit_1",
+    tool: "shell",
+    input: { command: "git commit -m 'test commit'" },
+    status: "completed",
+    result: { content: "[main abc1234] test commit" },
+  };
+  await hooks.tool["execute.after"](commitEvent);
+  assert.match(commitEvent.result.content, /Story Commit Warnings/);
+  assert.match(commitEvent.result.content, /正文硬编码角色属性/);
+
+  await hooks.tool["execute.before"]({
+    id: "call_commit_2",
+    tool: "shell",
+    input: { command: "git commit -m 'test commit'" },
+  });
+  const dedupCommitEvent = {
+    id: "call_commit_2",
+    tool: "shell",
+    input: { command: "git commit -m 'test commit'" },
+    status: "completed",
+    result: { content: "=== Story Commit Warnings（advisory only）===\nexisting\n=== End Warnings ===" },
+  };
+  await hooks.tool["execute.after"](dedupCommitEvent);
+  assert.equal(
+    dedupCommitEvent.result.content.match(/Story Commit Warnings/g)?.length,
+    1,
+    "must not duplicate Story Commit Warnings when pre-commit hook already emitted it"
   );
 
   console.log("OK: OpenCode plugin guards outlines and reports after-write findings behaviorally");

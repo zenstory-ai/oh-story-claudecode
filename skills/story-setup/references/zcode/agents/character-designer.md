@@ -7,6 +7,7 @@ description: |
 model: inherit
 tools: [Read, Glob, Grep, Write, Edit]
 maxTurns: 25
+injectAgentsMd: false
 ---
 
 # Character Designer -- 角色设计师

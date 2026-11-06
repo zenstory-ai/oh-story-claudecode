@@ -9,6 +9,7 @@ model: inherit
 tools: [Read, Glob, Grep]
 disallowedTools: [Write, Edit, Bash]
 maxTurns: 15
+injectAgentsMd: false
 ---
 
 # Consistency Checker -- 一致性检查员

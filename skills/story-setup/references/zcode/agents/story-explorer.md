@@ -10,6 +10,7 @@ model: inherit
 tools: [Read, Glob, Grep]
 disallowedTools: [Write, Edit, Bash]
 maxTurns: 15
+injectAgentsMd: false
 ---
 
 # Story Explorer -- 故事资料查询员

@@ -110,13 +110,14 @@ assert spec and spec.loader
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
-allowed = {'name', 'description', 'model', 'tools', 'disallowedTools', 'maxTurns'}
+allowed = {'name', 'description', 'model', 'tools', 'disallowedTools', 'maxTurns', 'injectAgentsMd'}
 for path in files:
     meta, body = module.parse_frontmatter(path.read_text(encoding='utf-8'))
     assert set(meta) <= allowed, (path, set(meta) - allowed)
-    assert {'name', 'description', 'model', 'tools', 'maxTurns'} <= set(meta), path
+    assert {'name', 'description', 'model', 'tools', 'maxTurns', 'injectAgentsMd'} <= set(meta), path
     assert meta['name'] == path.stem
     assert meta['model'] == 'inherit'
+    assert meta['injectAgentsMd'] == 'false', (path, meta.get('injectAgentsMd'))
     assert module.parse_tool_list(meta['tools'], 'tools'), path
     assert 'hooks' not in meta
     assert '.claude/skills/' not in body and '当前 Claude 部署' not in body
@@ -208,6 +209,8 @@ assert_grep 'references/zcode/config\.json\.patch' skills/story-setup/references
 # 组合安装验证代理（CI 无 ZCode 运行时）：插件 manifest 与 workspace config 注册同一批 hooks，
 # 部署算法必须记录二者互斥（装插件则跳过 config hooks 合并），否则 PreToolUse/PostToolUse 双触发。
 assert_grep 'hooks 互斥' skills/story-setup/references/deploy-zcode.md "story-setup must document the plugin/workspace hooks mutex (skip config hooks merge when plugin installed, avoid double-firing)"
+assert_grep 'config_project_hooks_ignored' skills/story-setup/references/deploy-zcode.md "story-setup must document that ZCode 3.7+ ignores project-level .zcode/config.json hooks unless plugin or user-level config is used"
+assert_grep 'injectAgentsMd: false' skills/story-setup/references/deploy-zcode.md "story-setup must document injectAgentsMd: false for ZCode plugin subagents"
 assert_grep '\.zcode/skills/story-setup/references/agent-references' skills/story-setup/references/deploy-zcode.md "story-setup missing ZCode reference path"
 assert_grep '更新后的插件副本' skills/story-setup/references/deploy-zcode.md "ZCode upgrade must choose the updated plugin setup, not its workspace snapshot"
 assert_grep '更新后的插件副本' skills/story-setup/UPGRADING.md "ZCode upgrade guide must explain the setup source priority"

@@ -80,6 +80,16 @@ def make_fixture(root: Path) -> None:
             "hooks": "hooks.json",
         },
     )
+    write_json(
+        root / "reasonix-plugin.json",
+        {
+            "apiVersion": "reasonix.io/plugin/v2",
+            "name": "oh-story",
+            "version": VERSION,
+            "description": "fixture",
+            "skills": "skills",
+        },
+    )
 
 
 def run_cli(root: Path, *extra: str) -> subprocess.CompletedProcess[str]:
@@ -240,7 +250,7 @@ def test_catalog_mutations() -> None:
 
 
 def test_native_and_version_mutations() -> None:
-    for relative in (".claude-plugin/plugin.json", ".zcode-plugin/plugin.json"):
+    for relative in (".claude-plugin/plugin.json", ".zcode-plugin/plugin.json", "reasonix-plugin.json"):
         assert_failure(
             f"{relative} identity",
             relative,
@@ -253,6 +263,31 @@ def test_native_and_version_mutations() -> None:
             json_mutation(relative, lambda data: data.update(version="1.0.0")),
             "native-plugin-version",
         )
+
+    assert_failure(
+        "Reasonix apiVersion missing",
+        "reasonix-plugin.json",
+        json_mutation("reasonix-plugin.json", lambda data: data.pop("apiVersion", None)),
+        "reasonix-api-version",
+    )
+    assert_failure(
+        "Reasonix apiVersion wrong",
+        "reasonix-plugin.json",
+        json_mutation("reasonix-plugin.json", lambda data: data.update(apiVersion="reasonix.io/plugin/v1")),
+        "reasonix-api-version",
+    )
+    assert_failure(
+        "Reasonix skills root",
+        "reasonix-plugin.json",
+        json_mutation("reasonix-plugin.json", lambda data: data.update(skills="./skills/story")),
+        "reasonix-skills-root",
+    )
+    assert_failure(
+        "Reasonix description",
+        "reasonix-plugin.json",
+        json_mutation("reasonix-plugin.json", lambda data: data.update(description="")),
+        "reasonix-description",
+    )
 
     assert_failure(
         "Claude metadata version",
@@ -302,7 +337,7 @@ def test_missing_malformed_and_skill_inventory() -> None:
     def write_malformed_catalog(root: Path) -> None:
         (root / "marketplace.json").write_text("{broken", encoding="utf-8")
 
-    for relative in (".claude-plugin/plugin.json", ".zcode-plugin/plugin.json"):
+    for relative in (".claude-plugin/plugin.json", ".zcode-plugin/plugin.json", "reasonix-plugin.json"):
         def remove_native_manifest(root: Path, path: str = relative) -> None:
             (root / path).unlink()
 
@@ -322,6 +357,7 @@ def test_missing_malformed_and_skill_inventory() -> None:
         ".claude-plugin/marketplace.json",
         ".claude-plugin/plugin.json",
         ".zcode-plugin/plugin.json",
+        "reasonix-plugin.json",
     ):
         def write_malformed_json(root: Path, path: str = relative) -> None:
             (root / path).write_text("{broken", encoding="utf-8")
