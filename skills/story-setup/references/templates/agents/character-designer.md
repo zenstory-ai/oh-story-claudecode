@@ -41,7 +41,7 @@ maxTurns: 25
 | 动机链 | `story-setup/references/agent-references/character-basics.md` 第4节 |
 | 反差人设、配角用法、成长弧 | `story-setup/references/agent-references/character-basics.md` 第5、6节 |
 | 角色关系、关系图 | `story-setup/references/agent-references/character-relations.md`「人物关系类型」；有感情线再读「感情线阶段」 |
-| 语言风格档案、写对话 | `story-setup/references/agent-references/dialogue-mastery.md`「人物语言差异化」「权力博弈对话」「潜台词与议程」 |
+| 语言风格档案、写对话 | `story-setup/references/agent-references/dialogue-mastery.md`「人物语言差异化」「权力博弈对话」「潜台词与说话目的」 |
 | 审查角色 | `story-setup/references/agent-references/character-relations.md`「质量检查清单」 |
 | 审查对话 | `story-setup/references/agent-references/dialogue-mastery.md`「质量检查」 |
 

@@ -351,7 +351,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "9d2001db98b6782a2ac787ec96e4b7304ea8da998c4a6e0ca4ef6b0f2d26ba6f",
+      "packageDigest": "5de6dee8fddc24dddbe31f935a6cf530662c4c37c7463ac53ee662e91c530033",
       "path": "skills/story-setup",
       "publisher": "worldwonderer",
       "rebuildOn": [],
