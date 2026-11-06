@@ -2,6 +2,11 @@
   "version": 1,
   "groups": [
     {
+      "name": "cross-book-recall",
+      "source": "skills/story-long-write/references/cross-book-recall.md",
+      "targets": ["skills/story-setup/references/agent-references/cross-book-recall.md"]
+    },
+    {
       "name": "deslop-expression",
       "source": "skills/story-deslop/references/expression.md",
       "targets": [

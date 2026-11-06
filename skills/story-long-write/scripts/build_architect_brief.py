@@ -26,7 +26,7 @@
 模板按围栏标签取（```markdown template=题材定位，见 template_fence.py）：只取那一块，标签不在或重复直接报错。
 流程文件的主会话一节（读取清单、分工、作者汇报）不进包。流程里点名、但只在某些书才用得上的参考
 （多对标时的跨书召回、女频手册、常见的八步结构、情绪模块公式、换地图、感情线阶段、反转速查）
-不进包，列在包末「按条件可读」，给出绝对路径与小节，条件满足才读。
+不进包，列在包末「按条件可读」，给出 story-architect 副本路径与小节，条件满足才读。
 本书的方向、设定与作者口头定下的事都在 `设定/`，不进包，由执行者按包里的流程定点读。
 `--rules-only` 只拼规则部分（不取本书卷纲），供仓库的预算守卫计量每次调用的加载量。
 
@@ -153,14 +153,17 @@ def new_addition_tiers() -> str:
 
 
 def conditional_reads(task: str) -> str:
-    lines = ["下面几份在包外，只在条件满足时读，只读点名的那一节（没点名读整份）；条件不满足不读："]
+    lines = ["下面几份在包外，只在条件满足时读，只读点名的那一节（没点名读整份）；条件不满足不读。"
+             "路径按你的参考文件路径规则解析；流程提到而这里没列的参考文件不用找，对标资料缺了就停下，说清缺哪份："]
     for name, part, when in CONDITIONAL[task]:
         # 自检：包外点名的文件和小节必须真在，挪了小节或删了文件就报错，不让执行者扑空。
         text = read_reference(name)
         if part:
             section(text, part)
         where = f"「{part}」一节" if part else "整份"
-        lines.append(f"- {when}：读 `{REFERENCES / name}` {where}")
+        lines.append(f"- {when}：读 `agent-references/{name}` {where}")
+    if CROSS_BOOK in CONDITIONAL[task]:
+        lines.append(f"读了 {CROSS_BOOK[0]} 时：`gaps.*` 写进「要作者定的事」，「副对标召回摘要」不单独回。")
     return "\n".join(lines)
 
 

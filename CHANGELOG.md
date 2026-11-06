@@ -12,6 +12,22 @@ compare 链接；小节名使用 Keep a Changelog 的六个英文类别（`Added
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-05
+
+> 本版 `agents_version: 40`、`setup_skill_version: 1.3.8`。更新技能包后，在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`），再新开会话，排纲助手才能读到跨书召回资料。书稿、设定和追踪不用迁移。
+
+修好登记多本对标书时排纲会停下的问题；扫榜不再丢掉只缺热度数字的榜单；发布资料可以边填边存，番茄短故事不用写简介。
+
+### Changed
+
+- **发布资料先存再补。** 每次整理都会保存一份能读的资料文件，没定的字段留空并列成待办，不用等都确认了才落盘；已有文件有手工改动时另存草案，不覆盖。
+
+### Fixed
+
+- **登记 2 本及以上对标书时，排纲不再停下。** 排纲助手现在能读到跨书召回资料，定设定、出卷纲和细纲都能继续。（#522）
+- **番茄短故事不再要简介。** 发布资料按平台规则省略这一节，封面准备也不再等简介；长篇照旧保留。
+- **只缺热度数字的起点榜单不再被丢掉。** 手机版榜单不带总推荐时，采集情况会标出来；题材和字数照用，只是不进热度结论，想要总推荐再用 Chrome 重采。
+
 ## [0.10.0] - 2026-11-03
 
 > 本版 `agents_version: 39`、`setup_skill_version: 1.3.7`。更新技能包后，在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`），再新开会话：写手、排纲助手和项目规则都改了。书稿、设定和追踪不用迁移。老书的卷纲、细纲照样能读能写，想换成新格式可以跑一次转换（见升级指南）。之前记下、但你没确认过的写作习惯不再生效，想保留的再说一次。
@@ -1358,7 +1374,8 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 - 初始版本：长篇/短篇写作、拆文、扫榜、去 AI 味、浏览器操控
 - 用 52000+ 本真实数据增强知识库
 
-[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.9.0...v0.9.1

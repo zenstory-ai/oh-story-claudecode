@@ -56,7 +56,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 1. 每次扫榜在工作目录新建 `扫榜/{YYYYMMDD}/`（同日再扫加 `-2`），下文 `{outdir}` 指它。不往旧目录追加，聚合会混进旧榜。
 2. 只读所选平台参考：[起点](references/platform-qidian.md) / [番茄](references/platform-fanqie.md) / [七猫](references/platform-qimao.md) / [晋江](references/platform-jjwxc.md) / [刺猬猫](references/platform-ciweimao.md)。按 Phase 1 的频道和「看什么」运行默认命令；需要 Chrome 的平台先 `/browser-cdp` 启动。
 3. 聚合：`node scripts/aggregate-rank.js {outdir} --out {outdir}/扫榜聚合.md`。**主会话先只读聚合**：题材分布、去重本数、热度与字数中位、标签、书名词、多榜重合和代表作。
-4. 看聚合的「采集情况」：标了问题（书名没解出来、没采到、只有书单、详情没取到）的榜单，按平台参考的「采不到时」排查后重采；重采不了，报告里说明结论不含它。
+4. 看聚合的「采集情况」：标了问题（书名没解出来、没采到、只有书单、详情没取到）的榜单，按平台参考的「采不到时」排查后重采；重采不了，报告里说明结论不含它。只缺热度数字的榜不算采不到：题材、字数照用，只是不进热度结论。
 5. 分析新人物设定、新切入设定和新桥段时按需抽样：`node scripts/aggregate-rank.js {outdir} --sample {题材/标签/书名词} --n 5`，一次一个方向。命中条数含多榜重复，样本本数按同平台书名+作者去重。
 
 #### 作者提供
