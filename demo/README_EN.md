@@ -87,7 +87,7 @@ Per-chapter extraction (events / characters / settings / foreshadowing / timelin
 
 | Path | What it is |
 |---|---|
-| [`长篇/…/正文/第021章_离别怎么会开花.md`](长篇/让你管账号，你高燃混剪炸全网/正文/第021章_离别怎么会开花.md) | Chapter 21, continued by `/story-long-write` in one real session (2,068 chars, chapter check green; the README video is this session) |
+| [`长篇/…/正文/第021章_离别怎么会开花.md`](长篇/让你管账号，你高燃混剪炸全网/正文/第021章_离别怎么会开花.md) | Chapter 21, continued by `/story-long-write` in one real session (2,068 chars, chapter check green; the README video is this session; paragraphs merged by hand afterwards, wording unchanged) |
 | [`长篇/…/大纲/细纲_第021章.md`](长篇/让你管账号，你高燃混剪炸全网/大纲/细纲_第021章.md) · [`设定/角色/谭守义.md`](长篇/让你管账号，你高燃混剪炸全网/设定/角色/谭守义.md) | The blueprint the skill wrote first (0 blocking structural findings) and the new character card |
 | [`长篇/…/.deslop-whitelist`](长篇/让你管账号，你高燃混剪炸全网/.deslop-whitelist) · [`追踪/逐章记录/第021章.md`](长篇/让你管账号，你高燃混剪炸全网/追踪/逐章记录/第021章.md) | The book-local style whitelist the skill created itself; the chapter-21 tracking record (with its retirement log) |
 | [`设定/角色/陆振国.md`](长篇/让你管账号，你高燃混剪炸全网/设定/角色/陆振国.md) · [`大纲/卷纲_第1卷.md`](长篇/让你管账号，你高燃混剪炸全网/大纲/卷纲_第1卷.md) · [`设定/关系.md`](长篇/让你管账号，你高燃混剪炸全网/设定/关系.md) | What the author's one-line ruling at the end of the video ("the sceptic is a military-affairs influencer") turned into: a new character card, plus the volume outline and relationship table updated to match (second session, 6½ minutes) |

@@ -136,7 +136,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "fb8abb8f0b7859613875ed14c9d511c93f041a5e1f3775dfef75aa6b9e367cef",
+      "packageDigest": "57bede00fa8d4639dbd70b3217941fb0d4963c907c3a2b983692a4322d76b2b4",
       "path": "skills/story-deslop",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -156,7 +156,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.1.41"
+      "version": "1.1.42"
     },
     {
       "catalogMigration": true,
@@ -279,7 +279,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "ac1a4e4b7721c3e386c27d5515e3ddf7c3d91639a176760ef0847b1a1ba608b2",
+      "packageDigest": "873f9ef64e6d12e832558c3c9cf209c5164a0ddbdfec5e9b6b2b597db45836fb",
       "path": "skills/story-long-write",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -299,7 +299,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.2.2"
+      "version": "1.2.3"
     },
     {
       "catalogMigration": true,
@@ -315,7 +315,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "e8ca363a583756d86a5e62b3ef84cac9c27f128d2d404d36283b51df4982da42",
+      "packageDigest": "52004a3b3d4d62fa0bb0ecd3cdb31ca4d4e2af81c9cec31ce60246f6297026a1",
       "path": "skills/story-review",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -335,7 +335,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.1.45"
+      "version": "1.1.46"
     },
     {
       "catalogMigration": true,
@@ -351,7 +351,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "b7c325ef07ed930ff312fa31e14c4f16e8d1eeb8ee948bc4706d8220b2b6b58e",
+      "packageDigest": "a12748da9d60f0a641f7156529f24fee921c7bbfe07638b4719f3343ee4f46c9",
       "path": "skills/story-setup",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -371,7 +371,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.2.2"
+      "version": "1.2.3"
     },
     {
       "catalogMigration": true,
@@ -387,7 +387,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "7a7a4f01600190894ee4e6745a5406a23b7f1ee1f5c1bb0d3c9ddb5a401af845",
+      "packageDigest": "233c463058d1c98a2e6249a6d81cbfb68912996e6b4ab463e1c6ff7e9f55c298",
       "path": "skills/story-short-analyze",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -404,7 +404,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.1.27"
+      "version": "1.1.28"
     },
     {
       "catalogMigration": true,
