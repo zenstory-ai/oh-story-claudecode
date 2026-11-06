@@ -91,5 +91,5 @@ demo/长篇/让你管账号，你高燃混剪炸全网/
 | [`设定/角色/陆振国.md`](长篇/让你管账号，你高燃混剪炸全网/设定/角色/陆振国.md) · [`大纲/卷纲_第1卷.md`](长篇/让你管账号，你高燃混剪炸全网/大纲/卷纲_第1卷.md) · [`设定/关系.md`](长篇/让你管账号，你高燃混剪炸全网/设定/关系.md) | 视频末尾作者那句「质疑方用军事自媒体大V」的落地：skill 新建的角色卡，以及卷纲、关系表的同步更新（第二次会话，6 分半） |
 | [`去AI味对照/`](去AI味对照/README.md) | `/story-deslop` 检查器的真实扫描输出：AI 腔样例 8 处命中 vs 干净写法零命中 |
 
-> `追踪/` 由 skill 在同一次真实会话里通过 `storyctl.py chapter commit` 推进到第 21 章（`state_revision` 0 → 1），派生视图全部由
-> `_tracking-state.json` 重生成；`.deslop-whitelist` 也是 skill 读了 `设定/文风.md` 后自己登记的。
+> `追踪/` 由 skill 在同一次真实会话里通过 `storyctl.py chapter commit` 推进到第 21 章（`state_revision` 0 → 1），各追踪文件全部由
+> `_tracking-state.json` 自动重新生成；`.deslop-whitelist` 也是 skill 读了 `设定/文风.md` 后自己登记的。

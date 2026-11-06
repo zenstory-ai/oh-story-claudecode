@@ -29,7 +29,7 @@
 "$PYBIN" -B "{story-long-write skill目录}/scripts/tracking_commit.py" check --project "{书根}"
 ```
 
-`PYBIN` 是前面已成功探测的 Python 3。这个 `check` 校验追踪状态及派生视图；不要用「JSON 能解析」代替它。缺解释器、校验器或其依赖时报告未能完成检查，不另写简化校验器，也不调用 `init` / `commit` 修复。追踪问题沿用 `UPGRADING.md` 的迁移说明和现有追踪事务流程。
+`PYBIN` 是前面已成功探测的 Python 3。这个 `check` 校验追踪状态及自动生成的追踪文件；不要用「JSON 能解析」代替它。缺解释器、校验器或其依赖时报告未能完成检查，不另写简化校验器，也不调用 `init` / `commit` 修复。追踪问题沿用 `UPGRADING.md` 的迁移说明和现有追踪事务流程。
 
 ## 4. 报告与后续
 

@@ -84,7 +84,7 @@ Phase 4 完整读取本文件、[tracking-initialization.md](tracking-initializa
 │   └── 读者已知.md
 ```
 
-- [ ] `tracking_commit.py check` 通过，`_tracking-state.json` 与全部派生视图一致
+- [ ] `tracking_commit.py check` 通过，`_tracking-state.json` 与全部自动生成的追踪文件一致
 - [ ] `_tracking-state.json.imported_through_chapter` 等于最后完整导入章
 - [ ] `追踪/伏笔.md` 每个 ID 至多一行，未来尚未埋设的设计没有混入
 - [ ] `_tracking-state.json.timeline` 已登记关键事实与读者认知，`读者已知.md` 无真相泄露

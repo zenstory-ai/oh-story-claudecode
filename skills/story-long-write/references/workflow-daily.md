@@ -10,7 +10,7 @@ SKILL.md 路由到「日更续写」后按本文件控制批次；每章正文�
 
 运行 `tracking_commit.py check`，取 `last_committed_chapter + 1` 作本批首章 N、`state_revision` 作修订号，并核对 `追踪/上下文.md` 的当前位置；章号不一致先修，不扫描正文猜编号。每章要读的上下文按 workflow-chapter「读取上下文」；`追踪/伏笔.md`、`时间线/`、`逐章记录/` 默认不整读，缺旧信息按下方「旧信息查找步骤」定点查。
 
-`追踪/上下文.md` 是续写状态卡（7 栏，由 `tracking_commit.py` 派生，禁止手改）；schema、修订与修复见 [tracking-transaction.md](tracking-transaction.md)，出错时才读。
+`追踪/上下文.md` 是续写状态卡（7 栏，由 `tracking_commit.py` 自动生成，禁止手改）；schema、修订与修复见 [tracking-transaction.md](tracking-transaction.md)，出错时才读。
 
 **缺 state 或视图不一致**：停下，按 workflow-chapter 开头「缺文件先修」修好再开始。
 
@@ -30,7 +30,7 @@ SKILL.md 路由到「日更续写」后按本文件控制批次；每章正文�
    - **用 story-explorer 召回时**：`gaps` 按 benchmark-recall.md 分流。
    - **写后清零不拖到批末**：hook 推回的命中当轮清零。
    - **每章写完立即提交追踪**：按 workflow-chapter「更新追踪」，提交成功才进下一章；只记会影响后续章节的变化，过程日志、质检计数、去味统计不进事务。narrative-writer 不写 `追踪/`。
-3. **不中断但不并发**：追踪已提交即进下一章；字数出了范围按 workflow-chapter「检测收口」请作者选，不静默推进。
+3. **不中断但不并发**：追踪已提交即进下一章；字数出了范围按 workflow-chapter「检测收口」请作者选，不私自跳过往下写。
 
 ### 旧信息查找步骤
 

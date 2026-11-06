@@ -116,7 +116,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 #### 追踪
 
-所有追踪写入都走 `scripts/tracking_commit.py`：`追踪/_tracking-state.json` 是唯一权威，`上下文.md`、角色快照、`伏笔.md`、时间线都由它派生，禁止手改。体积上限由脚本检查；字段与上限见 [tracking-transaction.md](references/tracking-transaction.md)。
+所有追踪写入都走 `scripts/tracking_commit.py`：`追踪/_tracking-state.json` 是唯一底账，`上下文.md`、角色快照、`伏笔.md`、时间线都由它自动生成，禁止手改。体积上限由脚本检查；字段与上限见 [tracking-transaction.md](references/tracking-transaction.md)。
 
 ---
 
