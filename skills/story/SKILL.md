@@ -94,7 +94,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ```text
 query：{要查的主题}
-type：{可选：历史考证、地理/环境、职业知识、文化习俗、器物/服饰、描写参考、命名参考、体系构建、诗词典故、视觉参考、真实案例、读者偏好}
+type：{可选：历史考证、地理/环境、职业知识、文化习俗、器物/服饰、诗词典故、视觉参考、真实案例}
 context：{可选：为什么要查，如正在写哪一段}
 project_dir：{书目录的绝对路径；没有书目录时用项目根}
 cdp_port：{可选：Chrome 调试端口不是 9222 时写}

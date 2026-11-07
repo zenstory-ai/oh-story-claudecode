@@ -79,7 +79,7 @@ Markdown 只负责给作者和 Agent 阅读，工具不再反向解析 Markdown�
     "timeline_events": [
       {
         "action": "upsert",
-        "id": "E010",
+        "id": "E005",
         "story_time": "实弹训练两天后",
         "objective_fact": "文工团高层否决专业重拍版，决定沿用江晨手机拍摄的原版视频",
         "reader_knowledge": "读者已看到周薄森指出专业版缺了灵魂，张耀祖当场拍板用回原版",
@@ -108,7 +108,7 @@ Markdown 只负责给作者和 Agent 阅读，工具不再反向解析 Markdown�
       "location": "火箭军文工团高层看片会",
       "goal": "完成五天百万粉任务，持续做出真正能打的军宣内容",
       "state": "专业团队反向验证原版价值，军内认可继续抬升",
-      "abilities_resources": ["前世MCN爆款运营经验", "《中国军魂》伴奏", "大师级导演能力"],
+      "abilities_resources": ["前世MCN爆款运营经验", "《中国军魂》伴奏", "天王级唱功", "大师级导演能力"],
       "relationships": ["钟嘉嘉持续提供军报资源", "周薄森和张耀祖已明确认可其创作能力"],
       "knowledge": ["《军报》采访稿已经过审", "原版视频将继续作为正式军宣内容"],
       "open_threads": ["五天百万粉任务尚未结算", "钟嘉嘉所谓只猜对一半仍未解释"]
