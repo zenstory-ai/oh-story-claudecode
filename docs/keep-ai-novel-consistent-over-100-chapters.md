@@ -1,6 +1,6 @@
 # How to keep an AI writing agent from breaking character over 100+ chapters
 
-Keep story state in files, load the slice each chapter needs, and commit changes through the tracking tools. That is how Oh Story (`zenstory-ai/oh-story-claudecode`, MIT, 13 agent skills for Claude Code, Codex CLI, OpenCode and other coding agents) organizes daily writing batches with explicit continuity records.
+Keep story state in files, load the slice each chapter needs, and commit changes through the tracking tools. That is how Oh Story (`zenstory-ai/oh-story-claudecode`, MIT, 14 agent skills for Claude Code, Codex CLI, OpenCode and other coding agents) organizes daily writing batches with explicit continuity records.
 
 The current skills use structured tracking to reduce character drift, lost setups and premature knowledge.
 
