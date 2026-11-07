@@ -12,6 +12,25 @@ compare 链接；小节名使用 Keep a Changelog 的六个英文类别（`Added
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-11-07
+
+> 本版 `agents_version: 41`、`setup_skill_version: 1.3.9`。更新技能包后，在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`），再新开会话，让精修后的写作助手、参考资料和各端项目配置生效。书稿、设定和追踪不用迁移。
+
+全仓精修写作技法、拆文与去味参考资料及示例：改掉黑话、公式和培训讲义腔，补齐各题材示例的前情、动作细节与利益后果，清理跨文件重复表格和脱离单书写作的创作心态建议；同时对齐 Antigravity 2.0、Reasonix 2.57、ZCode 3.7+ 与 OpenCode 2.x 的适配，修复短篇检查脚本和扫榜日期问题。
+
+### Changed
+
+- **写作技法、拆文与去味资料改成可直接照着写的白话，示例补齐前情、动作与后果。** 去掉「微兑现」「伪死局」「B 故事」「降维碾压」等黑话和等号公式，改为讲清谁在什么处境下做了什么、当场换来什么后果；补齐都市、仙侠、悬疑、言情、知乎短篇等内联示例的具体动作细节，长篇示例第 21 章合并单句碎段，20 章细纲逐章写实。（#525, #531, #532）
+- **删掉重复表格、冷门分类和面向人类培训的心态说教。** 清理 32 张长篇题材卡里重复的「正文落点」「前中后期写法」与离线抽样数字，合并拆文、修稿、大纲资料里的重复段落，删去脱离单书写作场景的跨书成长建议、作者心态安抚和训练课式口吻，留下的每条规则都能直接指导当下的大纲或正文。（#532）
+- **长短篇规则前后对齐。** 长篇跨章承接统一按上一章末尾的场面、情绪、未决问题和物件状态往下接，不再对普通过渡章硬套高潮要求；短篇世情、历史、搞笑等题材不再硬套反转模板，大纲允许不设反转、靠当众对峙和兑现推进。（#532）
+- **适配 Antigravity 2.0、Reasonix 2.57、ZCode 3.7+ 与 OpenCode 2.x。** Antigravity 对齐新版 Hook 事件、子代理调用与封面生成流程；Reasonix 插件清单升级到 v2；ZCode 子代理不再重复注入主会话总控指令；OpenCode 2.x 插件补齐首轮上下文与连续性提醒、命令行重定向写正文拦截及提交前角色属性检查。（#527, #528）
+
+### Fixed
+
+- **短篇检查脚本在任意工作目录下都能直接运行，并单独报出导语字数。** 不再因从别的目录调用而找不到模块；分节字数统计同时列出导语字数，方便核对开篇篇幅。（#533）
+- **长短篇扫榜的采集日期与文件名一致。** 聚合脚本改为按本地日期记录，不再因 UTC 时差比文件名偏一天。
+- **恢复 README 演示视频播放并统一说明用词。** 换回可直接播放的视频地址，清理说明里的内部术语。（#529, #530）
+
 ## [0.10.1] - 2026-11-05
 
 > 本版 `agents_version: 40`、`setup_skill_version: 1.3.8`。更新技能包后，在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`），再新开会话，排纲助手才能读到跨书召回资料。书稿、设定和追踪不用迁移。
@@ -1374,7 +1393,8 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 - 初始版本：长篇/短篇写作、拆文、扫榜、去 AI 味、浏览器操控
 - 用 52000+ 本真实数据增强知识库
 
-[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.2...HEAD
+[0.10.2]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.9.1...v0.9.2

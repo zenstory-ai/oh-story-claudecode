@@ -55,7 +55,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "9f599249f725632db479fc82f9b95e9d9dc27f7cc155eb8b6d1fcc99248320f9",
+      "packageDigest": "1e11bb0380be9d93407871459b07193c69d989a198779a77a70eeef1905bd720",
       "path": "skills/story",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -66,16 +66,16 @@
       "runtimeDependsOn": [
         "bin:node",
         "skill:worldwonderer/story-cover@1.1.15",
-        "skill:worldwonderer/story-deslop@1.1.44",
-        "skill:worldwonderer/story-import@1.0.40",
-        "skill:worldwonderer/story-long-analyze@1.1.37",
+        "skill:worldwonderer/story-deslop@1.1.45",
+        "skill:worldwonderer/story-import@1.0.41",
+        "skill:worldwonderer/story-long-analyze@1.1.38",
         "skill:worldwonderer/story-long-scan@1.1.26",
-        "skill:worldwonderer/story-long-write@1.2.5",
-        "skill:worldwonderer/story-review@1.1.48",
-        "skill:worldwonderer/story-setup@1.2.7",
+        "skill:worldwonderer/story-long-write@1.2.6",
+        "skill:worldwonderer/story-review@1.1.49",
+        "skill:worldwonderer/story-setup@1.2.8",
         "skill:worldwonderer/story-short-analyze@1.1.30",
         "skill:worldwonderer/story-short-scan@1.1.21",
-        "skill:worldwonderer/story-short-write@1.2.4"
+        "skill:worldwonderer/story-short-write@1.2.5"
       ],
       "slug": "story",
       "supportedRuntimes": [],
@@ -85,7 +85,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.0.33"
+      "version": "1.0.34"
     },
     {
       "catalogMigration": true,
@@ -136,7 +136,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "4f032bd401df4e354eeaec42141194174c52bcb20c9cc124f1e7e8ca37b7e0b0",
+      "packageDigest": "692c18cc9257b7734cf03d240fa5f513e53a68e8d21cf790773cc1ba3a2fb34e",
       "path": "skills/story-deslop",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -156,7 +156,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.1.44"
+      "version": "1.1.45"
     },
     {
       "catalogMigration": true,
@@ -172,7 +172,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "692aef1024ba8d5630aa5d774a73e01385b192a67bfe121ac3dac78580931ad7",
+      "packageDigest": "ddfb6ee913856b3ae8f27eb98a03cc1727348a62e8147f1bd0b765d74d9fa591",
       "path": "skills/story-import",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -192,7 +192,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.0.40"
+      "version": "1.0.41"
     },
     {
       "catalogMigration": true,
@@ -208,7 +208,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "d4846894f04962a147646db48c1de994bbf9ab9450a420878449441b3b944ab8",
+      "packageDigest": "f0af3806f341932f9ce494316a4664e205d44b2481161b7015820cc67e0b06c6",
       "path": "skills/story-long-analyze",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -227,7 +227,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.1.37"
+      "version": "1.1.38"
     },
     {
       "catalogMigration": true,
@@ -279,7 +279,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "4f0164a15b98f1217fb8b68949266d802a5c5c7f67879481329212c9a4d559d1",
+      "packageDigest": "75bd69b9475e9b4601252c5254b0319ea71d0ca3e3c4bd147cf841cba0d1ac83",
       "path": "skills/story-long-write",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -299,7 +299,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.2.5"
+      "version": "1.2.6"
     },
     {
       "catalogMigration": true,
@@ -315,7 +315,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "609cb24dc53dafe9a928ff4e9b8990d115df72c6026e0e4169b2d05d244d6dc4",
+      "packageDigest": "eae93590a9bbe27d13da7748eebbf82910e9a4419e71a870b1480b901644cba3",
       "path": "skills/story-review",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -335,7 +335,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.1.48"
+      "version": "1.1.49"
     },
     {
       "catalogMigration": true,
@@ -351,7 +351,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "f4274f6f6f569b66f119527921122231e9ef366ae9abf6830ca43cc7cf44dbeb",
+      "packageDigest": "deadf51211d0be8a5de795663aa0ba7041e3539ad7611b586d961f025fceb8c7",
       "path": "skills/story-setup",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -371,7 +371,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.2.7"
+      "version": "1.2.8"
     },
     {
       "catalogMigration": true,
@@ -455,7 +455,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "f93d38a8cb416dd3dbdc717af49069cad67a9b7b16de5c61ea1c97191ae675de",
+      "packageDigest": "af0f9eb8c20f2c98739fd37d06faf854e553752e62ec7f2f7e0cbc4c98a38037",
       "path": "skills/story-short-write",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -475,7 +475,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.2.4"
+      "version": "1.2.5"
     },
     {
       "categories": [
