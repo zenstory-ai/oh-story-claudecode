@@ -143,12 +143,3 @@ fi
 这版的思路：{构图 + 色调 + 书名字体，一句话}
 想调的话可以说：{2-3 个具体方向，如「换成人物特写」「书名改成毛笔字」}
 ```
-
----
-
-## 参考资料
-
-| 文件 | 何时读 |
-|:-----|:---------|
-| [references/cover-styles.md](references/cover-styles.md) | Step 1 定平台风格、Step 2 定题材、Step 3 查字体和画面时 |
-| [references/api-fallback.md](references/api-fallback.md) | Step 4 走 API 回退时 |

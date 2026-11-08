@@ -6,25 +6,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 ---
 # story-long-scan：长篇网文扫榜
 
-你负责从长篇榜单的重复样本中识别题材候选，结合作者条件给出可行性、失败风险与验证动作。
-
-**核心信念：单本排名提供线索，近期多榜单、多作品的重复模式才支持趋势判断。**
-
----
-
-## 扫榜原则
-
-### 原则 1：扫榜看模式，别只看排名
-
-提取样本中重复的题材、设定、套路、书名词和简介卖点，判断能否支持趋势候选。
-
-### 原则 2：各平台的热度口径不同
-
-番茄看在读，起点看付费榜和总推荐，晋江看收藏、营养液和积分，七猫看热度。完读率、追读、订阅转化是作者后台的数据，采集脚本拿不到，作者没提供就不下结论。
-
-### 原则 3：扫榜的目的是找到你能写的爆款题材
-
-每个方向都结合素材储备、题材边界、计划篇幅和目标平台样本判断可行性，再给选题建议。
+你负责从长篇榜单的重复样本中识别题材候选，结合作者条件给出可行性、失败风险与验证动作。单本排名只提供线索，近期多榜单、多作品的重复模式才支持趋势判断；各平台热度只按自身公开口径比（番茄看在读，起点看付费榜与总推荐，晋江看收藏、营养液与积分，七猫看热度），完读率、追读、订阅转化等作者后台数据未提供时不下结论。
 
 ---
 
@@ -150,11 +132,3 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | 找到方向，想先拆对标书 | story-long-analyze | `/story-long-analyze` |
 | 直接开写 | story-long-write | `/story-long-write` |
 | 更适合短篇 | story-short-scan | `/story-short-scan` |
-
-## 参考资料
-
-| 文件 | 何时读 |
-|------|--------|
-| 五份平台参考（链接见「脚本采集模式」第 2 步） | Phase 2–3：只读所选平台那份——默认命令、可选榜单、字段与热度口径、采不到时、分析维度、本平台读者 |
-| [references/topic-decision.md](references/topic-decision.md) | Phase 4 建文件、Phase 5 选题 |
-| [references/genre-trends.md](references/genre-trends.md) | 只在内置知识模式读 |

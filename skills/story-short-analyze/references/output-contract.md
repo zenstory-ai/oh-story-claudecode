@@ -14,10 +14,10 @@ description: story-short-analyze 输出契约。定义 Stage → 文件映射、
 ```
 拆文库/{书名}/
 ├── 原文/                  # 管道前置步骤产出，存放源文件备份
-├── 拆文报告.md             # 人类可读综合报告（Stage 2-6 综合）
-├── 情节节点.md             # Stage 2 情节节点清单
-├── 写作手法.md             # Stage 4 写作手法分析
-└── _meta.json             # 管道元数据 + 结构计数（resume + 验收数值依据）
+├── 拆文报告.md             # 人类可读综合报告（Stage 2-6 按阶段追加各段）
+├── 情节节点.md             # Stage 2 情节节点清单（独立成文，并在拆文报告镜像）
+├── 写作手法.md             # Stage 4 写作手法分析（独立成文）
+└── _meta.json             # 管道元数据 + Stage 6 结构计数（resume + 验收数值依据）
 ```
 
 **文件名约定**：`story-short-write` 按 `拆文报告.md / 情节节点.md / 写作手法.md` 定位产物，不可重命名。分析正文写入 Markdown，结构计数与反转枚举写入 `_meta.json.structure_counts`；具体读取范围与顺序按写作侧参考文件执行。

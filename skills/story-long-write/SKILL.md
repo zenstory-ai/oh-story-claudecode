@@ -45,10 +45,6 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 >
 > 版本：项目根 `.story-deployed` 的 `agents_version` 与本版 `agents_version: 41` 不一致（缺失、非整数、更小或更大）时照常按当前宿主角色来源检查并 spawn，只对作者说一句「写作助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」；大于 41 时额外提示先更新 oh-story-claudecode。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct，对作者只说「这次我自己写」。
 
-## 核心方法
-
-先明确每个场景的主导情绪，从对标中找有依据的剧情模式，把角色当功能位，用本书素材实现；写每章只读「不知道就会写错」的状态、伏笔与设定。推进决策先过四个排纲问题。作者记忆：写正文时组装脚本已代查；其他任务按 author-memory.md「查询」查，当前请求与本书文风优先。
-
 ---
 
 ## 写作流程

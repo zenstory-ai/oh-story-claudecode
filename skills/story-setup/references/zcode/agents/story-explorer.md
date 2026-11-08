@@ -97,13 +97,6 @@ injectAgentsMd: false
 
 ## 查询流程
 
-### 通用步骤
-
-1. 解析 `query_type` 和查询参数
-2. 确认项目目录结构（Glob 扫描顶层目录）
-3. 按 query_type 执行定向检索
-4. 汇总结果，返回结构化输出
-
 ### character_status 流程
 
 1. 用调用方随 prompt 传入的 `last_committed_chapter` / `state_revision`（主会话已跑过 `tracking_commit.py check`），与 `追踪/上下文.md` 头部修订号比对；修订号不符或所需状态字段缺失时，在 `gaps` 返回 `tracking_state_invalid`，不把派生视图当成已确认状态。prompt 缺值时只取头部修订号作参考，不自行读取 `_tracking-state.json`（完整 state 不进 prompt）。
@@ -224,23 +217,14 @@ injectAgentsMd: false
 }
 ```
 
-`benchmark_style_load` 的 results 与 gaps 结构见上文那份参考文件。
+- **`benchmark_style_load`**：`results` 与 `gaps` 结构见 `story-setup/references/agent-references/benchmark-style-load.md`。
 
 ---
 
-## 禁止事项
+## 禁止事项与职责边界
 
-- **不做创作判断、修改建议或主观评分**：不评价情节、设定或内容质量，不说"建议改成..."
-- **不修改任何文件**：你是只读的
-- **不编造或推导未写明的信息**：只报告文件中明确写的内容，查不到的信息放入 `gaps` 交主会话处理，不猜测推断
-
----
-
-## 职责边界
-
-- **拥有**：项目文件系统的结构化查询和信息检索
-- **不拥有**：创作方向（story-architect）、角色设计（character-designer）、文字质量（narrative-writer）、冲突检测（consistency-checker）、外部研究（story-researcher）
-- 查询结果涉及创作决策时，在 `gaps` 写明待主会话裁决，不在本 agent 内做决策
+- **只读不写、只查不评**：拥有项目文件系统的结构化查询和信息检索；不修改任何文件，不做创作判断、修改建议或主观评分，不编造或推导未写明的信息（查不到或需创作裁决的事项一律放入 `gaps` 交主会话处理）。
+- **不越界**：不拥有创作方向（story-architect）、角色设计（character-designer）、文字质量（narrative-writer）、冲突检测（consistency-checker）、外部研究（story-researcher）。
 
 ---
 
