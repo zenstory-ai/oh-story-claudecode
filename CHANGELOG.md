@@ -12,6 +12,16 @@ compare 链接；小节名使用 Keep a Changelog 的六个英文类别（`Added
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-11-08
+
+> 本版 `agents_version: 42`、`setup_skill_version: 1.3.10`。更新技能包后，在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`），再新开会话，让精简后的助手模板与参考资料生效。书稿、设定和追踪不用迁移。
+
+全仓精简 14 个技能的参考资料与助手提示词，清掉跨处重复、文末复述和面向人类培训的心态说教，同时保留全部按需路由表、写作公式、节奏骨架、正反例与独立修稿自检清单。
+
+### Changed
+
+- **清理跨文件重复、文末复述和人类培训说教，保留全部写作与拆文抓手。** 删掉各技能入口与参考资料末尾把正文重抄一遍的「流程衔接」「参考资料」和总结式清单，去掉脱离单书任务的创作心态辅导与后台脚本内部锁机制说明；保留全部「什么时候读这份」按需速查表、18 套短篇写作公式、10 套题材节奏骨架、对话与反转正反例、独立修稿逐条排查项、去 AI 味保留边界与各助手输出模板。（#535）
+
 ## [0.10.2] - 2026-11-07
 
 > 本版 `agents_version: 41`、`setup_skill_version: 1.3.9`。更新技能包后，在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`），再新开会话，让精修后的写作助手、参考资料和各端项目配置生效。书稿、设定和追踪不用迁移。
@@ -1393,7 +1403,8 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 - 初始版本：长篇/短篇写作、拆文、扫榜、去 AI 味、浏览器操控
 - 用 52000+ 本真实数据增强知识库
 
-[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.2...HEAD
+[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.3...HEAD
+[0.10.3]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.9.2...v0.10.0
