@@ -11,6 +11,7 @@ Issue #537 报告 v0.10.3 卷纲预览保留表格的竖线和分隔线。自带
 - 在现有解析器中识别表头和分隔行，输出语义化表格；支持可选首尾竖线、列对齐、转义竖线、缺列补空和多列截断。
 - 表格继续使用先转义 HTML 再处理行内格式的路径；围栏代码和普通含竖线的段落保持原行为。首列记录对应源文件行号，分隔行不产生可见数据行。
 - 复用现有主题变量添加边框、单元格间距和局部横向滚动，保留行号显示。
+- Dashboard 资产属于 ClawHub 的 story 包；将其独立包版本从 1.0.36 递增为 1.0.37，使用 CI 固定的中央控制脚本重新生成内容摘要。
 - 增加 Playwright 表格回归，覆盖桌面和移动视口、LF/CRLF、HTML 转义、代码块及相邻正文。按本次追加的整体 Dashboard 验证要求，另增保存冲突双分支、保存失败重试和删除冲突的浏览器回归。
 
 ## Alternatives considered
@@ -30,3 +31,4 @@ Issue #537 报告 v0.10.3 卷纲预览保留表格的竖线和分隔线。自带
 - 实际 demo 卷纲的 10 张表格在桌面和手机视口均生成；检查明暗截图，控制台和页面错误均为 0。截图保存在本地忽略目录 `test-results/dashboard-visual-537/`，自动化表格截图在 `test-results/dashboard/`。
 - `node --check`、`git diff --check`、`scripts/static-check.sh`、`scripts/skill-numbering.py check`、`scripts/check-doc-budget.sh`、`scripts/check-shared-files.sh` 和 `scripts/check-agent-notes.py` 通过。
 - 验证环境为 macOS + Chromium；Windows 换行有 fixture 覆盖，未运行 Windows 实机浏览器。
+- PR CI 中 Dashboard 的 Linux 浏览器测试和 Windows、Linux、macOS API 测试通过。ClawHub 首轮校验暴露遗漏的包摘要同步，补齐后按同一固定中央脚本运行基于主干 SHA 的离线校验。
