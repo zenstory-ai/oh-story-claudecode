@@ -1084,6 +1084,45 @@ kbd {
   border-top: 1px solid var(--zs-line);
 }
 
+.preview-table {
+  margin: 0 0 1.1em;
+  padding: 1px 0;
+  overflow-x: auto;
+}
+
+.preview-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.94em;
+}
+
+.preview-table th,
+.preview-table td {
+  min-width: 8em;
+  padding: 10px 14px;
+  border: 1px solid var(--zs-line-strong);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.preview-table th {
+  background: var(--zs-surface-2);
+  font-weight: 700;
+}
+
+.preview-table [data-align="left"] { text-align: left; }
+.preview-table [data-align="center"] { text-align: center; }
+.preview-table [data-align="right"] { text-align: right; }
+
+.show-line-numbers .preview-table {
+  margin-left: -46px;
+  padding-left: 46px;
+}
+
+.show-line-numbers .preview-table [data-line]::before {
+  top: 10px;
+}
+
 .editor-footer {
   min-width: 0;
   display: flex;
