@@ -82,48 +82,26 @@ CHROME_PID_COUNT=3
 
 ## 常用操作
 
-### 打开页面并等待加载
-
 ```bash
+# 打开页面并等待加载
 agent-browser --cdp 9222 open "<URL>"
 agent-browser --cdp 9222 wait 3000
-```
 
-### 提取页面文本
-
-```bash
+# 提取页面文本或 Auth Token（实际存储位置按站点确认）
 agent-browser --cdp 9222 eval 'document.body.innerText.substring(0, 8000)'
-```
-
-### 提取 Auth Token
-
-示例读取 localStorage 的 `token` 项或 JavaScript 可读的 Cookie；实际存放位置按站点确认。
-
-```bash
 agent-browser --cdp 9222 eval 'localStorage.getItem("token") || document.cookie'
-```
 
-### 复杂 JS（含引号 / `$` / 反引号）
+# 页面交互（snapshot 拿交互元素引用）
+agent-browser --cdp 9222 snapshot -i
+agent-browser --cdp 9222 click "<CSS or @e1>"
+agent-browser --cdp 9222 type "<sel>" "<text>"
 
-用 base64 或标准输入传入脚本，避免 shell 转义错误：
-
-```bash
-# 1) base64 包裹
+# 复杂 JS（含引号 / $ / 反引号，用 base64 或 --stdin 防转义错误）
 agent-browser --cdp 9222 eval -b "$(echo -n "document.querySelectorAll('a').length" | base64)"
-
-# 2) heredoc + --stdin
 cat <<'EOF' | agent-browser --cdp 9222 eval --stdin
 const links = document.querySelectorAll('a');
 links.length;
 EOF
-```
-
-### 页面交互（snapshot 拿元素引用）
-
-```bash
-agent-browser --cdp 9222 snapshot -i        # 仅交互元素
-agent-browser --cdp 9222 click "<CSS or @e1>"
-agent-browser --cdp 9222 type "<sel>" "<text>"
 ```
 
 ---

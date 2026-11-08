@@ -20,17 +20,9 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ---
 
-## Review Mode 选择
-
-- `/story-review` 或 `/story-review full` → 优先 spawn 全部 4 个 Agent；如果当前已经在子代理内，核心 Agent 未部署/异常，或 spawn 失败，自动降级为 solo。
-- `/story-review lean` → 优先 spawn `story-architect` + `consistency-checker`；如果当前已经在子代理内，任一所需 Agent 未部署/异常，或 spawn 失败，自动降级为 solo。
-- `/story-review solo` → 不 spawn Agent，由当前会话执行基础审查。
-
----
-
 ## Phase 0：预检与降级（必须先执行）
 
-1. **确定请求模式**：解析用户输入中的 `full`、`lean`、`solo`；未指定时目标模式为 `full`。
+1. **确定请求模式**：解析用户输入中的 `full`（默认，优先 spawn 全部 4 个 Agent）、`lean`（优先 spawn `story-architect` + `consistency-checker`）、`solo`（不 spawn Agent，由当前会话执行基础审查）。
 2. **确认是否允许 spawn**：如果当前已经在子代理/Agent 内执行，不再递归 spawn，直接降级为 `solo`。
 3. **识别当前宿主的角色来源**：ZCode 支持插件子代理，检查当前已启用插件注册的同名角色，不要求 `.zcode/agents/`。其他宿主按下一步查本端目录；不因宿主名、部署标记包含 zcode 或其他端目录存在而降级。
 4. **检查核心 Agent 可用状态**（仅查当前宿主来源）：
@@ -73,7 +65,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 6. `{项目根}/.agents/skills/{规范路径}`（Antigravity 项目内真实 skill root；Codex / Reasonix 也可能扫描此目录或其 symlink）
 7. 当前运行时加载本 skill 的目录，或其可访问的全局 skill 搜索路径中同名 `{skill-name}/...` 目录
 
-> 靠前几层不存在是正常的，不是部署损坏。`/story-setup` 会为 Antigravity 把 14 个 skill 真实复制到 `.agents/skills/`，为 ZCode 复制到 `.zcode/skills/`，并为 OpenClaw / Reasonix / generic 复制到 `skills/`。Codex 项目部署不复制 skill 本体，本 skill 由 Codex 从 skill root 加载，references 通常命中第 6 或第 7 层。不要手工把 `references/` 复制进 `.codex/skills/`——手工副本不受 story-setup 管理，升级后会静默变旧。
+> 靠前几层不存在属正常，命中第一个存在层即用；不要手工把 `references/` 复制进 `.codex/skills/`。
 
 规范路径如下；禁止只写裸文件名，禁止跨 skill 误读其他 skill 的 references：
 
@@ -96,14 +88,14 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 - 任务卡点：角色办事被卡住时，是否卡出信息、关系、代价、选择或伏笔变化；卡点只剩流程细节、删掉不影响故事至少 S3。
 - 情绪曲线：是否有铺垫、升温、释放或反转；情绪平直或突兀至少 S2/S3。
 - 钩子与期待：开头或结尾是否制造后续问题；没有悬念或未完成期待至少 S2。
-- 开头新鲜度（仅开篇/前 3 章）：开局有具体人物/处境切口，还是同题材默认套路（能整体换到任意同类书）？"有钩子/非天气开场"不豁免同质化；套路化开局即使有钩子也至少 S3，整体撞同题材模板 S2。
+- 开头新鲜度（仅开篇/前 3 章）：开局是否有具体人物/处境切口而非同题材默认套路；套路化开局即使有钩子也至少 S3，整体撞同题材模板 S2。
 - 角色动机：行为是否符合目标、性格、处境和关系压力；为剧情服务而失真是 S1/S2。
 - 对话质量：是否有潜台词、信息控制、角色差异；说明书式对话至少 S2。
 - 设定一致性：不违背已写规则、时间线、角色属性；明确事实冲突通常 S1。
 - 文字自然度：具体、可感、动作承载信息；AI 腔、陈词滥调、总结体按影响定 S2/S3。
-- 句长节奏：按本书文风、语义承接与场景功能判断；机械碎句、动作清单或臃肿长句按影响定 S3/S2，不按统一字数或句长模板验收。
+- 句长节奏：按本书文风、语义承接与场景功能判断；机械碎句、动作清单或臃肿长句按影响定 S3/S2。
 - 标点节奏：标点是否服务语气/人物声线；通篇句号化、随机堆砌问号/感叹号，或残留 `……`/`——` 硬造停顿，按影响定 S3/S2。
-- 具体字数表达校验：正文用“这五个字 / 短短四字 / 三个字一落 / 八个字砸下去”等具体字数表达评价台词、题字、信件、念头或弹幕时，必须能确认统计口径、机器核对结果和叙事必要；不能确保字数计算正确时，按文字自然度问题处理，建议改成“这句话一落”“那几个字”“话音落下”等非具体数字表达。
+- 具体字数表达校验：正文用“这五个字 / 短短四字”等具体字数评价台词、题字、信件、念头或弹幕时，须确认统计口径正确且有叙事必要；无法确认时按文字自然度问题处理，建议改成“这句话一落”“那几个字”等非具体数字表达。
 - 格式可读性：段落短、对话独立、无多余空行；格式阻碍阅读按 S3，严重混乱按 S2。
 - 剧情循环：目标 → 阻碍 → 行动 → 代价/反馈 → 新期待；缺少目标/阻碍/反馈通常至少 S2。
 - 高潮构建：检查蓄能、情绪落差与兑现；强反转可用蓄能 → 假胜 → 崩解 → 反转/兑现，缺铺垫或兑现通常 S2/S3。
@@ -148,18 +140,17 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
    - 短篇另按 `设定.md`「平台基调」核对格式、引号和导语。
    - 技术备注行的 Rubric 写叠加的平台表（`fanqie | qidian | zhihu`），不叠加写 `generic`；括号里文件可读写 `file`，用了内置摘要写 `embedded`。
-5. **形成审查基准包摘要**：把已加载的文件内容或内置 fallback 摘要压缩为 5-12 条审查标准，后续 solo 和子 Agent 都必须使用这份摘要。审查提示词要各保留一条剧情循环、高潮构建和关系进展的判断，审第 1-3 章时再加开头新鲜度。摘要必须保留一条句长标准：叙述默认是逗号长句，碎句和电报体与 AI 腔同级处理，不因「短」放行；本书文风另有约定时按文风。
+5. **形成审查基准包摘要**：把已加载的文件内容或内置 fallback 摘要压缩为 5-12 条审查标准，供后续 solo 和子 Agent 共用（保留剧情循环、高潮构建、关系进展、默认逗号长句反电报体各一条，审第 1-3 章时再加开头新鲜度）。
 6. **确定性预检（只报告，不修改）**：当审查范围包含本地正文文件路径时，运行本 skill 自带脚本：
    ```bash
    node scripts/normalize-punctuation.js --check <正文文件...>
    node scripts/check-ai-patterns.js --check --fail-on=blocking <正文文件...>
    node scripts/check-degeneration.js --check <正文文件...>
    ```
-   - 将 `ellipsis`、`double-hyphen`、`markdown-divider` 结果作为 `format` findings 合并进报告。`em-dash` 破折号只采用 `check-ai-patterns.js` 的语义改写建议（见下条）；`normalize-punctuation.js` 报的同一位置 `em-dash` 在合并时去重丢弃，避免同处出现「机械替换」与「按功能改写」两条相互冲突的 finding。另外人工检查标点节奏是否通篇句号化或随机堆砌，脚本不替代语气判断。
-   - `check-ai-patterns.js` 的 blocking / advisory 都先作为 `prose` 候选，按 `style_resolution`、原文功能及三层方法逐条复核；确认造成具体阅读损失后，按下方严重度定义定级。功能性纠错、叙述与停顿保留，不把脚本级别直接换成必须修改的 finding。检测器改法仅作参考，不覆盖文风与事实边界。完整语义复核见 `expression.md`、`narrative-focus.md`、`story-logic.md`，只报告问题与建议，不落改。
-   - `check-degeneration.js` 报告模型退化（逐字复读/截断/占位符/工程词泄漏），每条带 `severity: blocking|advisory`：blocking（复读/截断/tier1 工程词）作为 S1/S2 `prose` findings，修复建议是「重新生成该段，不是改写」；advisory（tier2 章节/歧义词）作为 S3。
-   - 这三个预检脚本只读；`story-review` **不修改正文、设定或大纲文件**，需要自动修复正文时建议转 `/story-deslop`。full / lean 模式只有下方「追踪文件维护」允许修改 `追踪/`；分批审查的所有模式都可按 batch-review.md 写 **.story-review/state.md**，solo 除该状态外不写项目内容。
-   - 默认 `--quote-mode keep`，不把知乎盐言短篇的 `「」` 当作问题；只有项目明确指定引号风格时才检查对应转换建议。
+   - `ellipsis`、`double-hyphen`、`markdown-divider` 归入 `format` findings；`em-dash` 只采用 `check-ai-patterns.js` 的语义改写建议（去重丢弃 `normalize-punctuation.js` 同位置的 `em-dash`）；默认 `--quote-mode keep`。另人工检查标点节奏是否通篇句号化或随机堆砌。
+   - `check-ai-patterns.js` 的 blocking / advisory 作为 `prose` 候选，按 `style_resolution`、原文功能及 `expression.md` / `narrative-focus.md` / `story-logic.md` 复核，确认造成具体阅读损失后按下方严重度定级；功能性纠错、叙述与停顿保留。
+   - `check-degeneration.js` 的 blocking（复读/截断/tier1 工程词）作为 S1/S2 `prose` findings（建议“重新生成该段，不是改写”），advisory（tier2 章节/歧义词）作为 S3。
+   - `story-review` **不修改正文、设定或大纲文件**（需自动修复正文建议转 `/story-deslop`）；仅 full/lean 的「追踪文件维护」可修改 `追踪/`，分批审查可按 batch-review.md 写 **.story-review/state.md**。
 
 ---
 

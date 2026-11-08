@@ -109,15 +109,3 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 ## Phase 5：汇报与激活
 
 读 [import-report.md](references/import-report.md)：自检、按模板向作者汇报、设置 `.active-book`。
-
----
-
-## 流程衔接
-
-| 时机 | 跳转到 | 命令 |
-|---|---|---|
-| 导入完想继续写 | story-long-write / story-short-write | `/story-long-write` + "写第N章"（N 是导入后的下一章） / `/story-short-write` + "补完构思" |
-| 导入完想审查质量 | story-review | `/story-review` |
-| 想拆一本外部对标书 | story-long-analyze / story-short-analyze | `/story-long-analyze` / `/story-short-analyze` |
-| 从零开新书 | story-long-write / story-short-write | `/story-long-write` + "开书" / `/story-short-write` |
-| 项目未装写作环境 | story-setup | `/story-setup` |

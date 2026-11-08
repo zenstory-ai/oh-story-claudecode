@@ -88,16 +88,7 @@ word_count = 全文字数
 
 ### 原文备份（管道前置步骤）
 
-**拆解开始前，必须先备份原文**：
-
-1. 检查 `拆文库/{书名}/原文/` 目录是否已存在
-2. 如果不存在，从用户提供的源路径复制原文文件到 `拆文库/{书名}/原文/`
-3. 如果用户未提供源文件路径（直接在对话中贴文本），将原始文本保存到
-   `拆文库/{书名}/原文/原文.md`
-4. 备份完成后验证 `原文/` 目录下文件非空（>0 bytes）
-
-备份完成后初始化 `_meta.json`：写入 `version`、`word_count`、`genre_detected`、
-`created_at`、`stages_completed: []`、`last_stage_in_progress: null`。
+拆解开始前，先确保 `拆文库/{书名}/原文/` 下有非空原文备份（从源路径复制，或将对话中贴出的原文存为 `拆文库/{书名}/原文/原文.md`），再初始化 `_meta.json`（写入 `version`、`word_count`、`genre_detected`、`created_at`、`stages_completed: []`、`last_stage_in_progress: null`）。
 
 ---
 
@@ -150,16 +141,3 @@ Stage 6 内容写完后**不**立刻 append `6`，先按 output-contract.md「�
 - 还缺的：{拆文报告末尾"待补"里需要作者决定的项；没有就写"无"}
 下一步：想照这个路子写一篇，运行 `/story-short-write`。
 ```
-
----
-
-## 流程衔接
-
-**流水线：** 短篇
-**位置：** 拆文（第 2/3 步）
-
-| 时机 | 跳转到 | 命令 |
-|---|---|---|
-| 准备开写 | story-short-write（同时读 拆文报告.md + 情节节点.md + 写作手法.md + 原文/ + _meta.json） | `/story-short-write` |
-| 需要市场数据 | story-short-scan | `/story-short-scan` |
-| 字数 > 3 万更适合长篇 | story-long-analyze | `/story-long-analyze` |

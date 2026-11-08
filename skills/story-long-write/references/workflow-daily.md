@@ -8,11 +8,7 @@ SKILL.md 路由到「日更续写」后按本文件控制批次；每章正文�
 
 ## Step 1：快速上下文加载
 
-运行 `tracking_commit.py check`，取 `last_committed_chapter + 1` 作本批首章 N、`state_revision` 作修订号，并核对 `追踪/上下文.md` 的当前位置；章号不一致先修，不扫描正文猜编号。每章要读的上下文按 workflow-chapter「读取上下文」；`追踪/伏笔.md`、`时间线/`、`逐章记录/` 默认不整读，缺旧信息按下方「旧信息查找步骤」定点查。
-
-`追踪/上下文.md` 是续写状态卡（7 栏，由 `tracking_commit.py` 自动生成，禁止手改）；schema、修订与修复见 [tracking-transaction.md](tracking-transaction.md)，出错时才读。
-
-**缺 state 或视图不一致**：停下，按 workflow-chapter 开头「缺文件先修」修好再开始。
+运行 `tracking_commit.py check`，取 `last_committed_chapter + 1` 作本批首章 N、`state_revision` 作修订号，并核对 `追踪/上下文.md` 的当前位置（7 栏，自动生成，禁止手改；schema 与修复见 [tracking-transaction.md](tracking-transaction.md)，出错时才读）；章号不一致、缺 state 或视图不一致时停下，按 workflow-chapter 开头「缺文件先修」修好再开始，不扫描正文猜编号。每章要读的上下文按 workflow-chapter「读取上下文」；`追踪/伏笔.md`、`时间线/`、`逐章记录/` 默认不整读，缺旧信息按下方「旧信息查找步骤」定点查。
 
 确定范围后直接进 Step 2，不问"是否继续"；K 默认 2-3 章，作者另给按作者。章号冲突、范围超纲或需改变既定故事安排时暂停确认；每章正常提交追踪不另问。
 
@@ -22,25 +18,19 @@ SKILL.md 路由到「日更续写」后按本文件控制批次；每章正文�
 
 **必须在主会话内串行逐章写**，不把多章并发交给多个子代理（追踪会互相覆盖）。"继续/续写/日更"不逐章重复确认；到达本轮 K（最多 3 章）后必须进入 Step 3/4 收尾并停止，不因还有细纲续写下一批。
 
-1. **读取写作计划**：按 全卷规矩 → 当前剧情段 → 章节细纲 确定；`outline_view.py --chapter {N}` 取一次全卷与本段内容，本批复用，不整读卷纲。写前明确这一批推进什么、先压住什么、章尾钩子不能越过的边界，别提前揭开或用掉后面才该揭开、用上的东西。批写完检查是否超前、拖慢或偏离阶段节奏（细节适配不算；已改变全卷规矩、本段剧情的承诺、推进线或好处归谁的，修正文或重规划后续细纲）：下一章要补偿的进 `next_chapter_commitments`，跨章风险进 `continuity_risks`，不靠提前泄露后期信息提速。
+1. **读取写作计划**：按 全卷规矩 → 当前剧情段 → 章节细纲 确定；`outline_view.py --chapter {N}` 取一次全卷与本段内容，本批复用，不整读卷纲。批写完检查是否超前、拖慢或偏离阶段节奏：下一章要补偿的进 `next_chapter_commitments`，跨章风险进 `continuity_risks`。
 2. **逐章执行**：每章按 workflow-chapter「单章写作流程」走完，叠加：
-   - **上一章欠账**：写本章前上一章不得有未清 blocking 毒句式（写前 hook 会拦；hook 不可用时对上一章跑一次 `chapter check`），标了 `<!-- 去味:跳过 -->` 的除外。
-   - **状态来源**：不把完整 `_tracking-state.json` 读进上下文，缺的信息定点查，不用来源不明的聊天记忆替代。久别核心角色读 `追踪/角色状态/{名}.md`，重新活跃后放进本章事务的 `context.active_character_names`。
-   - **本章技法**：主会话自己写时一批只读一份（选法见 SKILL.md「本章技法」），交给写手时每章照填类别。
-   - **用 story-explorer 召回时**：`gaps` 按 benchmark-recall.md 分流。
-   - **写后清零不拖到批末**：hook 推回的命中当轮清零。
-   - **每章写完立即提交追踪**：按 workflow-chapter「更新追踪」，提交成功才进下一章；只记会影响后续章节的变化，过程日志、质检计数、去味统计不进事务。narrative-writer 不写 `追踪/`。
-3. **不中断但不并发**：追踪已提交即进下一章；字数出了范围按 workflow-chapter「检测收口」请作者选，不私自跳过往下写。
+   - **上一章欠账**：写本章前上一章不得有未清 blocking 毒句式（写前 hook 不可用时对上一章跑一次 `chapter check`；标了 `<!-- 去味:跳过 -->` 的除外）。
+   - **状态来源**：不整读 `_tracking-state.json`；久别核心角色读 `追踪/角色状态/{名}.md`，重新活跃后放进本章事务的 `context.active_character_names`。
+   - **本章技法与召回**：主会话自写时一批只读一份本章技法（见 SKILL.md「本章技法」），交写手时每章照填类别；story-explorer 召回的 `gaps` 按 benchmark-recall.md 分流。
+   - **当轮清零与提交追踪**：hook 推回的命中当轮清零；每章写完立即按 workflow-chapter「更新追踪」提交，成功才进下一章（字数出了范围按「检测收口」请作者选，不私自跳过）。
 
 ### 旧信息查找步骤
 
-续写状态卡没有、但本章确实需要的旧信息，由近到远查，查到就停：
-
-1. **定点读追踪**：伏笔 `grep -n "F007" 追踪/伏笔.md`；角色读 `追踪/角色状态/{名}.md`；读者认知读 `时间线/读者已知.md`，作者真相读 `时间线/作者真相.md`。
-2. **查变化原因或历史**：调 story-explorer 的 `foreshadow_status / character_status / timeline`（不可用则 `grep -R -n --include='第*.md' "F007" 追踪/逐章记录/ | tail -5`，只取最近 5 条）。
-3. **读一个原文件**：对应逐章记录或埋设章正文，只读 1 个。全量读属 `/story-review` 或作者要求的全面审计，日更不做。
-
-单章第 2 级超过 3 次，说明细纲没写清要消费哪些旧信息：一次性让 story-explorer 查多项，并在日更批末汇报里提示细纲需补清回收项。
+续写状态卡没有、但本章确实需要的旧信息，由近到远查到即停（单章第 2 级超 3 次时让 story-explorer 一次查多项，并在批末汇报提示细纲补清回收项）：
+1. **定点读追踪**：伏笔 `grep -n "F007" 追踪/伏笔.md`；角色读 `追踪/角色状态/{名}.md`；认知读 `时间线/读者已知.md` 或 `作者真相.md`。
+2. **查变化历史**：调 story-explorer 的 `foreshadow_status / character_status / timeline`（不可用则 `grep -R -n --include='第*.md' "F007" 追踪/逐章记录/ | tail -5`）。
+3. **读一个原文件**：对应逐章记录或埋设章正文，只读 1 个。
 
 ---
 
