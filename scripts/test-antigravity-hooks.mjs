@@ -87,9 +87,25 @@ try {
   assert.equal(response.decision, "deny")
   assert.match(response.reason, /小节大纲/)
 
+  response = invoke("pre-tool-use", {
+    toolCall: { name: "write_file", args: { Path: shortProse } },
+  }).value
+  assert.equal(response.decision, "deny", "oneharness write_file with Path must also be guarded")
+  assert.match(response.reason, /小节大纲/)
+
+  response = invoke("pre-tool-use", {
+    toolCall: { name: "edit_file", args: { Path: shortProse } },
+  }).value
+  assert.equal(response.decision, "deny", "oneharness edit_file with Path must also be guarded")
+  assert.match(response.reason, /小节大纲/)
+
   write("短篇/小节大纲.md", "# 小节大纲\n")
   response = invoke("pre-tool-use", {
     toolCall: { name: "write_to_file", args: { TargetFile: "短篇/正文.md" } },
+  }).value
+  assert.deepEqual(response, { decision: "allow" })
+  response = invoke("pre-tool-use", {
+    toolCall: { name: "write_file", args: { Path: "短篇/正文.md" } },
   }).value
   assert.deepEqual(response, { decision: "allow" })
 
@@ -135,22 +151,38 @@ try {
   response = invoke("stop", { fullyIdle: true, terminationReason: "model_stop" }).value
   assert.equal(response.decision, "stop", "Stop may force at most one continuation")
 
+  // Antigravity CLI (oneharness) emits write_file/edit_file with Path and Stop terminationReason "NO_TOOL_CALL".
+  post = invoke("post-tool-use", {
+    toolCall: { name: "write_file", args: { Path: "短篇/正文.md" } },
+  })
+  assert.equal(post.raw, "{}")
+  assert.ok(fs.existsSync(pending), "write_file PostToolUse must persist pending findings")
+  response = invoke("stop", { fullyIdle: true, terminationReason: "NO_TOOL_CALL" }).value
+  assert.equal(response.decision, "continue", "Stop must continue on Antigravity NO_TOOL_CALL termination")
+  response = invoke("stop", { fullyIdle: true, terminationReason: "NO_TOOL_CALL" }).value
+  assert.equal(response.decision, "stop", "NO_TOOL_CALL continuation must also be bounded to once")
+
   const clean = "雨落在旧瓦上，檐角的水沿着石阶往下淌，院门外传来车轮碾过碎石的轻响。".repeat(4)
   write("短篇/正文.md", `# 标题\n\n${clean}\n`)
   post = invoke("post-tool-use", {
-    toolCall: { name: "multi_replace_file_content", args: { TargetFile: "短篇/正文.md" } },
+    toolCall: { name: "edit_file", args: { Path: "短篇/正文.md" } },
   })
   assert.equal(post.raw, "{}")
-  assert.ok(!fs.existsSync(pending), "clean rewrite must clear pending findings")
+  assert.ok(!fs.existsSync(pending), "clean edit_file rewrite must clear pending findings")
   assert.deepEqual(invoke("pre-invocation", { invocationNum: 1 }).value, {})
 
   write(".story-deployed", "agents_version: 26\ntarget_cli: antigravity\n")
   write(".active-book", "长书\n")
   write("长书/设定/世界观.md", "# 世界观\n")
   write("长书/追踪/上下文.md", "# 上下文\n")
-  response = invoke("pre-invocation", { invocationNum: 0 }).value
+  response = invoke("pre-invocation", { invocationNum: 0, initialNumSteps: 1 }).value
   assert.ok(Array.isArray(response.injectSteps))
   assert.match(response.injectSteps.map((item) => item.ephemeralMessage).join("\n"), /Active book: 长书/)
+  assert.deepEqual(
+    invoke("pre-invocation", { invocationNum: 0, initialNumSteps: 6 }).value,
+    {},
+    "subsequent turns (initialNumSteps > 1) must not re-inject session startup context",
+  )
 
   const git = (args) => spawnSync("git", args, { cwd: fixture, encoding: "utf8" })
   assert.equal(git(["init", "-q"]).status, 0)

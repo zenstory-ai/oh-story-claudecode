@@ -2,6 +2,7 @@
 """公开 CLI 回归：取段闭包、存量卷纲、组装与召回降档。"""
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -642,7 +643,7 @@ class PipelineTests(unittest.TestCase):
     def test_architect_brief_carries_only_the_moment_files(self):
         # 开书按作者确认点分时刻：卷纲任务包只带卷纲时刻的流程、模板与技法，细纲任务包只带细纲时刻的；
         # 主会话不读包，story-architect 在新上下文里只读包和项目文件。
-        refs = SCRIPTS.parent / 'references'
+        bundle = SCRIPTS.parents[1] / 'story-setup' / 'references' / 'agent-references'
         vol = self.call('build_architect_brief.py', '--project', self.book, '--task', 'volume', '--volume', 1)
         self.assertEqual(vol.returncode, 0, vol.stderr)
         info = json.loads(vol.stdout)
@@ -652,16 +653,16 @@ class PipelineTests(unittest.TestCase):
                                             'outline-methods.md（卷纲排法）',
                                             'reader-contract-and-progression.md', 'SKILL.md（新增物三级）',
                                             '按条件可读（包外）'])
-        # 包外读不到 SKILL.md：新增物三级判据随包；流程点名的条件参考给出绝对路径与小节。
+        # 包外读不到 SKILL.md：新增物三级判据随包；流程点名的条件参考给出 agent 副本路径与小节，路径都要在副本里。
         self.assertIn('**先问作者**：新主线事件或反转', text)
-        self.assertIn(f"{refs / 'long-reversal.md'}` 「反转类型」一节", text)
+        self.assertIn('agent-references/long-reversal.md` 「反转类型」一节', text)
         self.assertNotIn('## 情感虐心三板斧', text)
         # 卷纲排法每次随包；常见的八步结构、情绪模块公式、换地图按条件在包外读。
         self.assertIn('### 剧情单元设计', text)
         self.assertNotIn('## 常见的八步结构', text)
         self.assertNotIn('## 情绪模块公式', text)
-        self.assertIn(f"{refs / 'outline-methods.md'}` 「常见的八步结构」一节", text)
-        self.assertIn(f"{refs / 'character-relations.md'}` 「感情线阶段」一节", text)
+        self.assertIn('agent-references/outline-methods.md` 「常见的八步结构」一节', text)
+        self.assertIn('agent-references/character-relations.md` 「感情线阶段」一节', text)
         # 流程文件只截「排纲方法」：主会话的读取清单与作者汇报模板不进包。
         self.assertIn('## 排纲方法', text)
         self.assertIn('### 排纲刻度', text)
@@ -731,12 +732,15 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('## 作者已定', world_text)  # 设定模板随包，定方向落盘的作者决定有处可读
         self.assertIn('核心梗三层递进设计', world_text)
         self.assertIn('## 金手指', world_text)
-        self.assertIn(f"{refs / 'character-relations.md'}` 「感情线阶段」一节", world_text)
+        self.assertIn('agent-references/character-relations.md` 「感情线阶段」一节', world_text)
         self.assertNotIn('## 微创新与差异化设计', world_text)
         self.assertNotIn('## 感情流人设核心法', world_text)
         self.assertNotIn('全书体量与阶段总览', world_text)
         self.assertNotIn('主会话自己定设定时读', world_text)  # 主会话的读取清单不进包
-        self.assertIn(f"{refs / 'female-audience-writing.md'}` 整份", world_text)
+        self.assertIn('agent-references/female-audience-writing.md` 整份', world_text)
+        for brief_text in (text, outline_text, world_text):
+            for name in re.findall(r'`agent-references/([\w-]+\.md)`', brief_text):
+                self.assertTrue((bundle / name).is_file(), name)
         self.assertIn('按下附「新增物三级」属问作者', world_text)
         # 定设定多一份全书梗概：任务包点名要写它，模板随包，结局一节写明可空。
         self.assertIn('`设定/全书梗概.md`', world_text)

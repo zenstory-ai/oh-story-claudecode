@@ -295,7 +295,13 @@ CALLS="$(python3 -c 'import json; print(json.dumps([{"name": "write", "arguments
 run_case after-write "$CALLS"
 [ -s "$PROJECT/book/正文/第001章_开局.md" ] || fail "outlined write was blocked or not written"
 assert_tool_result after-write '正文兜底检测（book/正文/第001章_开局\.md）[\s\S]*占位符'
-echo "    OK write/shell/patch blocked without outline; outlined write passes with after-write findings"
+grep -q '\[story context\] 当前书目：book。继续长篇写作前先读取 book/追踪/上下文\.md。' "$MOCK_LOG" ||
+  fail "context hook did not inject session writing-context pointer into primary model request"
+
+SHELL_CALLS="$(python3 -c 'import json; body = "街灯一盏盏亮起。" * 30 + "\\nTODO 此处待补\\n"; print(json.dumps([{"name": "shell", "arguments": {"command": f"printf \"%b\" \"{body}\" > book/正文/第001章_开局.md", "description": "fixture"}}], ensure_ascii=False))')"
+run_case after-shell "$SHELL_CALLS"
+assert_tool_result after-shell '正文兜底检测（book/正文/第001章_开局\.md）[\s\S]*占位符'
+echo "    OK write/shell/patch blocked without outline; outlined write & shell pass with after-write findings and session context"
 
 SESSION_ID="$(cd "$PROJECT" && run_opencode session list --format json | python3 -c '
 import json, sys

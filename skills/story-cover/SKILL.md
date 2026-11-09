@@ -14,8 +14,8 @@ metadata: {"openclaw":{"requires":{"env":["GPT_IMAGE_API_KEY"],"bins":["curl","j
 
 ## 生成通路
 
-- **Codex 内置（优先）**：当前 Codex CLI 会话可调用 `$imagegen` / `image_gen` 时，直接调用工具生成并保存，无需 `OPENAI_API_KEY` 或 `GPT_IMAGE_API_KEY`，不运行 `curl`。
-- **API 回退**：仅在会话没有内置工具或用户明确指定 API 时使用，需要 `GPT_IMAGE_API_KEY`；环境变量和命令在 [references/api-fallback.md](references/api-fallback.md)，走这条通路时再读。工具缺失不等于 Codex 订阅不支持生图；内置调用失败时先报告错误，不静默切换到可能收费的 API。
+- **内置生图（优先）**：当前会话可调 Codex `$imagegen` / `image_gen` 或 Antigravity `generate_image` / `image-generator` 时，直接调用生成并保存，无需 `OPENAI_API_KEY` 或 `GPT_IMAGE_API_KEY`，不跑 `curl`。
+- **API 回退**：仅在无内置工具或用户指定 API 时使用，需 `GPT_IMAGE_API_KEY`；变量和命令见 [references/api-fallback.md](references/api-fallback.md)，走该通路再读。工具缺失不等于订阅不支持生图；内置失败先报错，不静默切到收费 API。
 
 ## 生成流程
 
@@ -83,11 +83,11 @@ Professional book cover, high detail digital painting, portrait [平台比例：
 
 先从「构图变体」里挑 2-3 种适合本题材的构图，每种用一句话描述画面（构图、主色、书名字体），连同 Step 2 定的题材一起给作者挑。作者选定后只生成那一张；作者说「都出」时每个方案单独生成一次。
 
-#### Codex 内置 ImageGen（优先）
+#### 内置生图（Codex / Antigravity，优先）
 
-1. 用 Step 3 的完整提示词调用 `image_gen`。比例和安全区写进提示词，不传 `GPT_IMAGE_MODEL`、`GPT_IMAGE_SIZE`、`response_format` 等 API 参数。
-2. 有 `REF_IMAGE` 时，本地文件先用图片查看工具载入会话；URL 先下载再载入。说明它是编辑目标还是风格参考，并列出必须保持的内容。
-3. 先创建 `BOOK_DIR/封面/`，再把工具返回的图片复制为 `封面_vN.png`，`N` 自增且不覆盖旧版；保留 `$CODEX_HOME/generated_images/` 原文件，同时保存同名 `.prompt.txt`，有参考图再保存 `.ref.txt`。确认图片可读，并把原图绝对路径交给 Step 5。
+1. 用 Step 3 的完整提示词调用 `image_gen`（Codex）或 `generate_image` / `image-generator`（Antigravity）。比例和安全区写进提示词，不传 `GPT_IMAGE_MODEL`、`GPT_IMAGE_SIZE`、`response_format` 等 API 参数。
+2. 有 `REF_IMAGE` 时，本地文件先载入会话（或传给 `image-generator`）；URL 先下载再载入。说明是编辑目标还是风格参考，并列出须保持的内容。
+3. 先创建 `BOOK_DIR/封面/`，把生成的图片复制为 `封面_vN.png`（`N` 自增不覆盖旧版）；保留 `$CODEX_HOME/generated_images/` 等原文件，并存同名 `.prompt.txt`（有参考图再存 `.ref.txt`）。确认可读后把原图绝对路径交给 Step 5。
 
 #### API 回退
 
@@ -143,12 +143,3 @@ fi
 这版的思路：{构图 + 色调 + 书名字体，一句话}
 想调的话可以说：{2-3 个具体方向，如「换成人物特写」「书名改成毛笔字」}
 ```
-
----
-
-## 参考资料
-
-| 文件 | 何时读 |
-|:-----|:---------|
-| [references/cover-styles.md](references/cover-styles.md) | Step 1 定平台风格、Step 2 定题材、Step 3 查字体和画面时 |
-| [references/api-fallback.md](references/api-fallback.md) | Step 4 走 API 回退时 |

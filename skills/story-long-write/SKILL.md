@@ -43,11 +43,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > 专业 agent 只查当前宿主：Claude `.claude/agents`、OpenCode `.opencode/agents`、Codex `.codex/agents` TOML、Antigravity `.agents/agents`（`invoke_subagent` + 同名 `TypeName`）；ZCode 查已启用插件注册的同名角色，用 `Agent` 工具按实际 schema 派发，不要求 `.zcode/agents`。返回 unknown agent 时按下面的降级处理，不因宿主名或其他端目录存在而降级。
 >
-> 版本：项目根 `.story-deployed` 的 `agents_version` 与本版 `agents_version: 39` 不一致（缺失、非整数、更小或更大）时照常按当前宿主角色来源检查并 spawn，只对作者说一句「写作助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」；大于 39 时额外提示先更新 oh-story-claudecode。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct，对作者只说「这次我自己写」。
-
-## 核心方法
-
-先明确每个场景的主导情绪，从对标中找有依据的剧情模式，把角色当功能位，用本书素材实现；写每章只读「不知道就会写错」的状态、伏笔与设定。推进决策先过四个排纲问题。作者记忆：写正文时组装脚本已代查；其他任务按 author-memory.md「查询」查，当前请求与本书文风优先。
+> 版本：项目根 `.story-deployed` 的 `agents_version` 与本版 `agents_version: 42` 不一致（缺失、非整数、更小或更大）时照常按当前宿主角色来源检查并 spawn，只对作者说一句「写作助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」；大于 42 时额外提示先更新 oh-story-claudecode。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct，对作者只说「这次我自己写」。
 
 ---
 
@@ -116,7 +112,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 #### 追踪
 
-所有追踪写入都走 `scripts/tracking_commit.py`：`追踪/_tracking-state.json` 是唯一权威，`上下文.md`、角色快照、`伏笔.md`、时间线都由它派生，禁止手改。体积上限由脚本检查；字段与上限见 [tracking-transaction.md](references/tracking-transaction.md)。
+所有追踪写入都走 `scripts/tracking_commit.py`：`追踪/_tracking-state.json` 是唯一底账，`上下文.md`、角色快照、`伏笔.md`、时间线都由它自动生成，禁止手改。体积上限由脚本检查；字段与上限见 [tracking-transaction.md](references/tracking-transaction.md)。
 
 ---
 

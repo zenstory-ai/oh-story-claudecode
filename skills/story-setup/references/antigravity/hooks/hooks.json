@@ -2,7 +2,7 @@
   "oh-story": {
     "PreToolUse": [
       {
-        "matcher": "run_command|write_to_file|replace_file_content|multi_replace_file_content",
+        "matcher": "run_command|write_file|edit_file|write_to_file|replace_file_content|multi_replace_file_content",
         "hooks": [
           {
             "type": "command",
@@ -14,7 +14,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "run_command|write_to_file|replace_file_content|multi_replace_file_content",
+        "matcher": "run_command|write_file|edit_file|write_to_file|replace_file_content|multi_replace_file_content",
         "hooks": [
           {
             "type": "command",

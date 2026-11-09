@@ -12,7 +12,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > Agent 兼容性：只检查当前宿主的 agent；ZCode 查插件注册的同名角色，用 `Agent` 按实际 schema 派发，不要求 `.zcode/agents`。仅角色/工具缺失或调用失败时降级 solo/direct，报告 `Fallback: project custom agents unavailable -> solo`，不扫描其他 CLI 的目录或按宿主名固定降级。
 >
-> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 39` 不一致时（标记缺失、字段缺失/非整数、小于或大于 39）照常按当前宿主角色来源检查并 spawn，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 39）` 并提示重新运行 `/story-setup` 后新开会话；大于 39 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct。
+> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 42` 不一致时（标记缺失、字段缺失/非整数、小于或大于 42）照常按当前宿主角色来源检查并 spawn，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 42）` 并提示重新运行 `/story-setup` 后新开会话；大于 42 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct。
 
 ## 分析边界
 
@@ -85,16 +85,11 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 - `角色/`、`设定/`、`人物关系图/`、`文风.md`；
 - `chapter_index.csv`、`_progress.md`、`_analysis_cache/`。
 
-`拆文报告.md` 是阅读入口。剧情单元管因果事实，`剧情/节奏.md` 管信息推进与三维节奏，`剧情/情绪模块.md` 管读者需求和复现机制，`角色/角色关系.md` 管关系事实，`文风.md` 管表达层。
-
 ## 各阶段要点
 
 - **Stage 0 机械索引**：全新和部分完成且要读原文时建 `chapter_index.csv`（命令见 stage1-golden-chapters.md）。只按 LF 计物理行，目录与正文标题重复时先剔掉目录块；落表前校验章号连续、无重复和边界有效。脚本因原文变化或章号对不上停下时读 index-rebuild.md，把说明和选项转告作者（默认推荐按旧章号继续）。
-- **Stage 1 黄金三章**：按索引读前三章，同一次阅读写三份单章深度拆解、可选 `_style-sample.txt` 和 `快速预览.md`，再运行 `manage_analysis_run.py mark-stage --stage stage1`。作者没要求一次跑完时按 author-facing「开头三章拆完、停下来问」询问；要求一次跑完、多本书一起拆或由导入自动续跑时不停。
-- **Stage 2 逐批提取**：`plan` 出只读计划，每批派一个 `chapter-extractor`，默认有限并行（每轮 3 批），作者问起才解释并切换拆法；子代理自己读原文并写批次输入，主会话不转贴、不读它，直接 `commit`。细则见 pipeline-ops.md。
-- **Stage 3–5**：用 `digest` 取料，不重读原文；怎么标阶段见 synthesis-inputs.md「阶段标记」；Stage 5 写新报告前先 `mark-stage --stage stage5 --prepare` 备份旧报告。
+- **Stage 1–6 执行**：按上方「按时刻读」加载各阶段说明执行（Stage 1 拆完前三章未要求一次跑完时停下来问；Stage 2 默认每轮 3 批有限并行；Stage 3–5 用 `digest` 取料不重读原文；Stage 6 定点取样生成 `文风.md`）。
 - **选题回填**：Stage 5 报告落盘后找 `选题决策.md`，只回填仍标记“待拆文验证”且题材匹配的项（查找位置与写法见 stage5-report.md）。没有「推荐选题」一节（只扫了榜）就跳过，不算无效；有推荐选题但缺少当前契约必需的“能爆的原因”等字段时返回 `invalid_topic_decision_contract`，提示重跑 `story-long-scan` Phase 5；文件不存在不影响拆文。
-- **Stage 6 文风**：优先用已有 `文风.md` 和有效 `_style-sample.txt`，样本不足时按索引定点读 4–6 段原文，不重扫全书；只缺文风时直接运行，不重跑 Stage 1–5。取不到可核验原句时明确失败。
 
 ## 状态与旧项目
 

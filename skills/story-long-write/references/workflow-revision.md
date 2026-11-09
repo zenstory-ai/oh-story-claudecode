@@ -64,7 +64,7 @@
 ```
 
 不到目标一半时选项 1 不标推荐。选 1 → 改用 `chapter accept-current-length`，不到目标一半、或超字还没压缩过一次会被拒，把差多少字告诉作者，作者明确坚持才加 `--force`；选 2 → 回 Step 3；选 3 → 用备份原稿覆盖回去，不提交。失败时保留草稿，修正后重跑同一命令；通过 `check` 前不修下一章、不写新章。
-7. **收口**：`{PYTHON} {skill 根}/scripts/tracking_commit.py check --project {项目根}` 验证 state 与派生视图一致。改变了角色状态、关系或世界观设定的，扫一遍后续章正文，把受影响的列进汇报。
+7. **收口**：`{PYTHON} {skill 根}/scripts/tracking_commit.py check --project {项目根}` 验证 state 与自动生成的视图一致。改变了角色状态、关系或世界观设定的，扫一遍后续章正文，把受影响的列进汇报。
 
 ---
 

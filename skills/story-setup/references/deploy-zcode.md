@@ -27,8 +27,8 @@
 3. 复制 `references/zcode/hooks/story_zcode_hook.js` 和 `references/zcode/hooks/story_hook_core.js` 到 `.zcode/hooks/`。
 4. 读取 `references/zcode/config.json.patch` 和现有 `.zcode/config.json`（如只有根 `zcode.json`，仍创建 `.zcode/config.json` 承载 oh-story 项目 Hooks，不改写根文件）：
    - 保留用户所有未知字段、MCP、plugins、skills/commands disable overrides；
-   - **hooks 互斥（避免双触发）**：若本项目经已安装的 oh-story 插件运行（marketplace 安装，仓库根 `.zcode-plugin/plugin.json` 的 `hooks.json` 已全局注册 SessionStart/PreToolUse/PostToolUse），则先从 `.zcode/config.json` 移除这批已知 oh-story hooks 注册、保留用户 hooks，再**跳过**下面的 `config.json.patch` hooks 合并——插件 manifest 已注册这批 hooks，再合并会让同一事件跑两遍（PreToolUse 拦两次、PostToolUse 注入两次）。只有未装插件（直接克隆 / 手动导入 references）时才合并 hooks。不确定时以「ZCode 是否已通过本插件注册这套 hooks」为准；skills/commands/hook 文件/AGENTS 与 config 的非 hook 字段两条路径都照常部署。
-   - 合并 hooks（仅未装插件时）：设置 `hooks.enabled: true`；用户已有更大的 `timeoutMs` 时保留，否则取模板值；对 `hooks.events` 的 SessionStart、PreToolUse、PostToolUse 按 `event + matcher + process command + args` 去重追加；不复制 ZCode 不支持的 PreCompact、PostCompact、SessionEnd、SubagentStop、Notification。
+   - **hooks 互斥（避免双触发）**：若本项目经已安装的 oh-story 插件运行（`.zcode-plugin/plugin.json` 的 `hooks.json` 已全局注册 SessionStart/PreToolUse/PostToolUse），则先从 `.zcode/config.json` 移除这批已知 oh-story hooks 注册、保留用户 hooks，再**跳过**下面的 `config.json.patch` hooks 合并，避免同一事件双触发。只有未装插件（直接克隆 / 手动导入 references）时才合并 hooks。不确定时以「ZCode 是否已通过本插件注册这套 hooks」为准；skills/commands/hook 文件/AGENTS 与 config 的非 hook 字段两条路径都照常部署。
+   - 合并 hooks（仅未装插件时）：设置 `hooks.enabled: true`；用户已有更大的 `timeoutMs` 时保留，否则取模板值；对 `hooks.events` 的 SessionStart、PreToolUse、PostToolUse 按 `event + matcher + process command + args` 去重追加；不复制 ZCode 不支持的 PreCompact、PostCompact、SessionEnd、SubagentStop、Notification。注：ZCode 3.7+ 忽略项目级 `.zcode/config.json` 的 `hooks`（`config_project_hooks_ignored`），需安装插件或合入用户级 `~/.zcode/cli/config.json` 才会在运行时执行。
 5. 将 `references/zcode/AGENTS.md.tmpl` 按 SKILL.md「项目指令合并」写入根 `AGENTS.md`（`--host zcode`）。
 6. `.story-deployed` 的 `target_cli` 写入 `zcode` 或多端组合，`references_dir` 写 `.zcode/skills/story-setup/references/agent-references`。不创建 Claude 的 `.claude/.agents-pending-restart`。
 7. 检查当前插件注册角色并如实报告：可用时按同名角色派发；缺角色时提示启用/更新插件后新开会话，不用重复部署 workspace 代替。Hook 需要 PATH 中可用的 `node`。
@@ -47,4 +47,4 @@ Plugin 安装不经过本算法：`.zcode-plugin/plugin.json` 暴露 Skills/Comm
 
 ## 安装报告必须提示
 
-说明实际角色注册情况：可用时 full/lean 按所需角色派发，缺角色或工具才降级；Hook 依赖 PATH 中的 `node`。部署后新开会话刷新项目资料；插件角色模型继承主会话，不移植 Claude 的单角色 inline hooks，拆文助手的单文件写入范围由角色正文约束，不承诺路径强隔离。
+说明实际角色注册情况：可用时 full/lean 按所需角色派发，缺角色或工具才降级；未装插件时提示启用插件（或将 `hooks` 合入 `~/.zcode/cli/config.json`）才能启用运行时 hooks 与 7 个角色；Hook 依赖 PATH 中的 `node`。部署后新开会话刷新项目资料；插件角色模型继承主会话并设 `injectAgentsMd: false`，不移植 Claude 的单角色 inline hooks，拆文助手的单文件写入范围由角色正文约束，不承诺路径强隔离。

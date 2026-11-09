@@ -66,9 +66,12 @@ fi
 # 先 cd 到项目/正文目录再用相对路径。Windows Git Bash 下若把绝对 POSIX 路径
 # （/tmp/...、/c/...）直接喂给原生 Windows python，会被解析成 C:\tmp\... 而找不到文件；
 # 相对路径按子进程真实 cwd 解析，三平台一致。末行回报命令选中的解释器，供 stub 断言。
-OUT="$(cd "$BOOK_DIR" && eval "$COUNT_BLOCK"; printf '\n__PYBIN=%s\n' "${PYBIN:-}")"
-PYBIN="$(printf '%s\n' "$OUT" | sed -n 's/^__PYBIN=//p')"
-GOT="$(printf '%s\n' "$OUT" | tr -d '\r' | sed '/^__PYBIN=/d;/^$/d')"
+run_count() {
+  OUT="$(cd "$BOOK_DIR" && eval "$COUNT_BLOCK"; printf '\n__PYBIN=%s\n' "${PYBIN:-}")"
+  PYBIN="$(printf '%s\n' "$OUT" | sed -n 's/^__PYBIN=//p')"
+  GOT="$(printf '%s\n' "$OUT" | tr -d '\r' | sed '/^__PYBIN=/d;/^$/d')"
+}
+run_count
 
 echo "selected interpreter: $PYBIN"
 echo "char count: $GOT (expect $EXPECT)"
@@ -76,6 +79,16 @@ echo "char count: $GOT (expect $EXPECT)"
 fail=0
 if [ "$GOT" != "$EXPECT" ]; then
   echo "FAIL: 字符数不符（中文路径或解释器问题）"
+  fail=1
+fi
+
+# 第一个小节标记前的导语也要单独报一行
+printf '%s' $'开头导语\n###1.\n中文字数测试\n###2.\nABC 123' > "$BOOK_DIR/正文.md"
+EXPECT=$'导语 4\n###1. 6\n###2. 6'
+run_count
+echo "lead count: $GOT (expect $EXPECT)"
+if [ "$GOT" != "$EXPECT" ]; then
+  echo "FAIL: 导语字数没有报出"
   fail=1
 fi
 if [ "$STUB" -eq 1 ] && [ "$PYBIN" = "python3" ]; then

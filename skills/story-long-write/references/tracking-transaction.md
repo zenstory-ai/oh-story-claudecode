@@ -4,20 +4,19 @@
 
 `追踪/` 以结构化 state 为权威，由脚本生成各 Markdown 视图。模型只提交一份语义 JSON，不分别 `Write/Edit/echo >>` 多个追踪文件。
 
-## 权威层与派生层
+## 底账与自动生成的视图
 
 | 层级 | 文件 | 语义 |
 |---|---|---|
-| 唯一权威 | `_tracking-state.json` | schema、最后提交章、导入截止章、状态修订号、上下文结构、角色/伏笔/时间线，以及已提交章节的简短字数记录 |
+| 唯一底账 | `_tracking-state.json` | schema、最后提交章、导入截止章、状态修订号、上下文结构、角色/伏笔/时间线，以及已提交章节的字数记录 |
 | 章节记录 | `逐章记录/第NNN章.md` | 本章对未来连续性有用的紧凑变化；目标 ≤1536 字节，硬上限 3072 字节；导入范围内修订写成覆盖记录 |
-| 派生视图 | `上下文.md`、`角色状态/{角色名}.md`、`伏笔.md`、`时间线/作者真相.md`、`时间线/读者已知.md` | 完全从 `_tracking-state.json` 生成；禁止手改，不作为程序输入 |
+| 自动生成的视图 | `上下文.md`、`角色状态/{角色名}.md`、`伏笔.md`、`时间线/作者真相.md`、`时间线/读者已知.md` | 完全从 `_tracking-state.json` 自动生成；禁止手改，不作为程序输入 |
 
-Markdown 只负责给作者和 Agent 阅读，工具不再反向解析 Markdown。`check` 直接从 `_tracking-state.json` 重渲染并逐文件比较。未来“第几章揭示”的计划写在卷纲/细纲，不写成时间线既成事实。
-逐章记录只是便于人阅读的紧凑变化记录，不承诺单独无损重建全部当前状态；完整当前语义以 `_tracking-state.json` 为准。
+未来“第几章揭示”的计划写在卷纲/细纲，不写成时间线既成事实。完整当前语义以 `_tracking-state.json` 为准。
 
 ## 运行工具
 
-先按运行环境探测 Python 3 解释器（依次尝试 `python3`、`python`、`py -3`）。追踪事务脚本使用当前 skill 根目录；字数与章节闭环统一使用 `story-long-write` skill 根目录：
+先探测 Python 3 解释器（依次试 `python3`、`python`、`py -3`）：
 
 ```text
 {PYTHON} {当前 skill 根}/scripts/tracking_commit.py init   --project {书项目根} --input {书项目根}/.story/work/init.json
@@ -28,28 +27,13 @@ Markdown 只负责给作者和 Agent 阅读，工具不再反向解析 Markdown�
 {PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter accept-current-length --project {书项目根} --chapter {N} --input {书项目根}/.story/work/第{NNN}章/tracking.json
 ```
 
-- `init`：只在 `_tracking-state.json` 不存在时执行，绝不覆盖已初始化项目。
-- `draft`：按当前 state 把逐章事务预填到 `.story/work/第NNN章/tracking.json`（修订号、模式、章名、`context` 四项当前值），并输出各文本字段的字数上限与在场核心角色的当前快照。新章（append）调用方只填 `delta` 与有变化角色的快照；已提交章（revision）的 `delta` 与相关角色快照按该章现有逐章记录预填（伏笔、时间线取当前值），调用方在上面改成修订后的完整记录，不清空重写。
-- 作者字数范围：细纲可写一行 `字数范围：2000-2600`（作者明确给了上下限时）；本轮临时给的范围用 `--min-chars` / `--max-chars`（两者同给，优先于细纲）。`wordcount check` / `checkpoint` 与 `chapter check` / `commit` / `accept-current-length` 都认，给了就同时替代默认 ±12% 内部带与 ±15% 用户带，结果里 `band_source` 为 `author`，提交的字数记录多一项 `author_range`。
-- `wordcount measure` / `wordcount checkpoint`：纯测量入口；不写正文、不写 tracking、不做语义判断。长篇正文整章写完由 `chapter check` 收口，平时不用 `checkpoint`；需要中途量一段时带 `--project` 从细纲读目标与字数范围，`remaining_user_range` 按生效区间（作者区间或默认用户带）计算。
-- `chapter check`：重新读取当前正文与细纲目标，返回确定性长度状态、现有 blocking quality、`state_revision` 和当前可执行动作，不保存 approval。顶层 `status`：`ready`（可提交，exit 0）/ `needs_decision`（长度带外，按 `available_actions` 交作者，exit 0）/ `blocked`（有 blocking 正文问题，exit 1）/ `invalid`（正文为空等，exit 1）/ `tool_unavailable`（找不到 node 或检测脚本，见 `quality.tool_errors`，不是正文问题，exit 3）。参数错误或文件缺失输出 `story-chapter-error/v1`（`status: error`，exit 2）。加 `--plain` 改用白话输出同一结论（含本章碎度两个数：短段占比、叙述句长中位数，附真人参照，只提示不拦），退出码不变。`under` 不提供自动补写；`over` 额外返回一次净删型 `compress-once` 及回到生效区间所需的删除字数。`quality.semantic_advisories` 是语义类 advisory 条数（检测器标 `review: mechanical` 的不计）。
-- `chapter commit`：再次读取当前文件、重新计数并重跑 blocking quality；只接受生效区间内的章节，把简短字数记录与逐章事务一起原子提交。新章与修订都走它。
-- `chapter accept-current-length`：只接受带外但 quality pass 的章节；接受动作发生时重新读取、重新计数并立即原子提交，不保存可陈旧的历史决议。低于字数目标一半（`BELOW_ACCEPT_FLOOR`），或超长却还没做过那一次压缩（`COMPRESSION_REQUIRED`），都拒绝；作者明确拍板时加 `--force`。
-- `check`：严格验证 state schema、逐章记录连续性/规范名/体积、固定 7 栏、角色快照硬上限、派生文件集合，以及所有派生视图与 state 的逐字一致性。
-
-每本书由 `追踪/.tracking-commit.lock` 串行写事务，`expected_state_revision` 再拒绝基于旧状态构造的 stale transaction。两个不同事务并发时至多一个修订成功。字数记录也在锁内对当前正文和目标重新验证，正文或目标变化会让预先构造的记录直接失败。
-
-事务 JSON 是临时输入，不是项目产物：只写在书目录 `.story/work/` 下（逐章事务放 `.story/work/第NNN章/tracking.json`），不写系统 `/tmp`、书根、`大纲/` 或 `正文/`；成功前必须保留，提交成功后即可删除（`storyctl.py chapter commit` / `accept-current-length` 成功时自动删除该章目录；直接调用 `tracking_commit.py commit` 时由调用方删除。已有字数记录的章节正文或目标改过后，`tracking_commit.py commit` 拒绝修订事务，须走 `storyctl.py chapter commit`）——之后 `check` 失败按下文提交 `mode=revision` 新事务修复，不需要原事务。若文件写入失败，`_tracking-state.json` 尚未推进；修正环境后直接重跑**同一份** `commit`。append 重跑只接受内容完全相同的既有逐章记录，不维护 `dirty/pending/repair` 状态机。
-
-校验失败与写入失败处理方式不同：校验失败（字段非法、退役结构、容量超限）要按报错改事务本身，重跑同一份结果不变。派生视图被手改或外部改动导致 `check` 报 `derived view differs from _tracking-state.json` 时，重新提交**该章**的 `mode=revision` 事务让工具整份重建，`expected_state_revision` 取 `追踪/_tracking-state.json` 的 `state_revision` 字段——`check` 失败时只往 stderr 打 ERROR，不输出 JSON；不手改派生文件，也不删 `_tracking-state.json` 重来。手写出的逐章记录会让同章 `append` 永久报 `chapter delta N already exists with different content`——删掉那个手写文件后重跑原事务即可。
-
-本工具不解析旧 `_tracking-meta.json`、`时间线/事件库.json` 或更早追踪结构，不提供语义兼容层。`init` 遇到这类旧文件时，先把它们按原样整体移入 `追踪/_旧追踪存档/`，再在原地建当前协议：旧内容留给作者查阅，不参与解析，当前状态完全以 init 输入为准。校验失败的 `init` 不移动任何文件。`commit` 与 `check` 仍直接拒绝旧结构——它们只在已建协议的项目上运行。
-
-## 初始化事务
-
-仅新书或导入初始化时，执行 `init` 前必须完整读取 [tracking-initialization.md](tracking-initialization.md)，按其中原始 JSON 与导入边界构造事务。已有项目续写直接使用下方逐章事务，不重复读初始化示例。
-
-调用方的逐章 JSON 不写 `wordcount`；正式入口 `chapter commit` 或 `chapter accept-current-length` 在提交当下生成并注入。最终 state 只为已提交章节保留 `metric / target / actual / status / resolution / body_sha256`（生效了作者字数范围时另加 `author_range`），不保存 MEASURE/RESOLVE 事件、ID 链、policy fingerprint 或独立 chapter state。
+- `init`：仅在 `_tracking-state.json` 不存在时执行（旧追踪文件自动移入 `追踪/_旧追踪存档/`）；执行前读 [tracking-initialization.md](tracking-initialization.md)。
+- `draft`：把逐章事务草稿预填到 `.story/work/第NNN章/tracking.json`，并输出字段上限与在场核心角色当前快照。新章（`append`）只填 `delta` 与变化角色快照；已提交章（`revision`）在预填记录上改成修订后的完整记录，不清空重写。
+- **作者字数范围**：细纲可写 `字数范围：2000-2600`，本轮临时覆盖传 `--min-chars` / `--max-chars`（同时替代默认 ±12% 内部带与 ±15% 用户带）。
+- `chapter check`：读取正文与细纲目标，返回 `ready`（可提交，exit 0）/ `needs_decision`（长度带外，交作者定夺，exit 0；`over` 额外返回 `compress-once` 删除字数）/ `blocked`（正文硬伤，exit 1）/ `invalid`（exit 1）/ `tool_unavailable`（exit 3）。加 `--plain` 输出白话结论（含短段占比与叙述句长中位数参考）。
+- `chapter commit`：重跑计数与硬伤检查，将生效区间内的字数记录与逐章事务原子提交（成功后自动删除 `.story/work/第NNN章/`）。
+- `chapter accept-current-length`：接受带外但质检通过的章节并原子提交；低于目标一半（`BELOW_ACCEPT_FLOOR`）或超长未压缩（`COMPRESSION_REQUIRED`）时拒绝，作者明确拍板加 `--force`。
+- `check`：校验 state schema、逐章记录与自动生成视图的一致性。若报 `derived view differs from _tracking-state.json`，取当前 `state_revision` 重新提交该章 `mode=revision` 事务重建，禁止手改视图或删 `_tracking-state.json`；手写逐章记录导致 `chapter delta N already exists with different content` 时，删掉手写文件后重跑原事务。
 
 ## 逐章事务
 
@@ -79,7 +63,7 @@ Markdown 只负责给作者和 Agent 阅读，工具不再反向解析 Markdown�
     "timeline_events": [
       {
         "action": "upsert",
-        "id": "E010",
+        "id": "E005",
         "story_time": "实弹训练两天后",
         "objective_fact": "文工团高层否决专业重拍版，决定沿用江晨手机拍摄的原版视频",
         "reader_knowledge": "读者已看到周薄森指出专业版缺了灵魂，张耀祖当场拍板用回原版",
@@ -108,7 +92,7 @@ Markdown 只负责给作者和 Agent 阅读，工具不再反向解析 Markdown�
       "location": "火箭军文工团高层看片会",
       "goal": "完成五天百万粉任务，持续做出真正能打的军宣内容",
       "state": "专业团队反向验证原版价值，军内认可继续抬升",
-      "abilities_resources": ["前世MCN爆款运营经验", "《中国军魂》伴奏", "大师级导演能力"],
+      "abilities_resources": ["前世MCN爆款运营经验", "《中国军魂》伴奏", "天王级唱功", "大师级导演能力"],
       "relationships": ["钟嘉嘉持续提供军报资源", "周薄森和张耀祖已明确认可其创作能力"],
       "knowledge": ["《军报》采访稿已经过审", "原版视频将继续作为正式军宣内容"],
       "open_threads": ["五天百万粉任务尚未结算", "钟嘉嘉所谓只猜对一半仍未解释"]
@@ -119,30 +103,15 @@ Markdown 只负责给作者和 Agent 阅读，工具不再反向解析 Markdown�
 
 约束：
 
-- 构造事务前运行 `check`，把当前 `state_revision` 原样写入 `expected_state_revision`；若状态已经变化，重新读取 state 并重构事务。
-- `context` 的允许字段随子命令不同：`init` 收 `position`、`long_term_constraints`、`active_character_names`、`continuity_risks`、`recent_chapters`、`next_chapter_commitments` 六项；`commit` 只收前四项。`recent_chapters` 与 `next_chapter_commitments` 在 commit 时由工具从当前视图和本章 `delta` 派生，手填会在任何写入前被拒（`context contains unsupported fields: ...`，exit 2）。commit 事务须使用自身允许字段，不能照搬 init 示例。
-- `character_snapshots` 中出现的角色视为核心复用角色，必须同时出现在 `character_changes`；已经建立快照的核心角色再次变化时必须提交新快照。
-- 角色快照的四个列表不限制条数，只限制单项长度和最终文件总字节：目标 ≤4096 字节，超过警告；硬上限 8192 字节，超过则在任何写入前拒绝。
-- 没有快照的角色变化视为临时角色，不建立状态文件；`context.active_character_names` 是下一章的活跃角色，不是核心角色总数或主角数：最多 20 人且必须已有当前快照，只列下一章出场或被直接牵动的核心角色，其余核心角色保留快照，需要时读 `追踪/角色状态/{名}.md`。
-- `context.long_term_constraints` 最多 6 条：要加第 7 条先合并语义重叠项或请作者取舍，不自动删旧约束；永久生效的设定裁定进它，短期强承诺进 `next_chapter_commitments`，过程决策不进续写状态卡。
-- `context.long_term_constraints` 和 `context.continuity_risks` 是整份提交的当前值。凡是上一版有、本次没有的条目，必须逐条列进 `delta.retired_context_items`，否则工具在任何写入前拒绝——漏写不会被当成删除。实际退役的条目由工具写进本章逐章记录的 `## 本章退役登记`，随后仍可回查。
-- 不再复用的核心角色写进 `delta.retired_characters`：工具删除其当前快照与 `角色状态/{角色名}.md`，并在逐章记录留档。同一事务里不能既退役又提交快照，也不能退役仍列在 `context.active_character_names` 的角色。角色阵亡/退场这一章，把变化照写进 `character_changes` 即可，本章退役的角色不必再交一份马上要删的快照，逐章记录仍按核心角色标注。退役只表示不再进入热上下文，正文与逐章记录不受影响。
-- 两类退役都只能在 `mode=append` 提交。退役表示「从此刻起离开当前状态」，而修订事务的逐章记录属于被改写的旧章，落在那里会谎报退役发生的章节；`mode=revision` 必须原样重交当前全部上下文条目，需要退役就放到下一次 append。
-- `伏笔.md` 只呈现已经埋设过的当前状态。未来规划仍留在大纲。
-- `timeline_events.action` 可为 `upsert/delete`。`未揭示` 的 `reveal_chapter` 必须为 `null`；部分/完全揭示只能填写已经发生的实际章节。
-- `mode=revision` 时，逐章记录必须重算为修订后该章仍然成立的完整连续性记录（用 `draft` 预填的草稿改，漏写的项会从记录里消失，工具在 stderr 警告被清空的栏目；原有的退役登记原样保留）；当前角色、伏笔、时间线和上下文则提交受影响对象截至最新已写章的当前值。
-- 修订导入截止章内的正文时，会新增或覆盖该章的逐章记录；`imported_through_chapter` 不变。
+- `expected_state_revision` 取当前 `state_revision`（`draft` 自动预填）；逐章 JSON 不写 `wordcount`。
+- `context` 字段：`init` 收 `position`、`long_term_constraints`、`active_character_names`、`continuity_risks`、`recent_chapters`、`next_chapter_commitments` 六项；`commit` 只收前四项（后两项由工具自动算出，手填报错 exit 2）。
+- `character_snapshots` 中的核心复用角色须同时出现在 `character_changes`；已建快照的核心角色再次变化时须提交新快照（单文件目标 ≤4096 字节，硬上限 8192 字节）。无快照的临时角色只写 `character_changes`。
+- `context.active_character_names`：仅列下一章出场或被直接牵动的核心角色（最多 20 人，须已有快照）。
+- `context.long_term_constraints`（最多 6 条，超限先合并或请作者取舍）与 `context.continuity_risks` 整份提交当前值；凡上一版有、本次移除的条目须列进 `delta.retired_context_items`（仅 `mode=append` 允许）。
+- 不再复用的核心角色写进 `delta.retired_characters`（仅 `mode=append` 允许；同事务不交快照、不列在 `active_character_names`，阵亡/退场变化照写进 `character_changes`）。
+- `伏笔.md` 只呈现已埋设状态；`timeline_events.action` 为 `upsert/delete`，`未揭示` 的 `reveal_chapter` 必须为 `null`。
+- `mode=revision`：在 `draft` 预填草稿上修改该章完整连续性记录（不可提交退役项），角色、伏笔、时间线和上下文提交截至最新已写章的当前值。
 
 ## 续写状态卡固定格式
 
-`上下文.md` ≤12288 字节，由 state 整份生成，只含以下 7 个顶层区块：
-
-1. `## 当前位置`
-2. `## 长期约束`
-3. `## 核心角色状态`
-4. `## 活跃伏笔`
-5. `## 近三章速记`
-6. `## 下一章承诺`
-7. `## 连贯性风险`
-
-其中活跃角色最多 20 人、活跃伏笔确定性选取最多 8 条、近章只保留 3 章。这些是下一章热上下文容量，不是完整角色状态的容量限制；人多且各角色状态行写得长时可能先撞字节上限，超了先压短状态行，再减人数。
+`上下文.md` ≤12288 字节（活跃角色 ≤20 人、活跃伏笔 ≤8 条、近章 3 章），由 state 自动生成 7 个顶层区块：`## 当前位置`、`## 长期约束`、`## 核心角色状态`、`## 活跃伏笔`、`## 近三章速记`、`## 下一章承诺`、`## 连贯性风险`。超字节上限时先压短状态行，再减人数。
