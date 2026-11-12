@@ -134,15 +134,17 @@ const METAPHOR_DENSITY_MIN_HITS = 7;
 const METAPHOR_DENSITY_PER_KILO = 3;
 
 // 解释链密度：常见“他知道/他明白/这意味着/必须需要”
-// 连续替读者推理，读感像报告。单个判断词可服务推理；高密度聚集才提示回到角色当下证据。
+// 连续替读者推理，读感像报告。单个判断词或领域名词可服务叙事；只有论文推导词/义务情态链成片出现才报。
+// 顺序固定为 connector → modal → mental → abstract，供同一行去重重叠区间（如“必须在规则惩罚前做出判断”只计 1 次 modal）。
 const REASONING_CHAIN_PATTERNS = [
+  { key: 'connector', core: true, pattern: /这意味着|也就是说|换句话说|真正的问题(?:在于)?|问题在于|关键在于|在这种情况下|按照这个逻辑/g },
+  { key: 'modal', core: true, pattern: /(?:(?<!不)(?:必须|需要|应该|只要|就会|可能|无法)|不能)[^。！？!?\n]{0,16}(?:判断|确认|承担|维持|稳住|控制|扩大|失控|带来|造成|默认|核对|筛选|减少|建立|风险|结果|秩序|责任)/g },
   { key: 'mental', core: true, pattern: /(?<![不没未无])(?:他|她|我)?(?:知道|明白|意识到|清楚|判断|确认|分析)/g },
-  { key: 'connector', core: true, pattern: /这意味着|也就是说|换句话说|真正的问题(?:在于)?|问题在于|关键在于|在这种情况下|按照这个逻辑|只有这样|想到这里/g },
-  { key: 'modal', core: true, pattern: /(?:(?<!不)(?:必须|需要|应该|只要|就会|可能|可以|能够|无法)|不能)[^。！？!?\n]{0,16}(?:判断|确认|承担|维持|稳住|控制|扩大|失控|带来|造成|理解|默认|回家|进门|核对|筛选|减少|建立|风险|结果|秩序|责任)/g },
   { key: 'abstract', core: false, pattern: /(?:任务|条件|风险|来源|逻辑|局面|结果|责任|秩序|规则|信息不足|决策能力)/g },
 ];
 const REASONING_CHAIN_MIN_HITS = 8;
 const REASONING_CHAIN_CORE_MIN_HITS = 4;
+const REASONING_CHAIN_MIN_LINKS = 3;
 const REASONING_CHAIN_MIN_BUCKETS = 2;
 const REASONING_CHAIN_PER_KILO = 18;
 
@@ -714,7 +716,7 @@ function findTrailerEnding(proseLines) {
         column: match.index + 1,
         type: 'trailer-ending',
         severity: 'blocking',
-        message: '预告式总结收尾：「没人知道/才刚刚开始/正朝着…压了过去」是 AI 章尾预告腔；结尾停在具体动作、画面或一句台词上，悬念让事件自己挂住，别替读者预告下一章。',
+        message: '预告式总结收尾：「没人知道/才刚刚开始/正朝着…压了过去」是 AI 章尾预告腔；结尾停在具体决定、动作、画面或一句台词上，悬念让事件自己挂住，别替读者预告下一章。',
         excerpt: compact(text.slice(match.index, match.index + match[0].length)),
       });
     }
@@ -726,7 +728,7 @@ function findTrailerEnding(proseLines) {
         column: summaryMatch.index + 1,
         type: 'trailer-summary',
         severity: 'blocking',
-        message: '章尾状态总结体：「这一夜注定…/这一切都结束了/新的人生才刚刚开始/命运的齿轮」是把细纲的结尾设定原样写成了总结句；结尾设定要落成最后一个具体动作、画面或台词，别替读者盖章。',
+        message: '章尾状态总结体：「这一夜注定…/这一切都结束了/新的人生才刚刚开始/命运的齿轮」是把细纲的结尾设定原样写成了总结句；结尾设定要落成最后一个具体决定、动作、画面或台词，别替读者盖章。',
         excerpt: compact(text.slice(summaryMatch.index, summaryMatch.index + summaryMatch[0].length)),
       });
     }
@@ -774,7 +776,7 @@ function findQuoteEmphasisTic(proseLines) {
     column: 1,
     type: 'quote-emphasis-tic',
     severity: 'advisory',
-    message: `引号强调滥用：叙述里 1-4 字短词加引号强调 ${hits} 处；只留真正反讽/转述必要的一两处，其余去掉引号直接写，或换成具体动作让读者自己品。`,
+    message: `引号强调滥用：叙述里 1-4 字短词加引号强调 ${hits} 处；只留真正反讽/转述必要的一两处，其余去掉引号直写原意，或把话里的反讽直接点明。`,
     excerpt: compact(samples.join(' ')),
   }];
 }
@@ -1005,10 +1007,11 @@ function findMetaphorDensityTic(proseLines) {
 }
 
 // 解释链密度：统计引号外叙述中“知道/明白/这意味着/必须需要”等论文式推导链。
-// 角色正常算利害、讲因果保留；只有带连接词或情态判断链成片像公文时才报。
+// 角色正常算利害、讲因果保留；同一行内去重重叠区间，且至少出现 3 处连接词/情态推导链才报。
 function findReasoningChainTic(proseLines) {
   let hits = 0;
   let coreHits = 0;
+  let linkHits = 0;
   let narrativeChars = 0;
   let firstLine = null;
   const samples = [];
@@ -1019,13 +1022,19 @@ function findReasoningChainTic(proseLines) {
     if (!trimmed || isDivider(trimmed) || isStructural(trimmed)) continue;
     const narrative = stripQuoted(trimmed);
     narrativeChars += visibleLength(narrative);
+    const acceptedSpans = [];
 
     for (const { pattern, key, core } of REASONING_CHAIN_PATTERNS) {
       pattern.lastIndex = 0;
       let match;
       while ((match = pattern.exec(narrative)) !== null) {
+        const start = match.index;
+        const end = start + match[0].length;
+        if (acceptedSpans.some(([a, b]) => start < b && end > a)) continue;
+        acceptedSpans.push([start, end]);
         hits += 1;
         if (core) coreHits += 1;
+        if (key === 'connector' || key === 'modal') linkHits += 1;
         buckets.add(key);
         if (firstLine === null) firstLine = lineNo;
         const sample = compact(match[0]);
@@ -1036,7 +1045,7 @@ function findReasoningChainTic(proseLines) {
 
   if (narrativeChars === 0 || hits < REASONING_CHAIN_MIN_HITS) return [];
   if (coreHits < REASONING_CHAIN_CORE_MIN_HITS || buckets.size < REASONING_CHAIN_MIN_BUCKETS) return [];
-  if (!buckets.has('connector') && !buckets.has('modal')) return [];
+  if (linkHits < REASONING_CHAIN_MIN_LINKS) return [];
   const perKilo = (hits / narrativeChars) * 1000;
   if (perKilo < REASONING_CHAIN_PER_KILO) return [];
 
@@ -1483,7 +1492,7 @@ function findNotIsComparisons(text, getPosition) {
         column: position.column,
         type: 'not-is-comparison',
         severity: 'blocking',
-        message: '高频 AI 对比句式；删掉否定铺垫，直接写后项，或改成动作/细节呈现。',
+        message: '高频 AI 对比句式；删掉否定铺垫，直接写后项（直白情绪、判断、对话或具体细节皆可）。',
         excerpt: compact(raw),
       });
     }

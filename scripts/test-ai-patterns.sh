@@ -1479,4 +1479,25 @@ if (rc.length !== 0) {
   throw new Error('无公文连接词/情态链的角色正常利害盘算不应误报 reasoning-chain-tic: ' + JSON.stringify(rc));
 }
 NODE
+
+# 复现七猫 15 万章实测检出的三类误报边界：
+# 1) 传统过渡词「想到这里」「只有这样」+ 日常「不能回家」「可以通过呼吸判断」重叠；
+# 2) 玄幻/网游领域词「规则/任务」高频复现 + 单处「在这种情况下」（不足 3 处推导链）。
+FIXTURE_CORPUS_EDGES="$TMP_DIR/fixture-reasoning-corpus-edges.md"
+cat > "$FIXTURE_CORPUS_EDGES" <<'TEXT'
+她失明以后可以通过别人呼吸的轻重判断来人是谁，也知道谁在敷衍自己。想到这里，她清楚今晚不能回家，只有这样才能避开前夫那边的耳目。
+
+识海里的同化规则一圈圈散开，他明白这道规则能吞掉血肉与金铁，也知道接下试炼任务的条件有多苛刻。在这种情况下，他先试着熟悉新规则的边界，把剩余的规则碎片一点点收进掌心。
+TEXT
+set +e
+node "$SCRIPT" --json "$FIXTURE_CORPUS_EDGES" > "$OUT"
+set -e
+node - "$OUT" <<'NODE'
+const fs = require('fs');
+const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const rc = r.findings.filter((f) => f.type === 'reasoning-chain-tic');
+if (rc.length !== 0) {
+  throw new Error('语料边界（想到这里/可以通过…判断重叠/单处连接词+高频规则任务词）不应误报 reasoning-chain-tic: ' + JSON.stringify(rc));
+}
+NODE
 echo "issue #540 slow-prop stock reaction & character calculation regression tests passed."
