@@ -270,6 +270,7 @@ assert_grep 'Path\.resolve.*realpath' "$SKILL_FILE" "deployment must canonicaliz
 assert_grep 'samefile' "$SKILL_FILE" "deployment must compare existing source/target filesystem identity"
 assert_grep 'target-descendant|目标位于源目录内' "$SKILL_FILE" "deployment must reject recursive-copy targets inside their source"
 assert_grep '清理自嵌套残留' "$SKILL_FILE" "story-setup must clean self-nested copies before deploying"
+assert_grep '[-][-]prune-orphans' "$SKILL_FILE" "story-setup must prune retired files inside exclusively-managed directories before overwriting"
 assert_file "$COPY_PATH_SAFETY"
 
 # 执行真实 helper 验证 symlink alias、同目录、子目录和安全 sibling；不能只锁 SKILL.md 措辞。
@@ -340,6 +341,78 @@ with mock.patch.object(module.os.path, "samefile", side_effect=OSError("identity
 assert payload["status"] == "filesystem_identity_error"
 assert payload["copy_allowed"] is False
 assert module.status_exit_code(payload["status"]) != 0
+
+# --prune-orphans 清理退役参考文件（如已删的 style-craft.md / emotion-on-page.md），保留源端仍在的文件与同级用户目录；
+# status == same 或目标本身是 symlink 时零删除。
+prune_src = root / "prune-src"
+prune_dst = root / "prune-parent/agent-references"
+user_sibling = root / "prune-parent/user-custom-skill"
+(prune_src / "genre-prose-cards").mkdir(parents=True)
+(prune_src / "writing-craft.md").write_text("current", encoding="utf-8")
+(prune_src / "genre-prose-cards/都市日常.md").write_text("card", encoding="utf-8")
+(prune_dst / "genre-prose-cards").mkdir(parents=True)
+(prune_dst / "retired-sub").mkdir(parents=True)
+(prune_dst / "writing-craft.md").write_text("old", encoding="utf-8")
+(prune_dst / "style-craft.md").write_text("retired", encoding="utf-8")
+(prune_dst / "emotion-on-page.md").write_text("retired", encoding="utf-8")
+(prune_dst / "retired-sub/legacy.md").write_text("retired", encoding="utf-8")
+user_sibling.mkdir(parents=True)
+(user_sibling / "SKILL.md").write_text("user", encoding="utf-8")
+
+proc = subprocess.run(
+    [sys.executable, helper, "--prune-orphans", str(prune_src), str(prune_dst)],
+    text=True,
+    capture_output=True,
+)
+assert proc.returncode == 0, proc.stderr
+pruned_payload = json.loads(proc.stdout)
+assert pruned_payload["status"] == "safe"
+assert pruned_payload["copy_allowed"] is True
+assert pruned_payload["pruned"] == [
+    "emotion-on-page.md",
+    "retired-sub/",
+    "retired-sub/legacy.md",
+    "style-craft.md",
+], pruned_payload["pruned"]
+assert (prune_dst / "writing-craft.md").exists()
+assert not (prune_dst / "style-craft.md").exists()
+assert not (prune_dst / "emotion-on-page.md").exists()
+assert not (prune_dst / "retired-sub").exists()
+assert (user_sibling / "SKILL.md").exists()
+
+# status == same 时零改动
+(prune_src / "only-in-same.md").write_text("keep", encoding="utf-8")
+proc_same = subprocess.run(
+    [sys.executable, helper, "--prune-orphans", str(prune_src), str(prune_src)],
+    text=True,
+    capture_output=True,
+)
+assert proc_same.returncode == 0
+same_payload = json.loads(proc_same.stdout)
+assert same_payload["status"] == "same"
+assert same_payload["pruned"] == []
+assert (prune_src / "only-in-same.md").exists()
+
+# 目标本身为 symlink 时拒绝穿透删除外部目录
+ext_dir = root / "external-target"
+ext_dir.mkdir(parents=True)
+(ext_dir / "do-not-delete.md").write_text(" precious ", encoding="utf-8")
+sym_target = root / "symlink-target"
+try:
+    sym_target.symlink_to(ext_dir, target_is_directory=True)
+except OSError:
+    pass
+else:
+    proc_sym = subprocess.run(
+        [sys.executable, helper, "--prune-orphans", str(prune_src), str(sym_target)],
+        text=True,
+        capture_output=True,
+    )
+    assert proc_sym.returncode != 0
+    sym_payload = json.loads(proc_sym.stdout)
+    assert sym_payload["status"] == "unsafe_target_symlink"
+    assert sym_payload["copy_allowed"] is False
+    assert (ext_dir / "do-not-delete.md").exists()
 PY
 # 探测器只写一份，先跑正负 fixture 自检，再扫真实 SKILL.md。
 cat > "$TMP_DIR/detect-self-copy.py" <<'PY'

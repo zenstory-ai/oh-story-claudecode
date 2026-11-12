@@ -14,7 +14,7 @@
 
 通用路径面向可读取项目文件的 NarraFork、Web AI、自定义 Agent，只部署 `AGENTS.md` 与项目本地 `skills/`。原生 hooks/agents 不部署；检查按 skill 软约束执行，分工走 solo/direct fallback。
 
-1. 复制仓库当前 `skills/` 下所有包含 `SKILL.md` 的 story skill 目录（14 个：`browser-cdp` 与 `story*`）到目标项目 `skills/{skill-name}/`；仅替换这些 story-setup 管理的已知 skill 目录，保留用户其他目录。项目副本是整份 skill 拷贝，agent references 只使用当前规范前缀 `skills/`。
+1. 复制仓库当前 `skills/` 下所有包含 `SKILL.md` 的 story skill 目录（14 个：`browser-cdp` 与 `story*`）到目标项目 `skills/{skill-name}/`；仅替换这些 story-setup 管理的已知 skill 目录（`status: safe` 时按 SKILL.md 先清理各已知目录内源端已删除的旧文件），保留用户其他目录。项目副本是整份 skill 拷贝，agent references 只使用当前规范前缀 `skills/`。
 2. 用 `skills/story-setup/references/generic/AGENTS.md.tmpl` 按 SKILL.md「项目指令合并」写入项目 `AGENTS.md`（`--host generic`）。
 3. `.story-deployed` 的 `target_cli` 写入 `generic` 或多端组合；`references_dir` 对 generic 写 `skills/story-setup/references/agent-references`。
 4. 安装报告提示项见下方「安装报告必须提示」。

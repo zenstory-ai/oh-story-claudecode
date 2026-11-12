@@ -630,5 +630,46 @@ class FragmentationTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 2)
             self.assertIn("第 9 章没有细纲", completed.stdout)
 
+    def test_prose_balance_counts_narrative_channels_and_never_blocks(self) -> None:
+        text = (
+            "## 第1章 算账\n"
+            "“我盯着你的指尖，因为我明白你的盘算！”\n"
+            "他伸手拿起桌上的旧账本，指腹摩挲着封皮。\n"
+            "这会儿当众翻脸犯不着，因为东院还没拿到货栈钥匙。\n"
+            "门外的雨越下越大。\n"
+        )
+        balance = storyctl.prose_balance(text)
+        self.assertEqual(balance["narrative_sentences"], 3)
+        self.assertEqual(balance["body_action_sentences"], 1)
+        self.assertAlmostEqual(balance["body_action_sentence_ratio"], 0.333)
+        self.assertEqual(balance["thought_causal_sentences"], 1)
+        self.assertAlmostEqual(balance["thought_causal_sentence_ratio"], 0.333)
+        self.assertEqual(balance["human_reference"]["body_action_sentence_ratio"], 0.19)
+        self.assertEqual(balance["human_reference"]["thought_causal_sentence_ratio"], 0.19)
+
+        with tempfile.TemporaryDirectory(prefix="storyctl-balance-") as directory:
+            project = Path(directory)
+            (project / "大纲").mkdir()
+            (project / "正文").mkdir()
+            (project / "大纲/细纲_第001章.md").write_text(
+                "- 字数目标：200 字\n- 字数口径：visible_chars_v1\n", encoding="utf-8")
+            skewed = "# 第一章\n" + "\n".join(
+                f"他伸手按住桌角第{i}次，目光落在茶盏边缘不说话。" for i in range(1, 10)
+            ) + "\n"
+            (project / "正文/第001章_测试.md").write_text(skewed, encoding="utf-8")
+            _init_tracking(project)
+            with unittest.mock.patch.object(storyctl, "check_blocking_quality", return_value={
+                "status": "pass", "blocking_findings": [], "advisories": [], "semantic_advisories": 0, "tool_errors": []}):
+                result = storyctl.chapter_check(project, 1)
+            self.assertEqual(result["status"], "ready")
+            self.assertEqual(result["prose_balance"]["body_action_sentence_ratio"], 1.0)
+            self.assertEqual(result["prose_balance"]["thought_causal_sentence_ratio"], 0.0)
+            plain = "\n".join(storyctl.plain_report(result))
+            self.assertIn("动作和心里话（只作参考，不拦）", plain)
+            self.assertIn("动作偏密、心里账偏少", plain)
+            for jargon in ("needs_decision", "blocking", "status", "advisory", "prose_balance"):
+                self.assertNotIn(jargon, plain)
+
+
 if __name__ == "__main__":
     unittest.main()

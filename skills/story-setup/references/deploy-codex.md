@@ -43,7 +43,7 @@ Codex 项目 hooks 部署到 `.codex/hooks.json`；运行脚本部署到 `.codex
 - 检查 `.codex/agents/` 下 7 个 `.toml` agent 定义文件存在并可解析
 - 检查 `.codex/hooks.json` 存在且 JSON 有效，Unix `command` 仅通过 `run-story-hook.sh` 启动，Windows `commandWindows` 仅通过 `run-story-hook.cmd` 启动；不存在直调 `story_codex_hook.py` 的注册
 - 检查 `.codex/hooks/story_codex_hook.py`、`run-story-hook.sh`、`run-story-hook.cmd` 存在，Python 语法有效，POSIX/Windows launcher 能从嵌套 cwd 定位项目根
-- 按源目录相对路径核对 `.codex/skills/story-setup/references/agent-references/`，含子目录
+- 按源目录相对路径核对 `.codex/skills/story-setup/references/agent-references/`，含子目录，且已按 SKILL.md 清理源目录已删除的退役文件
 
 ## 安装报告必须提示
 

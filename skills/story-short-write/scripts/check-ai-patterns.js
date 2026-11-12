@@ -72,7 +72,8 @@ const MICRO_TIC_PER_KILO = 6;
 // 像在念/宣判”模板。此类句子词面变化大，不能逐词 blocking；按章聚集到 4 处才
 // advisory，要求逐处做删除测试。正常受伤、打斗、生理反应若承担物理后果可保留。
 const STOCK_REACTION_PATTERNS = [
-  /(?:指尖|手指|指节|手背|掌心|拳头|袖口|衣角|裙角|下唇|嘴唇|唇角|嘴角|眉头|眼底|眸光|目光|视线|肩膀|呼吸)[^。！？!?\n]{0,16}(?:轻轻|微微|缓缓|悄然|不自觉|无意识|下意识|攥紧|握紧|收紧|绞紧|泛白|发白|叩|敲|摩挲|抿紧|抿成|移开|垂下|躲开|一颤|颤了?一下|停了?一下|顿了?一下)/g,
+  /(?:指尖|指腹|手指|指节|手背|掌心|拳头|袖口|衣角|裙角|下唇|嘴唇|唇角|嘴角|眉头|眼底|眸光|目光|视线|肩膀|呼吸)[^。！？!?\n]{0,16}(?:轻轻|微微|缓缓|慢慢|悄然|不自觉|无意识|下意识|攥紧|握紧|收紧|绞紧|拢住|按住|压住|扣住|捻|泛白|发白|叩|敲|摩挲|抿紧|抿成|移开|垂下|躲开|落[在到][^，。！？!?\n]{1,10}(?:停|顿)|一颤|颤了?一下|停了?一下|顿了?一下)/g,
+  /(?:手|指尖|手指)往(?:袖口?|怀|兜|口袋|身后|背后)里?一?(?:缩|揣|收|藏)/g,
   /(?:语气|声音)[^。！？!?\n]{0,12}(?:平静|冷静|平淡|冷淡|淡漠|平直)[^。！？!?\n]{0,12}(?:像|仿佛|如同|好像)[^。！？!?\n]{0,16}(?:念|读|报|说|陈述|宣判|背诵)/g,
   /(?:胸口|心口)[^。！？!?\n]{0,16}(?:像|仿佛|如同|好像)[^。！？!?\n]{0,16}(?:撞|锤|压|攥|堵)[^。！？!?\n]{0,8}(?:一下|一记|一拳)?/g,
   /(?:声音|嗓音|语气)[^。！？!?\n]{0,12}(?:放轻|压低|发紧|发颤|很轻|轻了些)/g,
@@ -878,7 +879,7 @@ function findStockReactionTic(proseLines) {
     column: 1,
     type: 'stock-reaction-tic',
     severity: 'advisory',
-    message: `套式反应细节：指尖/指节/喉结/眼圈/声音放轻等通用反应或“平静得像在念”式语气比喻 ${hits} 处（${perKilo.toFixed(1)}/千字）；逐处做删除测试，只标注情绪、不改变选择、关系、物件或动作结果的删掉，不要换部位或同义动作。`,
+    message: `套式反应细节：指尖/指腹/喉结/眼圈/拢住按住/视线停顿等套式微动作或“平静得像在念”式语气比喻 ${hits} 处（${perKilo.toFixed(1)}/千字）；逐处做删除测试，只标注情绪、不改变选择、关系或物理结果的直接删掉，或改成直白情绪与利害判断，不要换部位或换道具继续演。`,
     excerpt: compact(samples.join(' | ')),
   }];
 }
@@ -950,7 +951,7 @@ function findClicheDensityTic(proseLines) {
     column: 1,
     type: 'cliche-density-tic',
     severity: 'advisory',
-    message: `套词密度过高：高危 AI 套词 ${hits} 处（${perKilo.toFixed(1)}/千字）；不要同义词轮换，改成角色当下可见的动作、物件、对话和具体后果。`,
+    message: `套词密度过高：高危 AI 套词 ${hits} 处（${perKilo.toFixed(1)}/千字）；不要同义词轮换，直接删或改成直白情绪、角色利害判断、对话或具体后果，别硬塞手眼小动作。`,
     excerpt: compact(samples.join(' ')),
   }];
 }
@@ -998,13 +999,13 @@ function findMetaphorDensityTic(proseLines) {
     column: 1,
     type: 'metaphor-density-tic',
     severity: 'advisory',
-    message: `比喻密度过高：像/好像/仿佛/如同等比喻标记 ${hits} 处（${perKilo.toFixed(1)}/千字）；保留最有叙事功能的少数比喻，其余回到具体动作、物件、声音或后果，不要换成新比喻。`,
+    message: `比喻密度过高：像/好像/仿佛/如同等比喻标记 ${hits} 处（${perKilo.toFixed(1)}/千字）；保留最有叙事功能的少数比喻，其余回到直白情绪、角色判断、对话或具体后果，不要换成新比喻或小动作。`,
     excerpt: compact(samples.join(' | ')),
   }];
 }
 
-// 解释链密度：统计引号外叙述中“知道/明白/这意味着/必须需要”等判断链。
-// 全篇只报一条；修法不是补结构虚词，而是把判断落到动作、物件、对话和现场反馈。
+// 解释链密度：统计引号外叙述中“知道/明白/这意味着/必须需要”等论文式推导链。
+// 角色正常算利害、讲因果保留；只有带连接词或情态判断链成片像公文时才报。
 function findReasoningChainTic(proseLines) {
   let hits = 0;
   let coreHits = 0;
@@ -1035,6 +1036,7 @@ function findReasoningChainTic(proseLines) {
 
   if (narrativeChars === 0 || hits < REASONING_CHAIN_MIN_HITS) return [];
   if (coreHits < REASONING_CHAIN_CORE_MIN_HITS || buckets.size < REASONING_CHAIN_MIN_BUCKETS) return [];
+  if (!buckets.has('connector') && !buckets.has('modal')) return [];
   const perKilo = (hits / narrativeChars) * 1000;
   if (perKilo < REASONING_CHAIN_PER_KILO) return [];
 
@@ -1043,7 +1045,7 @@ function findReasoningChainTic(proseLines) {
     column: 1,
     type: 'reasoning-chain-tic',
     severity: 'advisory',
-    message: `解释链密度过高：知道/明白/这意味着/必须/需要等判断链 ${hits} 处（${perKilo.toFixed(1)}/千字）；像逻辑报告时，把判断落到角色当下可见的动作、物件、对话和现场反馈。`,
+    message: `解释链密度过高：知道/明白/这意味着/必须/需要等论文式推导 ${hits} 处（${perKilo.toFixed(1)}/千字）；删掉“这意味着/按照这个逻辑”式公文腔，保留角色自己的利害算账与因果判断，或落到对话与选择后果，别全改成手眼小动作。`,
     excerpt: compact(samples.join(' | ')),
   }];
 }
@@ -1224,7 +1226,7 @@ function findAbstractSummaryTic(proseLines) {
     column: 1,
     type: 'abstract-summary-tic',
     severity: 'advisory',
-    message: `抽象总结复读：命运/棋局/这一刻终于明白/才刚刚开始等作者总结 ${hits} 处（${perKilo.toFixed(1)}/千字）；回到角色当下可见的文件、动作、对话或物理后果，别替读者盖章。`,
+    message: `抽象总结复读：命运/棋局/这一刻终于明白/才刚刚开始等作者总结 ${hits} 处（${perKilo.toFixed(1)}/千字）；删掉作者盖章，回到角色当下的具体处境、利害盘算、对话或实际后果，别拿微动作顶替。`,
     excerpt: compact(samples.join(' | ')),
   }];
 }

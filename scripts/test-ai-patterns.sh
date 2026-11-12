@@ -1438,3 +1438,45 @@ node "$SCRIPT" --json "$FIXTURE_NEG" > "$OUT"
 set -e
 node -e "const r=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));if(r.findings.some(f=>f.type==='negation-pair-tic'))throw new Error('台词里的否定对偶与单处否定不应报')" "$OUT"
 echo "negation-pair-tic regression tests passed."
+
+# --- issue #540：慢速道具代偿归入 stock-reaction-tic，纯角色利害盘算不误报 reasoning-chain-tic ---
+FIXTURE_SLOW_STOCK="$TMP_DIR/fixture-slow-stock-reaction.md"
+printf '%s\n' \
+  '她手指慢慢拢住桌上的药包，一句话也没接。' \
+  '沈砚指腹摩挲着粗瓷杯沿，听管事把账念完。' \
+  '她视线落在借据末尾的红印上停了半秒，还是没伸手。' \
+  '掌柜手往袖口里一缩，笑脸倒没变。' > "$FIXTURE_SLOW_STOCK"
+set +e
+node "$SCRIPT" --json "$FIXTURE_SLOW_STOCK" > "$OUT"
+set -e
+node - "$OUT" <<'NODE'
+const fs = require('fs');
+const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const sr = r.findings.filter((f) => f.type === 'stock-reaction-tic');
+if (sr.length !== 1) throw new Error('慢速手眼/道具代偿聚集应报 1 条 stock-reaction-tic: ' + JSON.stringify(r.findings));
+if (sr[0].severity !== 'advisory' || sr[0].review !== 'semantic') {
+  throw new Error('stock-reaction-tic 应为 advisory/semantic: ' + JSON.stringify(sr[0]));
+}
+if (!sr[0].message.includes('直白情绪') && !sr[0].message.includes('利害判断')) {
+  throw new Error('stock-reaction-tic 提示应允许直白情绪或利害判断替代微动作: ' + sr[0].message);
+}
+NODE
+
+FIXTURE_PURE_CALC="$TMP_DIR/fixture-character-calculation.md"
+cat > "$FIXTURE_PURE_CALC" <<'TEXT'
+林澈知道二叔开出的条件看着体面，其实把铺子亏空的风险全推到了东院头上。他也明白这会儿当众掀桌讨不到好结果，老太太最烦小辈拿家里的规矩说事，闹大了反而正中二房下怀。
+
+他心里清楚，眼下这局面谁先接管账房谁就背锅，与其争那个虚名，不如先把南城货栈的钥匙留在手里。只要银钱出入还在自己眼皮底下，二叔就算拿了大印也翻不出浪来，这笔责任犯不着替别人扛。
+TEXT
+set +e
+node "$SCRIPT" --json "$FIXTURE_PURE_CALC" > "$OUT"
+set -e
+node - "$OUT" <<'NODE'
+const fs = require('fs');
+const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const rc = r.findings.filter((f) => f.type === 'reasoning-chain-tic');
+if (rc.length !== 0) {
+  throw new Error('无公文连接词/情态链的角色正常利害盘算不应误报 reasoning-chain-tic: ' + JSON.stringify(rc));
+}
+NODE
+echo "issue #540 slow-prop stock reaction & character calculation regression tests passed."

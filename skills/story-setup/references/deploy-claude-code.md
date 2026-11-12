@@ -73,7 +73,7 @@
 3. 验证 agents：
    - 检查 `.claude/agents/` 下的 7 个 agent 定义文件是否存在
 4. 验证 agent reference bundle：
-   - 按源目录相对路径核对 `.claude/skills/story-setup/references/agent-references/`，含子目录
+   - 按源目录相对路径核对 `.claude/skills/story-setup/references/agent-references/`，含子目录，且已按 SKILL.md 清理源目录已删除的退役文件
    - 检查所有 `story-setup/references/agent-references/<file>.md` 都能解析到 deployed bundle
 
 ## 安装报告必须提示
