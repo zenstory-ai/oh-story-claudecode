@@ -100,7 +100,7 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 **「作者真相」和「读者已知」分开记录**——避免角色提前知道未公开的设定，或把还没揭晓的伏笔提前写破。
 完整文件：[`demo/长篇/.../追踪/上下文.md`](demo/长篇/让你管账号，你高燃混剪炸全网/追踪/上下文.md)
 
-### 续写第 21 章：从门禁到回写，一条链走完
+### 续写第 21 章：从补细纲、写正文到追踪回写
 
 上面的视频录的就是这一段。`/story-long-write 写第21章` 在一次真实会话里的产出与每一道检查：
 
@@ -206,7 +206,7 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 |---|---|
 | <img src="demo/story-dashboard.png" width="420"> | <img src="demo/封面-剑道独尊.png" width="200"> |
 
-## 安装后的第一句话
+## 安装后的第一条请求
 
 复制下面对应的一条，把〈括号里的内容〉换成你的书即可开始：
 

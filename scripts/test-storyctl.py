@@ -644,8 +644,8 @@ class FragmentationTests(unittest.TestCase):
         self.assertAlmostEqual(balance["body_action_sentence_ratio"], 0.333)
         self.assertEqual(balance["thought_causal_sentences"], 1)
         self.assertAlmostEqual(balance["thought_causal_sentence_ratio"], 0.333)
-        self.assertEqual(balance["human_reference"]["body_action_sentence_ratio"], 0.19)
-        self.assertEqual(balance["human_reference"]["thought_causal_sentence_ratio"], 0.19)
+        self.assertEqual(balance["human_reference"]["body_action_sentence_ratio"], 0.12)
+        self.assertEqual(balance["human_reference"]["thought_causal_sentence_ratio"], 0.15)
 
         with tempfile.TemporaryDirectory(prefix="storyctl-balance-") as directory:
             project = Path(directory)

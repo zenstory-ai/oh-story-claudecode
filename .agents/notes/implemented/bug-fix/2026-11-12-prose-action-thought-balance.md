@@ -21,11 +21,11 @@ Issue #540 报告正文中大量叙述句带手眼或道具动作、角色心理
    - `STOCK_REACTION_PATTERNS` 纳入慢速与道具代偿分支（`指腹`、`慢慢`、`捻/拢住/按住/压住/扣住`、`落在……停/顿`、`手/指尖/手指往袖/怀/兜里缩/揣/收/藏`），同步至四份共享检测器副本；
    - `findReasoningChainTic` 要求同段至少命中 `connector` 或 `modal` 才报论文式推导，不再单凭 `mental + abstract` 误伤角色正常利害盘算；
    - 四条把改写方向单一导向「可见的动作、物件」的提示改为并列指向直白情绪、角色利害判断、对话与具体后果；
-   - `skills/story-long-write/scripts/storyctl.py` 的 `chapter check` 新增与 `fragmentation()` 同口径（七猫 90 章去引语叙述句标定）的非阻断指标 `prose_balance(body)` 及 `--plain` 白话参考提示。
+   - `skills/story-long-write/scripts/storyctl.py` 的 `chapter check` 新增与 `fragmentation()` 同口径（七猫 132 本完结长篇抽样 5246 章去引语叙述句标定：动作句均值 12%、P10–P90 3%–23%，盘算因果句均值 15%、P10–P90 4%–28%）的非阻断指标 `prose_balance(body)` 及 `--plain` 白话参考提示。
 3. **补齐 `story-setup` 独占受管目录的退役文件清理**：
    - `skills/story-setup/scripts/copy-path-safety.py` 增加可选 `--prune-orphans`：仅在 `classify_copy` 判定 `status == "safe"`（`copy_allowed: true`）且目标本身非符号链接时，删除目标受管目录中源目录已不存在的文件与空子目录，返回排序后的 `pruned` 列表；`status == "same"` 或目标本身是符号链接时零删除；
    - `skills/story-setup/SKILL.md` 及对应 `deploy-*.md` 规定对独占受管目录（各端 `agent-references/`、`.claude/hooks/` 以及 ZCode / OpenClaw / Reasonix / generic 的 14 个已知 `skills/{skill-name}/` 目录）覆盖前清理源端已退役文件，不触碰共享父目录里的用户自有条目。
-4. **收敛修复 `README.md` 确属生硬直译的几处标题与单向措辞**：保留原有口语感好的章节标题与站外文章原名链接，仅将 `安装后的第一条请求`（request）、`可复用的模块`（reusable modules）、`判定为 AI`（缺宾语中心）等确属直译处及「交给可见的动作和物件」单向表述做最小改写。
+4. **收敛修复 `README.md` 内部术语/直译标题与单向措辞**：保留原有自然的章节标题（如 `## 这是什么`、`## 安装后的第一条请求`）与站外文章原名链接，仅将内部黑话 `从门禁到回写，一条链走完`（改为 `从补细纲、写正文到追踪回写`）与 `看看它的输出`、`可复用的模块`、`判定为 AI` 及「交给可见的动作和物件」单向表述做最小改写。
 5. **同步 ClawHub 发布清单**：递增本次涉及字节变更的 `story-deslop`、`story-long-write`、`story-review`、`story-setup`、`story-short-write` 及主路由 `story` 的包版本，使用固定的中央控制脚本重新生成 `packageDigest`。
 
 ## Alternatives considered

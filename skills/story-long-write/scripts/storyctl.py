@@ -53,12 +53,12 @@ HUMAN_NARRATIVE_SENTENCE_MEDIAN = 39
 HUMAN_SHORT_PARAGRAPH_RANGE = (0.02, 0.33)
 HUMAN_NARRATIVE_SENTENCE_RANGE = (27, 54)
 # ---- 动作与心理平衡（只提示，不拦）----
-# 同一批七猫三本完结书前 30 章（90 章）去引语叙述句标定：
-# 带肢体/手眼动作词的叙述句平均约 19%（P10–P90 8%–32%），带盘算/因果词的叙述句平均约 19%（P10–P90 8%–28%）。
-HUMAN_BODY_ACTION_SENTENCE_RATIO = 0.19
-HUMAN_BODY_ACTION_SENTENCE_RANGE = (0.08, 0.32)
-HUMAN_THOUGHT_CAUSAL_SENTENCE_RATIO = 0.19
-HUMAN_THOUGHT_CAUSAL_SENTENCE_RANGE = (0.08, 0.28)
+# 七猫 132 本完结长篇抽样 5246 章去引语叙述句标定：
+# 带肢体/手眼动作词的叙述句平均约 12%（P10–P90 3%–23%，P95 29%），带盘算/因果词的叙述句平均约 15%（P10–P90 4%–28%）。
+HUMAN_BODY_ACTION_SENTENCE_RATIO = 0.12
+HUMAN_BODY_ACTION_SENTENCE_RANGE = (0.03, 0.23)
+HUMAN_THOUGHT_CAUSAL_SENTENCE_RATIO = 0.15
+HUMAN_THOUGHT_CAUSAL_SENTENCE_RANGE = (0.04, 0.28)
 _QUOTED = re.compile(r"“[^”]*”|「[^」]*」")
 _HTML_COMMENT = re.compile(r"<!--.*?-->", re.S)
 _BODY_ACTION_SENTENCE_RE = re.compile(
@@ -597,7 +597,7 @@ def plain_report(result: dict[str, Any]) -> list[str]:
             f"（真人平均约 {round(HUMAN_THOUGHT_CAUSAL_SENTENCE_RATIO * 100)}%，多数章在 {round(th_low * 100)}%–{round(th_high * 100)}%）",
         ]
         action_heavy = total_sentences >= 8 and (
-            act_ratio > act_high or (act_ratio > 0.25 and thought_ratio < th_low)
+            act_ratio > 0.29 or (act_ratio > act_high and thought_ratio < 0.08)
         )
         b_tail = (
             "。动作偏密、心里账偏少：删掉不改局面的手眼或道具小动作，把角色为什么这么选、图什么直接写出来。"
