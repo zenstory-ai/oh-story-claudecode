@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
-  "setup_skill_version": "1.3.10",
-  "agents_version": 42,
+  "setup_skill_version": "1.3.11",
+  "agents_version": 43,
   "topic_decision_phase": 5,
   "progress_schema_version": 2,
   "primary_benchmark_artifacts": [
