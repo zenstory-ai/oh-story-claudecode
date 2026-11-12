@@ -751,9 +751,9 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('- 这章不能说破：{这章确有一件具体的事要压住时才写一行', outline_text)
         self.assertNotIn('- 字数口径：', outline_text)
         self.assertNotIn('<!-- {单元编号', outline_text)  # 「属于哪段剧情」不再写编号注释
-        # 前 3 章细纲要排一次正面冲突、立起够大的赌注。
+        # 前 3 章细纲要排一次正面冲突、按题材量级立起切身赌注。
         self.assertIn('正面冲突', outline_text)
-        self.assertIn('够大的赌注', outline_text)
+        self.assertIn('切身赌注', outline_text)
         too_many = self.call('build_architect_brief.py', '--project', self.book, '--task', 'outline', '--chapters', '1-11')
         self.assertEqual(too_many.returncode, 2)
         self.assertIn('一批细纲最多 10 章', too_many.stderr)

@@ -31,10 +31,11 @@ Detect high-risk AI-flavor prose patterns that need human rewrite:
   - 预告式总结收尾 (文末窗口 没人知道/才刚刚开始/正朝着…压了过去, 实战漏网句式)
   - 章尾状态总结体 (文末窗口 这一夜注定/这一切都结束了/新的人生才刚刚开始/命运的齿轮)
   - 引号强调滥用 (叙述里 1-4 字短词加引号强调，密度型)
+  - 叙述省略号过密 (引号与面板外 …… 高密度刷屏，advisory)
 
 Book-local .deslop-whitelist literal spans are excluded from style scanning (no regex or ancestor inheritance).
-Each finding carries severity: blocking by default for generation/deslop cleanup (not-is-comparison / em-dash / voice-contrast / negation-parade / reverse-not-is / trailer-ending / trailer-summary). This is a local style/readability gate, not an AIGC detector score; functional human text can be marked for review instead of hard-edited for a detector.
-或 advisory (period-stutter / long-paragraph / micro-action-tic / negation-pair-tic / stock-reaction-tic / action-list-tic / abstract-summary-tic / cliche-density-tic / metaphor-density-tic / reasoning-chain-tic / system-notice-formality-tic / overcompressed-prose-tic / low-connective-density-tic / quote-emphasis-tic / formulaic-parallelism，是提示，justified 的长推理/氛围段可保留)。
+Each finding carries severity: blocking by default for generation/deslop cleanup (not-is-comparison / em-dash / voice-contrast / negation-parade / reverse-not-is / trailer-ending / trailer-summary), where single/low-count hits of rhetorical patterns downgrade to semantic advisory and high-density clusters block. This is a local style/readability gate, not an AIGC detector score; functional human text can be marked for review instead of hard-edited for a detector.
+或 advisory (period-stutter / long-paragraph / micro-action-tic / negation-pair-tic / stock-reaction-tic / action-list-tic / abstract-summary-tic / cliche-density-tic / metaphor-density-tic / reasoning-chain-tic / system-notice-formality-tic / overcompressed-prose-tic / low-connective-density-tic / quote-emphasis-tic / formulaic-parallelism / ellipsis-density-tic，是提示，justified 的长推理/氛围段可保留)。
 --fail-on=blocking 只在出现 blocking finding 时退出 1；默认 --fail-on=all 有任何 finding 即退出 1。
 Each finding also carries review: mechanical（表面形态确定、就地改写即可）或 semantic（可能承担叙事功能，需读上下文判断是否保留）；blocking 一律 mechanical。--list-review-classes 输出完整分类表（JSON）。
 HTML comments (<!-- ... -->, e.g. the 去味:跳过 exemption marker) are metadata, not prose, and are never scanned.
@@ -274,7 +275,20 @@ const TRAILER_SUMMARY_PATTERN = /这一(?:夜|天|刻|战|年|局|役)[，,]?[^�
 // “邀战书”等转述载体，真人也这么写），所以该规则只做 advisory，不升 blocking。
 const QUOTE_EMPHASIS_MIN_HITS = 3;
 const QUOTE_EMPHASIS_MAX_VISIBLE = 4;
-const QUOTE_EMPHASIS_SPEECH_VERB_PATTERN = /[说道问喊答念叫回吼骂写读唱嘀咕]/;
+const QUOTE_EMPHASIS_SPEECH_VERB_PATTERN = /[说道问喊答念叫回吼骂写读唱笑叹应哼嗤啐呸嘀咕]|开口|摇头|点头|出声|冷笑|苦笑|轻声|低声|沉声/;
+
+// 叙述旁白省略号密度：真人网文近三分之一章节在自由间接引语和悬念停顿处使用旁白 `……`（番茄 P90 约 3.0/千字），
+// 单处或少量留白正常保留；全章引号与面板外 ≥6 处且 ≥3.5/千字才报 advisory。
+const ELLIPSIS_DENSITY_PATTERN = /…+|\.{3,}|。{3,}/g;
+const ELLIPSIS_DENSITY_MIN_HITS = 6;
+const ELLIPSIS_DENSITY_PER_KILO = 3.5;
+
+// 单章密度分级门槛（800 章真人网文误报校准）：偶发 1 处（not-is 族 1-2 处）常承担正常纠错、转折或章末钩子，
+// 降为 advisory + semantic 交上下文判断；同章高频连刷升为 blocking + mechanical 强制清零。
+const NOT_IS_BLOCKING_MIN_HITS = 3;
+const VOICE_CONTRAST_BLOCKING_MIN_HITS = 2;
+const NEGATION_PARADE_BLOCKING_MIN_HITS = 2;
+const TRAILER_ENDING_BLOCKING_MIN_HITS = 2;
 
 // review 分类：下游按它分流。mechanical = 命中的表面形态本身就是问题，写作端就地改写即可；
 // semantic = 同一形态可能承担叙事功能，要读上下文判断保留还是改（交语义审查）。blocking 只能是
@@ -326,6 +340,7 @@ const REVIEW_CLASSES = Object.freeze({
   'low-connective-density-tic': 'semantic',
   'quote-emphasis-tic': 'semantic',
   'formulaic-parallelism': 'semantic',
+  'ellipsis-density-tic': 'semantic',
 });
 
 const options = {
@@ -378,7 +393,10 @@ for (const file of options.files) {
   let whitelist;
   try { whitelist = loadStyleWhitelist(fullPath); }
   catch (error) { die(`${file}: unable to read .deslop-whitelist (${error.message})`); }
-  const findings = scanDocument(maskStyleText(input, whitelist)).map((finding) => ({ file, ...finding, review: reviewClass(finding.type) }));
+  const findings = scanDocument(maskStyleText(input, whitelist)).map((finding) => {
+    const baseReview = reviewClass(finding.type);
+    return { file, ...finding, review: finding.review || baseReview };
+  });
   allFindings.push(...findings);
 }
 
@@ -392,8 +410,9 @@ if (options.json) {
 
 if (failed) process.exit(2);
 // --fail-on=blocking 只在出现 blocking finding 时退出 1（advisory 仅报告）；默认 all 沿用「有任何 finding 即 1」。
+// 用 process.exitCode 而非 process.exit(1)，确保 >64KB JSON 管道输出完整刷出后再退出。
 const hasBlocking = allFindings.some((f) => f.severity === 'blocking');
-if (options.failOn === 'blocking' ? hasBlocking : allFindings.length > 0) process.exit(1);
+if (options.failOn === 'blocking' ? hasBlocking : allFindings.length > 0) process.exitCode = 1;
 
 function reviewClass(type) {
   const review = REVIEW_CLASSES[type];
@@ -476,11 +495,39 @@ function scanDocument(input, unclosedOpenings = new Set()) {
 
   flushBlock();
   findings.push(...scanProsePatterns(proseLines));
+  applyDensitySeverityGates(findings);
   findings.sort((a, b) => a.line - b.line || a.column - b.column);
   return findings;
 }
 
-// 段落级检测：碎句号（连续短叙述句）、长段落、破折号（按功能改写，非机械替换）。
+function applyDensitySeverityGates(findings) {
+  const counts = new Map();
+  for (const f of findings) {
+    counts.set(f.type, (counts.get(f.type) || 0) + 1);
+  }
+  const notIsCombined = (counts.get('not-is-comparison') || 0) + (counts.get('reverse-not-is') || 0);
+  for (const f of findings) {
+    let block = null;
+    if (f.type === 'not-is-comparison' || f.type === 'reverse-not-is') {
+      block = notIsCombined >= NOT_IS_BLOCKING_MIN_HITS;
+    } else if (f.type === 'voice-contrast') {
+      block = (counts.get('voice-contrast') || 0) >= VOICE_CONTRAST_BLOCKING_MIN_HITS;
+    } else if (f.type === 'negation-parade') {
+      block = (counts.get('negation-parade') || 0) >= NEGATION_PARADE_BLOCKING_MIN_HITS;
+    } else if (f.type === 'trailer-ending') {
+      block = (counts.get('trailer-ending') || 0) >= TRAILER_ENDING_BLOCKING_MIN_HITS;
+    }
+    if (block === true) {
+      f.severity = 'blocking';
+      f.review = 'mechanical';
+    } else if (block === false) {
+      f.severity = 'advisory';
+      f.review = 'semantic';
+    }
+  }
+}
+
+// 段落级检测：碎句号（连续短叙述句）、长段落、旁白破折号（按功能改写，对白引号与面板内豁免）。
 function scanProsePatterns(proseLines) {
   const findings = [];
 
@@ -488,15 +535,16 @@ function scanProsePatterns(proseLines) {
     const trimmed = text.trim();
     if (!trimmed || isDivider(trimmed) || isStructural(trimmed)) continue;
 
+    const dashScanText = maskQuotedWithUnclosed(text);
     const dashPattern = /——|—|--+/g;
     let dash;
-    while ((dash = dashPattern.exec(text)) !== null) {
+    while ((dash = dashPattern.exec(dashScanText)) !== null) {
       findings.push({
         line: lineNo,
         column: dash.index + 1,
         type: 'em-dash',
         severity: 'blocking',
-        message: '破折号按功能改写：打断→动作 beat/短句，拖长音→省略或动作，插入说明→逗号/冒号；勿一律改句号。',
+        message: '叙述旁白不用破折号，按功能改写：打断→动作或抢白，停顿→逗号或省略，插入说明→逗号/冒号；勿一律改句号。',
         excerpt: compact(text.slice(Math.max(0, dash.index - 8), dash.index + dash[0].length + 8)),
       });
     }
@@ -531,11 +579,11 @@ function scanProsePatterns(proseLines) {
   findings.push(...findNoticeFormalityTic(proseLines));
   findings.push(...findOvercompressedProseTic(proseLines));
   findings.push(...findLowConnectiveDensityTic(proseLines));
+  findings.push(...findEllipsisDensityTic(proseLines));
   return findings;
 }
 
-// 音量反差腔（实战漏网 A）：引号外叙述逐处 blocking，位置与摘录取自原文
-// （maskQuoted 等长占位保偏移；命中片段不含问号占位符，故不会落进占位区）。
+// 音量反差腔（实战漏网 A）：引号外叙述命中，单处 advisory、同章 ≥2 处 blocking。
 function findVoiceContrast(proseLines) {
   const findings = [];
 
@@ -551,7 +599,7 @@ function findVoiceContrast(proseLines) {
         column: match.index + 1,
         type: 'voice-contrast',
         severity: 'blocking',
-        message: '音量反差腔：「声音不大/不高…却/但…」是 AI 高频反差模板；删掉音量铺垫，直接写声音落进场子的具体效果（谁停了手、哪排安静了）。',
+        message: '音量反差腔：「声音不大/不高…却/但…」是 AI 高频反差模板；删掉音量铺垫，直接写台词分量、利害后果或在场者的立场反应。',
         excerpt: compact(text.slice(match.index, match.index + match[0].length)),
       });
     }
@@ -759,10 +807,11 @@ function findQuoteEmphasisTic(proseLines) {
       const inner = text.slice(start + 1, end - 1);
       const visible = visibleLength(inner);
       if (visible < 1 || visible > QUOTE_EMPHASIS_MAX_VISIBLE) continue;
-      if (/[。！？!?…，,；;：:]/.test(inner)) continue; // 含句读的是台词/播报，不是强调
-      const before = text.slice(Math.max(0, start - 6), start);
-      const after = text.slice(end, end + 3);
+      if (/[。！？!?…，,；;：:—]|\.{2,}/.test(inner)) continue; // 含句读/省略/破折的是台词或播报，不是强调
+      const before = text.slice(Math.max(0, start - 8), start);
+      const after = text.slice(end, end + 6);
       if (QUOTE_EMPHASIS_SPEECH_VERB_PATTERN.test(before) || QUOTE_EMPHASIS_SPEECH_VERB_PATTERN.test(after)) continue; // 引语动词邻接=极短台词
+      if (/^(?:的|地)?一?[声下响]/.test(after)) continue; // 「“唰”的一声」类拟声词不是强调滥用
       hits += 1;
       if (firstLine === null) firstLine = lineNo;
       if (samples.length < 6 && !samples.includes(inner)) samples.push(inner);
@@ -805,6 +854,41 @@ function findNegationPairTic(proseLines) {
     type: 'negation-pair-tic',
     severity: 'advisory',
     message: `否定对偶偏多：「没A，也没B」式叙述 ${hits} 处；写人物没做什么是英文式节奏，改成他做了什么（留一两处真正要强调的）。`,
+    excerpt: compact(samples.join(' | ')),
+  }];
+}
+
+function findEllipsisDensityTic(proseLines) {
+  let hits = 0;
+  let narrativeChars = 0;
+  let firstLine = null;
+  const samples = [];
+
+  for (const { text, lineNo } of proseLines) {
+    const trimmed = text.trim();
+    if (!trimmed || isDivider(trimmed) || isStructural(trimmed)) continue;
+    const narrative = stripQuoted(trimmed).replace(/[“「『"][^”」』"]*$/, '');
+    narrativeChars += visibleLength(narrative);
+    ELLIPSIS_DENSITY_PATTERN.lastIndex = 0;
+    let match;
+    while ((match = ELLIPSIS_DENSITY_PATTERN.exec(narrative)) !== null) {
+      hits += 1;
+      if (firstLine === null) firstLine = lineNo;
+      const sample = sentenceAround(narrative, match.index);
+      if (samples.length < 5 && sample && !samples.includes(sample)) samples.push(sample);
+    }
+  }
+
+  if (narrativeChars === 0 || hits < ELLIPSIS_DENSITY_MIN_HITS) return [];
+  const perKilo = (hits / narrativeChars) * 1000;
+  if (perKilo < ELLIPSIS_DENSITY_PER_KILO) return [];
+
+  return [{
+    line: firstLine,
+    column: 1,
+    type: 'ellipsis-density-tic',
+    severity: 'advisory',
+    message: `叙述省略号过密：引号与面板外省略号 ${hits} 处（${perKilo.toFixed(1)}/千字）；保留关键思绪留白，其余改成逗号承接、直白判断或具体动作，别几句一刷。`,
     excerpt: compact(samples.join(' | ')),
   }];
 }
@@ -1319,6 +1403,15 @@ function maskQuoted(text) {
     out = out.replace(new RegExp(src, 'g'), (m) => '？'.repeat(m.length));
   }
   return out;
+}
+
+// 与 normalize-punctuation.js 的 quoteSpans 对齐：闭合引号/面板先等长占位，行末未收口的开引号
+// （如 `他猛地抬头：“你敢——` 或 `"等等——`）算到行尾，同时保留开引号前的旁白文本参与扫描。
+function maskQuotedWithUnclosed(text) {
+  const out = maskQuoted(text);
+  const unclosed = /[“「『"]/.exec(out);
+  if (!unclosed) return out;
+  return out.slice(0, unclosed.index) + '？'.repeat(out.length - unclosed.index);
 }
 
 // 返回引号内片段（含引号本身）的 [start, end) 区间，供 not-is 对比句豁免台词用。

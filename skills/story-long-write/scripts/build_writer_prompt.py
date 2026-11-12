@@ -629,7 +629,7 @@ def build(project: Path, chapter: int, report: list):
         "「见卷纲，不复读」，而卷纲不进本 prompt）／久别角色是否补读 `追踪/角色状态/{名}.md`。")
     parts.append(
         "——— 涉及角色 ———\n"
-        f"{SLOT_MARK} 按细纲「人物出场顺序」与「镜头准入」的台词位／动作位分配，"
+        f"{SLOT_MARK} 按细纲「出场顺序」与「这场谁说话多」（旧名镜头准入）的台词位／动作位分配，"
         "列出本章要读的角色卡；本节速记已给全状态的不必再列。")
     if not substantive(card_text):
         cards = match_genre_cards(project)

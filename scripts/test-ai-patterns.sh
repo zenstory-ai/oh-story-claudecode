@@ -204,7 +204,7 @@ NODE
 [ "$adv_all" -eq 1 ] || { echo "FAIL: advisory-only 默认 --fail-on=all 应退出 1，实际 $adv_all" >&2; exit 1; }
 [ "$adv_blk" -eq 0 ] || { echo "FAIL: advisory-only --fail-on=blocking 应退出 0，实际 $adv_blk" >&2; exit 1; }
 
-# blocking（em-dash）：severity=blocking，--fail-on=blocking 退出 1。
+# blocking（引号外叙述 em-dash）：severity=blocking，--fail-on=blocking 退出 1；对话引号/面板内 —— 豁免。
 FIXTURE7="$TMP_DIR/fixture-blocking.md"
 printf '%s\n' '她停住——没说话。' > "$FIXTURE7"
 set +e
@@ -220,13 +220,30 @@ if (!dash || dash.severity !== 'blocking') throw new Error('em-dash 应为 block
 NODE
 [ "$blk_blk" -eq 1 ] || { echo "FAIL: em-dash --fail-on=blocking 应退出 1，实际 $blk_blk" >&2; exit 1; }
 
+FIXTURE7_QUOTED="$TMP_DIR/fixture-quoted-em-dash.md"
+printf '%s\n' '“钥匙在——”他没说完。' '「等等——」『别动——』"快走——"' '【警告——权限不足】' '“话还没说完——' > "$FIXTURE7_QUOTED"
+set +e
+node "$SCRIPT" --json --fail-on=blocking "$FIXTURE7_QUOTED" > "$OUT"
+qdash_blk=$?
+set -e
+node - "$OUT" <<'NODE'
+const fs = require('fs');
+const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+if (r.findings.some((f) => f.type === 'em-dash')) {
+  throw new Error('对话引号/系统面板/未收口台词内的 —— 不应误报 em-dash: ' + JSON.stringify(r.findings));
+}
+NODE
+[ "$qdash_blk" -eq 0 ] || { echo "FAIL: 对话引号内 —— --fail-on=blocking 应退出 0，实际 $qdash_blk" >&2; exit 1; }
+
 echo "Prose pattern (碎句号/长段落/破折号) regression tests passed."
 
-# --- issue #205：跨空行的「不是A。/（空行）/是B」揭示句必须命中（旧 skipGap 只吞一个换行会漏）---
+# --- issue #205：跨空行的「不是A。/（空行）/是B」揭示句必须命中；单章 1–2 处为 advisory/semantic，≥3 处升为 blocking/mechanical ---
 FIXTURE8="$TMP_DIR/fixture-cross-para.md"
 printf '%s\n' '中年男人消失了。' '' '不是被拖走。' '' '是整个人像被橡皮擦抹掉，全没了。' > "$FIXTURE8"
 set +e
 node "$SCRIPT" --json "$FIXTURE8" > "$OUT"
+node "$SCRIPT" --fail-on=blocking "$FIXTURE8" >/dev/null 2>&1
+ni_single_blk=$?
 set -e
 node - "$OUT" <<'NODE'
 const fs = require('fs');
@@ -234,8 +251,28 @@ const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const ni = r.findings.filter((f) => f.type === 'not-is-comparison');
 if (ni.length !== 1) throw new Error('跨空行 不是A。/是B 应命中 1 处 not-is: ' + JSON.stringify(r.findings.map((f) => `${f.type}@${f.line}`)));
 if (ni[0].line !== 3) throw new Error('not-is 应定位到「不是」所在行 3，实际 ' + ni[0].line);
-if (ni[0].severity !== 'blocking') throw new Error('not-is 应为 blocking');
+if (ni[0].severity !== 'advisory' || ni[0].review !== 'semantic') {
+  throw new Error('单处 not-is 应为 advisory/semantic: ' + JSON.stringify(ni[0]));
+}
 NODE
+[ "$ni_single_blk" -eq 0 ] || { echo "FAIL: 单处 not-is --fail-on=blocking 应退出 0，实际 $ni_single_blk" >&2; exit 1; }
+
+FIXTURE8_BLK="$TMP_DIR/fixture-notis-blocking.md"
+printf '%s\n' '不是退让，而是试探。' '这不是巧合，而是预谋。' '是硬功夫，不是花架子撑出来的。' > "$FIXTURE8_BLK"
+set +e
+node "$SCRIPT" --json "$FIXTURE8_BLK" > "$OUT"
+node "$SCRIPT" --fail-on=blocking "$FIXTURE8_BLK" >/dev/null 2>&1
+ni_multi_blk=$?
+set -e
+node - "$OUT" <<'NODE'
+const fs = require('fs');
+const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const hits = r.findings.filter((f) => f.type === 'not-is-comparison' || f.type === 'reverse-not-is');
+if (hits.length !== 3 || !hits.every((f) => f.severity === 'blocking' && f.review === 'mechanical')) {
+  throw new Error('not-is + reverse-not-is 合计 ≥3 处应全部升为 blocking/mechanical: ' + JSON.stringify(hits));
+}
+NODE
+[ "$ni_multi_blk" -eq 1 ] || { echo "FAIL: ≥3 处 not-is --fail-on=blocking 应退出 1，实际 $ni_multi_blk" >&2; exit 1; }
 
 # 引号内台词「不是A，是B」是口语辩解，不算叙述层 AI 对比句式（与碎句号一致豁免引号内容）。
 FIXTURE9="$TMP_DIR/fixture-dialogue-notis.md"
@@ -935,6 +972,9 @@ const cases = [
     ...repeat(60, '周砚抬头。'),
     ...repeat(40, '灰雾贴住红线外侧，北门灯光晃成一团冷斑，脚步声压回门岗亭前。'),
   ])],
+  ['ellipsis-density-tic', say([
+    ...repeat(8, '他站在门口……风吹了进来……灯灭了。'),
+  ])],
 ];
 const failures = [];
 for (const [type, lines] of cases) {
@@ -1046,12 +1086,31 @@ echo "low-connective-density-tic (低连接密度 + 缺中长句) regression tes
 # 正例取自实战写作抓到的真实漏网句；反例含对话豁免、either-or、正常引用与真人语料边界句。
 # ============================================================
 
-# --- 实战漏网 A：voice-contrast（声音不高…却…，blocking）---
+# --- 实战漏网 A：voice-contrast（声音不高…却…，单处 advisory/semantic，≥2 处 blocking/mechanical）---
 FIXTURE_VOICE="$TMP_DIR/fixture-voice-contrast.md"
 printf '%s\n' \
   '声音不高，第一句却稳稳压住了整个大厅。' \
   '“他声音不大，却带着火气。”旁边的人小声嘀咕。' \
   '她的声音不大，台下前排听得清楚。' > "$FIXTURE_VOICE"
+set +e
+node "$SCRIPT" --json "$FIXTURE_VOICE" > "$OUT"
+node "$SCRIPT" --fail-on=blocking "$FIXTURE_VOICE" >/dev/null 2>&1
+voice_single_blk=$?
+set -e
+node - "$OUT" <<'NODE'
+const fs = require('fs');
+const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const vc = r.findings.filter((f) => f.type === 'voice-contrast');
+if (vc.length !== 1) throw new Error('音量反差腔应命中 1 处 voice-contrast: ' + JSON.stringify(r.findings.map((f) => `${f.type}@${f.line}`)));
+if (vc[0].line !== 1 || vc[0].severity !== 'advisory' || vc[0].review !== 'semantic') {
+  throw new Error('单处 voice-contrast 应为 line 1 advisory/semantic: ' + JSON.stringify(vc[0]));
+}
+// 引号内台词（line 2）与无转折的平铺（line 3）不算音量反差腔。
+if (vc[0].excerpt.includes('火气')) throw new Error('引号内台词不应命中 voice-contrast: ' + JSON.stringify(vc[0]));
+NODE
+[ "$voice_single_blk" -eq 0 ] || { echo "FAIL: 单处 voice-contrast --fail-on=blocking 应退出 0，实际 $voice_single_blk" >&2; exit 1; }
+
+printf '%s\n' '他声音不大，却让整条走廊安静下来。' >> "$FIXTURE_VOICE"
 set +e
 node "$SCRIPT" --json "$FIXTURE_VOICE" > "$OUT"
 node "$SCRIPT" --fail-on=blocking "$FIXTURE_VOICE" >/dev/null 2>&1
@@ -1061,12 +1120,11 @@ node - "$OUT" <<'NODE'
 const fs = require('fs');
 const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const vc = r.findings.filter((f) => f.type === 'voice-contrast');
-if (vc.length !== 1) throw new Error('音量反差腔应命中 1 处 voice-contrast: ' + JSON.stringify(r.findings.map((f) => `${f.type}@${f.line}`)));
-if (vc[0].line !== 1 || vc[0].severity !== 'blocking') throw new Error('voice-contrast 应为 line 1 blocking: ' + JSON.stringify(vc[0]));
-// 引号内台词（line 2）与无转折的平铺（line 3）不算音量反差腔。
-if (vc[0].excerpt.includes('火气')) throw new Error('引号内台词不应命中 voice-contrast: ' + JSON.stringify(vc[0]));
+if (vc.length !== 2 || !vc.every((f) => f.severity === 'blocking' && f.review === 'mechanical')) {
+  throw new Error('≥2 处 voice-contrast 应升为 blocking/mechanical: ' + JSON.stringify(vc));
+}
 NODE
-[ "$voice_blk" -eq 1 ] || { echo "FAIL: voice-contrast --fail-on=blocking 应退出 1，实际 $voice_blk" >&2; exit 1; }
+[ "$voice_blk" -eq 1 ] || { echo "FAIL: ≥2 处 voice-contrast --fail-on=blocking 应退出 1，实际 $voice_blk" >&2; exit 1; }
 
 echo "voice-contrast (音量反差腔) regression tests passed."
 
@@ -1139,7 +1197,7 @@ NODE
 
 echo "chapter-21 AI-flavor gap regression tests passed."
 
-# --- 实战漏网 C：reverse-not-is（是A，不是B — not-is 反序变种，blocking）---
+# --- 实战漏网 C：reverse-not-is（是A，不是B — not-is 反序变种，单处 advisory/semantic，与 not-is 合计 ≥3 处 blocking）---
 FIXTURE_REVNOTIS="$TMP_DIR/fixture-reverse-not-is.md"
 printf '%s\n' \
   '气息拉满不断，是真嗓子，不是修音修出来的。' \
@@ -1157,7 +1215,9 @@ const fs = require('fs');
 const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const rn = r.findings.filter((f) => f.type === 'reverse-not-is');
 if (rn.length !== 1) throw new Error('反序对比腔应命中 1 处 reverse-not-is: ' + JSON.stringify(r.findings.map((f) => `${f.type}@${f.line}`)));
-if (rn[0].line !== 1 || rn[0].severity !== 'blocking') throw new Error('reverse-not-is 应为 line 1 blocking: ' + JSON.stringify(rn[0]));
+if (rn[0].line !== 1 || rn[0].severity !== 'advisory' || rn[0].review !== 'semantic') {
+  throw new Error('单处 reverse-not-is 应为 line 1 advisory/semantic: ' + JSON.stringify(rn[0]));
+}
 if (!rn[0].excerpt.includes('是真嗓子')) throw new Error('reverse-not-is excerpt 应含正例片段: ' + JSON.stringify(rn[0]));
 // 反例必须全部保持沉默：引号内辩解（2）、就是/也是合成词（3/4）、是啊确认语（5）、
 // 是不是问句（6）、不是吗反问尾巴（7）。
@@ -1208,6 +1268,11 @@ printf '%s\n' \
   '这段“掉马神演”，正被一帧一帧拍下、剪好、甩上网。' \
   '没人出声，几千人像被那朵“花”钉在了座位上。' \
   '她说“好”，转身就走。' \
+  '他笑道“行”，也没多留。' \
+  '只听“唰”的一声，帘子拉上了。' \
+  '杯盖“啪”地一下弹开。' \
+  '"..."' \
+  '“——”' \
   '“嗯。”' \
   '“叮咚~”“叮咚~”“叮咚~”' \
   '他念了一遍“静”，又写下“定”。' > "$FIXTURE_QUOTE_EMPH"
@@ -1339,7 +1404,7 @@ set -e
 
 # 漏写 `-->` 的注释到文末都没闭合：不能把后面整章藏起来，按正文扫描（`<!--` 本身不报）。
 FIXTURE_UNCLOSED_COMMENT="$TMP_DIR/fixture-unclosed-comment.md"
-printf '%s\n' '# 第1章' '<!-- 作者备注' '这不是夸奖，而是命令。' '声音不大，却带着狠劲。' '他把门带上。' > "$FIXTURE_UNCLOSED_COMMENT"
+printf '%s\n' '# 第1章' '<!-- 作者备注' '这不是夸奖，而是命令。' '声音不大，却带着狠劲。' '她声音不高，却把话钉死了。' '他把门带上。' > "$FIXTURE_UNCLOSED_COMMENT"
 set +e
 node "$SCRIPT" --json --fail-on=blocking "$FIXTURE_UNCLOSED_COMMENT" > "$OUT"
 unclosed_status=$?
@@ -1348,7 +1413,7 @@ node - "$OUT" <<'NODE'
 const fs = require('fs');
 const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const types = r.findings.map((f) => `${f.line}:${f.type}`);
-for (const want of ['3:not-is-comparison', '4:voice-contrast']) {
+for (const want of ['3:not-is-comparison', '4:voice-contrast', '5:voice-contrast']) {
   if (!types.includes(want)) throw new Error('未闭合注释之后的正文必须照常扫描，缺 ' + want + ': ' + JSON.stringify(types));
 }
 if (r.findings.some((f) => f.line === 2)) throw new Error('`<!--` 本身不应报: ' + JSON.stringify(types));
@@ -1376,7 +1441,7 @@ if (dead.length) throw new Error('review 分类表有源码里不存在的类型
 for (const [type, cls] of Object.entries(table)) {
   if (cls !== 'semantic' && cls !== 'mechanical') throw new Error(`${type} 的 review 值非法: ${cls}`);
 }
-for (const t of ['stock-reaction-tic', 'formulaic-parallelism', 'reasoning-chain-tic', 'abstract-summary-tic']) {
+for (const t of ['stock-reaction-tic', 'formulaic-parallelism', 'reasoning-chain-tic', 'abstract-summary-tic', 'ellipsis-density-tic']) {
   if (table[t] !== 'semantic') throw new Error(`${t} 需要语义判断，应为 semantic`);
 }
 for (const t of ['em-dash', 'cliche-density-tic', 'not-is-comparison']) {
@@ -1387,7 +1452,7 @@ NODE
 # 运行期：一份多规则 fixture 的每条 finding 都带合法 review，原有字段不变，blocking 全是 mechanical。
 FIXTURE_REVIEW="$TMP_DIR/fixture-review.md"
 {
-  printf '%s\n' '他不是冷漠，而是绝望。' '声音不高，第一句却稳稳压住了整个大厅。' '没有伴奏，没有和声，没有提词器。'
+  printf '%s\n' '他不是冷漠，而是绝望。' '这不是巧合，而是预谋。' '声音不高，第一句却稳稳压住了整个大厅。' '没有伴奏，没有和声，没有提词器。'
   printf '%s\n' '是真嗓子，不是修音修出来的。' '他回头看了一眼——门已经关了。'
   printf '%s\n' '她指尖微微一颤。' '他指节泛白，攥紧了拳头。' '她眼眶发红。' '他喉结滚了滚。' '她抿了下唇。'
   printf '%s\n' '一。二。三。四。五。六。七。'
@@ -1501,3 +1566,68 @@ if (rc.length !== 0) {
 }
 NODE
 echo "issue #540 slow-prop stock reaction & character calculation regression tests passed."
+
+# --- 语料校准：旁白省略号过密（ellipsis-density-tic）+ >64KB stdout 管道完整输出 ---
+FIXTURE_ELLIPSIS="$TMP_DIR/fixture-ellipsis-density.md"
+cat > "$FIXTURE_ELLIPSIS" <<'TEXT'
+雨一直下……门外的脚步声越来越近……他握着门把没动。
+走廊里的灯闪了一下……又暗下去……连呼吸声都听不见了。
+风从窗缝灌进来……桌上的纸翻了一页……落在地砖上。
+“你……你别过来……”她低声喊，【警告……信号中断……】
+TEXT
+set +e
+node "$SCRIPT" --json --fail-on=blocking "$FIXTURE_ELLIPSIS" > "$OUT"
+ellipsis_blk=$?
+set -e
+node - "$OUT" <<'NODE'
+const fs = require('fs');
+const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const ed = r.findings.filter((f) => f.type === 'ellipsis-density-tic');
+if (ed.length !== 1 || ed[0].severity !== 'advisory' || ed[0].review !== 'semantic') {
+  throw new Error('高密度旁白省略号应报 1 条 advisory/semantic ellipsis-density-tic: ' + JSON.stringify(r.findings));
+}
+if (!ed[0].message.includes('6 处')) {
+  throw new Error('引号与【…】内省略号不应计入旁白密度（应恰计 6 处）: ' + JSON.stringify(ed[0]));
+}
+NODE
+[ "$ellipsis_blk" -eq 0 ] || { echo "FAIL: ellipsis-density-tic --fail-on=blocking 应退出 0，实际 $ellipsis_blk" >&2; exit 1; }
+
+FIXTURE_ELLIPSIS_SPARSE="$TMP_DIR/fixture-ellipsis-sparse.md"
+cat > "$FIXTURE_ELLIPSIS_SPARSE" <<'TEXT'
+他站在院门口，看着远处的山影发了很久的呆……直到母亲喊他进屋吃饭才转身。
+“我……我今天先把账结了……”父亲放下碗，没再多说一句话。
+TEXT
+set +e
+node "$SCRIPT" --json "$FIXTURE_ELLIPSIS_SPARSE" > "$OUT"
+set -e
+node -e "const r=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));if(r.findings.some(f=>f.type==='ellipsis-density-tic'))throw new Error('零星旁白省略号与对白省略号不应报 ellipsis-density-tic')" "$OUT"
+
+# >64KB JSON 管道输出回归：process.exitCode=1 自然排空 stdout，不因 process.exit(1) 截断 JSON
+FIXTURE_LARGE="$TMP_DIR/fixture-large-pipe.md"
+node -e 'const fs=require("fs");fs.writeFileSync(process.argv[1], Array.from({length:650}, (_,i)=>`第${i}段：他回头看了一眼——门已经关了。`).join("\n\n")+"\n")' "$FIXTURE_LARGE"
+set +e
+large_json="$(node "$SCRIPT" --json --fail-on=blocking "$FIXTURE_LARGE")"
+large_rc=$?
+set -e
+[ "$large_rc" -eq 1 ] || { echo "FAIL: >64KB blocking fixture 应退出 1，实际 $large_rc" >&2; exit 1; }
+printf '%s' "$large_json" | node -e 'const r=JSON.parse(require("fs").readFileSync(0,"utf8"));if(r.findings.length<650)throw new Error("large pipe JSON truncated: "+r.findings.length)'
+
+# 未闭合行末引号对白破折号与 normalize-punctuation 保持同口径豁免，开引号前旁白破折号照常拦截
+FIXTURE_UNCLOSED_DASH="$TMP_DIR/fixture-unclosed-dash.md"
+cat > "$FIXTURE_UNCLOSED_DASH" <<'TEXT'
+他猛地抬头：“你敢——
+"等等——
+他——猛地抬头：“你敢——
+TEXT
+set +e
+node "$SCRIPT" --json "$FIXTURE_UNCLOSED_DASH" > "$OUT"
+set -e
+node - "$OUT" <<'NODE'
+const fs = require('fs');
+const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const dashes = r.findings.filter((f) => f.type === 'em-dash');
+if (dashes.length !== 1 || dashes[0].line !== 3 || dashes[0].column !== 2) {
+  throw new Error('未闭合台词内破折号应豁免、开引号前旁白破折号应命中第3行第2列: ' + JSON.stringify(dashes));
+}
+NODE
+echo "ellipsis-density-tic, unclosed-quote dash parity & >64KB pipe flush regression tests passed."

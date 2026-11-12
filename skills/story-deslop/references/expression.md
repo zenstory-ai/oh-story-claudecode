@@ -64,13 +64,13 @@
 
 检测器是定位工具。密度提示不是词频配额，advisory 不作完成门槛。表达有功能不等于 blocking 可以不改：作者已明确选择的原句按白名单保留；其余保留叙事功能自然改写，由调用方复扫，不能以保留说明代替验收。指定原句不能改又不在白名单时报告剩余阻塞。不靠错字或拆句躲检测；确定性的事实、字数、截断与占位问题仍交调用方验收，不能靠文风豁免。
 
-下表索引检测器全部提示类别，加粗的是 blocking。
+下表索引检测器全部类别，加粗项在默认或高频时为 blocking。
 
 | 提示 | 人工判断对象 |
 |---|---|
 | **`not-is-comparison`**、**`reverse-not-is`**、**`negation-parade`**、`negation-pair-tic` | 见上文「否定铺垫后肯定翻转」 |
 | **`voice-contrast`** | 见上文「万能状语与套式声线」 |
-| **`em-dash`** | 按功能改成动作、停顿或完整句，不只换符号 |
+| **`em-dash`**、`ellipsis-density-tic` | 旁白破折号改动作或完整句；旁白省略号刷屏时压缩留白 |
 | **`trailer-ending`**、**`trailer-summary`** | 章末预告与状态总结，见上文「解释与叙述者」；收尾分量转 narrative-focus |
 | `formulaic-parallelism`、`quote-emphasis-tic` | 对比与强调是否有真实意义，是否机械复述 |
 | `cliche-density-tic`、`metaphor-density-tic` | 套词与比喻是否聚成同一腔调，功能是否重复 |
