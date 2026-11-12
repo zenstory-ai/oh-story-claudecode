@@ -218,13 +218,17 @@ _TOXIC_CLAUSE_BOUNDARY = set("，,。.！!？?；;：:、…—~ \t　")
 _TOXIC_TAG_PARTICLES = ("吗", "吧", "嘛")
 _TOXIC_AFFIRM_PARTICLES = ("的", "啊", "呀", "呢")
 _TOXIC_TRAILER_WINDOW = 600
+_TOXIC_NOT_IS_MIN_HITS = 3
+_TOXIC_VOICE_MIN_HITS = 2
+_TOXIC_PARADE_MIN_HITS = 2
+_TOXIC_TRAILER_MIN_HITS = 2
 # 不收 em-dash 是有意的（与 JS 核同）：破折号是标点，由 chapter check --fix-punctuation /
-# normalize-punctuation.js 确定性整理；这张网只推回需要模型动笔改写的句式。
+# normalize-punctuation.js 确定性整理；这张网只推回需要模型动笔改写的句式，且单章门槛与 check-ai-patterns.js 一致。
 _TOXIC_SENTENCE_PATTERNS = [
-    (re.compile(r"声音(?:并)?不[大高响亮][^。！？!?\n]{0,16}[却但偏]"), "voice-contrast", "删「不X…却Y」反差腔，直接写具体效果或动作。"),
+    (re.compile(r"声音(?:并)?不[大高响亮][^。！？!?\n]{0,16}[却但偏]"), "voice-contrast", "删「不X…却Y」反差腔，直接写台词分量、利害后果或在场反应。"),
     (re.compile(r"(?:没有[^。！？!?\n，,]{1,12}[，,]){2}"), "negation-parade", "「没有…，没有…」排比删到只剩一个或全删，改写正面在场的细节。"),
-    (re.compile(r"是[^。！？!?\n，,]{1,12}[，,]\s*(?:而)?不是[^。！？!?\n]{1,20}"), "reverse-not-is", "删否定铺垫，直接写肯定项，或改成动作细节。"),
-    (re.compile(r"不是[^。！？!?\n]{1,16}[，,]\s*(?:而)?是"), "not-is-comparison", "删否定铺垫，直接写肯定项，或改成动作细节。"),
+    (re.compile(r"是[^。！？!?\n，,]{1,12}[，,]\s*(?:而)?不是[^。！？!?\n]{1,20}"), "reverse-not-is", "删否定铺垫，直接写后项（直白情绪、判断、对话或具体细节皆可）。"),
+    (re.compile(r"不是[^。！？!?\n]{1,16}[，,]\s*(?:而)?是"), "not-is-comparison", "删否定铺垫，直接写后项（直白情绪、判断、对话或具体细节皆可）。"),
 ]
 # 「正式拉开序幕/帷幕」是场内事件的报幕式陈述，不是叙述者预告，lookbehind 排除（同 check-ai-patterns.js）。
 _TOXIC_TRAILER = re.compile(r"没人知道|谁也不知道|谁也没想到|殊不知|(?:这)?才刚刚开(?:始|头)|正(?:朝着|向着)[^。！？!?\n]{0,24}(?:压|涌|袭|逼)(?:了?过去|了?过来|来)|(?<!正式)拉开(?:序幕|帷幕)|即将(?:开始|来临|降临)")
@@ -283,16 +287,23 @@ def _toxic_reverse_not_is_excluded(line: str, matched: str, start: int) -> bool:
     return False
 
 
-def _toxic_match_sentence(line: str) -> tuple[str, str, str] | None:
-    """每行只报第一条命中的句式规则（复扫到净哲学：改完一处再扫下一处）。"""
-    for rx, label, fix in _TOXIC_SENTENCE_PATTERNS:
+def _toxic_match_sentences(line: str) -> list[tuple[str, str, str]]:
+    """提取单行内所有不重叠的句式命中（按码点起点与规则顺序去重），供全章密度分级计数。"""
+    candidates: list[tuple[int, int, int, str, str, str]] = []
+    for order, (rx, label, fix) in enumerate(_TOXIC_SENTENCE_PATTERNS):
         for m in rx.finditer(line):
             if label == "not-is-comparison" and _toxic_not_is_excluded(line, m.group(0), m.start()):
                 continue
             if label == "reverse-not-is" and _toxic_reverse_not_is_excluded(line, m.group(0), m.start()):
                 continue
-            return (label, fix, m.group(0))
-    return None
+            candidates.append((m.start(), m.end(), order, label, fix, m.group(0)))
+    candidates.sort(key=lambda item: (item[0], item[2]))
+    accepted: list[tuple[int, int, int, str, str, str]] = []
+    for item in candidates:
+        if any(item[0] < prev[1] and item[1] > prev[0] for prev in accepted):
+            continue
+        accepted.append(item)
+    return [(label, fix, text) for _, _, _, label, fix, text in accepted]
 
 
 def load_style_whitelist(file: Path) -> list[str]:
@@ -372,23 +383,40 @@ def toxic_phrase_findings(text: str, whitelist=(), rescan: str | None = None) ->
         if any(ch in _TOXIC_QUOTE_CHARS for ch in masked):
             continue
         content.append((i, masked))
+    sentence_hits: list[tuple[int, str, str, str]] = []
+    counts: dict[str, int] = {}
     for line_no, masked in content:
-        hit = _toxic_match_sentence(masked)
-        if hit:
-            findings.append(f"第{line_no}行 毒句式[{hit[0]}]：『{hit[2][:20]}』——{hit[1]}")
+        for label, fix, matched in _toxic_match_sentences(masked):
+            sentence_hits.append((line_no, label, fix, matched))
+            counts[label] = counts.get(label, 0) + 1
+    not_is_combined = counts.get("not-is-comparison", 0) + counts.get("reverse-not-is", 0)
+    for line_no, label, fix, matched in sentence_hits:
+        if label in ("not-is-comparison", "reverse-not-is") and not_is_combined < _TOXIC_NOT_IS_MIN_HITS:
+            continue
+        if label == "voice-contrast" and counts.get("voice-contrast", 0) < _TOXIC_VOICE_MIN_HITS:
+            continue
+        if label == "negation-parade" and counts.get("negation-parade", 0) < _TOXIC_PARADE_MIN_HITS:
+            continue
+        findings.append(f"第{line_no}行 毒句式[{label}]：『{matched[:20]}』——{fix}")
     # trailer-ending 只扫文末 600 字窗口（引号占位后按行累计，边界行整行计入）。
     acc = 0
     cut = len(content)
     while cut > 0 and acc < _TOXIC_TRAILER_WINDOW:
         cut -= 1
         acc += len(content[cut][1])
+    window_rows: list[tuple[int, list[str], list[str]]] = []
+    total_trailers = 0
     for line_no, masked in content[cut:]:
-        m = _TOXIC_TRAILER.search(masked)
-        if m:
-            findings.append(f"第{line_no}行 毒句式[trailer-ending]：『{m.group(0)[:20]}』——删章尾预告腔，用正在发生的动作或画面收章。")
-        ms = _TOXIC_TRAILER_SUMMARY.search(masked)
-        if ms:
-            findings.append(f"第{line_no}行 毒句式[trailer-summary]：『{ms.group(0)[:20]}』——删章尾状态总结句，细纲的结尾设定要落成最后的具体动作、画面或台词。")
+        trailers = [m.group(0) for m in _TOXIC_TRAILER.finditer(masked)]
+        summaries = [m.group(0) for m in _TOXIC_TRAILER_SUMMARY.finditer(masked)]
+        total_trailers += len(trailers)
+        window_rows.append((line_no, trailers, summaries))
+    for line_no, trailers, summaries in window_rows:
+        if total_trailers >= _TOXIC_TRAILER_MIN_HITS:
+            for hit in trailers:
+                findings.append(f"第{line_no}行 毒句式[trailer-ending]：『{hit[:20]}』——删章尾预告腔，用正在发生的动作或画面收章。")
+        for hit in summaries:
+            findings.append(f"第{line_no}行 毒句式[trailer-summary]：『{hit[:20]}』——删章尾状态总结句，细纲的结尾设定要落成最后的具体动作、画面或台词。")
     if findings:
         findings.append("毒句式是确定性 AI 指纹：本章须清零后再继续。" + (rescan if rescan is not None else toxic_rescan_hint()))
     return findings

@@ -5,14 +5,15 @@ const fs = require('fs');
 const { loadStyleWhitelist, styleSpans } = require('./style-whitelist.js');
 const path = require('path');
 
-const USAGE = `Usage: node normalize-punctuation.js [--check] [--quote-mode keep|ascii|yan] <file...>
+const USAGE = `Usage: node normalize-punctuation.js [--check] [--quote-mode keep|curly|ascii|yan] <file...>
 
 Normalize正文 punctuation deterministically:
-  - keep ellipses inside quotes (“”「」『』 and paired ASCII "), unified as ……
-  - replace other ellipses, em dashes, and double hyphens with Chinese punctuation
+  - keep standard ellipses (……) in dialogue, 【…】 panels, and narration; unify non-standard ellipses (..., single …, ………+, 。。。+, .……..) to ……
+  - keep em dashes inside dialogue quotes (“”「」『』 and paired ASCII "), unified as ——
+  - replace unquoted em dashes and double hyphens in narration with Chinese punctuation
   - remove markdown divider lines (---) from正文
   - preserve pause punctuation covered by book-local .deslop-whitelist literals
-  - keep quote style by default; convert quotes only when explicitly requested
+  - keep quote style by default; convert quotes only when explicitly requested (curly|ascii|yan)
 `;
 
 const options = {
@@ -27,7 +28,7 @@ for (let i = 2; i < process.argv.length; i += 1) {
     options.check = true;
   } else if (arg === '--quote-mode') {
     const value = process.argv[i + 1];
-    if (!value) die('--quote-mode requires keep, ascii, or yan');
+    if (!value) die('--quote-mode requires keep, curly, ascii, or yan');
     options.quoteMode = value;
     i += 1;
   } else if (arg.startsWith('--quote-mode=')) {
@@ -42,7 +43,7 @@ for (let i = 2; i < process.argv.length; i += 1) {
   }
 }
 
-if (!['keep', 'ascii', 'yan'].includes(options.quoteMode)) {
+if (!['keep', 'curly', 'ascii', 'yan'].includes(options.quoteMode)) {
   die(`Invalid --quote-mode: ${options.quoteMode}`);
 }
 if (options.files.length === 0) {
@@ -264,7 +265,10 @@ function normalizePausePunctuation(line, lineNo, commentOpen, whitelist) {
 function normalizePausePunctuationPass(line, lineNo, commentSpans) {
   const findings = [];
   const original = line;
-  const pattern = /…+|\.{3,}|——|—|--+/g;
+  // 匹配：破折号+省略号粘连、省略号+破折号粘连、各类非标/标准省略号（含 .…….. 与 。。。）、破折号（含 -— 混粘）、双连字符。
+  const dashUnit = '(?:—+[-—]*|-+—+[-—]*|--+)';
+  const ellipsisUnit = '(?:\\.+…+[.…]*|…+\\.+[.…]*|…+|\\.{3,}|。{3,})';
+  const pattern = new RegExp(`${dashUnit}${ellipsisUnit}|${ellipsisUnit}${dashUnit}|${ellipsisUnit}|${dashUnit}`, 'g');
   const quotes = quoteSpans(original);
   let output = '';
   let lastIndex = 0;
@@ -275,18 +279,56 @@ function normalizePausePunctuationPass(line, lineNo, commentSpans) {
     // HTML 注释是正文里的元信息（如 `<!-- 去味:跳过 -->` 豁免标记）：`<!--`/`-->` 里的
     // `--` 不是停顿标点，改掉它注释就散了，标记会变成读者看得见的正文。
     if (insideSpans(match.index, match.index + token.length, commentSpans)) continue;
-    // 引号里的省略号是人物说话的犹豫、打断和拖音（真人正文每千字约 0.8 个），保留，
-    // 只统一成全角六点；紧挨着的几段（`...……`）并成一个。破折号不在此列。
-    if (getPauseType(token) === 'ellipsis' && insideSpans(match.index, match.index + token.length, quotes)) {
+
+    const inDialogueQuote = insideSpans(match.index, match.index + token.length, quotes);
+    const hasEllipsis = /[…。]|\.{3,}/.test(token);
+    const hasDash = /[—-]/.test(token);
+
+    // 破折号与省略号紧挨粘连（如 `“等等——....……”`）：引号内收束为 `……`；引号外走常规替换或收束为 `……`。
+    if (hasEllipsis && hasDash) {
+      const merged = lastIndex === match.index && output.endsWith('……');
+      const replacement = merged ? '' : '……';
+      output += original.slice(lastIndex, match.index) + replacement;
+      lastIndex = match.index + token.length;
+      findings.push({
+        line: lineNo,
+        column: match.index + 1,
+        type: token.startsWith('-') ? 'double-hyphen' : 'em-dash',
+        message: '粘连的破折号与省略号统一为「……」。',
+      });
+      continue;
+    }
+
+    // 省略号（对话引号内、系统面板【…】内、叙述旁白）：标准 `……` 原样保留，非标形态统一规整为 `……`
+    // （旁白省略号刷屏由 check-ai-patterns.js 的 ellipsis-density-tic 按密度提示，不在标点层一刀切改逗号）。
+    if (hasEllipsis) {
       const merged = lastIndex === match.index && output.endsWith('……');
       const replacement = merged ? '' : '……';
       output += original.slice(lastIndex, match.index) + replacement;
       lastIndex = match.index + token.length;
       if (replacement !== token) {
-        findings.push({ line: lineNo, column: match.index + 1, type: 'ellipsis', message: '引号内的省略号统一为「……」。' });
+        findings.push({ line: lineNo, column: match.index + 1, type: 'ellipsis', message: '省略号统一为「……」。' });
       }
       continue;
     }
+
+    // 对话引号内的破折号（话被打断或拖音，真人网文约 13% 章节使用）：`——` 原样保留，单 `—` / 多 `———` / `--` 统一为 `——`。
+    if (inDialogueQuote && hasDash) {
+      const merged = lastIndex === match.index && output.endsWith('——');
+      const replacement = merged ? '' : '——';
+      output += original.slice(lastIndex, match.index) + replacement;
+      lastIndex = match.index + token.length;
+      if (replacement !== token) {
+        findings.push({
+          line: lineNo,
+          column: match.index + 1,
+          type: getPauseType(token),
+          message: '引号内的破折号统一为「——」。',
+        });
+      }
+      continue;
+    }
+
     output += original.slice(lastIndex, match.index);
     const replacement = choosePauseReplacement(original, match.index, token.length);
     output += replacement;
@@ -378,7 +420,7 @@ function choosePauseReplacement(text, start, length) {
   const after = nextNonSpace(text, start + length);
   const rest = text.slice(start + length).trimStart();
 
-  // 引号外不保留 `……`；`——`、`—`、`--` 引号内外都不保留，数字区间不设例外。
+  // 引号外的 ——、—、-- 全部替换为中文标点，数字区间替换为「到」。
   if (before === '') return '';
   // 紧跟开引号/开括号的停顿符号属于句首边界，删空即可，避免产出 `「，…」` 或 `「。」`。
   if (isOpeningDelimiter(before)) return '';
@@ -429,6 +471,53 @@ function normalizeQuotes(line, quoteMode, quoteOpen, lineNo) {
 
   const findings = [];
   let output = '';
+
+  if (quoteMode === 'curly') {
+    // 行内配对转换为中文弯引号 `“…”`（内嵌引号转为 `‘…’`）；保护英文撇号（don't / O'Connor）。
+    const stack = [];
+    const isAsciiWord = (ch) => /[A-Za-z0-9_]/.test(ch || '');
+    for (let i = 0; i < line.length; i += 1) {
+      const ch = line[i];
+      let replacement = ch;
+      if (ch === '“' || ch === '「' || ch === '『') {
+        const level = stack.length === 0 ? 'outer' : 'inner';
+        stack.push(level);
+        replacement = level === 'outer' ? '“' : '‘';
+      } else if (ch === '‘') {
+        stack.push('inner');
+        replacement = '‘';
+      } else if (ch === '”' || ch === '」' || ch === '』') {
+        const level = stack.length ? stack.pop() : 'outer';
+        replacement = level === 'inner' ? '’' : '”';
+      } else if (ch === '’') {
+        if (!isAsciiWord(line[i - 1]) || !isAsciiWord(line[i + 1])) {
+          if (stack.length && stack[stack.length - 1] === 'inner') stack.pop();
+        }
+        replacement = '’';
+      } else if (ch === '"') {
+        if (stack.length && stack[stack.length - 1] === 'outer') {
+          stack.pop();
+          replacement = '”';
+        } else {
+          stack.push('outer');
+          replacement = '“';
+        }
+      } else if (ch === "'" && !(isAsciiWord(line[i - 1]) && isAsciiWord(line[i + 1]))) {
+        if (stack.length && stack[stack.length - 1] === 'inner') {
+          stack.pop();
+          replacement = '’';
+        } else {
+          stack.push('inner');
+          replacement = '‘';
+        }
+      }
+      output += replacement;
+      if (replacement !== ch) {
+        findings.push({ line: lineNo, column: i + 1, type: 'quote-style', message: '按显式 quote-mode 转为中文弯引号。' });
+      }
+    }
+    return { line: output, findings, quoteOpen: stack.length > 0 };
+  }
 
   for (let i = 0; i < line.length; i += 1) {
     const ch = line[i];

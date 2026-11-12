@@ -43,15 +43,15 @@ WORK_ROOT = (".story", "work")
 
 
 # ---- 碎度（只提示，不拦）----
-# 与 0.10 对照实验的统计同一算法：先去掉 # 开头的行；短段＝非空行里去空白后不到 20 字的占比（对话段也算）；
-# 叙述句＝去掉“…”（或「…」）里的对话后按 。！？!? 切句，取每句去空白后的字数求中位数。
-# 真人参照：七猫三本完结书（玄幻、古言、现言）前 30 章，平均短段约 19%、叙述句长中位约 39 字；
-# 分章 P10–P90 为短段 2%–33%、句长 27–54 字。原生模型短段约 42%，0.9.2 约 45%。
+# 先去掉 # 开头的行；短段＝非空行里去空白后不到 20 字的占比（对话段也算）；
+# 叙述句＝逐段去掉“…”「…」『…』"..."里的对话后按 。！？!?… 切句，取每句去空白后的字数求中位数。
+# 真人参照：番茄、七猫、纵横 970 本长篇抽样 5458 章标定，短段中位数约 38%（P10–P90 16%–62%），
+# 叙述句长中位数约 23 字（P10–P90 15–35 字）。
 SHORT_PARAGRAPH_CHARS = 20
-HUMAN_SHORT_PARAGRAPH_RATIO = 0.19
-HUMAN_NARRATIVE_SENTENCE_MEDIAN = 39
-HUMAN_SHORT_PARAGRAPH_RANGE = (0.02, 0.33)
-HUMAN_NARRATIVE_SENTENCE_RANGE = (27, 54)
+HUMAN_SHORT_PARAGRAPH_RATIO = 0.38
+HUMAN_NARRATIVE_SENTENCE_MEDIAN = 23
+HUMAN_SHORT_PARAGRAPH_RANGE = (0.16, 0.62)
+HUMAN_NARRATIVE_SENTENCE_RANGE = (15, 35)
 # ---- 动作与心理平衡（只提示，不拦）----
 # 七猫 132 本完结长篇抽样 5246 章去引语叙述句标定：
 # 带肢体/手眼动作词的叙述句平均约 12%（P10–P90 3%–23%，P95 29%），带盘算/因果词的叙述句平均约 15%（P10–P90 4%–28%）。
@@ -59,7 +59,7 @@ HUMAN_BODY_ACTION_SENTENCE_RATIO = 0.12
 HUMAN_BODY_ACTION_SENTENCE_RANGE = (0.03, 0.23)
 HUMAN_THOUGHT_CAUSAL_SENTENCE_RATIO = 0.15
 HUMAN_THOUGHT_CAUSAL_SENTENCE_RANGE = (0.04, 0.28)
-_QUOTED = re.compile(r"“[^”]*”|「[^」]*」")
+_QUOTED = re.compile(r'“[^”]*”|「[^」]*」|『[^』]*』|"[^"]*"')
 _HTML_COMMENT = re.compile(r"<!--.*?-->", re.S)
 _BODY_ACTION_SENTENCE_RE = re.compile(
     r"指尖|指腹|手指|指节|手背|掌心|拳头|手腕|袖口|衣角|喉结|眼眶|眼底|眸光|目光|视线|眼神|眉头|嘴角|唇角|肩膀|呼吸|"
@@ -75,8 +75,12 @@ _THOUGHT_CAUSAL_SENTENCE_RE = re.compile(
 def _narrative_sentences(text: str) -> tuple[list[str], list[str]]:
     lines = [line.strip() for line in _HTML_COMMENT.sub("", text.lstrip("\ufeff")).splitlines()]
     paragraphs = [line for line in lines if line and not line.startswith("#")]
-    narrative = _QUOTED.sub("", "\n".join(paragraphs))
-    sentences = [compact for s in re.split(r"[。！？!?]", narrative) if (compact := re.sub(r"\s", "", s))]
+    sentences = [
+        compact
+        for line in paragraphs
+        for s in re.split(r"[。！？!?…]+", _QUOTED.sub("", line))
+        if (compact := re.sub(r"\s", "", s))
+    ]
     return paragraphs, sentences
 
 

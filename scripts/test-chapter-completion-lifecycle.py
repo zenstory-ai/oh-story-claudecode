@@ -126,7 +126,7 @@ class FinalChapterFlowTests(unittest.TestCase):
             "| 1 | 江晨完成一次审核 | 推进 | 不新增支线 |\n",
             encoding="utf-8",
         )
-        prefix = "这不是夸奖，而是命令。" if blocking else ""
+        prefix = "他回头——门已经关了。" if blocking else ""
         fill = max(0, actual - len(prefix) - 1)
         (self.project / "正文" / f"第{chapter:03d}章_测试.md").write_text(
             f"# 第{chapter}章\n{prefix}" + "字" * fill + "。",
@@ -136,7 +136,7 @@ class FinalChapterFlowTests(unittest.TestCase):
     def test_fix_punctuation_normalizes_body_before_the_single_check(self) -> None:
         self.write_contract(1, 1000)
         body = self.project / "正文" / "第001章_测试.md"
-        body.write_text(body.read_text(encoding="utf-8").replace("字字字字", "字……字", 1), encoding="utf-8")
+        body.write_text(body.read_text(encoding="utf-8").replace("字字字字字字", "字...字——字", 1), encoding="utf-8")
         plain = self.run_chapter("check", 1, expect=1)
         self.assertEqual(plain["status"], "blocked")
         self.assertEqual(plain["quality"]["status"], "fail")
@@ -146,7 +146,8 @@ class FinalChapterFlowTests(unittest.TestCase):
         fixed = self.run_process(args)
         self.assertTrue(fixed["punctuation_fixed"])
         self.assertEqual(fixed["quality"]["status"], "pass")
-        self.assertNotIn("……", body.read_text(encoding="utf-8"))
+        self.assertIn("……", body.read_text(encoding="utf-8"))
+        self.assertNotIn("——", body.read_text(encoding="utf-8"))
         self.assertFalse(self.run_process(args)["punctuation_fixed"])
 
     def test_complete_user_flow_without_persisted_approval_state(self) -> None:

@@ -10,7 +10,7 @@
 - **blocking（必须修）**：检测脚本报 blocking 的命中，和清单里标「必须修」的项，修完才能交付。
 - **advisory（建议看）**：检测脚本的 advisory 命中和清单其余项。回到上下文判断，有功能的写法保留，没功能的改；词句信号拿不准时查 `banned-words.md` 对应一节，不是出现就删。拿不准的列进交付说明请作者定；子代理标的 `[需复核]` 只写在交回说明里，`正文.md` 里不做标记。
 
-文件模式依次运行 `node {skill 根}/scripts/check-ai-patterns.js --check --fail-on=blocking {短篇目录}/正文.md`、`node {skill 根}/scripts/check-outline-copy.js --outline {短篇目录}/小节大纲.md {短篇目录}/正文.md`、`node {skill 根}/scripts/normalize-punctuation.js {短篇目录}/正文.md`（默认 `--quote-mode keep`：引号里的省略号保留并统一成 `……`，引号外的省略号和破折号、双连字符、独立分隔线按 short-format「标点」整理，白名单里登记过的不动；保留盐言「」）、`node {skill 根}/scripts/check-degeneration.js --check {短篇目录}/正文.md`，blocking 先改正文再复扫。照搬检测报出的誓词、关键原话等功能性台词保留，登记进 `小节大纲.md` 表格下方「原样出现的原话：」（旧书叫「复沓锚句」）再复检，其余现场重写。
+文件模式依次运行 `node {skill 根}/scripts/check-ai-patterns.js --check --fail-on=blocking {短篇目录}/正文.md`、`node {skill 根}/scripts/check-outline-copy.js --outline {短篇目录}/小节大纲.md {短篇目录}/正文.md`、`node {skill 根}/scripts/normalize-punctuation.js {短篇目录}/正文.md`（默认 `--quote-mode keep`：保留引号与面板内的 `……` 及对话引号内的 `——`，规整非标省略号，旁白破折号、双连字符、独立分隔线按 short-format「标点」整理，白名单登记过的不动；保留盐言「」）、`node {skill 根}/scripts/check-degeneration.js --check {短篇目录}/正文.md`，blocking 先改正文再复扫。照搬检测报出的誓词、关键原话等功能性台词保留，登记进 `小节大纲.md` 表格下方「原样出现的原话：」（旧书叫「复沓锚句」）再复检，其余现场重写。
 
 全部落盘后运行 `node scripts/check-delivery-contract.js --json --min-chars {MIN} --max-chars {MAX} --sections {N} {短篇目录}`。exit 0 才可交付；exit 1 只按 `repair_scope` 最小修复并重跑受影响的质量检查与本命令，最多 2 轮；仍失败则停止，按下方交付说明告诉作者哪项没达标、差多少。exit 2、脚本缺失或不可执行时不得声称交付契约通过。它只验字数、节数与排版。
 

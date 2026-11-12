@@ -82,15 +82,19 @@ expect_no_kw() {
     echo "FAIL: 不该出现「$2」: $1" >&2; printf '%s\n' "$out" | head -4 >&2; fails=$((fails+1))
   fi
 }
+# 单处疑似对比/反差/排比/预告不进写后硬拦网（真人长篇单章 1 处属常态，仅交深扫 semantic advisory）。
+{ printf '# 第15章 单处豁免\n\n'; PAD; printf '\n声音不大，却带着一股狠劲。\n这不是退让，而是试探。\n没有伴奏，没有和声，没有提词器。\n没人知道他去了哪里。\n他把门关上了。\n'; } > "$TMP/某书/正文/第015章_单处常态.md"
+expect_silent "$TMP/某书/正文/第015章_单处常态.md"
+
 mkdir -p "$TMP/白名单书/正文" "$TMP/白名单书/大纲" "$TMP/对照书/正文" "$TMP/对照书/大纲"
 printf '# 白名单\n声音不大，却带着一股狠劲\n' > "$TMP/白名单书/.deslop-whitelist"
 for book in 白名单书 对照书; do
-  { printf '# 第1章 开场\n\n'; PAD; printf '\n声音不大，却带着一股狠劲。\n他把门关上了。\n'; } > "$TMP/$book/正文/第001章_开场.md"
+  { printf '# 第1章 开场\n\n'; PAD; printf '\n声音不大，却带着一股狠劲。\n他声音不高，却压住了整间屋子。\n他把门关上了。\n'; } > "$TMP/$book/正文/第001章_开场.md"
 done
 expect_fire_kw "$TMP/对照书/正文/第001章_开场.md" 'voice-contrast'
 expect_no_kw "$TMP/白名单书/正文/第001章_开场.md" '毒句式'
-# 白名单只遮登记的片段：同章另一处毒句式照报。
-{ printf '# 第2章 回声\n\n'; PAD; printf '\n声音不大，却带着一股狠劲。\n没有伴奏，没有和声，没有提词器。\n他把门关上了。\n'; } > "$TMP/白名单书/正文/第002章_回声.md"
+# 白名单只遮登记的片段：同章另一类达阈值的毒句式照报。
+{ printf '# 第2章 回声\n\n'; PAD; printf '\n声音不大，却带着一股狠劲。\n他声音不高，却压住了整间屋子。\n没有伴奏，没有和声，没有提词器。\n没有灯光，没有掌声，没有退路。\n他把门关上了。\n'; } > "$TMP/白名单书/正文/第002章_回声.md"
 expect_fire_kw "$TMP/白名单书/正文/第002章_回声.md" 'negation-parade'
 expect_no_kw "$TMP/白名单书/正文/第002章_回声.md" 'voice-contrast'
 # 复扫指引：长篇分章正文指向 storyctl chapter check（长篇流程只认这个入口），短篇 正文.md
@@ -99,7 +103,7 @@ expect_fire_kw "$TMP/对照书/正文/第001章_开场.md" 'storyctl.py chapter 
 expect_no_kw "$TMP/对照书/正文/第001章_开场.md" 'check-ai-patterns.js'
 mkdir -p "$TMP/短篇书"
 printf '# 设定\n' > "$TMP/短篇书/设定.md"
-{ printf '# 正文\n\n'; PAD; printf '\n声音不大，却带着一股狠劲。\n他把门关上了。\n'; } > "$TMP/短篇书/正文.md"
+{ printf '# 正文\n\n'; PAD; printf '\n声音不大，却带着一股狠劲。\n他声音不高，却压住了整间屋子。\n他把门关上了。\n'; } > "$TMP/短篇书/正文.md"
 expect_fire_kw "$TMP/短篇书/正文.md" 'check-ai-patterns.js --check <正文文件>$'
 expect_no_kw "$TMP/短篇书/正文.md" 'storyctl'
 # 硬信号分流文案：退化类重写该段，毒句式就地改写。

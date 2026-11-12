@@ -38,7 +38,7 @@
    - **字数出了范围**：欠字不补、不重试，用下方字数问法请作者选；超字交 narrative-writer 按 agent-calls「超字一次净删」删一次（自写同样只删不加），复检仍超请作者选。选 1 → `chapter accept-current-length`（不到目标一半或超长未压缩被拒时先告知/先删一次，作者坚持加 `--force`）；选 2 → 等作者改完细纲或目标后回本步；选 3 → 删本章正文与工作目录，不提交。
 8. **检查钩子与爽点**：章尾有往下看的理由，推进/爆发章爽点到位；不达标只修批准内容，修后重跑「检测收口」。
 9. **元信息扫描**：标题行以外清掉第X章、上一章、本章、前文、后文、伏笔、细纲、读者等工程词，改成角色感知的事件锚点。
-10. **检测结果处理**：检测器的必须改与 checker 的 S1/S2 必须修；建议看与 S3 读原文确属问题才改（拿不准按类别查 `references/banned-words.md` 对应节，不整读）；细纲照搬里判定保留的补进细纲「复沓锚句」（不算改大纲）。改完重跑「检测收口」复扫。
+10. **检测结果处理**：检测器的必须改与 checker 的 S1/S2 必须修；建议看与 S3 读原文确属问题才改（拿不准按类别查 `references/banned-words.md` 对应节，不整读）；细纲照搬里判定保留的补进细纲「原样出现的原话」（旧名复沓锚句，不算改大纲）。改完重跑「检测收口」复扫。
 11. **更新追踪**：跑 `{PYTHON} {skill 根}/scripts/tracking_commit.py draft --project {项目根} --chapter {N}` 预填 `tracking.json`，只填 `delta`、本章结尾时间/场景与变化的核心角色快照（`character_snapshots`），撤下的约束/风险写入 `delta.retired_context_items`；出错才读 [tracking-transaction.md](tracking-transaction.md)。再跑 `{PYTHON} {skill 根}/scripts/storyctl.py chapter commit --project {项目根} --chapter {N} --input {工作目录}/tracking.json`（接受当前长度换 `accept-current-length`）。判为「登记」的申报项一并提交；有「先问作者」项时暂停提交。「本章没写成的」：细纲没给的追加进本段排纲笔记「写纲时补的」，先问作者的走下方处置表。
 12. **提交后核对**：返回 `tracking_committed: true` 即本章完成。
 

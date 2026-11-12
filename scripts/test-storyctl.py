@@ -342,7 +342,7 @@ class StoryctlCliTests(unittest.TestCase):
             outline = root / "细纲_第001章.md"
             outline.write_text("- 字数目标：1000 字\n", encoding="utf-8")
             body = root / "第001章_测试.md"
-            prose = "他站在门口。声音不大，却让屋里的人都停了手。\n"
+            prose = "他站在门口。声音不大，却让屋里的人都停了手。她声音不高，却把账念得清清楚楚。\n"
             body.write_text("## 第1章 测试\n" + prose, encoding="utf-8")
             plain = storyctl.check_blocking_quality(outline, body)
             self.assertEqual(plain["status"], "fail", plain)
@@ -601,8 +601,13 @@ class FragmentationTests(unittest.TestCase):
         # 去掉“…”里的话，按 。！？!? 切句，每句去空白后数字数（标点也算）：26、10、4，中位数 10。
         self.assertEqual(result["narrative_sentences"], 3)
         self.assertEqual(result["narrative_sentence_median"], 10)
-        self.assertEqual(result["human_reference"]["short_paragraph_ratio"], 0.19)
-        self.assertEqual(result["human_reference"]["narrative_sentence_median"], 39)
+        self.assertEqual(result["human_reference"]["short_paragraph_ratio"], 0.38)
+        self.assertEqual(result["human_reference"]["narrative_sentence_median"], 23)
+        self.assertEqual(result["human_reference"]["short_paragraph_range"], [0.16, 0.62])
+        self.assertEqual(result["human_reference"]["narrative_sentence_range"], [15, 35])
+        # 半角双引号与『…』台词同样剥离，无句末标点的换行按段断开不跨行粘连。
+        unpunctuated = storyctl.fragmentation('## 第1章\n"别动！"他推门进来\n屋里黑漆漆的\n『快走！』她转身跑了……没回头。\n')
+        self.assertEqual(unpunctuated["narrative_sentences"], 4)
 
     def test_plain_report_speaks_plainly_and_never_blocks_on_fragmentation(self) -> None:
         with tempfile.TemporaryDirectory(prefix="storyctl-plain-") as directory:
@@ -620,7 +625,7 @@ class FragmentationTests(unittest.TestCase):
             text = "\n".join(lines)
             self.assertIn("字数不在范围里，要请作者定", lines[0])
             self.assertIn("少了约", text)
-            self.assertIn("短段占 100%（真人平均约 19%，多数章在 2%–33%）", text)
+            self.assertIn("短段占 100%（真人平均约 38%，多数章在 16%–62%）", text)
             self.assertIn("只作参考，不拦", text)
             for jargon in ("needs_decision", "blocking", "status", "advisory"):
                 self.assertNotIn(jargon, text)

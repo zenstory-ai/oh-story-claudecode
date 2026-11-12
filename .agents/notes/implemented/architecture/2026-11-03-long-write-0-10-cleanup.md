@@ -2,7 +2,7 @@
 
 Status: implemented
 Date: 2026-11-03
-Related: [最小版重建（被本篇取代）](../../rejected/architecture/2026-11-02-long-write-minimal-rebuild.md)、[按契约、方法、范例三分重构](../../rejected/architecture/2026-11-02-long-write-contract-method-example-split.md)、[长短篇写作 references 按作者时刻和读者重组](../../implemented/architecture/2026-10-17-write-references-by-moment.md)、[细纲必填收到九个字段](../../implemented/simplification/2026-09-25-outline-core-fields.md)、[35K 加载上限](../../implemented/architecture/2026-09-26-per-call-load-ceiling-35k.md)
+Related: [最小版重建（被本篇取代）](../../rejected/architecture/2026-11-02-long-write-minimal-rebuild.md)、[按契约、方法、范例三分重构](../../rejected/architecture/2026-11-02-long-write-contract-method-example-split.md)、[长短篇写作 references 按作者时刻和读者重组](../../implemented/architecture/2026-10-17-write-references-by-moment.md)、[细纲必填收到九个字段](../../implemented/simplification/2026-09-25-outline-core-fields.md)、[35K 加载上限](../../implemented/architecture/2026-09-26-per-call-load-ceiling-35k.md)、[对照网文真实语料校准规则、标点与去味阻断阈值（修订本篇省略号替换、碎度参照与单句成段限令）](2026-11-12-long-write-corpus-calibration.md)
 
 ## Problem
 
