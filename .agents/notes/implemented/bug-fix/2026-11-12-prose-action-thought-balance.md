@@ -25,7 +25,7 @@ Issue #540 报告正文中大量叙述句带手眼或道具动作、角色心理
 3. **补齐 `story-setup` 独占受管目录的退役文件清理**：
    - `skills/story-setup/scripts/copy-path-safety.py` 增加可选 `--prune-orphans`：仅在 `classify_copy` 判定 `status == "safe"`（`copy_allowed: true`）且目标本身非符号链接时，删除目标受管目录中源目录已不存在的文件与空子目录，返回排序后的 `pruned` 列表；`status == "same"` 或目标本身是符号链接时零删除；
    - `skills/story-setup/SKILL.md` 及对应 `deploy-*.md` 规定对独占受管目录（各端 `agent-references/`、`.claude/hooks/` 以及 ZCode / OpenClaw / Reasonix / generic 的 14 个已知 `skills/{skill-name}/` 目录）覆盖前清理源端已退役文件，不触碰共享父目录里的用户自有条目。
-4. **重写 `README.md` 翻译腔小节标题与单向动作化措辞**：保留既有外链锚点（`#安装`、`#常见问题`），将直译标题与延伸阅读链接文字改为自然中文，并修正去 AI 味说明中「全部交给可见动作和物件」的单向表述。
+4. **收敛修复 `README.md` 确属生硬直译的几处标题与单向措辞**：保留原有口语感好的章节标题与站外文章原名链接，仅将 `安装后的第一条请求`（request）、`可复用的模块`（reusable modules）、`判定为 AI`（缺宾语中心）等确属直译处及「交给可见的动作和物件」单向表述做最小改写。
 5. **同步 ClawHub 发布清单**：递增本次涉及字节变更的 `story-deslop`、`story-long-write`、`story-review`、`story-setup`、`story-short-write` 及主路由 `story` 的包版本，使用固定的中央控制脚本重新生成 `packageDigest`。
 
 ## Alternatives considered
