@@ -22,7 +22,7 @@
 
 项目部署 Skills、Commands、AGENTS.md 与 Hooks；不部署 `.zcode/agents` 或 `.zcode/rules`，插件角色随插件安装/更新注册。
 
-1. 复制仓库当前 `skills/` 下 14 个包含 `SKILL.md` 的目录到 `.zcode/skills/{skill-name}/`；仅替换这些已知目录，保留用户其他 Skills。ZCode 只使用当前规范前缀 `.zcode/skills/` 查找 agent references，不在运行时遍历历史备选路径。
+1. 复制仓库当前 `skills/` 下 14 个包含 `SKILL.md` 的目录到 `.zcode/skills/{skill-name}/`；仅替换这些已知目录（替换前按 SKILL.md 清理各已知 skill 目录内源端已删除的旧文件），保留用户其他 Skills。ZCode 只使用当前规范前缀 `.zcode/skills/` 查找 agent references，不在运行时遍历历史备选路径。
 2. 复制 `references/zcode/commands/*.md` 到 `.zcode/commands/`；仅替换 14 个同名命令，保留用户其他 Commands。
 3. 复制 `references/zcode/hooks/story_zcode_hook.js` 和 `references/zcode/hooks/story_hook_core.js` 到 `.zcode/hooks/`。
 4. 读取 `references/zcode/config.json.patch` 和现有 `.zcode/config.json`（如只有根 `zcode.json`，仍创建 `.zcode/config.json` 承载 oh-story 项目 Hooks，不改写根文件）：

@@ -62,9 +62,11 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 Phase 2 幂等：复制、写入与各宿主合并重复执行结果一致。受管目录中只覆盖 oh-story 自己的 14 个 skill、7 个助手、hook 与规则文件，保留同目录里作者自己的文件；不覆盖书稿、设定、大纲、追踪和 `.active-book`。工具、权限或网络问题中断后，从头重跑即可，不另清理半成品；`create only if absent` 的用户状态文件（见清单 Owner class）不会被覆盖。
 
-**两列基准目录不同**：`Source path` 是包内来源，story-setup 内的路径以当前 `SKILL.md` 所在目录定位；`Target path` 相对用户项目根。执行每一行（以及各宿主部署算法里的每个递归复制步骤）之前，先把通配符具体化为单个源/目标，再用本 `SKILL.md` 同级的 `scripts/copy-path-safety.py` 检查。该脚本按 `Path.resolve` / `realpath` 语义跟随已有 symlink，并在两侧都存在时用 `samefile` 核对文件系统对象；**只转绝对路径或比较字符串不算检查完成**。读取其 JSON：`status: same` 时 no-op，禁止复制；仅 `copy_allowed: true` 时可以复制；`source_missing`、`unsafe_target_within_source` 或 `filesystem_identity_error` 必须停止该步骤并报告。无法运行脚本时只能用当前环境的文件系统 API 做完全相同的 canonical realpath、same-object 与 target-descendant 检查；无法确认就停止，不得尝试复制。OpenClaw / Reasonix / generic 的项目副本是整份 skill 拷贝，重跑时执行的就是项目里那份；Reasonix / Codex 还可能经 `.agents/skills → ../skills` symlink 加载，路径文本不同也可能指向同一目录，照字面复制会把目录嵌进自身并撑满磁盘。
+**两列基准目录不同**：`Source path` 相对当前 `SKILL.md` 所在包目录；`Target path` 相对用户项目根。每个递归复制步骤前，先把通配符具体化为单个源/目标，再用同级 `scripts/copy-path-safety.py` 检查（按 `Path.resolve` / `realpath` 跟随 symlink，两侧存在时用 `samefile` 核对文件系统对象，目标位于源目录内判 `target-descendant` 拦截；**只比字符串不算检查**）：`status: same` 时 no-op 禁复制；仅 `copy_allowed: true` 可复制；其余异常状态停止并报告。无法跑脚本时须用文件系统 API 做完全相同的 realpath、samefile 与 target-descendant 检查，无法确认即停止。
 
-**部署前清理自嵌套残留**：`{.claude,.codex,.zcode}/skills/story-setup/references/agent-references/` 与项目根 `skills/story-setup/references/agent-references/` 里若多出 `agent-references/` 层（可能嵌了多层），以及 `skills/story-setup/skills/`，整段删掉再部署，并在安装报告里列出删掉的路径。
+**部署前清理自嵌套残留与独占目录退役文件**：
+- 自嵌套残留：`{.claude,.codex,.zcode}/skills/story-setup/references/agent-references/` 与项目根 `skills/story-setup/references/agent-references/` 若多出 `agent-references/` 层，以及 `skills/story-setup/skills/`，整段删掉并记入报告。
+- 独占目录退役文件：覆盖各端 `agent-references/`、`.claude/hooks/` 及 ZCode / OpenClaw / Reasonix / generic 的 14 个已知 `{.zcode/skills,skills}/{skill-name}/` 前，按 `python3` → `python` → `py` 探测解释器运行 `scripts/copy-path-safety.py --prune-orphans <源目录> <目标目录>`（仅 `status: safe` 且目标非 symlink 时删源端已删文件与空子目录，`pruned` 记入报告；`same` 零改动；无解释器时按同一安全条件手工清理）。`agents/`、`rules/`、`commands/` 与顶层 `skills/` 只按已知名字覆盖 oh-story 条目，不删同级用户文件或目录。
 
 ### Step 1：按宿主部署
 

@@ -52,17 +52,38 @@ HUMAN_SHORT_PARAGRAPH_RATIO = 0.19
 HUMAN_NARRATIVE_SENTENCE_MEDIAN = 39
 HUMAN_SHORT_PARAGRAPH_RANGE = (0.02, 0.33)
 HUMAN_NARRATIVE_SENTENCE_RANGE = (27, 54)
+# ---- 动作与心理平衡（只提示，不拦）----
+# 七猫 132 本完结长篇抽样 5246 章去引语叙述句标定：
+# 带肢体/手眼动作词的叙述句平均约 12%（P10–P90 3%–23%，P95 29%），带盘算/因果词的叙述句平均约 15%（P10–P90 4%–28%）。
+HUMAN_BODY_ACTION_SENTENCE_RATIO = 0.12
+HUMAN_BODY_ACTION_SENTENCE_RANGE = (0.03, 0.23)
+HUMAN_THOUGHT_CAUSAL_SENTENCE_RATIO = 0.15
+HUMAN_THOUGHT_CAUSAL_SENTENCE_RANGE = (0.04, 0.28)
 _QUOTED = re.compile(r"“[^”]*”|「[^」]*」")
 _HTML_COMMENT = re.compile(r"<!--.*?-->", re.S)
+_BODY_ACTION_SENTENCE_RE = re.compile(
+    r"指尖|指腹|手指|指节|手背|掌心|拳头|手腕|袖口|衣角|喉结|眼眶|眼底|眸光|目光|视线|眼神|眉头|嘴角|唇角|肩膀|呼吸|"
+    r"伸手|抬手|探手|拿起|拿过|取出|取过|掏出|摸出|抓起|攥住|攥紧|握住|握紧|捏住|按住|压住|扣住|拢住|摩挲|"
+    r"推开|拉开|打开|关上|放下|递给|挑开|掀开|扯开|转身|回头|抬头|低头|弯腰|俯身|走到|走向|坐下|站起|盯着|扫过|看向|望向"
+)
+_THOUGHT_CAUSAL_SENTENCE_RE = re.compile(
+    r"因为|所以|既然|省得|免得|要不然|否则|怪不得|难怪|偏偏|明明|反正|横竖|索性|干脆|好在|幸亏|毕竟|本来|原本|其实|说白了|说到底|"
+    r"知道|明白|清楚|觉得|以为|盘算|寻思|估摸|琢磨|怀疑|担心|害怕|后悔|心想|暗想|暗道|暗骂|腹诽|犯不着|舍不得|懒得|巴不得"
+)
+
+
+def _narrative_sentences(text: str) -> tuple[list[str], list[str]]:
+    lines = [line.strip() for line in _HTML_COMMENT.sub("", text.lstrip("\ufeff")).splitlines()]
+    paragraphs = [line for line in lines if line and not line.startswith("#")]
+    narrative = _QUOTED.sub("", "\n".join(paragraphs))
+    sentences = [compact for s in re.split(r"[。！？!?]", narrative) if (compact := re.sub(r"\s", "", s))]
+    return paragraphs, sentences
 
 
 def fragmentation(text: str) -> dict[str, Any]:
-    lines = [line.strip() for line in _HTML_COMMENT.sub("", text.lstrip("\ufeff")).splitlines()]
-    paragraphs = [line for line in lines if line and not line.startswith("#")]
+    paragraphs, sentences = _narrative_sentences(text)
     short = sum(1 for line in paragraphs if len(re.sub(r"\s", "", line)) < SHORT_PARAGRAPH_CHARS)
-    narrative = _QUOTED.sub("", "\n".join(paragraphs))
-    sentences = re.split(r"[。！？!?]", narrative)
-    lengths = [n for n in (len(re.sub(r"\s", "", sentence)) for sentence in sentences) if n]
+    lengths = [len(sentence) for sentence in sentences]
     return {
         "paragraphs": len(paragraphs),
         "short_paragraphs": short,
@@ -73,6 +94,26 @@ def fragmentation(text: str) -> dict[str, Any]:
                             "narrative_sentence_median": HUMAN_NARRATIVE_SENTENCE_MEDIAN,
                             "short_paragraph_range": list(HUMAN_SHORT_PARAGRAPH_RANGE),
                             "narrative_sentence_range": list(HUMAN_NARRATIVE_SENTENCE_RANGE)},
+    }
+
+
+def prose_balance(text: str) -> dict[str, Any]:
+    _, sentences = _narrative_sentences(text)
+    total = len(sentences)
+    act_hits = sum(1 for s in sentences if _BODY_ACTION_SENTENCE_RE.search(s))
+    thought_hits = sum(1 for s in sentences if _THOUGHT_CAUSAL_SENTENCE_RE.search(s))
+    return {
+        "narrative_sentences": total,
+        "body_action_sentences": act_hits,
+        "body_action_sentence_ratio": round(act_hits / total, 3) if total else None,
+        "thought_causal_sentences": thought_hits,
+        "thought_causal_sentence_ratio": round(thought_hits / total, 3) if total else None,
+        "human_reference": {
+            "body_action_sentence_ratio": HUMAN_BODY_ACTION_SENTENCE_RATIO,
+            "body_action_sentence_range": list(HUMAN_BODY_ACTION_SENTENCE_RANGE),
+            "thought_causal_sentence_ratio": HUMAN_THOUGHT_CAUSAL_SENTENCE_RATIO,
+            "thought_causal_sentence_range": list(HUMAN_THOUGHT_CAUSAL_SENTENCE_RANGE),
+        },
     }
 
 
@@ -358,6 +399,7 @@ def chapter_check(project: Path, chapter: int, author_range: Any = None) -> dict
         "length": length,
         "quality": quality,
         "fragmentation": fragmentation(body),
+        "prose_balance": prose_balance(body),
         "compression": compression,
         "state_revision": state["state_revision"],
         "tracking_committed": state["last_committed_chapter"] >= chapter,
@@ -541,6 +583,27 @@ def plain_report(result: dict[str, Any]) -> list[str]:
         choppy = (ratio is not None and ratio > high) or (median is not None and median < shortest)
         tail = "。偏碎：同一个动作或同一层意思的几句可以接成一句、并成一段。" if choppy else "。"
         lines.append("这章碎不碎（只作参考，不拦）：" + "，".join(parts) + tail)
+    balance = result.get("prose_balance") or {}
+    act_ratio = balance.get("body_action_sentence_ratio")
+    thought_ratio = balance.get("thought_causal_sentence_ratio")
+    total_sentences = balance.get("narrative_sentences") or 0
+    if act_ratio is not None and thought_ratio is not None:
+        act_low, act_high = HUMAN_BODY_ACTION_SENTENCE_RANGE
+        th_low, th_high = HUMAN_THOUGHT_CAUSAL_SENTENCE_RANGE
+        b_parts = [
+            f"带肢体或手眼动作的叙述句占 {round(act_ratio * 100)}%"
+            f"（真人平均约 {round(HUMAN_BODY_ACTION_SENTENCE_RATIO * 100)}%，多数章在 {round(act_low * 100)}%–{round(act_high * 100)}%）",
+            f"带盘算或因果的叙述句占 {round(thought_ratio * 100)}%"
+            f"（真人平均约 {round(HUMAN_THOUGHT_CAUSAL_SENTENCE_RATIO * 100)}%，多数章在 {round(th_low * 100)}%–{round(th_high * 100)}%）",
+        ]
+        action_heavy = total_sentences >= 8 and (
+            act_ratio > 0.29 or (act_ratio > act_high and thought_ratio < 0.08)
+        )
+        b_tail = (
+            "。动作偏密、心里账偏少：删掉不改局面的手眼或道具小动作，把角色为什么这么选、图什么直接写出来。"
+            if action_heavy else "。"
+        )
+        lines.append("动作和心里话（只作参考，不拦）：" + "，".join(b_parts) + b_tail)
     return lines
 
 

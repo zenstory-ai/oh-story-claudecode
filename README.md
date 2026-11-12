@@ -70,7 +70,7 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 > 各 Agent 的部署差异、已知限制与安装排查（Windows `ENOENT`、Antigravity `agy -p`、目录残留等）见 **[各编程 Agent 的部署与安装排查](docs/hosts.md)**。
 > 版本与变更见 [CHANGELOG.md](CHANGELOG.md) 和 [Releases](https://github.com/zenstory-ai/oh-story-claudecode/releases)，已有项目的更新步骤见[升级指南](skills/story-setup/UPGRADING.md)。
 
-## 看看它的输出
+## 看看实际效果
 
 下面每一份都是 skill 跑出来的真实文件（外加一段专门构造的 AI 腔反例），完整文件在 **[demo/](demo/README.md)**。
 
@@ -100,7 +100,7 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 **「作者真相」和「读者已知」分开记录**——避免角色提前知道未公开的设定，或把还没揭晓的伏笔提前写破。
 完整文件：[`demo/长篇/.../追踪/上下文.md`](demo/长篇/让你管账号，你高燃混剪炸全网/追踪/上下文.md)
 
-### 续写第 21 章：从门禁到回写，一条链走完
+### 续写第 21 章：从补细纲、写正文到追踪回写
 
 上面的视频录的就是这一段。`/story-long-write 写第21章` 在一次真实会话里的产出与每一道检查：
 
@@ -161,7 +161,7 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 
 完整报告：[`demo/拆文库/盘龙/拆文报告.md`](demo/拆文库/盘龙/拆文报告.md)
 
-### 短篇拆文：把自己的作品拆成可复用的模块
+### 短篇拆文：把自己的旧作拆成下一篇能用的套路
 
 `/story-short-analyze` 拆《曾将爱意私藏》（作者自己的短篇，约 8,500 字，追妻火葬场 · 死遁），
 产出 54 个情节节点、11 项写作手法。每个节点都锚定原文，并标注情绪类型与强度（−9~+9）：
@@ -194,7 +194,7 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 ```
 
 取第 21 章正文中的同一场戏跑同一个扫描：**零命中，exit 0**。
-两段字数几乎一样，差别在于改前用抽象判词替读者定性，改后把同一件事交给可见的动作和物件。
+两段字数几乎一样，差别在于改前用抽象判词替读者定性，改后把同一件事落回现场的动作、对话和反应。
 
 完整对照与全部 8 条命中：**[demo/去AI味对照/](demo/去AI味对照/README.md)**
 
@@ -352,9 +352,9 @@ oh-story-claudecode 内置适配 Claude Code、Google Antigravity、OpenCode、Z
 
 从 v0.7.7 起，长篇正文只用一个机器统计的字数口径：每份细纲必须写明合法的「字数目标」，缺少时会停止而不是回退到 3000；欠字不会自动加戏，超字最多压缩一次。字数只由写作流程在交付前统一测量，写后 hook 不再提醒字数欠账。升级旧项目后重跑 `/story-setup` 并新开会话即可生效。
 
-### 去AI味之后，朱雀等 AI 检测还是判定为 AI 怎么办？
+### 去AI味之后，还是被朱雀等工具判成 AI 写的怎么办？
 
-`story-deslop`（`/去AI味`）先用本地脚本抓出已知的 AI 高频句式、破折号泛滥和复读截断，再由 Agent 顺着上下文把总结腔、空泛情绪和强行拔高改回具体动作与细节。核心目标是让读者读着顺畅不出戏；朱雀等外部检测工具仅作自测参考。
+`story-deslop`（`/去AI味`）先用本地脚本抓出已知的 AI 高频句式、破折号泛滥和复读截断，再由 Agent 顺着上下文把总结腔、空泛套话和强行拔高改回具体处境、对话与细节。核心目标是让读者读着顺畅不出戏；朱雀等外部检测工具仅作自测参考。
 具体改法见[去 AI 味改稿指南](https://zenstory.ai/zh/oh-story/revise-ai-prose)，仓库内的规则说明见[去AI味的具体做法](docs/how-to-remove-ai-flavor-from-web-fiction.md)。
 
 ### 已经写了一部分的小说，能导入后继续写吗？
@@ -391,7 +391,7 @@ oh-story-claudecode 内置适配 Claude Code、Google Antigravity、OpenCode、Z
 - [导入 10–20 章后接着写](https://zenstory.ai/zh/oh-story/import-and-continue) — 旧稿反推设定与无缝续写实操
 - [分开角色已知、承诺与线索](https://zenstory.ai/zh/oh-story/long-novel-continuity) — 避免长篇连载前后矛盾或角色未卜先知
 - [把细纲要求写成看得见的场面变化](https://zenstory.ai/zh/oh-story/outline-to-chapter) — 细纲怎么写成有画面感的正文冲突
-- [用具体改稿减少“AI 味”](https://zenstory.ai/zh/oh-story/revise-ai-prose) — 删掉总结腔和套话，把戏落回动作与细节
+- [用具体改稿减少“AI 味”](https://zenstory.ai/zh/oh-story/revise-ai-prose) — 删掉总结腔和套话，把戏落回具体场面与细节
 - [分开文风选择与本书事实](https://zenstory.ai/zh/oh-story/preserve-author-voice) — 让 AI 学你的行文腔调而不串戏
 - [AI 写长篇小说怎么不崩人设：Oh Story 的做法](docs/ai-long-novel-character-consistency.md) — 仓库内文档
 - [去AI味的具体做法](docs/how-to-remove-ai-flavor-from-web-fiction.md) — 仓库内文档

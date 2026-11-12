@@ -88,15 +88,69 @@ def classify_copy(source_raw: str, target_raw: str) -> Dict[str, object]:
     return result
 
 
+def prune_orphans(source_raw: str, target_raw: str) -> Dict[str, object]:
+    raw_target = Path(os.path.abspath(os.path.expanduser(target_raw)))
+    result = classify_copy(source_raw, target_raw)
+    result["pruned"] = []
+    if result["status"] != "safe" or not result["copy_allowed"]:
+        return result
+    if raw_target.is_symlink():
+        result["status"] = "unsafe_target_symlink"
+        result["copy_allowed"] = False
+        return result
+
+    source = Path(str(result["source_realpath"]))
+    target = Path(str(result["target_realpath"]))
+    if not source.is_dir() or not target.exists() or not target.is_dir() or target.is_symlink():
+        return result
+
+    pruned = []
+    for dirpath, dirnames, filenames in os.walk(target, topdown=False, followlinks=False):
+        cur_dir = Path(dirpath)
+        for fname in filenames:
+            t_entry = cur_dir / fname
+            rel = t_entry.relative_to(target)
+            s_entry = source / rel
+            if not s_entry.exists() or (s_entry.is_dir() and not s_entry.is_symlink()):
+                t_entry.unlink()
+                pruned.append(rel.as_posix())
+        for dname in dirnames:
+            t_sub = cur_dir / dname
+            rel = t_sub.relative_to(target)
+            s_sub = source / rel
+            if t_sub.is_symlink():
+                if not s_sub.exists():
+                    t_sub.unlink()
+                    pruned.append(rel.as_posix())
+            elif not s_sub.is_dir() or s_sub.is_symlink():
+                try:
+                    t_sub.rmdir()
+                except OSError:
+                    pass
+                else:
+                    pruned.append(rel.as_posix() + "/")
+    result["pruned"] = sorted(pruned)
+    return result
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Resolve symlinks and reject recursive deployment copies."
+        description="Resolve symlinks, reject unsafe recursive copies, and optionally prune retired files in managed target directories."
+    )
+    parser.add_argument(
+        "--prune-orphans",
+        action="store_true",
+        help="When status is safe and target is a real directory, delete files inside target that no longer exist in source.",
     )
     parser.add_argument("source")
     parser.add_argument("target")
     args = parser.parse_args()
 
-    result = classify_copy(args.source, args.target)
+    result = (
+        prune_orphans(args.source, args.target)
+        if args.prune_orphans
+        else classify_copy(args.source, args.target)
+    )
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return status_exit_code(str(result["status"]))
 

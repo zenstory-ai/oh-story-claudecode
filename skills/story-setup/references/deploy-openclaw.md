@@ -19,7 +19,7 @@
 按以下步骤部署项目 skills：
 
 1. 读取仓库当前 `skills/` 下所有包含 `SKILL.md` 的 story skill 目录（14 个：`browser-cdp` 与 `story*`）。
-2. 写入目标项目 `skills/{skill-name}/`，仅替换这些 story-setup 管理的已知 skill 目录；保留用户在 `skills/` 下的其他目录。项目副本是整份 skill 拷贝，agent references 只使用当前规范前缀 `skills/`。
+2. 写入目标项目 `skills/{skill-name}/`，仅替换这些 story-setup 管理的已知 skill 目录（`status: safe` 时按 SKILL.md 先清理各已知目录内源端已删除的旧文件）；保留用户在 `skills/` 下的其他目录。项目副本是整份 skill 拷贝，agent references 只使用当前规范前缀 `skills/`。
 3. 每个 `SKILL.md` 必须满足 OpenClaw frontmatter 约束：`name` / `description` 是单行键值，`metadata` 是单行 JSON 对象且含 `metadata.openclaw`。
 4. 用 `skills/story-setup/references/openclaw/AGENTS.md.tmpl` 按 SKILL.md「项目指令合并」写入项目 `AGENTS.md`（`--host openclaw`）。
 5. `.story-deployed` 的 `target_cli` 写入 `openclaw` 或多端组合；`references_dir` 对 OpenClaw 写 `skills/story-setup/references/agent-references`。
