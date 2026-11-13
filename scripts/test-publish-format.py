@@ -129,11 +129,29 @@ class ContractTests(unittest.TestCase):
 
     def test_placeholders_never_in_values(self):
         for before, after in (("- 主角1：江晨", "- 主角1：待作者确认"),
+                              ("- 主角1：江晨", "- 主角1：未定"),
+                              ("- 主角1：江晨", "- 主角1：江晨（建议）"),
                               ("- 人设：皇叔", "- 人设：建议皇叔"),
                               ("# 书本名称：春风：第2年", "# 书本名称：待确认"),
-                              ("江晨穿越到平行世界，靠一部手机整顿军宣。", "待作者确认")):
+                              ("江晨穿越到平行世界，靠一部手机整顿军宣。", "待作者确认"),
+                              ("江晨穿越到平行世界，靠一部手机整顿军宣。", "暂无")):
             with self.subTest(after=after):
                 self.assertTrue(errors(LONG.replace(before, after)))
+
+    def test_legitimate_words_and_inline_cover_fields_not_false_flagged(self):
+        natural_title = SHORT.replace("春风：第2年", "离婚后，律师建议我继承百亿家产")
+        self.assertEqual(errors(natural_title), [])
+        self.assertEqual(errors(SHORT.replace("春风：第2年", "婚期未定")), [])
+        natural_synopsis = LONG.replace(
+            "江晨穿越到平行世界，靠一部手机整顿军宣。",
+            "前路未定，手头暂无现钱的江晨推门进来，建议立刻封锁消息并重拟并购草案。",
+        )
+        self.assertEqual(errors(natural_synopsis), [])
+        inline_cover = LONG.replace(
+            "- 状态：提示词已生成，图片未生成\n- 提示词：\n````text\n## 画面构图\n```text\n山间春风\n```\n````\n- 图片：",
+            "- 状态：提示词：已生成；图片：未生成\n- 提示词：Chinese web novel cover, Color palette: deep blue, gold\n- 图片：D:\\小说\\封面\\封面_v1.png",
+        )
+        self.assertEqual(errors(inline_cover), [])
 
     def test_basics_order_and_choices(self):
         self.assertTrue(errors(LONG.replace("- 主角1：江晨\n", "")))

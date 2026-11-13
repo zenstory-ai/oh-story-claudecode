@@ -152,7 +152,7 @@ try {
   assert.strictEqual(good.report.ok, true)
   assert.deepStrictEqual(good.report.failures, [])
 
-  // 平台表六个平台都要识别；旧项目写的「知乎盐选」「盐选」「番茄短篇」继续通过；作者没定平台写「未定」。
+  // 平台表五个平台都要识别；旧项目写的「知乎盐选」「盐选」「番茄短篇」「红果」继续通过；作者没定平台写「未定」。
   for (const platform of ['番茄', '七猫', '黑岩', '红果', '小程序', '点众', '盐言', '知乎盐选', '盐选', '番茄短篇', '未定']) {
     const named = run(writeCase(`platform-${platform}`, validSettings({ platform }), validOutline()))
     assert.strictEqual(named.status, 0, named.stdout + named.stderr)
@@ -255,6 +255,18 @@ try {
     const ok = run(writeCase(`genre-${genre.length}`, validSettings({ genre }), validOutline()))
     assert.strictEqual(ok.status, 0, ok.stdout + ok.stderr)
   }
+
+  // 「番茄短故事」写法与冷门题材「参照的结构」bullet 行不误报超套路数。
+  const fanqieShortColdGenre = run(writeCase(
+    'fanqie-short-cold-genre-structure-bullet',
+    validSettings({
+      platform: '番茄短故事',
+      genre: '题材：冷门：职场逆袭',
+      moves: ['背锅裁员开局：首节砸出停职通知', '核心专利留底：第4节亮原始署名', '当众反杀：第6节董事会翻盘', '参照的结构（冷门题材才写）：四段递进，末段清算'],
+    }),
+    validOutline()
+  ))
+  assert.strictEqual(fanqieShortColdGenre.status, 0, fanqieShortColdGenre.stdout + fanqieShortColdGenre.stderr)
   for (const [name, settings] of [
     ['bad-genre-name', validSettings({ genre: '题材：不存在' })],
     ['bad-genre-path', v09Settings({ genre: 'references/genre-styles/不存在.md' })],

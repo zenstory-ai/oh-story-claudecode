@@ -20,7 +20,13 @@ TAIL = ["作品简介", "待作者确认", "待平台核实", "来源说明"]
 COVER_FIELDS = ["模式", "状态", "提示词", "图片"]
 COVER_MODES = {"直接生成", "仅提示词", "暂缓"}
 BLANK = "（不填）"
-PLACEHOLDER = re.compile(r"待(?:作者)?确认|待定|未定|建议|草案|TBD|暂无", re.I)
+PLACEHOLDER = re.compile(
+    r"待(?:作者|平台)?确认"
+    r"|(?<![^\s（(【\[<：:、，,；;])(?:待定|未定|暂定|暂无|草案)(?=$|[\s）)】\]>、，,。；;])"
+    r"|(?:^|[（(【\[<])\s*建议|建议\s*[：:]|建议(?:候选|草案|填|选|用|改为)"
+    r"|\b(?:TBD|TODO)\b",
+    re.I,
+)
 
 
 def frontmatter(path):
@@ -85,7 +91,7 @@ def parse_fields(lines, where, errors):
         name, value = match[1], match[2].strip()
         if name in fields:
             errors.append(f"{where}的 {name} 出现了不止一次。")
-        if re.search(r"[^\s、，,]+\s*[：:]", value):
+        if not (where == "封面" and name in ("提示词", "图片", "状态")) and re.search(r"[^\s、，,]+\s*[：:]", value):
             errors.append(f"{where}的 {name} 行混入了其他字段，要拆行。")
         fields[name] = value
     return fields

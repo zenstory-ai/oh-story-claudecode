@@ -45,7 +45,7 @@ function getToken(port) {
 }
 
 /** 调用后端 API 获取书籍列表 */
-function fetchBookList(port, token, pageNum) {
+function fetchBookList(port, token, pageNum, lang = "zh_TW") {
   const t = safeStr(token);
   const js =
     "fetch(" + safeStr(API_BASE + "/manage/book/list") + "," +
@@ -54,7 +54,7 @@ function fetchBookList(port, token, pageNum) {
     "'Content-Type':'application/x-www-form-urlencoded'," +
     "'Authorization':'Bearer '+" + t +
     "}," +
-    "body:new URLSearchParams({pageNum:" + safeStr(pageNum) + ",pageSize:" + safeStr(PAGE_SIZE) + ",language:'zh_TW'})" +
+    "body:new URLSearchParams({pageNum:" + safeStr(pageNum) + ",pageSize:" + safeStr(PAGE_SIZE) + ",language:" + safeStr(lang) + "})" +
     "}).then(function(r){return r.json()})";
   return evalJSON(port, js);
 }
@@ -226,14 +226,25 @@ function main() {
   }
   console.log("  ✓ 获取到认证 token");
 
-  // 分页采集
+  // 分页采集（默认接口语种 zh_TW；若首页正常返回但为空，自动回退试一次 zh_CN）
   const allBooks = [];
   let total = 0;
+  let activeLang = "zh_TW";
 
   for (let p = 1; p <= PAGES; p++) {
     try {
       sleep(800);
-      const resp = fetchBookList(PORT, token, p);
+      let resp = fetchBookList(PORT, token, p, activeLang);
+      if (
+        p === 1 &&
+        resp &&
+        resp.code !== 401 &&
+        (!resp.data || !resp.data.rows || !resp.data.rows.length) &&
+        (resp.code == null || resp.code === 0 || resp.code === 200)
+      ) {
+        activeLang = "zh_CN";
+        resp = fetchBookList(PORT, token, 1, activeLang);
+      }
 
       // 区分失败：接口无响应(超时/CDP) / 401 未授权
       if (!resp) {

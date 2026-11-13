@@ -86,13 +86,25 @@ def last_body_chapter(project: Path) -> int:
     return max(numbers, default=0)
 
 
-def check_batch_size(first: int, last: int, final: int) -> None:
+def has_existing_outlines(project: Path, first: int, last: int) -> bool:
+    outline_dir = project / "大纲"
+    if not outline_dir.is_dir():
+        return False
+    for chapter in range(first, last + 1):
+        try:
+            find_chapter_file(outline_dir, chapter, outline=True)
+        except WordcountError:
+            return False
+    return True
+
+
+def check_batch_size(project: Path, first: int, last: int, final: int) -> None:
     size = last - first + 1
     if size > MAX_BATCH:
         raise SystemExit(f"ERROR: 一批细纲最多 {MAX_BATCH} 章，拆成两批")
-    # 只有全书最后一批可以不足 10 章（包太大时脚本自己少排几章不受此限）。
-    if size < MIN_BATCH and last < final:
-        raise SystemExit(f"ERROR: 一批细纲至少 {MIN_BATCH} 章（全书最后一批除外），把范围扩到第{first}-{min(final, first + MIN_BATCH - 1)}章")
+    # 全书最后一批（含不足 10 章的半成品整本）或已有细纲落盘的章节返修可以不足 10 章（包太大时脚本自己少排几章不受此限）。
+    if size < MIN_BATCH and last < final and not has_existing_outlines(project, first, last):
+        raise SystemExit(f"ERROR: 一批细纲至少 {MIN_BATCH} 章（全书最后一批或已有细纲返修除外），把范围扩到第{first}-{min(final, first + MIN_BATCH - 1)}章")
 
 
 def shown_path(path: Path, base: Path) -> str:
@@ -286,7 +298,7 @@ def main(argv=None) -> int:
         final = last_body_chapter(project)
         if last > final:
             raise SystemExit(f"ERROR: 正文只迁到第{final}章，范围超出")
-        check_batch_size(first, last, final)
+        check_batch_size(project, first, last, final)
         analysis = (args.analysis or project.parent / "拆文库" / project.name).resolve()
         result = build(project, analysis, first, last)
     except SystemExit as exc:

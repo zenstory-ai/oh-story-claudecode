@@ -23,8 +23,8 @@
 
 | 文件 | 读取条件 |
 |---|---|
-| [long-genre-catalog.md](long-genre-catalog.md) | 长篇男频题材定位或框架速查 |
-| [female-audience-writing.md](female-audience-writing.md) | 女频长篇的题材框架、读者需求与简介；女频只读本文件，不读题材目录 |
+| [long-genre-catalog.md](long-genre-catalog.md) | 长篇男频，或无 CP 剧情流/规则悬疑向女频的题材定位与框架速查 |
+| [female-audience-writing.md](female-audience-writing.md) | 言情、宅斗、年代、家庭等情感关系驱动的女频长篇：框架、读者需求与简介（读本文件时不叠读题材目录） |
 | [long-genre-mechanics.md](long-genre-mechanics.md) | 提炼长篇核心梗、设计金手指或微创新 |
 | [genre-prose-cards.md](genre-prose-cards.md) | 确定长篇题材声线与长线约束 |
 | [character-relations.md](character-relations.md) | 本书有感情线：只读「感情线阶段」 |

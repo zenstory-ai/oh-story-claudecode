@@ -72,6 +72,9 @@ run_functional() {
   "ai_selfref_era_ok": "作为一个人工智能时代的产物，他对孤独习以为常。\n他把灯关了。",
   "terminal_banner_ok": "他抬起手按在光屏上。\n【叮！任务完成，奖励已发放】",
   "terminal_ascii_quote_ok": "他站起来推开门。\n他说：\"我回来了。\"",
+  "terminal_signoff_ok": "她推开门走进阳光里。\n（全文完）",
+  "terminal_signoff_dash_ok": "她推开门走进阳光里。\n-完-",
+  "juqing_jiedian_ok": "他深吸一口气。\n熬到必死的剧情节点过去，他就自由了。",
   "toxic_quote_codename_ok": "他把烟头按进烟灰缸。\n这一战注定是「血屠」的开端，没人料到后来会那样。",
   "engword": "街灯一盏盏亮起。\n按照本章细纲的情节点他该出场了。",
   "repeat": "他握紧拳头一步步走过去缓缓逼近。\n他握紧拳头一步步走过去缓缓逼近。\n他终于停下了。",
@@ -175,6 +178,9 @@ JS
   done
   grep -q '^english_ai | 第2行 元信息泄漏（英文 AI 腔）' "$tmp/py.txt" || { echo "FAIL: 英文 AI 腔未命中" >&2; return 3; }
   grep -q '^engword | 第2行 工程词泄漏' "$tmp/py.txt" || { echo "FAIL: 工程词泄漏未命中" >&2; return 3; }
+  grep -q '^juqing_jiedian_ok | $' "$tmp/py.txt" || { echo "FAIL: 穿书常见词剧情节点被误判工程词泄漏" >&2; return 3; }
+  grep -q '^terminal_signoff_ok | $' "$tmp/py.txt" || { echo "FAIL: （全文完）落款行被误判截断" >&2; return 3; }
+  grep -q '^terminal_signoff_dash_ok | $' "$tmp/py.txt" || { echo "FAIL: -完- 落款行被误判截断" >&2; return 3; }
   grep -q '^placeholder | 第2行 占位符' "$tmp/py.txt" || { echo "FAIL: 占位符未命中" >&2; return 3; }
   grep -q '^repeat | 第2行 紧邻复读' "$tmp/py.txt" || { echo "FAIL: 紧邻复读未命中" >&2; return 3; }
   grep -q '^repeat_seven_ok | $' "$tmp/py.txt" || { echo "FAIL: 7 字短行不应触发复读" >&2; return 3; }

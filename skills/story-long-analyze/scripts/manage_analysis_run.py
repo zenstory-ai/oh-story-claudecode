@@ -49,9 +49,12 @@ TONE_ALIASES = {"悲痛": "悲伤", "伤感": "悲伤", "悲愤": "悲伤", "痛
                 "恐惧": "恐怖", "危险": "紧张", "危急": "紧张", "绝望": "压抑", "无力": "压抑", "释然": "轻松"}
 POINT_ALIASES = {"揭示": "信息揭示", "转折": "转折点", "变化": "状态变化", "动作": "行动",
                  "交谈": "对话", "化解": "解决"}
-MIN_PLOT_POINTS = 10
+MIN_PLOT_POINTS = 6
 MAX_PLOT_POINTS = 30
-CHARS_PER_FLOOR_POINT = 200
+CHARS_PER_FLOOR_POINT = 350
+CHARS_PER_CEILING_POINT = 120
+PLACEHOLDER_TOKEN_RE = re.compile(r"\{[^{}\n]{1,80}\}")
+QUOTED_SPAN_RE = re.compile(r"“[^”]*”|「[^」]*」|『[^』]*』|\"[^\"]*\"|`[^`]*`")
 MAX_CHAPTERS = 3
 MAX_CHARS = 25_000
 # Stage 3-6 each run once over complete Stage 2 output; their rows decide 最终状态.
@@ -262,10 +265,17 @@ def write_state(progress: Path, state: Dict[str, Any]) -> bool:
 
 
 def min_plot_points(chapter_chars: Optional[int]) -> int:
-    """Raw-chapter floor: chars / 200 rounded, at least 1, at most 10 (a ~540-char prologue needs 3)."""
+    """Raw-chapter floor: chars / 350 rounded, at least 1, at most 6 (a ~540-char prologue needs 2)."""
     if chapter_chars is None:
         return MIN_PLOT_POINTS
     return max(1, min(MIN_PLOT_POINTS, (chapter_chars + CHARS_PER_FLOOR_POINT // 2) // CHARS_PER_FLOOR_POINT))
+
+
+def max_plot_points(chapter_chars: Optional[int]) -> int:
+    """Raw-chapter ceiling: 30 by default, scaling with chars // 120 for mega-chapters (>3600 chars)."""
+    if chapter_chars is None:
+        return MAX_PLOT_POINTS
+    return max(MAX_PLOT_POINTS, chapter_chars // CHARS_PER_CEILING_POINT)
 
 
 def chars_by_chapter(rows: Optional[Sequence[Dict[str, Any]]]) -> Dict[int, int]:
@@ -558,7 +568,8 @@ def compact_field(body: str, name: str) -> str:
     if not match:
         raise RunError("chapter_schema_incomplete", "missing field: %s" % name)
     value = match.group(1).strip()
-    if "{" in value or "}" in value:
+    probe = QUOTED_SPAN_RE.sub("", value) if name == "证据" else value
+    if PLACEHOLDER_TOKEN_RE.search(probe):
         raise RunError("template_placeholder", name)
     return value
 
@@ -576,7 +587,8 @@ def map_enum(value: str, allowed: Sequence[str], aliases: Dict[str, str], defaul
     return default
 
 
-def parse_plot_points(body: str, chapter: int, minimum: int) -> List[Dict[str, Any]]:
+def parse_plot_points(body: str, chapter: int, minimum: int,
+                      maximum: int = MAX_PLOT_POINTS) -> List[Dict[str, Any]]:
     """Parse the repeated ``P{n}`` blocks that follow ``**情节点**：``."""
     match = re.search(r"(?m)^\*\*情节点\*\*\s*[：:]\s*$", body)
     if not match:
@@ -607,14 +619,14 @@ def parse_plot_points(body: str, chapter: int, minimum: int) -> List[Dict[str, A
             points[-1]["quote"].append(stripped)
     if [point["number"] for point in points] != list(range(1, len(points) + 1)):
         raise RunError("plot_point_invalid", "chapter %s: points must be numbered P1..Pn" % chapter)
-    if not minimum <= len(points) <= MAX_PLOT_POINTS:
+    if not minimum <= len(points) <= maximum:
         raise RunError("plot_point_count", "chapter %s has %s points; expected %s-%s"
-                       % (chapter, len(points), minimum, MAX_PLOT_POINTS))
+                       % (chapter, len(points), minimum, maximum))
     for point in points:
         if point["tag"] is None:
             raise RunError("plot_point_invalid", "chapter %s P%s missing 主题标签/基调 line" % (chapter, point["number"]))
-        text = "%s %s %s" % (point["title"], " ".join(point["rest"]), " ".join(point["quote"]))
-        if "{" in text or "}" in text:
+        probe = "%s %s" % (point["title"], QUOTED_SPAN_RE.sub("", " ".join(point["rest"])))
+        if PLACEHOLDER_TOKEN_RE.search(probe):
             raise RunError("template_placeholder", "chapter %s P%s" % (chapter, point["number"]))
     return points
 
@@ -639,9 +651,11 @@ def parse_model_output(text: str, start: int, end: int, input_kind: str,
         if not re.search(r"(?m)^##\s+第%s章(?:\s+.*)?$" % chapter, body):
             raise RunError("chapter_schema_incomplete", "chapter %s heading missing" % chapter)
         fields = {name: compact_field(body, name) for name in COMPACT_FIELDS}  # type: Dict[str, Any]
-        # Raw floor scales with chapter length; projections rebuilt from old results need only one beat.
-        minimum = min_plot_points((chapter_chars or {}).get(chapter)) if input_kind == "raw-original" else 1
-        fields["情节点"] = parse_plot_points(body, chapter, minimum)
+        # Raw floor/ceiling scale with chapter length; projections rebuilt from old results need only one beat.
+        char_count = (chapter_chars or {}).get(chapter)
+        minimum = min_plot_points(char_count) if input_kind == "raw-original" else 1
+        maximum = max_plot_points(char_count)
+        fields["情节点"] = parse_plot_points(body, chapter, minimum, maximum)
         records[chapter] = fields
     if input_kind == "raw-original" and set(records) != set(range(start, end + 1)):
         raise RunError("chapter_block_missing", "%s-%s" % (start, end))

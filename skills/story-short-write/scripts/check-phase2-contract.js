@@ -90,13 +90,14 @@ function verify(projectDir) {
   const settings = settingsRead.text
   const outline = outlineRead.text
 
-  const platformMatch = settings.match(/目标平台\s*[：:]\s*(知乎(?:盐言|盐选)?|盐[言选]|七猫(?:短篇)?|黑岩|红果|小程序|点众|番茄(?:短篇)?|未定)/)
+  // 正则保留「红果」仅兼容旧项目已写的设定，新项目引导不再列出
+  const platformMatch = settings.match(/目标平台\s*[：:]\s*(知乎(?:盐言|盐选)?|盐[言选]|七猫(?:短篇)?|黑岩|红果|小程序|点众|番茄(?:短篇|短故事)?|未定)/)
   checks.push(makeCheck(
     'phase2.platform-declared',
     Boolean(platformMatch),
     '设定.md',
     platformMatch ? `目标平台：${platformMatch[1]}` : '未找到可识别的目标平台字段',
-    '写明“目标平台：知乎盐言 / 番茄 / 七猫 / 黑岩 / 红果 / 小程序”之一；作者没定平台写“未定”',
+    '写明“目标平台：知乎盐言 / 番茄 / 七猫 / 黑岩 / 小程序”之一；作者没定平台写“未定”',
     ['references/submission-craft.md'],
     '只在 设定.md 的基本信息补目标平台。'
   ))
@@ -147,7 +148,7 @@ function verify(projectDir) {
         .map((line) => line.match(/^[ \t]*[-*][ \t]+(.+)$/))
         .filter(Boolean)
         .map((match) => match[1].trim())
-        .filter((item) => item && item !== '[待补充]')
+        .filter((item) => item && item !== '[待补充]' && !/^参照的结构/.test(item))
     }
   }
   checks.push(makeCheck(

@@ -1126,16 +1126,16 @@ def test_plan_carries_every_dispatch_field() -> None:
 
 
 def test_plot_point_floor_scales_with_chapter_length() -> None:
-    """A ~540-char prologue cannot be held to the 10-point floor of a normal chapter."""
+    """A ~540-char prologue cannot be held to the 6-point floor of a normal chapter."""
     with tempfile.TemporaryDirectory(prefix="long-plot-floor-") as temporary:
         root = Path(temporary) / "书"
         write_source_and_index(root, 2, body_chars={1: 540, 2: 2400})
         batch = json.loads(run(MANAGE, "plan", "--root", root).stdout)["batches"][0]
         require(batch["batch_id"] == "RAW-1-2", batch["batch_id"])
         short_floor, long_floor = batch["min_plot_points"]
-        require(short_floor == max(1, min(10, (batch["chapter_chars"][0] + 100) // 200)) == 3,
-                f"楔子下限按字数÷200：{batch}")
-        require(long_floor == 10, "正常长度章节下限仍是 10")
+        require(short_floor == max(1, min(6, (batch["chapter_chars"][0] + 175) // 350)) == 2,
+                f"楔子下限按字数÷350：{batch}")
+        require(long_floor == 6, "正常长度章节下限为 6")
         model = Path(temporary) / "model.md"
 
         def commit(points: dict[int, int]) -> subprocess.CompletedProcess[str]:
@@ -1143,12 +1143,90 @@ def test_plot_point_floor_scales_with_chapter_length() -> None:
             return run(MANAGE, "commit", "--root", root, "--input", model, "--batch-id", "RAW-1-2",
                        "--range-sha256", batch["range_sha256"])
 
-        for points, label in (({1: 2, 2: 12}, "楔子低于下限"), ({1: 3, 2: 9}, "正常章少于10")):
+        for points, label in (({1: 1, 2: 8}, "楔子低于下限"), ({1: 2, 2: 5}, "正常章少于6")):
             refused = commit(points)
             require(refused.returncode != 0 and json.loads(refused.stdout)["error"] == "plot_point_count"
                     and not (root / "章节").exists(), f"{label}必须整批拒收")
-        accepted = commit({1: 3, 2: 12})
-        require(accepted.returncode == 0, "楔子 3 个情节点应当通过：" + accepted.stdout)
+        accepted = commit({1: 2, 2: 8})
+        require(accepted.returncode == 0, "楔子 2 个情节点、正常章 8 个情节点应当通过：" + accepted.stdout)
+
+        mega = Path(temporary) / "超长章与花括号"
+        write_source_and_index(mega, 1, body_chars={1: 6000})
+        mega_batch = json.loads(run(MANAGE, "plan", "--root", mega).stdout)["batches"][0]
+        mega_text = compact_output(1, 1, points=35).replace(
+            '原文定位词“正文1”', '原文定位词“系统提示：{} 与 {已激活}”'
+        ).replace(
+            "P1 **节拍1**：类型动作 | 人物甲在第1章完成第1步。 | 涉及人物甲,人物乙 | 地点旧城",
+            "P1 **节拍1**：类型动作 | 人物甲看见符号 {}。 | 涉及人物甲,人物乙 | 地点旧城\n原文摘录：面板弹出 {奖励已发放}",
+        )
+        model.write_text(mega_text, encoding="utf-8")
+        mega_ok = run(MANAGE, "commit", "--root", mega, "--input", model, "--batch-id", "RAW-1-1",
+                      "--range-sha256", mega_batch["range_sha256"])
+        require(mega_ok.returncode == 0, "6000 字合并章 35 个情节点及原文 {} 引用应当通过：" + mega_ok.stdout)
+
+        spaced_placeholder = Path(temporary) / "带空格占位符"
+        write_source_and_index(spaced_placeholder, 1, body_chars={1: 2400})
+        sp_batch = json.loads(run(MANAGE, "plan", "--root", spaced_placeholder).stdout)["batches"][0]
+        for bad_text, label in (
+            (compact_output(1, 1).replace("人物在本章完成一次可核查推进。", "{1-2 句概括全文}"), "带空格的章级占位符"),
+            (compact_output(1, 1).replace("人物甲在第1章完成第1步。", "{一句话 客观白描}"), "带空格的情节点占位符"),
+        ):
+            model.write_text(bad_text, encoding="utf-8")
+            bad_res = run(MANAGE, "commit", "--root", spaced_placeholder, "--input", model,
+                          "--batch-id", "RAW-1-1", "--range-sha256", sp_batch["range_sha256"])
+            require(bad_res.returncode != 0 and json.loads(bad_res.stdout)["error"] == "template_placeholder",
+                    f"{label}必须被拦住：" + bad_res.stdout)
+
+        md_gap = Path(temporary) / "标题变体与跳号"
+        md_gap.mkdir()
+        src = md_gap / "原文.txt"
+        out = md_gap / "chapter_index.csv"
+        src.write_text(
+            "# 卷一 山雨\n\n## 第一回 起风\n"
+            + "第三章的内容他翻来覆去看了三遍，越看越觉得这封信背面的印章不像寻常商号的手笔，倒像北境军镇流出来的旧物，一时不敢声张只能压在箱底。\n\n"
+            + "## 第三回 惊雷\n正文二。\n",
+            encoding="utf-8",
+        )
+        gap_res = run(INDEX, "--source", src, "--output", out, "--locator-path", "原文/原文.txt")
+        gap_payload = json.loads(gap_res.stdout)
+        require(gap_res.returncode == 0
+                and [r["source_chapter"] for r in rows(out)] == ["1", "3"]
+                and rows(out)[0]["volume"] == "山雨"
+                and len(gap_payload["numbering_anomalies"]) == 1
+                and gap_payload["numbering_anomalies"][0]["kind"] == "chapter_number_gap",
+                "Markdown 标题、章回体、超长正文句防误判与原书跳号直接建表必须生效：" + gap_res.stdout)
+
+        real_variants = Path(temporary) / "语料标题与正文抗误切"
+        real_variants.mkdir()
+        rv_src = real_variants / "原文.txt"
+        rv_out = real_variants / "chapter_index.csv"
+        rv_src.write_text(
+            "第1章，稻花\n"
+            "第一部分是以黄江为界，黄江以南为南境。\n"
+            "第一卷是总纲，说了有神，无神。\n"
+            "第一回合，完胜！\n"
+            "第一节课是数学课。\n\n"
+            "第2章难道他就是那个武道宗师？\n\n"
+            "第二章难道他就是那个武道宗师？\n"
+            "正文二。\n"
+            "第二卷《玄天真经》第3章至10章\n\n"
+            "第二卷《玄天真经》第3章冰天雪地\n\n"
+            "第3章\n"
+            "正文三。\n"
+            "第4章 你可以质疑人品，但别质疑圣体\n"
+            "第四章你可以质疑人品，但不能质疑圣体！\n"
+            "正文四。\n"
+            "第五章 第一次的亲密接触\n"
+            "第86章\n"
+            "正文五。\n",
+            encoding="utf-8",
+        )
+        rv_res = run(INDEX, "--source", rv_src, "--output", rv_out, "--locator-path", "原文/原文.txt")
+        require(rv_res.returncode == 0, "真实语料无空格带标点标题与紧邻重复标题必须通过：" + rv_res.stdout)
+        rv_rows = rows(rv_out)
+        require([r["source_chapter"] for r in rv_rows] == ["1", "2", "3", "4", "5"], f"章号序列异常：{rv_rows}")
+        require([r["title"] for r in rv_rows] == ["稻花", "难道他就是那个武道宗师？", "冰天雪地", "你可以质疑人品，但别质疑圣体", "第一次的亲密接触"], f"标题清洗异常：{rv_rows}")
+        require(rv_rows[2]["volume"] == "《玄天真经》", f"书名号卷名解析异常：{rv_rows[2]}")
 
 
 def test_plan_chapter_window() -> None:

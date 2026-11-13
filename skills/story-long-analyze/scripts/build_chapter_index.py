@@ -29,17 +29,31 @@ CSV_COLUMNS = (
     "char_count", "source_locator", "status", "chapter_sha256", "source_sha256",
     "parser_version",
 )
+MAX_HEADING_CHARS = 50
+MAX_VOLUME_HEADING_CHARS = 30
+HEADING_PREFIX = r"^\s*(?:#{1,6}\s+)?"
+HEADING_SEP = r"[\s:：、.．\-—【《「（(]"
 NUMBER = r"〇零一二三四五六七八九十百千万两0-9"
-VOLUME_RE = re.compile(rf"^\s*第(?P<number>[{NUMBER}]+)卷(?P<title>.*)$")
-COMBINED_RE = re.compile(rf"^\s*第(?P<volume>[{NUMBER}]+)卷\s*第(?P<chapter>[{NUMBER}]+)章(?P<title>.*)$")
-CHAPTER_RE = re.compile(rf"^\s*第(?P<number>[{NUMBER}]+)章(?P<title>.*)$")
-ENGLISH_RE = re.compile(r"^\s*Chapter\s+(?P<number>[0-9]+)\b(?P<title>.*)$", re.IGNORECASE)
-NUMERIC_RE = re.compile(r"^\s*(?P<number>[0-9]+)[.．、]\s*(?P<title>.*)$")
+VOLUME_RE = re.compile(
+    rf"{HEADING_PREFIX}(?:第(?P<number>[{NUMBER}]+)(?:卷|部(?!分))(?=$|{HEADING_SEP})|卷(?P<cn_number>[{NUMBER}]+)(?=$|{HEADING_SEP}))(?P<title>.*)$"
+)
+COMBINED_RE = re.compile(
+    rf"{HEADING_PREFIX}第(?P<volume>[{NUMBER}]+)(?:卷|部(?!分))"
+    rf"(?:\s+|《(?P<vol_title>[^》\n]{{1,16}})》\s*)"
+    rf"第(?P<chapter>[{NUMBER}]+)"
+    rf"(?:章(?!至[{NUMBER}]+章)(?P<title>.*)|[回节](?P<title_rs>$|(?={HEADING_SEP}).*))$"
+)
+CHAPTER_RE = re.compile(
+    rf"{HEADING_PREFIX}第(?P<number>[{NUMBER}]+)"
+    rf"(?:章(?P<title>.*)|[回节](?P<title_rs>$|(?={HEADING_SEP}).*))$"
+)
+ENGLISH_RE = re.compile(rf"{HEADING_PREFIX}Chapter\s+(?P<number>[0-9]+)\b(?P<title>.*)$", re.IGNORECASE)
+NUMERIC_RE = re.compile(rf"{HEADING_PREFIX}(?P<number>[0-9]+)[.．、]\s*(?P<title>.*)$")
 SPECIAL_RE = re.compile(
-    rf"^\s*(?P<label>楔子|序章|引子|前言|后记|尾声|番外(?:[{NUMBER}]+)?)"
+    rf"{HEADING_PREFIX}(?P<label>楔子|序章|引子|前言|后记|尾声|番外(?:[{NUMBER}]+)?)"
     r"(?:[\s:：\-—]+(?P<title>.*))?\s*$"
 )
-TITLE_PREFIX_RE = re.compile(r"^[\s\-—:：、.．]+")
+TITLE_PREFIX_RE = re.compile(r"^[\s\-—:：、.．,，]+")
 DIGITS = {"〇": 0, "零": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4,
           "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
 UNITS = {"十": 10, "百": 100, "千": 1000, "万": 10000}
@@ -121,25 +135,35 @@ def heading_candidates(lines: Sequence[str]) -> List[Dict[str, Any]]:
     volume_number = None  # type: Optional[int]
     volume_title = ""
     for line_number, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if not stripped or len(stripped) > MAX_HEADING_CHARS:
+            continue
         combined = COMBINED_RE.match(line)
         if combined:
             raw_volume = combined.group("volume")
             raw_chapter = combined.group("chapter")
             volume_number = parse_number(raw_volume)
-            volume_title = "第%s卷" % raw_volume
+            vol_sub = combined.group("vol_title")
+            volume_title = ("《%s》" % vol_sub.strip()) if vol_sub else ("第%s卷" % raw_volume)
+            raw_title = combined.group("title") if combined.group("title") is not None else combined.group("title_rs")
+            cleaned = TITLE_PREFIX_RE.sub("", raw_title or "").strip()
             explicit.append({
                 "line": line_number, "heading_kind": "combined",
                 "source_chapter": str(parse_number(raw_chapter)),
                 "number_value": parse_number(raw_chapter), "volume_number": volume_number,
                 "volume": volume_title,
-                "title": clean_title(combined.group("title"), "第%s章" % raw_chapter),
+                "title": cleaned or ("第%s章" % raw_chapter),
+                "bare_title": not bool(cleaned),
             })
             continue
         volume = VOLUME_RE.match(line)
-        if volume and not CHAPTER_RE.match(line):
-            raw_volume = volume.group("number")
+        if (volume and not CHAPTER_RE.match(line)
+                and len(stripped) <= MAX_VOLUME_HEADING_CHARS
+                and not stripped.endswith(("。", "……", "…)"))):
+            raw_volume = volume.group("number") or volume.group("cn_number")
             volume_number = parse_number(raw_volume)
-            volume_title = clean_title(volume.group("title"), "第%s卷" % raw_volume)
+            default_volume = ("卷%s" % raw_volume) if volume.group("cn_number") else ("第%s卷" % raw_volume)
+            volume_title = clean_title(volume.group("title"), default_volume)
             continue
         chapter = CHAPTER_RE.match(line)
         english = ENGLISH_RE.match(line)
@@ -147,11 +171,17 @@ def heading_candidates(lines: Sequence[str]) -> List[Dict[str, Any]]:
         if match:
             raw_chapter = match.group("number")
             value = parse_number(raw_chapter)
+            raw_title = (
+                (chapter.group("title") if chapter.group("title") is not None else chapter.group("title_rs"))
+                if chapter else english.group("title")
+            )
+            cleaned = TITLE_PREFIX_RE.sub("", raw_title or "").strip()
             explicit.append({
                 "line": line_number, "heading_kind": "chapter" if chapter else "english",
                 "source_chapter": str(value), "number_value": value,
                 "volume_number": volume_number, "volume": volume_title,
-                "title": clean_title(match.group("title"), "第%s章" % raw_chapter),
+                "title": cleaned or ("第%s章" % raw_chapter),
+                "bare_title": not bool(cleaned),
             })
             continue
         special = SPECIAL_RE.match(line)
@@ -199,10 +229,6 @@ def drop_leading_toc(candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return candidates
 
 
-def duplicate_title_key(title: str) -> str:
-    return re.sub(r"\s*[（(][^）)]*[）)]\s*$", "", title).strip()
-
-
 def drop_adjacent_duplicate_headings(candidates: List[Dict[str, Any]], lines: Sequence[str]) -> List[Dict[str, Any]]:
     deduplicated = []  # type: List[Dict[str, Any]]
     for candidate in candidates:
@@ -210,17 +236,27 @@ def drop_adjacent_duplicate_headings(candidates: List[Dict[str, Any]], lines: Se
             previous = deduplicated[-1]
             gap = candidate["line"] - previous["line"]
             between = lines[previous["line"]:candidate["line"] - 1]
-            if (previous.get("heading_kind") == "numeric"
-                    and candidate.get("heading_kind") == "numeric"
-                    and identity(candidate) == identity(previous) and 1 <= gap <= 3
-                    and all(not line.strip() for line in between)
-                    and duplicate_title_key(candidate["title"]) == duplicate_title_key(previous["title"])):
-                continue
+            if (candidate.get("number_value") is not None
+                    and previous.get("number_value") is not None
+                    and 1 <= gap <= 3
+                    and all(not line.strip() for line in between)):
+                prev_bare = bool(previous.get("bare_title"))
+                cand_bare = bool(candidate.get("bare_title"))
+                if identity(candidate) == identity(previous):
+                    if prev_bare and not cand_bare:
+                        previous["title"] = candidate["title"]
+                        previous["bare_title"] = False
+                    continue
+                if (not prev_bare and cand_bare
+                        and candidate["volume_number"] == previous["volume_number"]
+                        and candidate["number_value"] != previous["number_value"] + 1):
+                    continue
         deduplicated.append(candidate)
     return deduplicated
 
 
-def validate_numbering(candidates: Sequence[Dict[str, Any]]) -> None:
+def collect_numbering_anomalies(candidates: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    anomalies = []  # type: List[Dict[str, Any]]
     previous = None  # type: Optional[Dict[str, Any]]
     for position, candidate in enumerate(candidates, start=1):
         number = candidate.get("number_value")
@@ -235,12 +271,25 @@ def validate_numbering(candidates: Sequence[Dict[str, Any]]) -> None:
             expected = previous["number_value"] + 1
             if number != expected:
                 kind = "chapter_number_duplicate" if number <= previous["number_value"] else "chapter_number_gap"
-                raise ValueError("%s:expected=%s:actual=%s:position=%s" % (kind, expected, number, position))
+                anomalies.append({
+                    "kind": kind,
+                    "position": position,
+                    "line": candidate["line"],
+                    "expected": expected,
+                    "actual": number,
+                })
         else:
             expected = previous["number_value"] + 1
             if number not in (1, expected):
-                raise ValueError("volume_chapter_number_invalid:expected=1_or_%s:actual=%s:position=%s" % (expected, number, position))
+                anomalies.append({
+                    "kind": "volume_chapter_number_invalid",
+                    "position": position,
+                    "line": candidate["line"],
+                    "expected": "1_or_%s" % expected,
+                    "actual": number,
+                })
         previous = candidate
+    return anomalies
 
 
 def normalized_chapter_text(lines: Sequence[str], start_line: int, end_line: int) -> str:
@@ -268,15 +317,15 @@ def fold_leading_specials(candidates: List[Dict[str, Any]]) -> Tuple[List[Dict[s
 
 
 def build_boundaries(text: str, locator_path: str, source_hash: str,
-                     fold_prologue: bool = False) -> Tuple[List[Dict[str, Any]], List[str]]:
+                     fold_prologue: bool = False) -> Tuple[List[Dict[str, Any]], List[str], List[Dict[str, Any]]]:
     lines = physical_lines(text)
     candidates = drop_adjacent_duplicate_headings(drop_leading_toc(heading_candidates(lines)), lines)
     if not candidates:
         raise ValueError("chapter_heading_not_found")
-    validate_numbering(candidates)
     folded = []  # type: List[str]
     if fold_prologue:
         candidates, folded = fold_leading_specials(candidates)
+    anomalies = collect_numbering_anomalies(candidates)
     rows = []  # type: List[Dict[str, Any]]
     for index, candidate in enumerate(candidates):
         start_line = candidate["line"]
@@ -285,7 +334,6 @@ def build_boundaries(text: str, locator_path: str, source_hash: str,
             raise ValueError("chapter_boundary_invalid:position=%s" % (index + 1))
         body = "\n".join(lines[start_line:end_line])
         char_count = len(re.sub(r"\s+", "", body))
-        chapter_text = normalized_chapter_text(lines, start_line, end_line)
         rows.append({
             "chapter": index + 1, "source_chapter": candidate["source_chapter"],
             "volume": candidate["volume"], "title": candidate["title"],
@@ -295,7 +343,7 @@ def build_boundaries(text: str, locator_path: str, source_hash: str,
             "chapter_sha256": sha256(normalized_chapter_text(lines, start_line, end_line).encode("utf-8")),
             "source_sha256": source_hash, "parser_version": PARSER_VERSION,
         })
-    return rows, folded
+    return rows, folded, anomalies
 
 
 def csv_payload(rows: Sequence[Dict[str, Any]]) -> bytes:
@@ -431,14 +479,16 @@ def main() -> int:
                               "chapters": len(existing_rows), "pending_chapters": []}, ensure_ascii=False))
             return 0
         text = decode_source(raw)
-        rows, folded = build_boundaries(text, locator_path, source_hash, args.fold_prologue)
+        rows, folded, anomalies = build_boundaries(
+            text, locator_path, source_hash, args.fold_prologue
+        )
         pending = list(range(1, len(rows) + 1))
         old_count = 0
         if args.output.is_file():
             _, old_rows = read_existing(args.output)
             old_count = len(old_rows)
             if not args.fold_prologue and index_was_folded(old_rows, rows):
-                rows, folded = build_boundaries(text, locator_path, source_hash, True)
+                rows, folded, anomalies = build_boundaries(text, locator_path, source_hash, True)
             pending = compare_rebuild(old_rows, rows)
         else:
             mapping = legacy_mapping_check(args.output.parent, rows)
@@ -454,6 +504,7 @@ def main() -> int:
             "pending_chapters": pending, "unchanged_chapters": len(rows) - len(pending),
             "source_sha256": source_hash, "parser_version": PARSER_VERSION,
             "folded_into_first_chapter": folded,
+            "numbering_anomalies": anomalies,
         }, ensure_ascii=False))
         return 0
     except RebuildMismatch as exc:

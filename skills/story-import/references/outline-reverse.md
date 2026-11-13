@@ -4,7 +4,7 @@
 
 ## Step 1：生成本批任务包
 
-按当前平台探测 Python 3（`python3` → `python` → `py -3`），请求第 B+1 章起的 20 章（剩下不足 20 章就到最后一章）：
+按当前平台探测 Python 3（`python3` → `python` → `py -3`），请求第 B+1 章起的 20 章（剩下不足 20 章就到最后一章；已生成细纲的局部返修直接传对应章范围）：
 
 ```text
 {PYTHON} {story-import skill 根}/scripts/build_outline_brief.py --project {书目录} --chapters {A-B}
