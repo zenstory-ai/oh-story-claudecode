@@ -180,6 +180,22 @@ if (js.indexOf("book-img-text") > -1) {
     },
   ]);
 }
+if (js.indexOf("Admin-Token=") > -1) out("tok-heiyan-test");
+if (js.indexOf("/manage/book/list") > -1) {
+  if (process.env.SCAN_FAKE_HEIYAN_CN_ONLY && js.indexOf('"zh_TW"') > -1) {
+    out({ code: 200, data: { rows: [], total: 0 } });
+  }
+  const isPage1 = js.indexOf('pageNum:"1"') > -1;
+  out({
+    code: 200,
+    data: {
+      total: 1,
+      rows: isPage1
+        ? [{ id: 1, name: "简体书目甲", userName: "黑岩作者", classifyStr: "女频", typeDesc: "现言", words: 9800 }]
+        : [],
+    },
+  });
+}
 out({});
 `;
 
@@ -1393,6 +1409,7 @@ function runQimaoLibrary(args, routes) {
 function testQimaoLibraryPagedCollection() {
   const page1 = Array.from({ length: 15 }, (_, i) => qmBook(1001 + i, [203, 1, 207][i % 3]));
   page1[0] = qmBook(1001, 203, { title: "风&amp;雨&#x4E66;", desc: "甲&lt;乙&gt;\n丙<!<!---->--" });
+  page1[3] = qmBook(1004, 203, { words: "8500字" });
   const page2 = [
     page1[13],
     page1[14],
@@ -1427,6 +1444,7 @@ function testQimaoLibraryPagedCollection() {
   assert.strictEqual(md.split("\n")[0], "# 七猫 · 全站书库点击新书");
   assert.match(md, /数据质量：\[OK\]/);
   assert.match(md, /问题摘要：无/);
+  assert.match(md, /8500字/);
   assert.match(md, /有效条目：28 \/ 28/);
   assert.match(md, /来源：https:\/\/www\.qimao\.com\/shuku\/a-a-a-1-1-a-0-click-1\//);
   assert.match(md, /筛选：.*3天内更新.*连载中.*按点击量.*没有热度/);
@@ -1712,6 +1730,43 @@ function testHeiyanFieldDriftAndWordFormat() {
     assert.strictEqual(heiyan.dataQuality(withDetail(4, 4), true), "[OK]");
     assert.strictEqual(heiyan.dataQuality(withDetail(4, 3), true), "[部分详情缺失]");
     assert.strictEqual(heiyan.dataQuality(withDetail(4, 1), true), "[详情解析异常/登录态缺失]");
+
+    // 黑岩首页 zh_TW 为空时自动回退 zh_CN，无需额外 CLI 参数
+    const hyCnFallback = runScraper(
+      path.join(repoRoot, "skills/story-short-scan/scripts/heiyan-booklist-scraper.js"),
+      ["--pages", "2", "--channel", "female"],
+      { SCAN_FAKE_HOST: "manage.zhangwenpindu.cn", SCAN_FAKE_HEIYAN_CN_ONLY: "1" }
+    );
+    assert.strictEqual(hyCnFallback.status, 0, hyCnFallback.stderr);
+    assert.strictEqual(hyCnFallback.files.length, 1);
+    assert(hyCnFallback.contents[0].includes("简体书目甲"), hyCnFallback.contents[0]);
+
+    // 点众短篇：过滤混入书库的 >5万字长篇连载，同时兼容「1.2万字」与纯数字「9800字」
+    const dz = loadFresh(path.join(repoRoot, "skills/story-short-scan/scripts/dz-browse-scraper.js"));
+    assert.strictEqual(dz.parseDzWords("9800字"), 9800);
+    assert.strictEqual(dz.parseDzWords("1.2万字"), 12000);
+    assert.strictEqual(dz.parseDzWords("85.5万字"), 855000);
+    const dzMixed = dz.filterShortStories([
+      { title: "短篇甲", words: "10200字" },
+      { title: "短篇乙", words: "1.5万字" },
+      { title: "混入长篇", words: "120万字" },
+    ]);
+    assert.deepStrictEqual(dzMixed.stories.map((s) => s.title), ["短篇甲", "短篇乙"]);
+    assert.strictEqual(dzMixed.filteredLong, 1);
+    const dzAllLong = dz.filterShortStories([
+      { title: "长篇甲", words: "80万字" },
+      { title: "长篇乙", words: "150万字" },
+    ]);
+    assert.strictEqual(dzAllLong.stories.length, 2, "整页都是长篇时保留原列表并发告警，避免静默变 0 条");
+    assert.strictEqual(dzAllLong.allLongWarning, 2);
+
+    // 番茄详情页：SSR JSON 的明文 lastChapterTitle 优先解码，避免列表页字体反爬乱码
+    const fanqie = loadFresh(path.join(repoRoot, "skills/story-long-scan/scripts/fanqie-rank-scraper.js"));
+    const fqHtml = `<!doctype html><html><head><title>测试书_作者_番茄小说</title></head><body><script>window.__INITIAL_STATE__={"page":{"bookId":"70001","bookName":"测试书","author":"某作者","abstract":"【玄幻+逆袭】明文简介","categoryV2":"[{\\"Name\\":\\"东方玄幻\\"}]","readCount":3200,"wordNumber":8500,"creationStatus":1,"lastChapterTitle":"第12章 斩风破局"}};</script></body></html>`;
+    const fqParsed = fanqie.parseDetailHtml(fqHtml, "70001");
+    assert.strictEqual(fqParsed.lastChapterTitle, "第12章 斩风破局");
+    assert.strictEqual(fqParsed.readCount, "3200");
+    assert.strictEqual(fqParsed.wordNumber, "8500");
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -1961,6 +2016,9 @@ function runSetupCdp(scenario) {
     );
     fs.mkdirSync(srcDefault, { recursive: true });
     fs.writeFileSync(path.join(srcDefault, "Cookies"), "src-cookies", "utf8");
+    fs.writeFileSync(path.join(srcDefault, "Cookies-wal"), "src-cookies-wal", "utf8");
+    fs.writeFileSync(path.join(srcDefault, "Cookies-shm"), "src-cookies-shm", "utf8");
+    fs.writeFileSync(path.join(path.dirname(srcDefault), "Local State"), '{"os_crypt":{"encrypted_key":"K1"}}', "utf8");
     const debugProfile = path.join(home, "chrome-debug-profile");
     fs.mkdirSync(path.join(debugProfile, "Default"), { recursive: true });
     const sentinel = path.join(debugProfile, "SENTINEL");
@@ -1971,6 +2029,7 @@ function runSetupCdp(scenario) {
       unhealthyHolder: { args: ["--reset", "--yes"], pids: "empty", kill: "noop", chrome: "fake-chrome-dies.js", oldStatus: 500 },
       genuineReset: { args: ["--reset", "--yes"], pids: "old", kill: "real", chrome: "fake-chrome-fresh.js" },
       plainReuse: { args: [], pids: "empty", kill: "noop", chrome: "fake-chrome-dies.js" },
+      freshIncremental: { args: [], pids: "empty", kill: "noop", chrome: "fake-chrome-fresh.js", noOldCdp: true },
       orphanEndpoint: { args: ["--reset", "--yes"], pids: "old", kill: "real", chrome: "fake-chrome-orphan.js" },
       foreignHeldPort: { args: ["--reset", "--yes"], pids: "old", kill: "real", chrome: "fake-chrome-foreign-alive.js" },
       outsideTreeHolder: { args: ["--reset", "--yes"], pids: "old", kill: "real", chrome: "fake-chrome-outside-tree.js" },
@@ -1982,23 +2041,36 @@ function runSetupCdp(scenario) {
     // 起「旧 CDP」，让它自己挑端口并报回来——测试之间不会抢固定端口
     const portfile = path.join(tmpDir, "port");
     const stopfile = path.join(tmpDir, "stop");
-    oldCdp = spawn(
-      process.execPath,
-      [
-        path.join(tmpDir, "fake-cdp.js"),
-        "--port", "0",
-        "--id", "stale-existing-cdp",
-        "--portfile", portfile,
-        "--stopfile", stopfile,
-        "--status", String(plan.oldStatus || 200),
-      ],
-      { stdio: "ignore" }
-    );
-    for (let i = 0; i < 200 && port === null; i++) {
-      sleepSyncMs(50);
-      if (fs.existsSync(portfile)) port = fs.readFileSync(portfile, "utf8").trim();
+    if (plan.noOldCdp) {
+      const pick = spawnSync(
+        process.execPath,
+        [
+          "-e",
+          "const net=require('net');const s=net.createServer();s.listen(0,'127.0.0.1',()=>{process.stdout.write(String(s.address().port));s.close();});",
+        ],
+        { encoding: "utf8" }
+      );
+      port = (pick.stdout || "").trim();
+      assert(port, "harness: 未分配到空闲端口");
+    } else {
+      oldCdp = spawn(
+        process.execPath,
+        [
+          path.join(tmpDir, "fake-cdp.js"),
+          "--port", "0",
+          "--id", "stale-existing-cdp",
+          "--portfile", portfile,
+          "--stopfile", stopfile,
+          "--status", String(plan.oldStatus || 200),
+        ],
+        { stdio: "ignore" }
+      );
+      for (let i = 0; i < 200 && port === null; i++) {
+        sleepSyncMs(50);
+        if (fs.existsSync(portfile)) port = fs.readFileSync(portfile, "utf8").trim();
+      }
+      assert(port, "harness: 假旧 CDP 没起来");
     }
-    assert(port, "harness: 假旧 CDP 没起来");
 
     const result = spawnSync(
       process.execPath,
@@ -2026,6 +2098,15 @@ function runSetupCdp(scenario) {
       port,
       sentinelSurvived: fs.existsSync(sentinel),
       debugProfileSurvived: fs.existsSync(debugProfile),
+      copiedCookiesWal: fs.existsSync(path.join(debugProfile, "Default", "Cookies-wal"))
+        ? fs.readFileSync(path.join(debugProfile, "Default", "Cookies-wal"), "utf8")
+        : null,
+      copiedCookiesShm: fs.existsSync(path.join(debugProfile, "Default", "Cookies-shm"))
+        ? fs.readFileSync(path.join(debugProfile, "Default", "Cookies-shm"), "utf8")
+        : null,
+      copiedLocalState: fs.existsSync(path.join(debugProfile, "Local State"))
+        ? fs.readFileSync(path.join(debugProfile, "Local State"), "utf8")
+        : null,
       listenerAliveBeforeCleanup: canConnectTcp(port),
     };
   } finally {
@@ -2355,6 +2436,15 @@ function testRankQualityHeaders() {
   assert.match(thin, /- 数据质量：\[存在问题\]\n- 问题摘要：只解析到 3 条（每榜 10 条）；作品页链接只匹配到 0 \/ 3 条\n/);
 }
 
+function testCdpIncrementalRefreshCopiesWalAndLocalState() {
+  const run = runSetupCdp("freshIncremental");
+  assert.strictEqual(run.status, 0, `增量刷新启动应成功:\n${run.stdout}\n${run.stderr}`);
+  assert(run.sentinelSurvived, "增量刷新不应删除已有 debug profile");
+  assert.strictEqual(run.copiedCookiesWal, "src-cookies-wal", "应同步 SQLite Cookies-wal");
+  assert.strictEqual(run.copiedCookiesShm, "src-cookies-shm", "应同步 SQLite Cookies-shm");
+  assert.strictEqual(run.copiedLocalState, '{"os_crypt":{"encrypted_key":"K1"}}', "应同步父级 Local State 密钥文件");
+}
+
 testCdpUtils(longUtilsPath);
 testWindowsInvocationBuilder(longUtilsPath);
 testLocalDateStamp(longUtilsPath);
@@ -2385,4 +2475,5 @@ testCdpRejectsPortHeldOutsideSpawnedTree();
 testCdpRejectsUnverifiableIdentity();
 testCdpAcceptsPortHeldByLaunchedChildProcess();
 testCdpResetSucceedsWhenPortActuallyFrees();
+testCdpIncrementalRefreshCopiesWalAndLocalState();
 console.log("OK: scan runtime uses shell-safe CDP calls and side-effect-free scraper modules");

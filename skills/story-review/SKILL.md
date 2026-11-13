@@ -84,7 +84,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 通用网文内容 rubric：
 - 核心卖点：本章是否围绕明确卖点推进；看不出卖点至少 S2。
-- 冲突推进：本章是否有阻碍、选择、代价或关系变化；只解释/闲聊/总结至少 S2。
+- 冲突推进：本章是否有阻碍、选择、代价、信息或关系变化（日常/过渡章按细纲定位看关系、经营或铺垫推进，不强求硬冲突）；只解释/闲聊/总结至少 S2。
 - 任务卡点：角色办事被卡住时，是否卡出信息、关系、代价、选择或伏笔变化；卡点只剩流程细节、删掉不影响故事至少 S3。
 - 情绪曲线：是否有铺垫、升温、释放或反转；情绪平直或突兀至少 S2/S3。
 - 钩子与期待：开头或结尾是否制造后续问题；没有悬念或未完成期待至少 S2。
@@ -92,13 +92,13 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 - 角色动机：行为是否符合目标、性格、处境和关系压力；为剧情服务而失真是 S1/S2。
 - 对话质量：是否有潜台词、信息控制、角色差异；说明书式对话至少 S2。
 - 设定一致性：不违背已写规则、时间线、角色属性；明确事实冲突通常 S1。
-- 文字自然度：具体、可感、动作承载信息；AI 腔、陈词滥调、总结体按影响定 S2/S3。
-- 句长节奏：按本书文风、语义承接与场景功能判断；机械碎句、动作清单或臃肿长句按影响定 S3/S2。
-- 标点节奏：标点是否服务语气/人物声线；通篇句号化、随机堆砌问号/感叹号，或残留 `……`/`——` 硬造停顿，按影响定 S3/S2。
+- 文字自然度：具体、可感，直写情绪、算账判断、台词与有后果动作四条通道按需选用；AI 腔、陈词滥调、总结体或无后果手眼/道具微动作代偿情绪按影响定 S2/S3。
+- 句长节奏：按本书文风、语义承接与场景功能判断（区分意思走完的一句一段与三五字切碎的残句）；机械碎句、动作清单或臃肿长句按影响定 S3/S2。
+- 标点节奏：标点服务语气与声线（对话内 `——` 与有节制的 `……` 可用）；通篇句号化、随机堆砌问号/感叹号，或旁白未入白名单的 `——` 及 `……` 刷屏，按影响定 S3/S2。
 - 具体字数表达校验：正文用“这五个字 / 短短四字”等具体字数评价台词、题字、信件、念头或弹幕时，须确认统计口径正确且有叙事必要；无法确认时按文字自然度问题处理，建议改成“这句话一落”“那几个字”等非具体数字表达。
 - 格式可读性：段落短、对话独立、无多余空行；格式阻碍阅读按 S3，严重混乱按 S2。
-- 剧情循环：目标 → 阻碍 → 行动 → 代价/反馈 → 新期待；缺少目标/阻碍/反馈通常至少 S2。
-- 高潮构建：检查蓄能、情绪落差与兑现；强反转可用蓄能 → 假胜 → 崩解 → 反转/兑现，缺铺垫或兑现通常 S2/S3。
+- 剧情循环：目标 → 阻碍/变数 → 行动 → 代价/反馈 → 新期待；紧章缺少目标/阻碍/反馈通常至少 S2，松的章/过渡章至少交代目标、行动与状态变化。
+- 高潮构建：有高潮的章检查蓄能、情绪落差与兑现（强反转可用蓄能 → 假胜 → 崩解 → 反转/兑现），缺铺垫或兑现通常 S2/S3；细纲标明无高潮的松章看功能是否落地。
 - 关系进展：互动尺度必须匹配当前关系阶段；越界亲密、突然信任、突然敌对都需要铺垫，否则按影响定 S1/S2。
 - 伏笔状态：伏笔状态需可追踪；伏笔密度只作为结构风险提示，除非直接造成理解混乱，否则不升级到 S2+。
 
@@ -136,18 +136,18 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
      | 长篇 | 起点 | `story-review/references/rubrics/qidian.md` |
      | 长篇 | 番茄 | `story-review/references/rubrics/fanqie.md` |
      | 长篇 | 晋江、其他、未定、没写 | 不叠加 |
-     | 短篇 | 知乎盐言（也写作盐选）、番茄、七猫、黑岩、红果、小程序、未定、没写 | `story-review/references/rubrics/zhihu.md` |
+     | 短篇 | 知乎盐言（也写作盐选）、番茄、七猫、黑岩、小程序、未定、没写 | `story-review/references/rubrics/zhihu.md` |
 
    - 短篇另按 `设定.md`「平台基调」核对格式、引号和导语。
    - 技术备注行的 Rubric 写叠加的平台表（`fanqie | qidian | zhihu`），不叠加写 `generic`；括号里文件可读写 `file`，用了内置摘要写 `embedded`。
-5. **形成审查基准包摘要**：把已加载的文件内容或内置 fallback 摘要压缩为 5-12 条审查标准，供后续 solo 和子 Agent 共用（保留剧情循环、高潮构建、关系进展、默认逗号长句反电报体各一条，审第 1-3 章时再加开头新鲜度）。
+5. **形成审查基准包摘要**：把已加载的文件内容或内置 fallback 摘要压缩为 5-12 条审查标准，供后续 solo 和子 Agent 共用（保留剧情循环、高潮构建、关系进展、连贯句段反电报碎句各一条，审第 1-3 章时再加开头新鲜度）。
 6. **确定性预检（只报告，不修改）**：当审查范围包含本地正文文件路径时，运行本 skill 自带脚本：
    ```bash
    node scripts/normalize-punctuation.js --check <正文文件...>
    node scripts/check-ai-patterns.js --check --fail-on=blocking <正文文件...>
    node scripts/check-degeneration.js --check <正文文件...>
    ```
-   - `ellipsis`、`double-hyphen`、`markdown-divider` 归入 `format` findings；`em-dash` 只采用 `check-ai-patterns.js` 的语义改写建议（去重丢弃 `normalize-punctuation.js` 同位置的 `em-dash`）；默认 `--quote-mode keep`。另人工检查标点节奏是否通篇句号化或随机堆砌。
+   - `ellipsis`、`double-hyphen`、`markdown-divider` 归入 `format` findings；旁白引号外的 `em-dash` 只采用 `check-ai-patterns.js` 的语义改写建议（去重丢弃 `normalize-punctuation.js` 同位置的 `em-dash`；对话引号内被打断或拖音的 `——` 不报错）；默认 `--quote-mode keep`。另人工检查标点节奏是否通篇句号化或随机堆砌。
    - `check-ai-patterns.js` 的 blocking / advisory 作为 `prose` 候选，按 `style_resolution`、原文功能及 `expression.md` / `narrative-focus.md` / `story-logic.md` 复核，确认造成具体阅读损失后按下方严重度定级；功能性纠错、叙述与停顿保留。
    - `check-degeneration.js` 的 blocking（复读/截断/tier1 工程词）作为 S1/S2 `prose` findings（建议“重新生成该段，不是改写”），advisory（tier2 章节/歧义词）作为 S3。
    - `story-review` **不修改正文、设定或大纲文件**（需自动修复正文建议转 `/story-deslop`）；仅 full/lean 的「追踪文件维护」可修改 `追踪/`，分批审查可按 batch-review.md 写 **.story-review/state.md**。

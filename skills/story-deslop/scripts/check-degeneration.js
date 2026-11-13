@@ -58,9 +58,11 @@ const QUOTED_SPAN_PATTERNS = [
 // （DeepSeek-v4 这类会在对话里冒「该到下一章了」）。漏词的模型自己发现不了，靠脚本兜。
 // tier1 = 纯写作流水线术语，正文里几乎永不合法；tier2 = 章节结构/歧义词，角色在故事内
 // 真实阅读/讨论「第X章」或故事内系统/界面用语时属例外（report-only，交人/LLM 判）。
-// 细纲字段名改白话后（0.10），新旧字段名都算工程词；「分寸」「作用」是常用词，不收。短篇小节大纲的节尾列新旧名同收。
-const META_TIER1_RE = /细纲|情节点|卷纲|功能标签|目标情绪|字数目标|字数口径|章首钩子|章尾钩子|这章不能说破|本章禁止提前释放|排纲笔记|排纲底稿|节尾停在哪|结尾承接/;
+// 细纲字段名改白话后（0.10），新旧字段名都算工程词；「分寸」「作用」是常用词，不收；穿书常见词「剧情节点」不收。短篇小节大纲的节尾列新旧名同收。
+const META_TIER1_RE = /细纲|(?<!剧)情节点|卷纲|功能标签|目标情绪|字数目标|字数口径|章首钩子|章尾钩子|这章不能说破|本章禁止提前释放|排纲笔记|排纲底稿|节尾停在哪|结尾承接/;
 const META_TIER2_RE = /第[一二三四五六七八九十百千万两0-9]+章|本章|这一章|上一章|下一章|上章|下章|前一章|后一章|前文|后文|伏笔|读者|任务描述/;
+const CHAPTER_HEADING_RE = /^第[零〇一二三四五六七八九十百千万两0-9]+[章节回](?:$|[\s_：:——\-]+[^\n。；;]{0,28}$)/;
+const END_SIGNOFF_RE = /^[-—~～＜<【\[（(《\s]*(?:全文完|正文完|全书完|本卷完|完结|完|END|The\s+End)[-—~～＞>】\]）)》.。！!\s]*$/i;
 
 const options = { json: false, files: [], failOn: 'all' };
 
@@ -249,11 +251,11 @@ function findRepetition(content) {
 }
 
 function findTruncation(content) {
-  const body = content.filter((c) => isContent(c.trimmed));
+  const body = content.filter((c) => isContent(c.trimmed) && !END_SIGNOFF_RE.test(c.trimmed));
   if (body.length === 0) return [];
   const last = body[body.length - 1];
   // a finished chapter ends on terminal/closing punctuation; otherwise it was cut off.
-  if (/[。！？!?…”"』」）)】]$/.test(last.trimmed)) return [];
+  if (/(?:[。！？!?…~”"』」）)】]|\.{3,})$/.test(last.trimmed)) return [];
   return [{
     line: last.lineNo,
     column: last.trimmed.length,
@@ -291,14 +293,10 @@ function findPlaceholders(content) {
 
 function findMetaLeak(content) {
   const findings = [];
-  let firstContentSeen = false;
   for (const { trimmed, lineNo } of content) {
     if (!isContent(trimmed)) continue;
-    if (!firstContentSeen) {
-      firstContentSeen = true;
-      // 标题行（第N章 章名，无 ## 前缀时也算）属「标题行以外的正文」之外，排除
-      if (/^第[一二三四五六七八九十百千万两0-9]+章/.test(trimmed)) continue;
-    }
+    // 独立成行的章/节标题（含首行与短篇文中分节标题，无 ## 前缀时也算）属结构标记，不算正文泄漏
+    if (CHAPTER_HEADING_RE.test(trimmed)) continue;
     const outsideQuotes = maskQuotedSpans(trimmed);
     let m = META_TIER1_RE.exec(outsideQuotes);
     let quotedTier1 = false;

@@ -423,10 +423,10 @@ function scrapeChannel(ch, type) {
 
         bodyLines.push(`### #${i + 1} ${title}`);
         bodyLines.push(
-          `*${author}${catSeg} · ${fmtStatus(b.creationStatus)} · ${fmtReads(b.read_count)} 在读 · ${fmtWords(b.wordNumber)}字*`
+          `*${author}${catSeg} · ${fmtStatus(info.creationStatus || b.creationStatus)} · ${fmtReads(info.readCount || b.read_count)} 在读 · ${fmtWords(info.wordNumber || b.wordNumber)}字*`
         );
         if (info.tags) bodyLines.push(`**标签：** ${info.tags}`);
-        bodyLines.push(`**最新更新：** ${b.lastChapterTitle || "未知"}`);
+        bodyLines.push(`**最新更新：** ${info.lastChapterTitle || b.lastChapterTitle || "未知"}`);
         bodyLines.push(`**bookId：** ${b.bookId}`);
         bodyLines.push(`[作品页](https://fanqienovel.com/page/${b.bookId})`);
         const desc = cleanDesc(info.desc);

@@ -940,6 +940,26 @@ class ImportOutlineBriefTests(unittest.TestCase):
         too_few = self.call('1-5')
         self.assertEqual(too_few.returncode, 2)
         self.assertIn('至少 10 章', too_few.stderr)
+        for ch in range(1, 6):
+            self.put(f'大纲/细纲_第{ch:03d}章.md', f'## 细纲（第 {ch} 章）\n')
+        rerun_ok = self.call('1-5')  # 已有细纲落盘的章节返修无需额外参数直接放行
+        self.assertEqual(rerun_ok.returncode, 0, rerun_ok.stderr)
+        self.assertEqual(json.loads(rerun_ok.stdout)['chapters'], '1-5')
+        partial = self.root / '半成品四章'
+        for ch in range(1, 5):
+            p = partial / '正文' / f'第{ch:03d}章_起笔.md'
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(f'# 第{ch}章 起笔\n\n刚写了四章的半成品。\n', encoding='utf-8')
+        vol = partial / '大纲' / '卷纲_第1卷.md'
+        vol.parent.mkdir(parents=True, exist_ok=True)
+        vol.write_text('# 第一卷 卷纲\n\n### 第一段剧情：开局 <!-- L1-01 -->\n- 章节范围：第1-4章\n- 单元节拍/章功能分配：起笔\n', encoding='utf-8')
+        partial_ok = subprocess.run(
+            [sys.executable, str(self.SCRIPT), '--project', str(partial), '--chapters', '1-4'],
+            cwd=self.root, capture_output=True, encoding='utf-8',
+            env={**os.environ, 'PYTHONIOENCODING': 'ascii'},
+        )
+        self.assertEqual(partial_ok.returncode, 0, partial_ok.stderr)
+        self.assertEqual(json.loads(partial_ok.stdout)['chapters'], '1-4')
         info, text = self.brief('21-25')  # 全书最后一批可以不足 10 章
         self.assertIn('L1-02', text)
         self.assertIsNone(info['next'])

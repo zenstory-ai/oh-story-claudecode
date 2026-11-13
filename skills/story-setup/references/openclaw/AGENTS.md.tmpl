@@ -45,7 +45,7 @@ OpenClaw 会从项目 `skills/` 目录发现 `SKILL.md`。优先通过 OpenClaw 
 
 - 写正文前必须先有对应大纲：长篇 `大纲/细纲_第N章*.md`，短篇 `小节大纲.md`。
 - OpenClaw Phase 1 没有硬 hook 拦截；执行写作 skill 时必须由 skill 流程自行检查大纲，不得跳过。
-- **每章写完先去 AI 味**（没有 hook 替你检查）：正文落盘后同一轮内按写作 skill 的检测器和禁用词表自检、改净；能运行 node 时跑写作 skill 的 `scripts/check-ai-patterns.js --check --fail-on=blocking {章节文件}`。写下一章前先确认上一章已改净。只有作者明确说「这章不去味」时才跳过，并在标题行下加 `<!-- 去味:跳过 -->`。
+- **每章写完先去 AI 味**（没有 hook 替你检查）：正文落盘后同一轮内按写作 skill 的去味流程复核并清零 blocking 机械套式（词表仅作语境定位线索，不逐词清零）；能运行 node 时跑写作 skill 的 `scripts/check-ai-patterns.js --check --fail-on=blocking {正文文件}`。写下一章前先确认上一章已改净。只有作者明确说「这章不去味」时才跳过，并在标题行下加 `<!-- 去味:跳过 -->`。
 
 ## 与作者协作
 

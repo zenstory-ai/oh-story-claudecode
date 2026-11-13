@@ -142,15 +142,15 @@ function extractBooksFromText(port) {
     "  if(!cur)continue;" +
     // 跳过 UI 文字
     "  if(/^(加入书架|立即阅读|蝉联|榜首)/.test(line))continue;" +
-    // 热度
-    "  var hm=line.match(/([\\d.]+)\\s*万\\s*热度/);" +
-    "  if(hm){cur.heat=hm[1]+'万';continue}" +
+    // 热度（兼容「12.3万 热度」与新书榜「8500 热度」）
+    "  var hm=line.match(/^([\\d.]+(?:\\s*万)?)\\s*热度$/);" +
+    "  if(hm){cur.heat=hm[1].replace(/\\s+/g,'');continue}" +
     // 最新更新
     "  if(line.indexOf('最近更新')===0){cur.update=line.replace(/^最近更新\\s*/,'');continue}" +
     // 状态
     "  if(/^(连载中|已完结)$/.test(line)){cur.status=line;continue}" +
-    // 字数
-    "  if(/^[\\d.]+万字$/.test(line)){cur.words=line;continue}" +
+    // 字数（兼容「12.3万字」与不足一万字的「8500字」）
+    "  if(/^[\\d.]+万?字$/.test(line)){cur.words=line;continue}" +
     // 按序填充：书名→作者→题材→子分类
     "  if(fieldIdx===0){cur.title=line;fieldIdx=1;continue}" +
     "  if(fieldIdx===1){cur.author=line;fieldIdx=2;continue}" +

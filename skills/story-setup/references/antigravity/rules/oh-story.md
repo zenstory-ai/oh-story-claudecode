@@ -64,6 +64,7 @@ Read the selected skill's `SKILL.md` first, then load references as it directs.
 ## Context recovery
 
 At the start of a new conversation, and whenever context appears compacted or
-story state is uncertain, locate the active book and read `追踪/上下文.md` before
-continuing. The Antigravity external hook API has no PreCompact/PostCompact
-event, so this rule is the mandatory recovery path after compaction.
+story state is uncertain, locate the active book and read `追踪/上下文.md`
+(long-form) or `设定.md` + `小节大纲.md` (short-form) before continuing. The
+Antigravity external hook API has no PreCompact/PostCompact event, so this rule
+is the mandatory recovery path after compaction.

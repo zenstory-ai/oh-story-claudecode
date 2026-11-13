@@ -371,8 +371,9 @@ async function findProjectRoots(
     childDirectoryNames.has(marker),
   );
   const isShortProject =
-    childFileNames.has(SHORT_PROJECT_BODY_FILE) &&
-    [...SHORT_PROJECT_COMPANION_FILES].some((marker) => childFileNames.has(marker));
+    (childFileNames.has(SHORT_PROJECT_BODY_FILE) &&
+      [...SHORT_PROJECT_COMPANION_FILES].some((marker) => childFileNames.has(marker))) ||
+    [...SHORT_PROJECT_COMPANION_FILES].every((marker) => childFileNames.has(marker));
   if (isLongProject || isShortProject) {
     projects.push({
       absolutePath: currentPath,

@@ -622,21 +622,24 @@ function rmDirSafe(dir) {
  * 包含各类 -journal / -wal / -shm 旁路文件，以及 Google 账号登录数据。
  */
 function refreshAuthFiles(srcDefault, destDefault) {
-  const targets = [
-    "Cookies", "Cookies-journal",
-    "Login Data", "Login Data-journal",
-    "Login Data For Account", "Login Data For Account-journal",
-    "Web Data", "Web Data-journal",
+  const bases = [
+    "Cookies",
+    "Login Data",
+    "Login Data For Account",
+    "Web Data",
     path.join("Network", "Cookies"),
-    path.join("Network", "Cookies-journal"),
   ];
+  const suffixes = ["", "-journal", "-wal", "-shm"];
   let copied = 0;
-  for (const rel of targets) {
-    const src = path.join(srcDefault, rel);
-    if (!fs.existsSync(src)) continue;
-    const dest = path.join(destDefault, rel);
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    if (copyFileSafe(src, dest)) copied++;
+  for (const base of bases) {
+    for (const suffix of suffixes) {
+      const rel = `${base}${suffix}`;
+      const src = path.join(srcDefault, rel);
+      if (!fs.existsSync(src)) continue;
+      const dest = path.join(destDefault, rel);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      if (copyFileSafe(src, dest)) copied++;
+    }
   }
   return copied;
 }
@@ -889,17 +892,24 @@ async function main() {
     rmDirSafe(debugProfile);
   }
 
-  // 7) 复制 / 刷新 profile（此时 Chrome 已关闭，SQLite 一致）
+  // 7) 复制 / 刷新 profile（此时 Chrome 已关闭，SQLite 一致；顺带同步上层 Local State 供解密 Cookie）
   const debugDefault = path.join(debugProfile, "Default");
+  const srcLocalState = path.join(config.profileDir, "Local State");
   if (!fs.existsSync(debugDefault)) {
     log("正在复制 Chrome profile 到 debug 目录...");
     fs.mkdirSync(debugProfile, { recursive: true });
     try { fs.chmodSync(debugProfile, 0o700); } catch {}
+    if (fs.existsSync(srcLocalState)) {
+      copyFileSafe(srcLocalState, path.join(debugProfile, "Local State"));
+    }
     copyDirRecursive(defaultProfile, debugDefault);
     ok(`Profile 已复制到: ${debugProfile}`);
   } else {
     log("debug profile 已存在，刷新登录态相关文件...");
     try { fs.chmodSync(debugProfile, 0o700); } catch {}
+    if (fs.existsSync(srcLocalState)) {
+      copyFileSafe(srcLocalState, path.join(debugProfile, "Local State"));
+    }
     const n = refreshAuthFiles(defaultProfile, debugDefault);
     ok(`已刷新 ${n} 个登录态文件`);
   }

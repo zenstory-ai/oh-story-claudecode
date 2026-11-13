@@ -155,6 +155,30 @@ function resolveBookRoot(file, projectRoot) {
   return null
 }
 
+// 与 wordcount_core.py 同口径：同章正文已落盘（导入旧稿或已成稿返修）时，历史长度可短于 500 字或超过 20000 字，自动放宽目标区间。
+function hasExistingChapterProse(file, projectRoot) {
+  const bookRoot = resolveBookRoot(file, projectRoot)
+  const chMatch = path.basename(file).match(/^细纲_第0*(\d+)章.*\.md$/)
+  if (!bookRoot || !chMatch) return false
+  const wanted = Number(chMatch[1])
+  if (!Number.isInteger(wanted) || wanted < 1) return false
+  const proseDir = path.join(bookRoot, '正文')
+  try {
+    return fs.readdirSync(proseDir).some((entry) => {
+      if (entry.includes('_原稿_')) return false
+      const match = entry.match(/^第0*(\d+)章(?:[_\- 　].*)?\.md$/)
+      if (!match || Number(match[1]) !== wanted) return false
+      try {
+        return fs.statSync(path.join(proseDir, entry)).isFile()
+      } catch {
+        return false
+      }
+    })
+  } catch {
+    return false
+  }
+}
+
 // 项目引用须写目录路径；裸文件名可能指向 skill reference，不猜测其归属。
 const REF_DIR_PREFIX = /^(?:设定|大纲|追踪|正文|读者笔记|对标)\//
 
@@ -344,6 +368,9 @@ function verify(file, projectRoot = null) {
 
   checks.push(checkSettingRefs(text, name, file, projectRoot))
 
+  const hasProse = hasExistingChapterProse(file, projectRoot)
+  const minTarget = hasProse ? 1 : 500
+  const maxTarget = hasProse ? 500000 : 20000
   const targetParse = parseWordcountTarget(text)
   const rangeParse = parseWordcountRange(text)
   const target = targetParse.value
@@ -352,10 +379,10 @@ function verify(file, projectRoot = null) {
   const rangeLabel = rangeParse.status === 'invalid' ? `；字数范围写法不对（${rangeParse.raw.join('、')}）` : (rangeParse.value ? `；字数范围：${rangeParse.value.min}-${rangeParse.value.max}` : '')
   checks.push(makeCheck(
     'outline.wordcount-target',
-    targetParse.status === 'ok' && target >= 500 && target <= 20000 && caliberOk && rangeParse.status !== 'invalid',
+    targetParse.status === 'ok' && target >= minTarget && target <= maxTarget && caliberOk && rangeParse.status !== 'invalid',
     name,
     `字数目标：${targetLabel}；字数口径（可不写，写了须是 ${CALIBER}）：${caliberOk}${rangeLabel}`,
-    `字数目标为 500-20000 的正整数（可写「2300 字」「约 2300」「2,300」，可带括号备注）；字数口径不用写，写了只能是 ${CALIBER}；作者给了上下限时另写一行「字数范围：2000-2600」`,
+    `字数目标为 ${minTarget}-${maxTarget} 的正整数（可写「2300 字」「约 2300」「2,300」，可带括号备注）；字数口径不用写，写了只能是 ${CALIBER}；作者给了上下限时另写一行「字数范围：2000-2600」`,
     '只补字数目标、字数范围，或删掉写错的字数口径行，不调整情节安排。'
   ))
 

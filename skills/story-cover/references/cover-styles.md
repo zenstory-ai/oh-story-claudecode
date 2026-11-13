@@ -7,7 +7,7 @@
 
 | 平台 | 画面特点 | 关键词串 |
 |:-----|:---------|:---------|
-| 番茄 | 高饱和、高对比，人物占画面 60% 以上且面部清晰；大头贴构图配华丽背景，书名用金、红或白色粗体加光效 | `vibrant saturated colors, eye-catching bold design, character portrait dominating frame, mass-market novel cover style, high contrast` |
+| 番茄 | 高饱和、高对比，视觉主体占画面 60% 以上（人物封面面部清晰，纯场景封面主意象醒目），书名用金、红或白色粗体加光效 | `vibrant saturated colors, eye-catching bold design, clear focal subject, mass-market novel cover style, high contrast` |
 | 起点 | 细腻、偏写实的插画，色彩沉稳；人物与场景均衡，层次丰富有电影感，书名偏传统毛笔楷体 | `polished refined illustration, detailed cinematic composition, epic atmospheric, mature sophisticated style, premium quality` |
 | 晋江 | 粉、紫、浅蓝、暖白等柔和色调，人物五官精致；画面居中对称，用花瓣、光斑、丝绸和珠宝装饰，书名用优雅行书或纤细圆体 | `dreamy ethereal aesthetic, soft pastel tones, elegant romantic, delicate beauty, flower petals and bokeh` |
 | 知乎盐言 | 灰、蓝、白或暗色的极简画面，大量留白；用场景、物品或抽象意象营造氛围，少刻画人物，书名用现代简约无衬线体，接近独立电影海报 | `minimalist literary style, clean composition with negative space, subtle moody atmosphere, independent film poster aesthetic` |
@@ -25,15 +25,15 @@
 | 关键词 | 题材 |
 |:-------|:-----|
 | 修仙、修真、仙尊、仙帝、仙门、宗门、剑仙、剑尊、剑道、帝尊、神帝、灵根、飞升、渡劫、长生、玄幻 | 玄幻 / 仙侠 |
-| 都市、校园、兵王、神医、战神、赘婿、神豪、首富、学霸 | 都市 |
-| 王妃、皇后、贵妃、太子妃、嫡女、庶女、侯府、王府、宫斗、宅斗、公主、娘娘 | 古言 / 宫斗 |
-| 总裁、霸总、豪门、契约、替嫁、甜宠、娇妻、萌宝、闪婚、离婚、前夫、追妻 | 现言 / 甜宠 |
-| 命案、凶案、诡案、刑侦、法医、侦探、悬疑、推理、密室、连环 | 悬疑 / 推理 |
+| 都市、校园、兵王、神医、战神、赘婿、神豪、首富、学霸、年代、种田、重生、经商、娱乐圈、职场、电竞 | 都市 |
+| 王妃、皇后、贵妃、太子妃、嫡女、庶女、侯府、王府、宫斗、宅斗、公主、娘娘、世情、科举 | 古言 / 宫斗 |
+| 总裁、霸总、豪门、契约、替嫁、甜宠、娇妻、萌宝、闪婚、离婚、前夫、追妻、破镜 | 现言 / 甜宠 |
+| 命案、凶案、诡案、刑侦、法医、侦探、悬疑、推理、密室、连环、无限流、规则怪谈 | 悬疑 / 推理 |
 | 星际、末世、末日、丧尸、天灾、机甲、赛博、废土、进化 | 科幻 / 末世 |
 | 魔法、魔王、巨龙、龙族、骑士、精灵、领主、异世界 | 西幻 |
-| 三国、大明、大唐、大宋、大秦、战场、将军、谋士 | 历史 / 军事 |
-| 鬼怪、捉鬼、诡异、僵尸、阴阳、风水、盗墓、诅咒、冥婚 | 灵异 / 恐怖 |
-| 二次元、动漫、猫娘、萌娘、转生 | 轻小说 / 二次元 |
+| 三国、大明、大唐、大宋、大秦、战场、将军、谋士、权谋 | 历史 / 军事 |
+| 鬼怪、捉鬼、诡异、僵尸、阴阳、风水、盗墓、诅咒、冥婚、克苏鲁 | 灵异 / 恐怖 |
+| 二次元、动漫、轻小说、猫娘、萌娘、转生 | 轻小说 / 二次元 |
 
 命中多个题材时按这个顺序取第一个：玄幻 / 仙侠 > 西幻 > 古言 / 宫斗 > 现言 / 甜宠 > 都市 > 悬疑 / 推理 > 科幻 / 末世 > 历史 / 军事 > 灵异 / 恐怖 > 轻小说 / 二次元。都没命中先用「都市」，给作者看方案时说明。
 
@@ -90,11 +90,11 @@ Professional book cover, high detail digital painting, portrait 2:3 ratio, keep 
 ### 都市
 
 **标签**：`modern urban contemporary style, clean cinematic composition`
-**色彩**：深蓝+灰色+金色，霓虹点缀(夜景)/暖橙(黄昏)
-**人物**：男-西装/休闲装干练轮廓分明 | 女-时尚穿搭自信表情
-**背景**：城市天际线、高端办公室、校园、霓虹街道
-**光效**：`sharp city lights, sunset glow reflecting on glass buildings, neon rim light`
-**书名字体**：`modern bold sans-serif with metallic silver finish`
+**色彩**：深蓝+灰金（商战夜景）或暖阳米白（年代/日常/校园）
+**人物**：男-西装/工装/休闲干练轮廓 | 女-利落穿搭或年代衣着、神态鲜明
+**背景**：城市天际线、办公室、老街院落、校园、霓虹街道
+**光效**：`natural daylight or sunset glow on buildings, optional city rim light`
+**书名字体**：`modern bold sans-serif with clean metallic or warm matte finish`
 **笔名字体**：`small clean white modern text with subtle drop shadow, positioned above a thin silver horizontal divider line`
 
 ### 古言 / 宫斗
@@ -109,22 +109,22 @@ Professional book cover, high detail digital painting, portrait 2:3 ratio, keep 
 
 ### 现言 / 甜宠
 
-**标签**：`modern romance cover art, soft dreamy warm atmosphere`
-**色彩**：粉色+暖白+浅金，温暖柔和
-**人物**：双人构图为主，甜蜜互动（拥抱/对视/牵手）
-**背景**：咖啡厅、花园、温馨室内、夕阳海滩
-**光效**：`soft warm backlighting, dreamy bokeh, gentle sunset glow`
-**书名字体**：`soft rounded handwritten style in white with pink glow`
-**笔名字体**：`small soft pink-white handwritten text with a tiny heart motif on the left side, light sparkle effect`
+**标签**：`modern romance cover art, emotional cinematic atmosphere`
+**色彩**：暖粉+暖白+浅金（甜宠）或冷蓝+暮灰（追妻/拉扯）
+**人物**：双人互动（对视/牵手/擦肩背影）或单人情绪特写
+**背景**：咖啡厅、花园、落地窗室内、雨幕街角、夕阳海滩
+**光效**：`soft warm backlighting or moody twilight bokeh`
+**书名字体**：`soft rounded handwritten or clean serif style in white`
+**笔名字体**：`small soft white text with subtle glow or minimal thin line`
 
 ### 悬疑 / 推理
 
 **标签**：`dark mystery thriller, noir atmosphere, high contrast shadows`
-**色彩**：黑色+深灰+暗蓝，血红/冷白点缀
+**色彩**：黑色+深灰+暗蓝，冷白/暗红点缀
 **人物**：剪影/半遮面/背影，冷静或紧张
-**背景**：雨夜街道、老旧建筑、密室、暗巷
+**背景**：雨夜街道、老旧建筑、密室、案发现场、暗巷
 **光效**：`dramatic chiaroscuro, single spotlight, rain-slicked reflections`
-**书名字体**：`distorted bold cracked letters in blood red`
+**书名字体**：`sharp cold white sans-serif or distressed dark-red lettering`
 **笔名字体**：`small pale grey text with slight blur effect, almost hidden in the shadows, a thin cracked line underneath`
 
 ### 科幻 / 末世
@@ -169,10 +169,10 @@ Professional book cover, high detail digital painting, portrait 2:3 ratio, keep 
 
 ### 轻小说 / 二次元
 
-**标签**：`anime light novel cover, vibrant colorful moe style`
-**色彩**：明亮多色，星光/花瓣点缀
-**人物**：Q版/萌系角色，猫耳/翅膀等萌属性
+**标签**：`anime light novel cover, vibrant cel-shaded illustration`
+**色彩**：明快通透多色，高光/粒子点缀
+**人物**：少年少女立绘或奇幻冒险角色（萌系可加Q版/兽耳）
 **背景**：奇幻世界、校园、异世界、星空
-**光效**：`sparkly star effects, magical particle effects, soft luminous glow`
-**书名字体**：`colorful cartoon outlined bubbly font`
+**光效**：`clean anime rim lighting, magical particle effects, soft luminous glow`
+**书名字体**：`bold stylized anime logo lettering with clean outline`
 **笔名字体**：`small playful rounded white text with pastel color outline, tiny star decorations on both sides`

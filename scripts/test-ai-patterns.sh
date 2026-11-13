@@ -1631,3 +1631,37 @@ if (dashes.length !== 1 || dashes[0].line !== 3 || dashes[0].column !== 2) {
 }
 NODE
 echo "ellipsis-density-tic, unclosed-quote dash parity & >64KB pipe flush regression tests passed."
+
+# --- 万字短篇单文件篇幅缩放回归：3 处 not-is 在 9,000 字短篇降为 advisory，≥6 处升为 blocking ---
+FIXTURE_SHORT_SPARSE="$TMP_DIR/fixture-short-sparse.md"
+FIXTURE_SHORT_DENSE="$TMP_DIR/fixture-short-dense.md"
+node - "$FIXTURE_SHORT_SPARSE" "$FIXTURE_SHORT_DENSE" <<'NODE'
+const fs = require('fs');
+const pad = Array.from({ length: 230 }, (_, i) => `###${i + 1}.\n雨夜里的便利店还亮着灯，收银台后的风扇转个不停，我低头核对着账本上的数字。`).join('\n\n');
+const threeHits = [
+  '他不是来接我的，而是来拿那份转让协议的。',
+  '那不是愧疚，而是怕事情闹大收不了场。',
+  '我不是心软，而是要等银行流水彻底到账。',
+].join('\n\n');
+const sixHits = [
+  threeHits,
+  '她不是不知情，而是从头到尾都在帮他瞒着。',
+  '这不是意外，而是提前三个月就布好的局。',
+  '他们不是来道歉的，而是来探我手里还有多少底牌的。',
+].join('\n\n');
+fs.writeFileSync(process.argv[2], `${pad}\n\n${threeHits}\n`);
+fs.writeFileSync(process.argv[3], `${pad}\n\n${sixHits}\n`);
+NODE
+set +e
+node "$SCRIPT" --json --fail-on=blocking "$FIXTURE_SHORT_SPARSE" > "$OUT"
+sparse_rc=$?
+set -e
+[ "$sparse_rc" -eq 0 ] || { echo "FAIL: 9000字短篇偶发 3 处 not-is 应降为 advisory（退出 0），实际 $sparse_rc" >&2; exit 1; }
+node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const n=r.findings.filter(f=>f.type==="not-is-comparison");if(n.length!==3||!n.every(f=>f.severity==="advisory"))throw new Error("expected 3 advisory not-is: "+JSON.stringify(n))' "$OUT"
+
+set +e
+node "$SCRIPT" --json --fail-on=blocking "$FIXTURE_SHORT_DENSE" > "$OUT"
+dense_rc=$?
+set -e
+[ "$dense_rc" -eq 1 ] || { echo "FAIL: 9000字短篇高频 6 处 not-is 应升为 blocking（退出 1），实际 $dense_rc" >&2; exit 1; }
+echo "Short-story length-scaled blocking threshold regression tests passed."

@@ -1063,7 +1063,7 @@ NEGATIVE_CASES = (
     ("导入卷纲剧情段丢了单元编号注释", IMPORT_LONG, "{一句话} <!-- L1-01 -->", "{一句话}", "outline_view"),
     ("导入卷纲剧情段丢了这段让读者图什么", IMPORT_LONG, "- 这段让读者图什么：", "- 情绪引擎：", "这段让读者图什么"),
     ("审稿平台映射漏了晋江", REVIEW_SKILL, "晋江、其他", "其他", "晋江"),
-    ("审稿平台映射漏了黑岩", REVIEW_SKILL, "七猫、黑岩、红果", "七猫、红果", "黑岩"),
+    ("审稿平台映射漏了黑岩", REVIEW_SKILL, "七猫、黑岩、小程序", "七猫、小程序", "黑岩"),
     ("审稿端不给 consistency-checker 传修订号", REVIEW_PROMPTS, "  state_revision：", "  修订号：", "state_revision"),
     ("去味索引漏了一类 blocking", DESLOP_EXPRESSION, "**`em-dash`**", "**`em_dash`**", "em-dash"),
     ("短篇派写手用了写手不认的去味标签", "skills/story-short-write/references/agent-calls.md",

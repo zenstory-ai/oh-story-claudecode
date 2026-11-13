@@ -184,9 +184,12 @@ _NET_SOFT_PATTERNS = [
 _NET_HARD_PATTERNS = [
     (re.compile(r"[（(](此处|以下|这里|下文|后续)?[^）)]{0,10}(省略|略去|略过)[^）)]{0,10}[）)]"), "占位符（括号省略）"),
     (re.compile(r"(TODO|占位符|placeholder|待补充|此处待填|此处待补)"), "占位符"),
-    (re.compile(r"(细纲|情节点|卷纲|功能标签|目标情绪|字数目标|章首钩子|章尾钩子|任务描述)"), "工程词泄漏"),
+    (re.compile(r"(细纲|(?<!剧)情节点|卷纲|功能标签|目标情绪|字数目标|章首钩子|章尾钩子|任务描述)"), "工程词泄漏"),
     (re.compile("�"), "乱码（替换字符）"),
 ]
+
+
+_TOXIC_END_SIGNOFF = re.compile(r"^[-—~～＜<【\[（(《\s]*(?:全文完|正文完|全书完|本卷完|完结|完|END|End|end|THE\s+END|The\s+End|the\s+end)[-—~～＞>】\]）)》.。！!\s]*$")
 
 
 def _net_is_skippable(stripped: str) -> bool:
@@ -197,6 +200,8 @@ def _net_is_skippable(stripped: str) -> bool:
     if stripped == "---":
         return True
     if re.match(r"^[-—=*·•\s]+$", stripped):
+        return True
+    if _TOXIC_END_SIGNOFF.match(stripped):
         return True
     return False
 
@@ -218,6 +223,7 @@ _TOXIC_CLAUSE_BOUNDARY = set("，,。.！!？?；;：:、…—~ \t　")
 _TOXIC_TAG_PARTICLES = ("吗", "吧", "嘛")
 _TOXIC_AFFIRM_PARTICLES = ("的", "啊", "呀", "呢")
 _TOXIC_TRAILER_WINDOW = 600
+_TOXIC_SCALE_UNIT_CHARS = 4500
 _TOXIC_NOT_IS_MIN_HITS = 3
 _TOXIC_VOICE_MIN_HITS = 2
 _TOXIC_PARADE_MIN_HITS = 2
@@ -375,14 +381,17 @@ def _mask_html_comment_lines(lines: list[str]) -> list[str]:
 def toxic_phrase_findings(text: str, whitelist=(), rescan: str | None = None) -> list[str]:
     findings: list[str] = []
     content: list[tuple[int, str]] = []
+    doc_chars = 0
     for i, raw in enumerate(_mask_html_comment_lines(text.split("\n")), 1):
         s = raw.strip()
         if _net_is_skippable(s):
             continue
+        doc_chars += len(re.sub(r"[ \t\r\n\f\v\u3000]+", "", s))
         masked = _toxic_mask_quoted(mask_style_text(s, whitelist))
         if any(ch in _TOXIC_QUOTE_CHARS for ch in masked):
             continue
         content.append((i, masked))
+    scale = max(1, (doc_chars + _TOXIC_SCALE_UNIT_CHARS // 2) // _TOXIC_SCALE_UNIT_CHARS)
     sentence_hits: list[tuple[int, str, str, str]] = []
     counts: dict[str, int] = {}
     for line_no, masked in content:
@@ -391,11 +400,11 @@ def toxic_phrase_findings(text: str, whitelist=(), rescan: str | None = None) ->
             counts[label] = counts.get(label, 0) + 1
     not_is_combined = counts.get("not-is-comparison", 0) + counts.get("reverse-not-is", 0)
     for line_no, label, fix, matched in sentence_hits:
-        if label in ("not-is-comparison", "reverse-not-is") and not_is_combined < _TOXIC_NOT_IS_MIN_HITS:
+        if label in ("not-is-comparison", "reverse-not-is") and not_is_combined < _TOXIC_NOT_IS_MIN_HITS * scale:
             continue
-        if label == "voice-contrast" and counts.get("voice-contrast", 0) < _TOXIC_VOICE_MIN_HITS:
+        if label == "voice-contrast" and counts.get("voice-contrast", 0) < _TOXIC_VOICE_MIN_HITS * scale:
             continue
-        if label == "negation-parade" and counts.get("negation-parade", 0) < _TOXIC_PARADE_MIN_HITS:
+        if label == "negation-parade" and counts.get("negation-parade", 0) < _TOXIC_PARADE_MIN_HITS * scale:
             continue
         findings.append(f"第{line_no}行 毒句式[{label}]：『{matched[:20]}』——{fix}")
     # trailer-ending 只扫文末 600 字窗口（引号占位后按行累计，边界行整行计入）。

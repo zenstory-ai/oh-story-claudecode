@@ -283,8 +283,10 @@ const ELLIPSIS_DENSITY_PATTERN = /…+|\.{3,}|。{3,}/g;
 const ELLIPSIS_DENSITY_MIN_HITS = 6;
 const ELLIPSIS_DENSITY_PER_KILO = 3.5;
 
-// 单章密度分级门槛（800 章真人网文误报校准）：偶发 1 处（not-is 族 1-2 处）常承担正常纠错、转折或章末钩子，
+// 单章密度分级门槛（800 章真人长篇 + 500 篇真人短篇误报校准）：偶发 1 处（not-is 族 1-2 处）常承担正常纠错、转折或章末钩子，
 // 降为 advisory + semantic 交上下文判断；同章高频连刷升为 blocking + mechanical 强制清零。
+// 短篇整篇（约 8,000-12,000 字）写在单个 正文.md 时，按章节当量 DENSITY_SCALE_UNIT_CHARS 等比抬升全篇句式阻断线（单章 ≤6,749 字时倍数为 1）。
+const DENSITY_SCALE_UNIT_CHARS = 4500;
 const NOT_IS_BLOCKING_MIN_HITS = 3;
 const VOICE_CONTRAST_BLOCKING_MIN_HITS = 2;
 const NEGATION_PARADE_BLOCKING_MIN_HITS = 2;
@@ -495,12 +497,19 @@ function scanDocument(input, unclosedOpenings = new Set()) {
 
   flushBlock();
   findings.push(...scanProsePatterns(proseLines));
-  applyDensitySeverityGates(findings);
+  let proseChars = 0;
+  for (const { text } of proseLines) {
+    const trimmed = text.trim();
+    if (!trimmed || isDivider(trimmed) || isStructural(trimmed)) continue;
+    proseChars += Array.from(trimmed.replace(/\s+/g, '')).length;
+  }
+  applyDensitySeverityGates(findings, proseChars);
   findings.sort((a, b) => a.line - b.line || a.column - b.column);
   return findings;
 }
 
-function applyDensitySeverityGates(findings) {
+function applyDensitySeverityGates(findings, proseChars = 0) {
+  const scale = Math.max(1, Math.floor((proseChars + Math.floor(DENSITY_SCALE_UNIT_CHARS / 2)) / DENSITY_SCALE_UNIT_CHARS));
   const counts = new Map();
   for (const f of findings) {
     counts.set(f.type, (counts.get(f.type) || 0) + 1);
@@ -509,11 +518,11 @@ function applyDensitySeverityGates(findings) {
   for (const f of findings) {
     let block = null;
     if (f.type === 'not-is-comparison' || f.type === 'reverse-not-is') {
-      block = notIsCombined >= NOT_IS_BLOCKING_MIN_HITS;
+      block = notIsCombined >= NOT_IS_BLOCKING_MIN_HITS * scale;
     } else if (f.type === 'voice-contrast') {
-      block = (counts.get('voice-contrast') || 0) >= VOICE_CONTRAST_BLOCKING_MIN_HITS;
+      block = (counts.get('voice-contrast') || 0) >= VOICE_CONTRAST_BLOCKING_MIN_HITS * scale;
     } else if (f.type === 'negation-parade') {
-      block = (counts.get('negation-parade') || 0) >= NEGATION_PARADE_BLOCKING_MIN_HITS;
+      block = (counts.get('negation-parade') || 0) >= NEGATION_PARADE_BLOCKING_MIN_HITS * scale;
     } else if (f.type === 'trailer-ending') {
       block = (counts.get('trailer-ending') || 0) >= TRAILER_ENDING_BLOCKING_MIN_HITS;
     }
@@ -1379,8 +1388,8 @@ function isDivider(trimmed) {
 
 // markdown 结构行（标题/列表/引用/表格）不是叙述正文，长段落/碎句号/破折号检测都跳过。
 function isStructural(trimmed) {
-  return /^(#{1,6}\s|>\s?|[-*+]\s|\d+[.)]\s|\|)/.test(trimmed)
-    || /^第[零一二三四五六七八九十百千万\d]+章(?:\s|_|$)/.test(trimmed);
+  return /^(#{1,6}(?:\s|\d)|>\s?|[-*+]\s|\d+[.)]\s|\|)/.test(trimmed)
+    || /^第[零〇一二三四五六七八九十百千万两\d]+[章节回](?:$|[\s_：:——\-]+[^\n。；;]{0,28}$)/.test(trimmed);
 }
 
 // 去掉成对引号内的片段（台词/系统播报），只留引号外叙述。碎句号判定用：纯对话/弹幕成片短句

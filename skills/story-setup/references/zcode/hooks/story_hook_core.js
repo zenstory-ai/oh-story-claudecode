@@ -785,12 +785,14 @@ const SOFT_PATTERNS = [
 const HARD_PATTERNS = [
   [/[（(](此处|以下|这里|下文|后续)?[^）)]{0,10}(省略|略去|略过)[^）)]{0,10}[）)]/, "占位符（括号省略）"],
   [/(TODO|占位符|placeholder|待补充|此处待填|此处待补)/, "占位符"],
-  [/(细纲|情节点|卷纲|功能标签|目标情绪|字数目标|章首钩子|章尾钩子|任务描述)/, "工程词泄漏"],
+  [/(细纲|(?<!剧)情节点|卷纲|功能标签|目标情绪|字数目标|章首钩子|章尾钩子|任务描述)/, "工程词泄漏"],
   [/�/, "乱码（替换字符）"],
 ]
 
+const TOXIC_END_SIGNOFF = /^[-—~～＜<【\[（(《\s]*(?:全文完|正文完|全书完|本卷完|完结|完|END|End|end|THE\s+END|The\s+End|the\s+end)[-—~～＞>】\]）)》.。！!\s]*$/
+
 function skippableLine(line) {
-  return !line || line.startsWith("#") || line === "---" || /^[-—=*·•\s]+$/.test(line)
+  return !line || line.startsWith("#") || line === "---" || /^[-—=*·•\s]+$/.test(line) || TOXIC_END_SIGNOFF.test(line)
 }
 
 // ── 毒句式（确定性 AI 句式指纹，写后正文网热路径）─────────────────────────────
@@ -812,6 +814,7 @@ const TOXIC_CLAUSE_BOUNDARY = new Set(Array.from("，,。.！!？?；;：:、…
 const TOXIC_TAG_PARTICLES = new Set(["吗", "吧", "嘛"])
 const TOXIC_AFFIRM_PARTICLES = new Set(["的", "啊", "呀", "呢"])
 const TOXIC_TRAILER_WINDOW = 600
+const TOXIC_SCALE_UNIT_CHARS = 4500
 const TOXIC_NOT_IS_MIN_HITS = 3
 const TOXIC_VOICE_MIN_HITS = 2
 const TOXIC_PARADE_MIN_HITS = 2
@@ -987,15 +990,18 @@ function maskHtmlCommentLines(lines) {
 function toxicPhraseFindings(text, whitelist = [], rescan = toxicRescanHint("")) {
   const findings = []
   const content = []
+  let docChars = 0
   maskHtmlCommentLines(text.split("\n")).forEach((raw, index) => {
     const line = raw.trim()
     if (skippableLine(line)) return
+    docChars += Array.from(line.replace(/[ \t\r\n\f\v\u3000]+/g, "")).length
     const masked = maskQuotedSpans(maskStyleText(line, whitelist))
     for (const ch of masked) {
       if (TOXIC_QUOTE_CHARS.has(ch)) return
     }
     content.push([index + 1, masked])
   })
+  const scale = Math.max(1, Math.floor((docChars + Math.floor(TOXIC_SCALE_UNIT_CHARS / 2)) / TOXIC_SCALE_UNIT_CHARS))
   const sentenceHits = []
   const counts = new Map()
   for (const [lineNo, masked] of content) {
@@ -1006,9 +1012,9 @@ function toxicPhraseFindings(text, whitelist = [], rescan = toxicRescanHint(""))
   }
   const notIsCombined = (counts.get("not-is-comparison") || 0) + (counts.get("reverse-not-is") || 0)
   for (const [lineNo, label, fix, matched] of sentenceHits) {
-    if ((label === "not-is-comparison" || label === "reverse-not-is") && notIsCombined < TOXIC_NOT_IS_MIN_HITS) continue
-    if (label === "voice-contrast" && (counts.get("voice-contrast") || 0) < TOXIC_VOICE_MIN_HITS) continue
-    if (label === "negation-parade" && (counts.get("negation-parade") || 0) < TOXIC_PARADE_MIN_HITS) continue
+    if ((label === "not-is-comparison" || label === "reverse-not-is") && notIsCombined < TOXIC_NOT_IS_MIN_HITS * scale) continue
+    if (label === "voice-contrast" && (counts.get("voice-contrast") || 0) < TOXIC_VOICE_MIN_HITS * scale) continue
+    if (label === "negation-parade" && (counts.get("negation-parade") || 0) < TOXIC_PARADE_MIN_HITS * scale) continue
     findings.push(`第${lineNo}行 毒句式[${label}]：『${codePointSlice(matched, 0, 20)}』——${fix}`)
   }
   // trailer-ending 只扫文末 600 字窗口（引号占位后按行累计，边界行整行计入）。

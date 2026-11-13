@@ -69,8 +69,14 @@ async function createProjectDiscoveryWorkspace() {
   await writeFile(resolve(root, "短篇", "标准短篇", "小节大纲.md"), "大纲", "utf8");
   await writeFile(resolve(root, "短篇", "标准短篇", "设定.md"), "设定", "utf8");
 
+  await mkdir(resolve(root, "短篇", "构思中短篇"), { recursive: true });
+  await writeFile(resolve(root, "短篇", "构思中短篇", "小节大纲.md"), "大纲", "utf8");
+  await writeFile(resolve(root, "短篇", "构思中短篇", "设定.md"), "设定", "utf8");
+
   await mkdir(resolve(root, "普通资料"), { recursive: true });
   await writeFile(resolve(root, "普通资料", "正文.md"), "不是短篇工程", "utf8");
+  await mkdir(resolve(root, "孤立设定"), { recursive: true });
+  await writeFile(resolve(root, "孤立设定", "设定.md"), "只有单个设定文件", "utf8");
 
   await mkdir(resolve(root, "拆文库", "伪项目"), { recursive: true });
   await writeFile(resolve(root, "拆文库", "伪项目", "正文.md"), "拆文原文", "utf8");
@@ -154,10 +160,11 @@ describe("workspace scanning", () => {
 
     assert.deepEqual(
       workspace.projects.map((entry) => entry.path),
-      ["短篇/标准短篇", "长篇/标准长篇"],
+      ["短篇/标准短篇", "长篇/标准长篇", "短篇/构思中短篇"],
     );
     assert.deepEqual(workspace.libraries.map((entry) => entry.path), ["拆文库/伪项目"]);
     assert.ok(!workspace.projects.some((entry) => entry.path === "普通资料"));
+    assert.ok(!workspace.projects.some((entry) => entry.path === "孤立设定"));
     assert.ok(!workspace.projects.some((entry) => entry.path.startsWith("拆文库/")));
   });
 

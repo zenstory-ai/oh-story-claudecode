@@ -268,6 +268,18 @@ try {
   assert.strictEqual(badRange.status, 1)
   assert.deepStrictEqual(failureIds(badRange), ['outline.wordcount-target'])
 
+  // 导入历史章节常有 <500 字短楔子或 >20000 字合章：未写正文的新章继续阻断，同章正文已落盘时自动放行 1-500000。
+  for (const [label, wc] of [['short-wedge', '320 字'], ['merged-chapter', '45000 字']]) {
+    const project = writeCase(`hist-${label}`, outline({ fieldValues: { 字数目标: wc } }))
+    const strictRes = run(project)
+    assert.strictEqual(strictRes.status, 1, label)
+    assert.deepStrictEqual(failureIds(strictRes), ['outline.wordcount-target'])
+    fs.mkdirSync(path.join(project, '正文'), { recursive: true })
+    fs.writeFileSync(path.join(project, '正文', '第021章_旧稿.md'), '# 第21章 旧稿\n\n已有历史正文。\n', 'utf8')
+    const histRes = run(project)
+    assert.strictEqual(histRes.status, 0, histRes.stdout + histRes.stderr)
+  }
+
   // 有没有硬伤可选；写了就只收三档，并把档位放进 JSON 供审稿与作者汇报取用。
   assert.deepStrictEqual(good.report.contract_risk, { level: '没问题', detail: '', status: 'ok' })
   const reinforce = run(writeCase('risk-reinforce', outline({ fieldValues: { 有没有硬伤: '要补——补一段交换，让主角付出代价' } })))
