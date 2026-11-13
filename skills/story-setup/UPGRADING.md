@@ -2,12 +2,12 @@
 
 ## 当前版本
 
-助手版本 43（v0.10.4）。已有项目更新技能包后，在项目根重跑 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或直接点名），再新开会话。
+助手版本 44（v0.10.5）。已有项目更新技能包后，在项目根重跑 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或直接点名），再新开会话。
 
-- `setup_skill_version: 1.3.11`
-- `agents_version: 43`
+- `setup_skill_version: 1.3.12`
+- `agents_version: 44`
 
-`.story-deployed` 字段不全，或 `agents_version` 不是整数、低于 43，都算待更新，重跑 story-setup 即可。项目里的 `agents_version` 大于 43，说明本机技能包比项目旧：先更新 oh-story-claudecode，不要用旧包覆盖。各版本改了什么见仓库根目录 `CHANGELOG.md`。
+`.story-deployed` 字段不全，或 `agents_version` 不是整数、低于 44，都算待更新，重跑 story-setup 即可。项目里的 `agents_version` 大于 44，说明本机技能包比项目旧：先更新 oh-story-claudecode，不要用旧包覆盖。各版本改了什么见仓库根目录 `CHANGELOG.md`。
 
 ## 升级步骤
 
@@ -17,7 +17,12 @@
 4. 正在写的长篇：确认每本书有 `追踪/_tracking-state.json`。没有就按下方「追踪模型迁移」重建，否则写下一章会被拦。
 5. 拆文成果或细纲不满足当前格式时，按检查提示定点补齐，不因单项缺口整本重拆。
 
-## 本次更新必须重跑 story-setup（v0.10.4，助手版本 43）
+## 本次更新必须重跑 story-setup（v0.10.5，助手版本 44）
+
+- 写手、排纲、拆文、审稿助手与各端写后钩子按真人网文校准了万字短篇句式阻断门槛、退化与截断检查、弯引号默认、审稿细则和 0.10 细纲字段；重跑 story-setup 后新开会话才生效。
+- 书稿、设定、追踪不用迁移。
+
+## v0.10.4 的改动（助手版本 43）
 
 - 写手、排纲、审稿助手与参考资料按真人网文校准了情绪直写、利害算账、标点整理和去味阻断门槛，各端写后钩子同步按单章次数分级，重部署时还会清掉受管目录里已退役的旧文件；重跑 story-setup 后新开会话才生效。
 - 书稿、设定、追踪不用迁移。
