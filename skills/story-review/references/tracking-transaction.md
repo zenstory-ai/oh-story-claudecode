@@ -28,7 +28,7 @@
 ```
 
 - `init`：仅在 `_tracking-state.json` 不存在时执行（旧追踪文件自动移入 `追踪/_旧追踪存档/`）；执行前读 [tracking-initialization.md](tracking-initialization.md)。
-- `draft`：把逐章事务草稿预填到 `.story/work/第NNN章/tracking.json`，并输出字段上限与在场核心角色当前快照。新章（`append`）只填 `delta` 与变化角色快照；已提交章（`revision`）在预填记录上改成修订后的完整记录，不清空重写。
+- `draft`：把逐章事务草稿预填到 `.story/work/第NNN章/tracking.json`，把全部核心角色当前快照写入同目录 `snapshots/{角色名}.json`（返回 `snapshot_files`），并在预算内输出在场角色 `current_snapshots` 与字段上限。新章（`append`）只填 `delta` 与变化角色快照（未内联的大快照或久别回归角色从 `snapshot_files` 取）；已提交章（`revision`）在预填记录上改成修订后的完整记录，不清空重写。
 - **作者字数范围**：细纲可写 `字数范围：2000-2600`，本轮临时覆盖传 `--min-chars` / `--max-chars`（同时替代默认 ±12% 内部带与 ±15% 用户带）。
 - `chapter check`：读取正文与细纲目标，返回 `ready`（可提交，exit 0）/ `needs_decision`（长度带外，交作者定夺，exit 0；`over` 额外返回 `compress-once` 删除字数）/ `blocked`（正文硬伤，exit 1）/ `invalid`（exit 1）/ `tool_unavailable`（exit 3）。加 `--plain` 输出白话结论（含短段占比与叙述句长中位数参考）。
 - `chapter commit`：重跑计数与硬伤检查，将生效区间内的字数记录与逐章事务原子提交（成功后自动删除 `.story/work/第NNN章/`）。
@@ -105,7 +105,7 @@
 
 - `expected_state_revision` 取当前 `state_revision`（`draft` 自动预填）；逐章 JSON 不写 `wordcount`。
 - `context` 字段：`init` 收 `position`、`long_term_constraints`、`active_character_names`、`continuity_risks`、`recent_chapters`、`next_chapter_commitments` 六项；`commit` 只收前四项（后两项由工具自动算出，手填报错 exit 2）。
-- `character_snapshots` 中的核心复用角色须同时出现在 `character_changes`；已建快照的核心角色再次变化时须提交新快照（单文件目标 ≤4096 字节，硬上限 8192 字节）。无快照的临时角色只写 `character_changes`。
+- `character_snapshots` 中的核心复用角色须同时出现在 `character_changes`；已建快照的核心角色再次变化时须在既有快照基础上提交截至本章的完整新快照（四个列表不限条数，单项 ≤600 字节；单文件目标 ≤16384 字节仅提醒，硬上限 65536 字节；快照保留截至当前章仍有效的状态与条目，逐章经过留在 `逐章记录/`）。无快照的临时角色只写 `character_changes`。
 - `context.active_character_names`：仅列下一章出场或被直接牵动的核心角色（最多 20 人，须已有快照）。
 - `context.long_term_constraints`（最多 6 条，超限先合并或请作者取舍）与 `context.continuity_risks` 整份提交当前值；凡上一版有、本次移除的条目须列进 `delta.retired_context_items`（仅 `mode=append` 允许）。
 - 不再复用的核心角色写进 `delta.retired_characters`（仅 `mode=append` 允许；同事务不交快照、不列在 `active_character_names`，阵亡/退场变化照写进 `character_changes`）。

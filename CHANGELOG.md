@@ -12,6 +12,10 @@ compare 链接；小节名使用 Keep a Changelog 的六个英文类别（`Added
 
 ## [Unreleased]
 
+### Changed
+
+- **提升长篇角色快照容量，并补齐逐章草稿的按需角色快照文件。** `tracking_commit.py` 将核心角色快照单文件目标提醒从 4096 字节调至 16384 字节（仅提醒、不阻断提交），硬上限从 8192 字节提高到 65536 字节（64 KiB，约 2.15 万字），四个列表单项上限调至 600 字节（约 200 字），同时保留 `上下文.md` 的 12288 字节独立热预算与存量项目追踪格式不变；`draft` 将全部核心角色（含不在上一章活跃列表内的久别回归角色）当前快照写入 `.story/work/第NNN章/snapshots/{角色名}.json` 并控制标准输出内联体积，补齐 `init` 多字段超长一次性字数汇总提示与既有角色列表误清空提醒，`story-long-write`、`story-import`、`story-review` 同步生效。（#548）
+
 ## [0.10.5] - 2026-11-13
 
 > 本版 `agents_version: 44`、`setup_skill_version: 1.3.12`。更新技能包后，在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`），再新开会话，让新版写作、拆文、审稿助手与写后检查生效。书稿、设定和追踪不用迁移。

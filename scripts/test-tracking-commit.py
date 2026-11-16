@@ -340,19 +340,35 @@ class TrackingCommitTests(unittest.TestCase):
 
     def test_snapshot_target_warns_and_hard_cap_rejects_before_any_write(self) -> None:
         self.init()
-        warning = transaction(1, character=True)
-        warning["character_snapshots"]["江晨"] = snapshot(items=12, repeat=2)
+        over_old_cap = transaction(1, character=True)
+        over_old_cap["character_snapshots"]["江晨"] = snapshot(items=14, repeat=4)
+        completed = self.run_tool("commit", over_old_cap)
+        self.assertNotIn("WARNING: character snapshot 江晨", completed.stderr)
+        rendered_ch1 = (self.project / "追踪/角色状态/江晨.md").read_bytes()
+        self.assertGreater(len(rendered_ch1), 8192)
+        self.assertLessEqual(len(rendered_ch1), 16384)
+        self.assertEqual(len(self.read_state()["characters"]["江晨"]["knowledge"]), 14)
+        self.assertLessEqual(len((self.project / "追踪/上下文.md").read_bytes()), 12288)
+        self.run_tool("check")
+
+        warning = transaction(2, character=True)
+        warning["character_snapshots"]["江晨"] = snapshot(items=24, repeat=4)
         completed = self.run_tool("commit", warning)
         self.assertIn("WARNING: character snapshot 江晨", completed.stderr)
-        self.assertEqual(self.read_state()["state_revision"], 1)
+        self.assertIn("不影响本次提交", completed.stderr)
+        self.assertEqual(self.read_state()["state_revision"], 2)
+        self.run_tool("check")
 
-        rejected = transaction(2, character=True)
-        rejected["character_snapshots"]["江晨"] = snapshot(items=24, repeat=4)
+        rejected = transaction(3, character=True)
+        rejected["character_snapshots"]["江晨"] = snapshot(items=80, repeat=4)
         before = json.loads(json.dumps(self.read_state(), ensure_ascii=False))
+        snapshot_before = (self.project / "追踪/角色状态/江晨.md").read_bytes()
         completed = self.run_tool("commit", rejected, expect=2)
-        self.assertIn("hard cap of 8192 bytes", completed.stderr)
+        self.assertIn("exceeds hard cap of 65536 bytes", completed.stderr)
+        self.assertIn("能力与资源 80 项", completed.stderr)
         self.assertEqual(self.read_state(), before)
-        self.assertFalse((self.project / "追踪/逐章记录/第002章.md").exists())
+        self.assertEqual((self.project / "追踪/角色状态/江晨.md").read_bytes(), snapshot_before)
+        self.assertFalse((self.project / "追踪/逐章记录/第003章.md").exists())
 
     def test_missing_active_snapshot_is_rejected_before_any_write(self) -> None:
         self.init()
@@ -1076,6 +1092,199 @@ class TrackingCommitTests(unittest.TestCase):
         self.assertEqual(self.read_state(), before)
         self.assertEqual((self.project / "追踪/上下文.md").read_bytes(), context_before)
         self.assertFalse((self.project / "追踪/逐章记录/第001章.md").exists())
+
+    def test_snapshot_utf8_multibyte_boundary_and_list_item_limit(self) -> None:
+        self.init()
+        # 列表单项允许 200 个中文字（600 UTF-8 字节），201 字报字数提示并不写盘。
+        too_long_item = transaction(1, character=True)
+        too_long_item["character_snapshots"]["江晨"]["abilities_resources"] = ["剑" * 201]
+        failed_item = self.run_tool("commit", too_long_item, expect=2)
+        self.assertIn("exceeds 600 bytes（现 201 字，上限约 200 字，至少删 1 字）", failed_item.stderr)
+        self.assertEqual(self.read_state()["state_revision"], 0)
+
+        # 构造渲染后恰好 65536 UTF-8 字节（中文 3 字节 + ASCII 精确补齐）的快照：通过；再多 1 个汉字（+3 字节）即拒。
+        base_snap = {
+            "identity": "太虚宗执剑弟子",
+            "location": "寒鸦关石室",
+            "goal": "护送残卷回宗",
+            "state": "灵力存六成",
+            "abilities_resources": ["剑" * 200 for _ in range(100)],
+            "relationships": ["盟" * 10],
+            "knowledge": ["秘" * 10],
+            "open_threads": ["债" * 10],
+        }
+        probe = transaction(1, character=True)
+        probe["character_snapshots"]["江晨"] = json.loads(json.dumps(base_snap, ensure_ascii=False))
+        self.run_tool("commit", probe)
+        current_bytes = len((self.project / "追踪/角色状态/江晨.md").read_bytes())
+        # 第 2 章提交时 revision 从 1 变成 2（位数相同，字节差仅来自新增列表项）。
+        remaining = 65536 - current_bytes
+        exact_snap = json.loads(json.dumps(base_snap, ensure_ascii=False))
+        while remaining > 603:
+            exact_snap["knowledge"].append("剑" * 200)
+            remaining -= 603
+        self.assertGreater(remaining, 10)
+        # 最后一条 `- ` + payload + `\n` 增加 3 + byte_size(payload) 字节，且不超过单项 600 字节。
+        payload_budget = remaining - 3
+        cjk_count, ascii_rem = divmod(payload_budget, 3)
+        exact_item = ("阵" * cjk_count) if ascii_rem == 0 else ("阵" * cjk_count + "A" * ascii_rem)
+        exact_snap["knowledge"].append(exact_item)
+        exact_tx = transaction(2, character=True)
+        exact_tx["character_snapshots"]["江晨"] = exact_snap
+        self.run_tool("commit", exact_tx)
+        snapshot_file = self.project / "追踪/角色状态/江晨.md"
+        self.assertEqual(len(snapshot_file.read_bytes()), 65536)
+        self.assertLess(len(snapshot_file.read_text(encoding="utf-8")), 25000)
+        self.run_tool("check")
+
+        over_by_one_hanzi = json.loads(json.dumps(exact_snap, ensure_ascii=False))
+        over_by_one_hanzi["open_threads"][0] = over_by_one_hanzi["open_threads"][0] + "多"
+        over_tx = transaction(3, character=True)
+        over_tx["character_snapshots"]["江晨"] = over_by_one_hanzi
+        before = self.read_state()
+        rejected = self.run_tool("commit", over_tx, expect=2)
+        self.assertIn("65539 bytes", rejected.stderr)
+        self.assertIn("exceeds hard cap of 65536 bytes", rejected.stderr)
+        self.assertEqual(self.read_state(), before)
+        self.assertEqual(len(snapshot_file.read_bytes()), 65536)
+        self.assertFalse((self.project / "追踪/逐章记录/第003章.md").exists())
+
+    def test_multi_character_accumulation_draft_files_revision_and_reactivation_across_copies(self) -> None:
+        # 1. init 一次性汇总多字段超长，修正后导入含大快照与非在场核心角色的 60 章存量项目。
+        def rich_snapshot(tag: str, count: int) -> dict[str, object]:
+            return {
+                "identity": f"{tag}·北境镇魔司执令使",
+                "location": "寒鸦关地下古阵石室",
+                "goal": f"{tag}查清阵眼被蚀真相并稳住根基",
+                "state": f"{tag}寒毒压于奇经但战力尚存七成",
+                "abilities_resources": [f"{tag}功法器物{i:02d}：玄铁剑诀第{i}式与灵矿密牒（第{i}章所得，剩余三次）" for i in range(1, count + 1)],
+                "relationships": [f"{tag}关键关系{i:02d}：与守关将领及暗桩第{i}号结盟互保但留底牌" for i in range(1, count + 1)],
+                "knowledge": [f"{tag}已知情报{i:02d}：确认军粮账册第{i}页篡改牵涉兵部侍郎走私链" for i in range(1, count + 1)],
+                "open_threads": [f"{tag}未结事项{i:02d}：月底前核查第{i}批失踪斥候并归还古阵盘" for i in range(1, max(4, count // 2) + 1)],
+            }
+
+        bad_init = initial_document(last_chapter=60)
+        bad_init["book_title"] = "书" * 100
+        bad_init["context"]["position"]["scene"] = "场" * 100
+        bad_res = self.run_tool("init", bad_init, expect=2)
+        self.assertIn("2 个字段超长", bad_res.stderr)
+        self.assertFalse((self.project / "追踪/_tracking-state.json").exists())
+
+        init_doc = initial_document(last_chapter=60)
+        init_doc["context"]["active_character_names"] = ["沈砚", "钟离"]
+        init_doc["character_snapshots"] = {
+            "沈砚": rich_snapshot("沈砚", 40),
+            "钟离": rich_snapshot("钟离", 28),
+            "顾长渊": rich_snapshot("顾长渊", 28),  # 久别非在场核心角色
+        }
+        self.run_tool("init", init_doc)
+        self.assertGreater(len((self.project / "追踪/角色状态/沈砚.md").read_bytes()), 12000)
+        self.assertGreater(len((self.project / "追踪/角色状态/顾长渊.md").read_bytes()), 8192)
+        self.run_tool("check")
+
+        # 2. 第 61 章继续累积使沈砚突破 16 KiB 内联阈值；第 62 章 draft 验证 stdout 受控且久别角色顾长渊可从 snapshot_files 取回。
+        ch61 = transaction(61)
+        grown_shen = rich_snapshot("沈砚", 70)
+        ch61["delta"]["character_changes"] = [{"name": "沈砚", "change": "破入石室深层并掌握新阵纹线索"}]
+        ch61["context"]["active_character_names"] = ["沈砚", "钟离"]
+        ch61["character_snapshots"] = {"沈砚": grown_shen}
+        self.run_tool("commit", ch61)
+        self.assertGreater(len((self.project / "追踪/角色状态/沈砚.md").read_bytes()), 20000)
+
+        (self.project / "大纲").mkdir(exist_ok=True)
+        (self.project / "正文").mkdir(exist_ok=True)
+        (self.project / "大纲/细纲_第062章.md").write_text(
+            "### 第 62 章：驰援西营\n- 字数目标：1000 字\n- 字数口径：visible_chars_v1\n",
+            encoding="utf-8",
+        )
+        guide62, draft62_path = self.draft(62)
+        self.assertIn("沈砚", guide62.get("omitted_active_snapshots", []))
+        self.assertNotIn("沈砚", guide62["current_snapshots"])
+        self.assertIn("钟离", guide62["current_snapshots"])
+        snapshot_files = guide62["snapshot_files"]
+        self.assertEqual(set(snapshot_files), {"沈砚", "钟离", "顾长渊"})
+        gu_from_disk = json.loads(Path(snapshot_files["顾长渊"]).read_text(encoding="utf-8"))
+        self.assertEqual(gu_from_disk, init_doc["character_snapshots"]["顾长渊"])
+
+        # 久别核心角色顾长渊本章变化但漏交快照时，报错明确指路 current_snapshots / snapshot_files 且不写盘。
+        draft62 = json.loads(draft62_path.read_text(encoding="utf-8"))
+        draft62["delta"]["result"] = "顾长渊驰援寒鸦关，与沈砚合破妖族暗桩。"
+        draft62["delta"]["character_changes"] = [{"name": "顾长渊", "change": "驰援寒鸦关并交出南境密信"}]
+        draft62["context"]["position"].update({"story_time": "风雪第四夜", "scene": "寒鸦关西营"})
+        draft62["context"]["active_character_names"] = ["沈砚", "钟离", "顾长渊"]
+        missing_gu = self.run_tool("commit", draft62, expect=2)
+        self.assertIn("snapshot_files", missing_gu.stderr)
+        self.assertEqual(self.read_state()["last_committed_chapter"], 61)
+
+        # 通过 storyctl.py chapter commit 正式提交第 62 章，验证工作目录连同 snapshots/ 自动清理。
+        (self.project / "正文/第062章_驰援西营.md").write_text(
+            "# 第062章 驰援西营\n"
+            + "\n".join(f"顾长渊在西营核对第{i}册军械账目，沈砚旁证北境第{i}道暗桩口供。" for i in range(1, 36))
+            + "\n",
+            encoding="utf-8",
+        )
+        gu_from_disk["knowledge"].append("顾长渊新知：西营军械库暗门已被妖族识破")
+        draft62["character_snapshots"] = {"顾长渊": gu_from_disk}
+        draft62_path.write_text(json.dumps(draft62, ensure_ascii=False), encoding="utf-8")
+        storyctl_commit = subprocess.run(
+            [
+                sys.executable, str(STORYCTL), "chapter", "commit",
+                "--project", str(self.project), "--chapter", "62", "--input", str(draft62_path),
+            ],
+            text=True, capture_output=True, check=False, encoding="utf-8",
+        )
+        self.assertEqual(storyctl_commit.returncode, 0, storyctl_commit.stdout + storyctl_commit.stderr)
+        self.assertFalse((self.project / ".story/work/第062章").exists())
+        self.assertEqual(len(self.read_state()["characters"]["顾长渊"]["knowledge"]), 29)
+
+        # 3. 修订第 61 章：预填完整 >20KB 快照，不丢任何条目；意外清空列表时给出非阻断提醒，完结 open_threads 不误报。
+        _, rev61_path = self.draft(61)
+        rev61 = json.loads(rev61_path.read_text(encoding="utf-8"))
+        self.assertEqual(len(rev61["character_snapshots"]["沈砚"]["abilities_resources"]), 70)
+        rev61["character_snapshots"]["沈砚"]["open_threads"] = []
+        ok_clear_threads = self.run_tool("commit", rev61)
+        self.assertNotIn("清空成了空列表", ok_clear_threads.stderr)
+
+        rev61_wipe = json.loads(json.dumps(rev61, ensure_ascii=False))
+        rev61_wipe["expected_state_revision"] = self.read_state()["state_revision"]
+        rev61_wipe["character_snapshots"]["沈砚"]["knowledge"] = []
+        warned_wipe = self.run_tool("commit", rev61_wipe)
+        self.assertIn("WARNING: 角色快照「沈砚」把 已知信息（原有 70 项） 清空成了空列表", warned_wipe.stderr)
+        # 恢复完整快照确保后续全量保真
+        rev61["expected_state_revision"] = self.read_state()["state_revision"]
+        rev61["character_snapshots"]["沈砚"]["open_threads"] = grown_shen["open_threads"]
+        self.run_tool("commit", rev61)
+        self.assertEqual(self.read_state()["characters"]["沈砚"], grown_shen)
+
+        # 4. 退役钟离后再重新激活并写入 >10KB 快照，且长篇/导入/审查三份部署脚本 check 一致通过。
+        retire63 = transaction(63)
+        retire63["delta"]["character_changes"] = [{"name": "钟离", "change": "奉命秘密赴京述职，暂离北境线"}]
+        retire63["delta"]["retired_characters"] = ["钟离"]
+        retire63["context"]["active_character_names"] = ["沈砚", "顾长渊"]
+        self.run_tool("commit", retire63)
+        self.assertFalse((self.project / "追踪/角色状态/钟离.md").exists())
+        guide64, _ = self.draft(64)
+        self.assertNotIn("钟离", guide64["snapshot_files"])
+        self.assertFalse((self.project / ".story/work/第064章/snapshots/钟离.json").exists())
+
+        reactivate64 = transaction(64)
+        returned_zhongli = rich_snapshot("钟离京城归来", 36)
+        reactivate64["delta"]["character_changes"] = [{"name": "钟离", "change": "携兵部尚书密旨重返寒鸦关"}]
+        reactivate64["context"]["active_character_names"] = ["沈砚", "顾长渊", "钟离"]
+        reactivate64["character_snapshots"] = {"钟离": returned_zhongli}
+        self.run_tool("commit", reactivate64)
+        self.assertGreater(len((self.project / "追踪/角色状态/钟离.md").read_bytes()), 11000)
+
+        for copy_rel in (
+            "skills/story-long-write/scripts/tracking_commit.py",
+            "skills/story-import/scripts/tracking_commit.py",
+            "skills/story-review/scripts/tracking_commit.py",
+        ):
+            checked = subprocess.run(
+                [sys.executable, str(ROOT / copy_rel), "check", "--project", str(self.project)],
+                text=True, capture_output=True, check=False, encoding="utf-8",
+            )
+            self.assertEqual(checked.returncode, 0, f"{copy_rel}: {checked.stderr}")
 
 
 if __name__ == "__main__":

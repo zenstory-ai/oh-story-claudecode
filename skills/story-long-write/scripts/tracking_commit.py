@@ -43,8 +43,11 @@ DELTA_TARGET_BYTES = 1536
 DELTA_MAX_BYTES = 3072
 CONTEXT_TARGET_BYTES = 8192
 CONTEXT_MAX_BYTES = 12288
-SNAPSHOT_TARGET_BYTES = 4096
-SNAPSHOT_MAX_BYTES = 8192
+# 角色快照属按需读取的冷视图（不进 上下文.md 四列表）；单文件上限对齐各宿主单次无分页 Read 的 25K token 边界。
+SNAPSHOT_TARGET_BYTES = 16384
+SNAPSHOT_MAX_BYTES = 65536
+SNAPSHOT_ITEM_MAX_BYTES = 600
+DRAFT_INLINE_SNAPSHOTS_MAX_BYTES = 16384
 # 下一章热上下文里列出的活跃角色，不是核心角色总数；体积仍由 CONTEXT_MAX_BYTES 兜底。
 ACTIVE_CHARACTER_MAX = 20
 
@@ -308,6 +311,11 @@ def delta_path(tracking: Path, chapter: int) -> Path:
     return tracking / "逐章记录" / f"第{chapter:0{width}d}章.md"
 
 
+def chapter_work_dir(project: Path, chapter: int) -> Path:
+    width = max(3, len(str(chapter)))
+    return project / ".story" / "work" / f"第{chapter:0{width}d}章"
+
+
 def find_retired_tracking_paths(tracking: Path) -> list[str]:
     found = [relative for relative in RETIRED_TRACKING_PATHS if (tracking / relative).exists()]
     found.extend(sorted(path.name for path in tracking.glob("基线_截至第*章.md")))
@@ -388,11 +396,25 @@ def normalize_snapshot(value: object, label: str) -> dict[str, Any]:
         "goal": clean_text(snapshot.get("goal"), f"{label}.goal", max_bytes=300),
         "state": clean_text(snapshot.get("state"), f"{label}.state", max_bytes=300),
         "abilities_resources": clean_string_list(
-            snapshot.get("abilities_resources", []), f"{label}.abilities_resources"
+            snapshot.get("abilities_resources", []),
+            f"{label}.abilities_resources",
+            item_max_bytes=SNAPSHOT_ITEM_MAX_BYTES,
         ),
-        "relationships": clean_string_list(snapshot.get("relationships", []), f"{label}.relationships"),
-        "knowledge": clean_string_list(snapshot.get("knowledge", []), f"{label}.knowledge"),
-        "open_threads": clean_string_list(snapshot.get("open_threads", []), f"{label}.open_threads"),
+        "relationships": clean_string_list(
+            snapshot.get("relationships", []),
+            f"{label}.relationships",
+            item_max_bytes=SNAPSHOT_ITEM_MAX_BYTES,
+        ),
+        "knowledge": clean_string_list(
+            snapshot.get("knowledge", []),
+            f"{label}.knowledge",
+            item_max_bytes=SNAPSHOT_ITEM_MAX_BYTES,
+        ),
+        "open_threads": clean_string_list(
+            snapshot.get("open_threads", []),
+            f"{label}.open_threads",
+            item_max_bytes=SNAPSHOT_ITEM_MAX_BYTES,
+        ),
     }
 
 
@@ -429,10 +451,23 @@ def render_snapshot(name: str, snapshot: dict[str, Any], through_chapter: int, r
     lines.extend(section("已知信息", snapshot["knowledge"]))
     lines.extend(section("未结事项", snapshot["open_threads"]))
     payload = "\n".join(lines).rstrip() + "\n"
-    require(
-        byte_size(payload) <= SNAPSHOT_MAX_BYTES,
-        f"character snapshot {name} exceeds hard cap of {SNAPSHOT_MAX_BYTES} bytes",
-    )
+    size = byte_size(payload)
+    if size > SNAPSHOT_MAX_BYTES:
+        allowed = max(1, SNAPSHOT_MAX_BYTES * len(payload) // size)
+        counts = "、".join(
+            f"{title} {len(values)} 项"
+            for title, values in (
+                ("能力与资源", snapshot["abilities_resources"]),
+                ("关键关系", snapshot["relationships"]),
+                ("已知信息", snapshot["knowledge"]),
+                ("未结事项", snapshot["open_threads"]),
+            )
+        )
+        raise TrackingError(
+            f"character snapshot {name} ({size} bytes) exceeds hard cap of {SNAPSHOT_MAX_BYTES} bytes"
+            f"（现 {len(payload)} 字，上限约 {allowed} 字，至少精简 {len(payload) - allowed} 字；"
+            f"当前：{counts}。逐章经过已留在 逐章记录/，快照只保留截至当前章仍有效的状态与条目）"
+        )
     return payload
 
 
@@ -784,8 +819,8 @@ def normalize_delta(
         # 本章退役的角色记录最后一次变化即可，不必再交一份马上要删的快照。
         require(
             not is_core or name in snapshots or portable_name_key(name) in retiring,
-            f"core character {name} changed but has no current snapshot: 把 draft 输出 current_snapshots 里"
-            f"「{name}」的快照整份改成本章结束时的状态，放进 character_snapshots",
+            f"core character {name} changed but has no current snapshot: 把 draft 输出 current_snapshots"
+            f"（或 snapshot_files 里的 {name}.json）中「{name}」的快照整份改成本章结束时的状态，放进 character_snapshots",
         )
         character_changes.append(
             {"name": name, "change": clean_text(change.get("change"), f"delta.character_changes[{index}].change", max_bytes=360)}
@@ -963,6 +998,17 @@ def load_state(project: Path) -> dict[str, Any]:
 
 
 def normalize_initial_document(document: object) -> dict[str, Any]:
+    global _LENGTH_ISSUES
+    _LENGTH_ISSUES = []
+    try:
+        state_doc = _normalize_initial_document(document)
+    finally:
+        issues, _LENGTH_ISSUES = _LENGTH_ISSUES, None
+    require(not issues, f"{len(issues)} 个字段超长，一次改完再提交：" + "；".join(issues))
+    return normalize_state(state_doc)
+
+
+def _normalize_initial_document(document: object) -> dict[str, Any]:
     root = as_mapping(document, "init input")
     require_known_keys(
         root,
@@ -974,6 +1020,7 @@ def normalize_initial_document(document: object) -> dict[str, Any]:
     )
     require(root.get("schema_version") == INPUT_SCHEMA_VERSION, "init input schema_version is unsupported")
     last_chapter = as_int(root.get("last_chapter"), "last_chapter")
+    book_title = clean_text(root.get("book_title"), "book_title", max_bytes=240)
     context = validate_context_input(root.get("context"), include_initial_fields=True)
     snapshots = normalize_snapshots(root.get("character_snapshots", {}))
     foreshadow: dict[str, dict[str, Any]] = {}
@@ -995,20 +1042,18 @@ def normalize_initial_document(document: object) -> dict[str, Any]:
         event["first_recorded_chapter"] = max(1, last_chapter)
         event["updated_chapter"] = max(1, last_chapter)
         timeline[event["id"]] = event
-    return normalize_state(
-        {
-            "schema_version": TRACKING_SCHEMA_VERSION,
-            "book_title": clean_text(root.get("book_title"), "book_title", max_bytes=240),
-            "last_committed_chapter": last_chapter,
-            "imported_through_chapter": last_chapter,
-            "state_revision": 0,
-            "context": context,
-            "characters": snapshots,
-            "foreshadow": foreshadow,
-            "timeline": timeline,
-            "wordcount_records": {},
-        }
-    )
+    return {
+        "schema_version": TRACKING_SCHEMA_VERSION,
+        "book_title": book_title,
+        "last_committed_chapter": last_chapter,
+        "imported_through_chapter": last_chapter,
+        "state_revision": 0,
+        "context": context,
+        "characters": snapshots,
+        "foreshadow": foreshadow,
+        "timeline": timeline,
+        "wordcount_records": {},
+    }
 
 
 def normalize_transaction(project: Path, state: dict[str, Any], document: object) -> dict[str, Any]:
@@ -1246,8 +1291,11 @@ def warn_sizes(views: dict[str, str], delta_payload: str | None = None) -> None:
             continue
         size = byte_size(payload)
         if size > SNAPSHOT_TARGET_BYTES:
+            target_chars = max(1, SNAPSHOT_TARGET_BYTES * len(payload) // size)
             emit(
-                f"WARNING: character snapshot {Path(relative).stem} is {size} bytes; target is <= {SNAPSHOT_TARGET_BYTES}",
+                f"WARNING: character snapshot {Path(relative).stem} is {size} bytes; target is <= {SNAPSHOT_TARGET_BYTES}"
+                f"（现 {len(payload)} 字，建议目标约 {target_chars} 字；不影响本次提交，"
+                "后续更新时可将已了结事项或已被新状态取代的旧阶段归并为当前值）",
                 error=True,
             )
 
@@ -1312,9 +1360,37 @@ def _apply_transaction_locked(project: Path, document: object) -> dict[str, Any]
     # 唯一权威文件最后落盘；在此之前失败可用同一事务直接重跑。
     atomic_write_text(state_path(project), next_state_payload)
     warn_sizes(views, delta_payload)
+    warn_emptied_snapshots(state["characters"], transaction["snapshots"])
     if previous_record is not None:
         warn_emptied_record(transaction["chapter"], previous_record, transaction["delta"])
     return next_state
+
+
+def warn_emptied_snapshots(
+    previous_characters: dict[str, dict[str, Any]],
+    updated_snapshots: dict[str, dict[str, Any]],
+) -> None:
+    labels = {
+        "abilities_resources": "能力与资源",
+        "relationships": "关键关系",
+        "knowledge": "已知信息",
+    }
+    for name, updated in updated_snapshots.items():
+        previous = previous_characters.get(name)
+        if previous is None:
+            continue
+        emptied = [
+            f"{label}（原有 {len(previous[key])} 项）"
+            for key, label in labels.items()
+            if previous.get(key) and not updated.get(key)
+        ]
+        if emptied:
+            emit(
+                f"WARNING: 角色快照「{name}」把 " + "、".join(emptied)
+                + " 清空成了空列表；character_snapshots 提交的是角色完整当前状态，不是只写本章新增。"
+                "若非有意清空，请从 draft 的 snapshot_files 读回完整快照修改后重提。",
+                error=True,
+            )
 
 
 def warn_emptied_record(chapter: int, previous: dict[str, Any], delta: dict[str, Any]) -> None:
@@ -1368,7 +1444,8 @@ def check_project(project: Path) -> dict[str, Any]:
 DRAFT_LIMITS = {
     "delta.result": 160, "character_changes[].change": 120, "foreshadow_changes[].summary": 120,
     "timeline_events[].objective_fact / reader_knowledge": 160, "context.position.story_time / scene": 80,
-    "character_snapshots.*.goal / state": 100, "逐章记录总量": 1024,
+    "character_snapshots.*.identity / location": 80, "character_snapshots.*.goal / state": 100,
+    "character_snapshots.*.四个列表单项": 200, "角色快照单文件": 21500, "逐章记录总量": 1024,
 }
 
 
@@ -1482,14 +1559,17 @@ def entry_shapes(chapter: int) -> dict[str, Any]:
     }
 
 
-def draft_transaction(project: Path, chapter: int) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+def draft_transaction(
+    project: Path, chapter: int, *, state: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     """按当前 state 预填一份逐章事务：修订号、模式、章名和整份提交的上下文当前值都填好。
     新章（append）调用方只写本章变化；另返回在场核心角色的当前快照，供有变化时整份改写后放进事务。
     新章的故事时间与场景留空：它们必须是本章结束时的位置，沿用上一章的值能静默提交，
     所以不预填，上一章的值另行返回作参考。
     修订（revision）的 delta 是修订后本章的完整记录，所以按已提交的逐章记录预填，调用方在上面改；
     第三项返回 {"notes": [...], "prefilled": bool}：没能预填的条目，以及逐章记录是否读到。"""
-    state = load_state(project)
+    if state is None:
+        state = load_state(project)
     last = state["last_committed_chapter"]
     require(1 <= chapter <= last + 1, f"draft chapter must be between 1 and {last + 1}")
     mode = "append" if chapter == last + 1 else "revision"
@@ -1606,8 +1686,53 @@ def rebuild_stale_draft(document: dict[str, Any], existing: dict[str, Any], appe
     if differs:
         notes.append("卷信息与当前状态不同，已取当前状态，本章确实换卷就改回（" + "；".join(differs) + "）")
     if snapshots:
-        notes.append("带过来的角色快照（" + "、".join(snapshots) + "）可能被中间的提交改过，逐个对照 current_snapshots 重核")
+        notes.append("带过来的角色快照（" + "、".join(snapshots) + "）可能被中间的提交改过，逐个对照 current_snapshots 或 snapshot_files 重核")
     return "；".join(notes)
+
+
+def prepare_draft_snapshots(
+    project: Path,
+    chapter: int,
+    all_characters: dict[str, dict[str, Any]],
+    active_names: list[str],
+) -> tuple[dict[str, dict[str, Any]], dict[str, str], list[str]]:
+    """把全部核心角色的当前快照落到本章工作目录，并把 stdout 内联体积控制在预算内。
+
+    久别回归的非在场核心角色不在 active_character_names 里，但本章一旦变化也必须交完整新快照；
+    单角色快照放大到 64 KiB 后，20 名在场角色全塞进单行 stdout 又会撑大上下文或被宿主截断。
+    因此所有核心角色一律写 `.story/work/第NNN章/snapshots/{名}.json`（随 chapter commit 自动清理），
+    stdout 的 `current_snapshots` 只内联预算内的在场角色，其余指路 `snapshot_files`。
+    """
+    snapshots_dir = chapter_work_dir(project, chapter) / "snapshots"
+    expected_files = {f"{name}.json" for name in all_characters}
+    if snapshots_dir.is_dir():
+        for existing_file in snapshots_dir.glob("*.json"):
+            if existing_file.name not in expected_files:
+                existing_file.unlink()
+        if not all_characters:
+            try:
+                snapshots_dir.rmdir()
+            except OSError:
+                pass
+    snapshot_files: dict[str, str] = {}
+    for name, snap in all_characters.items():
+        target = snapshots_dir / f"{name}.json"
+        write_if_changed(target, json_payload(snap))
+        snapshot_files[name] = str(target)
+
+    inline: dict[str, dict[str, Any]] = {}
+    omitted: list[str] = []
+    used_bytes = 2
+    for name in dict.fromkeys(active_names):
+        if name not in all_characters:
+            continue
+        entry_bytes = byte_size(json.dumps({name: all_characters[name]}, ensure_ascii=False))
+        if used_bytes + entry_bytes <= DRAFT_INLINE_SNAPSHOTS_MAX_BYTES:
+            inline[name] = all_characters[name]
+            used_bytes += entry_bytes
+        else:
+            omitted.append(name)
+    return inline, snapshot_files, omitted
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1636,11 +1761,13 @@ def main() -> int:
         except wordcount_core.WordcountError as exc:
             raise TrackingError(str(exc)) from exc
         if args.command == "draft":
-            document, snapshots, extra = draft_transaction(args.project, args.chapter)
+            state = load_state(args.project)
+            document, _, extra = draft_transaction(args.project, args.chapter, state=state)
+            all_characters = state["characters"]
             previous_position = extra if document["mode"] == "append" else {}
             prefill_notes = extra.get("notes", []) if document["mode"] == "revision" else []
             record_prefilled = bool(extra.get("prefilled")) if document["mode"] == "revision" else False
-            out = args.out or args.project / ".story" / "work" / f"第{args.chapter:03d}章" / "tracking.json"
+            out = args.out or chapter_work_dir(args.project, args.chapter) / "tracking.json"
             out.parent.mkdir(parents=True, exist_ok=True)
             refreshed = ""
             if out.exists() and not args.force:
@@ -1653,18 +1780,22 @@ def main() -> int:
                 if existing.get("expected_state_revision") == document["expected_state_revision"]:
                     document, refreshed = existing, "已有草稿且修订号未变，原样保留"
                 else:
-                    refreshed = rebuild_stale_draft(document, existing, bool(previous_position),
-                                                    load_state(args.project)["characters"])
+                    refreshed = rebuild_stale_draft(document, existing, bool(previous_position), all_characters)
             out.write_text(json.dumps(document, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+            raw_active = (document.get("context") or {}).get("active_character_names") if isinstance(document.get("context"), dict) else []
+            active_names = [name for name in raw_active if isinstance(name, str)] if isinstance(raw_active, list) else []
+            snapshots, snapshot_files, omitted_snapshots = prepare_draft_snapshots(
+                args.project, args.chapter, all_characters, active_names
+            )
             if document["mode"] == "revision" and not record_prefilled:
                 fill = (f"这是修订，但本章逐章记录缺失或读不了（{delta_path(Path('追踪'), args.chapter).as_posix()}），delta 没有预填："
                         "按修订后正文把本章完整记录整份写上（结果、承诺、角色变化、伏笔、时间线、约束），没写的项不会进记录。"
-                        "角色快照、伏笔、时间线写截至最新已写章的当前值；context 原样保留全部当前条目（修订不能退役）。"
+                        "角色快照、伏笔、时间线写截至最新已写章的当前值（已有核心角色的当前快照见 snapshot_files）；context 原样保留全部当前条目（修订不能退役）。"
                         "正文改过就用 story-long-write 的 storyctl.py chapter commit 提交（重新计数并清理本章工作目录）。"
                         "不要从脚本源码或 state 文件里另找格式。")
             elif document["mode"] == "revision":
                 fill = ("这是修订：delta 是修订后本章的完整记录，已按本章现有逐章记录预填（伏笔与时间线取当前值，"
-                        "记录里的核心角色快照已放进 character_snapshots）。对照修订后正文逐项改：仍成立的原样保留，"
+                        "记录里的核心角色快照已放进 character_snapshots，其他核心角色当前快照见 snapshot_files）。对照修订后正文逐项改：仍成立的原样保留，"
                         "被推翻的删掉或改写，新增的补上；不要清空后只写改动，没写的项会从本章记录里消失。"
                         "角色快照、伏笔、时间线改成截至最新已写章的当前值；context 原样保留全部当前条目（修订不能退役）。"
                         "正文改过就用 story-long-write 的 storyctl.py chapter commit 提交（重新计数并清理本章工作目录）。"
@@ -1673,8 +1804,10 @@ def main() -> int:
                     fill += "没能预填：" + "；".join(prefill_notes) + "。"
             else:
                 fill = ("只填 delta 里本章的变化；context 其余字段已是当前值，要撤下的长期约束或连贯性风险从 context 删掉并把原文放进 "
-                        "delta.retired_context_items（仅 append）；本章有变化的核心角色把下面的当前快照整份改好放进 character_snapshots，"
-                        "并在 character_changes 写一句变化。每类条目照 shapes 的形状写，不要从脚本源码或 state 文件里另找格式。")
+                        "delta.retired_context_items（仅 append）；本章有变化的核心角色从 current_snapshots（未内联的大快照或久别回归角色读 snapshot_files 对应 JSON）"
+                        "取当前快照整份改好放进 character_snapshots，并在 character_changes 写一句变化。每类条目照 shapes 的形状写，不要从脚本源码或 state 文件里另找格式。")
+            if omitted_snapshots:
+                fill = (f"在场角色（{'、'.join(omitted_snapshots)}）快照较大未内联到 stdout，本章若有变化先读取 snapshot_files 对应 JSON 在其基础上修改，勿凭空重写以免丢失既有条目。") + fill
             blank = not (document["context"]["position"].get("story_time") or document["context"]["position"].get("scene"))
             if previous_position and blank:
                 fill = ("context.position 的 story_time 与 scene 留空，填本章结束时的故事时间与场景（上一章结束时见 "
@@ -1687,7 +1820,10 @@ def main() -> int:
                 "limits_chars": DRAFT_LIMITS,
                 "shapes": entry_shapes(args.chapter),
                 "current_snapshots": snapshots,
+                "snapshot_files": snapshot_files,
             }
+            if omitted_snapshots:
+                payload["omitted_active_snapshots"] = omitted_snapshots
             if previous_position:
                 payload["previous_position"] = previous_position
             emit(json.dumps(payload, ensure_ascii=False))
