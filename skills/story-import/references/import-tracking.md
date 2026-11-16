@@ -44,7 +44,7 @@ Phase 4 完整读取本文件、[tracking-initialization.md](tracking-initializa
 
 - 伏笔 `id` 形如 `F001`，`status` 取 已埋/已回收/已过期/放弃，`importance` 取 高/中/低；`planted_chapter` 不晚于 N。事件 `id` 形如 `E001`，`reveal_status` 取 未揭示/部分揭示/已揭示：`未揭示` 的 `reveal_chapter` 必须为 `null`，部分/完全揭示只能填已经发生的实际章节。
 - `context` 在 init 时收六项：`position`、`long_term_constraints`、`active_character_names`、`continuity_risks`、`recent_chapters`（最多 3 章，按章号升序）、`next_chapter_commitments`。
-- `character_snapshots` 里的角色就是核心角色；四个列表不限条数，单角色文件目标 ≤4096 字节，硬上限 8192 字节，超过在任何写入前拒绝。`active_character_names` 是导入截止章之后下一章的活跃角色，不是核心角色总数：最多 20 人且必须已有快照；`long_term_constraints` 最多 6 条。
+- `character_snapshots` 里的角色就是核心角色；四个列表不限条数（单项 ≤600 字节），单角色文件目标 ≤16384 字节（仅提醒），硬上限 65536 字节，超过在任何写入前拒绝。`active_character_names` 是导入截止章之后下一章的活跃角色，不是核心角色总数：最多 20 人且必须已有快照；`long_term_constraints` 最多 6 条。
 - `上下文.md` ≤12288 字节，只含 7 个顶层区块：当前位置、长期约束、核心角色状态、活跃伏笔（最多 8 条）、近三章速记、下一章承诺、连贯性风险。
 - 报错按提示改事务本身再跑，字段形状以 tracking-initialization.md 的骨架和本节为准。
 
