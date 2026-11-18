@@ -1259,6 +1259,22 @@ for (const marker of ['没人知道', '这才刚刚开头', '压了过去']) {
 NODE
 [ "$trailer_blk" -eq 1 ] || { echo "FAIL: trailer-ending --fail-on=blocking 应退出 1，实际 $trailer_blk" >&2; exit 1; }
 
+# 全知旁白预告「她不知道的是」：单处按 trailer-ending 密度规则为 advisory；
+# 反例「她不知道该说什么」是普通叙述，不计。
+FIXTURE_TRAILER_UNAWARE="$TMP_DIR/fixture-trailer-unaware.md"
+printf '%s\n' \
+  '她不知道该说什么，只好低头收拾行李。' \
+  '她不知道的是，这一去，她的命运就此改变了。' > "$FIXTURE_TRAILER_UNAWARE"
+node "$SCRIPT" --json "$FIXTURE_TRAILER_UNAWARE" > "$OUT" || true
+node - "$OUT" <<'NODE'
+const fs = require('fs');
+const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const te = r.findings.filter((f) => f.type === 'trailer-ending');
+if (te.length !== 1 || te[0].line !== 2 || te[0].excerpt !== '她不知道的是' || te[0].severity !== 'advisory') {
+  throw new Error('「她不知道的是」应单处命中 advisory trailer-ending，「她不知道该说什么」不应命中: ' + JSON.stringify(te));
+}
+NODE
+
 echo "trailer-ending (预告式总结收尾) regression tests passed."
 
 # --- 实战漏网 E：quote-emphasis-tic（叙述里短词加引号强调，advisory 密度型）---
