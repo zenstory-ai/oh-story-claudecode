@@ -15,9 +15,9 @@
 | [goink](https://github.com/sigpanic/goink) | 桌面应用（Go + Wails） | AGPL-3.0 | 488 / 2026-10-13 | 未核实 | 人物、关系历史与伏笔回收期限的结构化追踪；本地中文语义检索 |
 | [AI_NovelGenerator](https://github.com/YILING0013/AI_NovelGenerator) | 本地网页应用（Next.js + FastAPI + MongoDB） | AGPL-3.0 | 6,364 / 2026-10-16 | OpenAI 兼容、DeepSeek、Gemini、Claude | 卷—弧—场景—章节分层规划，人物与势力关系图，可编辑的节点式工作流 |
 | [Long-Novel-GPT](https://github.com/MaoXiaoYuZ/Long-Novel-GPT) | 网页应用（Gradio，Docker） | 未检测到许可证 | 1,251 / 2025-11-05 | `.env` 配 Key，支持 OpenAI 格式的本地接口 | 大纲→章节→正文逐层展开，可导入旧作拆书再改写 |
-| [NovelKit](https://github.com/t59688/novel-kit) | 编程 Agent 斜杠命令（README 写明目前只支持 Cursor） | 未检测到许可证（README 徽章写 MIT） | 162 / 2025-12-22 | 用宿主的模型 | “小说宪法”一致性检查，章节生命周期，伏笔追踪 |
+| [NovelKit](https://github.com/t59688/novel-kit) | 编程 Agent 斜杠命令（README 写明目前只支持 Cursor） | 未检测到许可证（README 徽章写 MIT） | 162 / 2025-12-22 | 用所在工具的模型 | “小说宪法”一致性检查，章节生命周期，伏笔追踪 |
 | [novel-writer-skills](https://github.com/wordflowlab/novel-writer-skills) / [novelws](https://github.com/binlee1990/novel-writer-skills) | Claude Code 斜杠命令 | MIT | 270 / 2025-10-20；分支版 novelws 6 / 2026-02-26 | 用 Claude Code 的模型 | `/track`、`/plot-check`、`/timeline` 等追踪命令；novelws 另有 JSON 追踪文件和本地看板 |
-| [Oh Story](https://github.com/zenstory-ai/oh-story-claudecode)（我们） | 编程 Agent skill 包，适配 Claude Code、Codex、OpenCode 等 7 个宿主 | MIT | 8,153 / 2026-10-30 | 用宿主 Agent 的模型，不另配 | 设定、大纲、正文、追踪分文件存；写正文前检查本章细纲；追踪文件由工具重建，手改会被检查拒绝 |
+| [Oh Story](https://github.com/zenstory-ai/oh-story-claudecode)（我们） | 编程 Agent skill 包，适配 Claude Code、Codex、OpenCode 等 7 款编程 Agent | MIT | 8,153 / 2026-10-30 | 直接用当前 Agent 的模型，不另配 | 设定、大纲、正文、追踪分文件存；写正文前检查本章细纲；追踪文件由工具重建，手改会被检查拒绝 |
 
 另一个相关项目是 [denova](https://github.com/alfredxw/denova)（Apache-2.0，981 星，Beta）：写作加互动游戏的工作台，内置网文 skill，也能接入 Claude Code、Codex。
 
@@ -27,7 +27,7 @@
 
 **不用编程 Agent，想要一个打开就能写的应用。** 看 show-me-the-story（一个不到 10MB 的可执行文件，浏览器里操作）、Pagekin（桌面应用，可接本地 Ollama）和 goink。它们都由作者自己填 API Key，费用按自己用的模型计算。
 
-**已经在用编程 Agent。** 看 Oh Story、novel-writer-skills / novelws 和 NovelKit。这类工具不带模型，写作用的就是 Agent 当前的模型。区别在宿主范围和题材：novel-writer-skills 只支持 Claude Code，NovelKit 只支持 Cursor；Oh Story 适配 7 个宿主，流程按网文写（起点、番茄、晋江等平台的扫榜和拆文）。
+**已经在用编程 Agent。** 看 Oh Story、novel-writer-skills / novelws 和 NovelKit。这类工具不带模型，写作用的就是 Agent 当前的模型。区别在支持的工具和题材方向：novel-writer-skills 只支持 Claude Code，NovelKit 只支持 Cursor；Oh Story 适配 7 款编程 Agent，流程按网文设计（含起点、番茄、晋江等平台的扫榜和拆文）。
 
 **想在本机部署一套网页工作台。** AI_NovelGenerator 功能最全，但需要 MongoDB 副本集，README 说明只适合本地使用、没有登录鉴权。Long-Novel-GPT 用 Docker 启动最简单，不过最近一次提交已是一年前。不想部署也可以用托管版的 ZenStory 工作台（我们的项目，免费版每天 3 条 AI 消息）。
 

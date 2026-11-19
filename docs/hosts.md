@@ -2,8 +2,8 @@
 
 [English](hosts_EN.md)
 
-Oh Story 为 7 款编程 Agent 提供部署适配，另支持 Web AI / 通用文件模式。本页说明各宿主的部署条件、限制与安装排查；
-日常使用只需 README 的[安装](../README.md#安装)一节。
+Oh Story 为 7 款编程 Agent 提供部署适配，另支持 Web AI / 通用文件模式。本页说明各工具的部署条件、已知限制与安装排查；
+日常使用只需看 README 的[安装](../README.md#安装)一节。
 
 ## 安装排查：Windows 报错、环境检查、marketplace 路径
 
@@ -26,17 +26,23 @@ claude plugin install oh-story@oh-story-skills
 
 ## Antigravity
 
-先用 `/skills` 或自然语言运行 `story-setup`，它会自动识别当前宿主（`target_cli=antigravity`），判断不出时才会问你。它只在当前写作项目创建/更新 14 个 `.agents/skills/` 已知目录、7 个 `.agents/agents/agent-name/agent.md` 已知定义（`agent-name` 替换为实际名称）、`.agents/rules/oh-story.md`、两个 `.agents/hooks/` runtime 文件与 `.agents/hooks.json` 的 `oh-story` 管理组；其他用户 Skills、Agents、Rules、Hooks 和 hook groups 都保留，部署器本身不会写 `~/.gemini/`。项目内 Skills 使用真实目录；若 `.agents/skills` 已是 symlink，会先解释 git diff 并征求明确迁移同意，未同意绝不沿链接写入。Hook 依赖 PATH 中的 `node`；部署后新开 conversation，再分别在 IDE 与交互式 `agy` 中 smoke test。命令行写作可从项目目录启动交互式 `agy`，确认 `/skills`、`/agents`、`/hooks` 已发现 oh-story 后再发任务。**print 模式（`agy -p`）必须带 `--add-dir "$PWD"`**：实测 agy 1.2.10 带上它会加载工作区 `.agents/`（14 个 skills、7 个 agents 与 hooks），不带则一个都不加载，skill 回退、甚至把普通模型输出写到 `~/.gemini/antigravity-cli/scratch/`。测试后检查 scratch 没有意外小说产物。
+先用 `/skills` 或自然语言运行 `story-setup`，它会自动识别当前工具（`target_cli=antigravity`），判断不出时才会问你。部署只在当前写作项目内创建或更新 14 个 `.agents/skills/` 已知目录、7 个 `.agents/agents/agent-name/agent.md` 已知定义（`agent-name` 替换为实际名称）、`.agents/rules/oh-story.md`、两个 `.agents/hooks/` 运行时文件与 `.agents/hooks.json` 的 `oh-story` 管理组；其他用户 Skills、Agents、Rules、Hooks 和 hook groups 原样保留，部署器不会写 `~/.gemini/`。项目内 Skills 使用真实目录；若 `.agents/skills` 已是 symlink，会先说明 git diff 影响并征得明确同意后才迁移，未同意绝不沿链接写入。
+
+Hook 依赖 PATH 中的 `node`。部署后新开一个会话，可从项目目录启动交互式 `agy`，确认 `/skills`、`/agents`、`/hooks` 已发现 oh-story 后再发任务。**print 模式（`agy -p`）必须带 `--add-dir "$PWD"`**：实测 agy 1.2.10 带上它会加载工作区 `.agents/`（14 个 skills、7 个 agents 与 hooks），不带则一个都不加载，skill 回退，甚至可能把普通模型输出写到 `~/.gemini/antigravity-cli/scratch/`。测试后检查 scratch 目录没有意外产物。
 
 ## Codex
 
-repo 内直接使用：Codex 会扫描 `$REPO_ROOT/.agents/skills`（指向 `skills/` 的 symlink）发现 14 个 skill；用 `$story`、`$story-setup` 或 `/skills` 调用。Windows 上 git 需开 `core.symlinks=true`，否则 symlink 失效，改走下方 `$story-setup` 部署。
+仓库内直接使用：Codex 会扫描 `$REPO_ROOT/.agents/skills`（指向 `skills/` 的 symlink）发现 14 个 skill，用 `$story`、`$story-setup` 或 `/skills` 调用。Windows 上 git 需开启 `core.symlinks=true`，否则 symlink 失效，改走下方 `$story-setup` 部署。
 
-跑 `$story-setup` 部署到写作项目后，会写入 `.codex/agents/*.toml`、`.codex/hooks.json`、`.codex/hooks/{story_codex_hook.py,run-story-hook.sh,run-story-hook.cmd}` 和 `.codex/skills/story-setup/references/agent-references/`；请信任项目 `.codex/` 配置层并在 `/hooks` review/trust hooks、新开 Codex 会话，让 custom agents 生效。**在 `/hooks` 信任之前，Codex 会静默跳过这些 hooks，包括写正文前的大纲守卫**，不报错也不提示；自动化里的 `codex exec` 可加 `--dangerously-bypass-hook-trust`。
+跑 `$story-setup` 部署到写作项目后，会写入 `.codex/agents/*.toml`、`.codex/hooks.json`、`.codex/hooks/{story_codex_hook.py,run-story-hook.sh,run-story-hook.cmd}` 和 `.codex/skills/story-setup/references/agent-references/`。请信任项目 `.codex/` 配置层，在 `/hooks` 里检查并信任 hooks，再新开 Codex 会话让自定义 agents 生效。**在 `/hooks` 信任之前，Codex 会静默跳过这些 hooks（包括写正文前的大纲守卫）**，不报错也不提示；自动化里的 `codex exec` 可加 `--dangerously-bypass-hook-trust`。
 
 ## ZCode
 
-在 Plugin Management 中添加本仓库，安装 `oh-story`，即可调用全部 14 个 Skills/Commands。市场名可能显示 `oh-story-zcode`（根 catalog）或 `oh-story-skills`（Claude catalog）；选择其中一个即可，内容相同。旧版多条目安装按[升级指南](../skills/story-setup/UPGRADING.md#插件打包身份迁移v079-同版本修复)迁移。`$story-setup` 选择 `target_cli=zcode` 会部署 `.zcode/skills/`、`.zcode/commands/`、`.zcode/hooks/story_zcode_hook.js`，安全合并 `.zcode/config.json` 与根 `AGENTS.md`；Hook 依赖 PATH 中的 `node`。注：ZCode 3.7+ 出于安全限制会忽略项目级 `.zcode/config.json` 的 `hooks`（`config_project_hooks_ignored`），写前守卫与写后检查须通过启用 `oh-story` 插件（或手动将 `hooks` 合入用户级 `~/.zcode/cli/config.json`）才会在运行时执行。当前 ZCode 支持插件子代理；oh-story 插件注册 7 个专业角色（默认带 `injectAgentsMd: false`，避免把主会话 `AGENTS.md` 重复注入子代理），按当前 `Agent` 工具派发，只有角色或工具不可用时才降级。独立安装 Skills 不会注册这些角色，需启用插件；不创建 `.zcode/agents/` 或写入用户 home。升级插件后重新运行 `$story-setup` 更新项目快照和旧 AGENTS 指令，再新开会话。现有 Hook 适配不注册 `PreCompact` / `SessionEnd`，compact 后由 `SessionStart` 恢复上下文。见 [ZCode 插件](https://zcode.z.ai/en/docs/plugin)与[子代理文档](https://zcode.z.ai/en/docs/subagents)。
+在 Plugin Management 中添加本仓库并安装 `oh-story`，即可调用全部 14 个 Skills/Commands。市场名可能显示 `oh-story-zcode`（根 catalog）或 `oh-story-skills`（Claude catalog），任选一个即可，内容相同；旧版多条目安装按[升级指南](../skills/story-setup/UPGRADING.md#插件打包身份迁移v079-同版本修复)迁移。
+
+`$story-setup` 选择 `target_cli=zcode` 会部署 `.zcode/skills/`、`.zcode/commands/`、`.zcode/hooks/story_zcode_hook.js`，并合并 `.zcode/config.json` 与根 `AGENTS.md`；Hook 依赖 PATH 中的 `node`。注意：ZCode 3.7+ 出于安全限制会忽略项目级 `.zcode/config.json` 里的 `hooks`（`config_project_hooks_ignored`），写前守卫与写后检查须启用 `oh-story` 插件（或手动将 `hooks` 合入用户级 `~/.zcode/cli/config.json`）才会在运行时执行。
+
+当前 ZCode 支持插件子代理，`oh-story` 插件注册了 7 个专业角色（默认带 `injectAgentsMd: false`，避免把顶层 `AGENTS.md` 重复注入子代理），按当前 `Agent` 工具派发，只有角色或工具不可用时才降级。独立安装 Skills 不会注册这些角色，需启用插件；部署不创建 `.zcode/agents/`，也不写入用户主目录。升级插件后重跑 `$story-setup` 刷新项目快照与旧 AGENTS 指令，再新开会话。现有 Hook 适配不注册 `PreCompact` / `SessionEnd`，压缩后由 `SessionStart` 恢复上下文。详见 [ZCode 插件](https://zcode.z.ai/en/docs/plugin)与[子代理文档](https://zcode.z.ai/en/docs/subagents)。
 
 ## OpenCode
 

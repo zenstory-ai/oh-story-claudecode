@@ -5,7 +5,7 @@
 逐项完成基础检查：
 1. 格式合规性检查：按戏剧单元/画面分段而非机械按字数切分；段首建立主语、段中用代词或省略（连续无必要重复同一角色名才算主语过密）；无段间空行；对话独立成行；正文评价台词、题字等所用的具体字数须统计正确且有叙事必要。
 2. 设定一致性 grep（角色名、属性、关键设定、伏笔关键词）+ 推理型一致性检查（规则边界、设定层级、跨章因果链、可滥用漏洞、代价一致性）。
-3. AI 味按表达、用笔、故事三层检查：完整读 `story-review/references/expression.md`、`story-review/references/narrative-focus.md`、`story-review/references/story-logic.md` 及 `story-review/references/banned-words.md`（不可读时用 SKILL.md 内置三层去味 fallback 速查并在「没法判断的地方」写明诊断受限）。每项报告原文位置、读者损失、建议与依据，只报告不落改。
+3. AI 味按表达、用笔、故事三层检查：完整读 `story-review/references/expression.md`、`story-review/references/narrative-focus.md`、`story-review/references/story-logic.md` 及 `story-review/references/banned-words.md`（不可读时用 SKILL.md 内置三层去味 fallback 速查并在「没法判断的地方」写明诊断受限）。每项报告原文位置、哪里影响读感、建议与依据，只报告不落改。
 4. 按通用 rubric 加叠加的平台表评估内容。
 5. 长篇工程里，正文证据显示 `追踪/` 的事实错了或漏了（如伏笔过期、开放钩子漏登记），不改 `追踪/`，把要修的事实写进「需要你决定」，提示作者装好审稿助手后用 `/story-review lean` 修，或在 `/story-long-write` 改到该章时一并提交。
 6. 按统一 Findings Schema 整理问题，再按下方模板写给作者。
