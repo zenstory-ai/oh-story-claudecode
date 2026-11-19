@@ -81,7 +81,7 @@ demo/长篇/让你管账号，你高燃混剪炸全网/
                  角色状态/{角色名}.md · 时间线/{作者真相.md · 读者已知.md}
 ```
 
-Per-chapter extraction (events / characters / settings / foreshadowing / timeline) is reverse-engineered into a continuation bible, so the author seamlessly continues from chapter 21.
+Per-chapter extraction (events / characters / settings / foreshadowing / timeline) is turned into a continuation project, so the author can pick up directly at chapter 21.
 
 ## Published continuation artifacts
 

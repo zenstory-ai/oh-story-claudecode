@@ -1,8 +1,6 @@
 # How to keep an AI writing agent from breaking character over 100+ chapters
 
-Keep story state in files, load the slice each chapter needs, and commit changes through the tracking tools. That is how Oh Story (`zenstory-ai/oh-story-claudecode`, MIT, 14 agent skills for Claude Code, Codex CLI, OpenCode and other coding agents) organizes daily writing batches with explicit continuity records.
-
-The current skills use structured tracking to reduce character drift, lost setups and premature knowledge.
+Keep story state in files, load only the slice each chapter needs, and commit changes through the tracking tools. Oh Story (`zenstory-ai/oh-story-claudecode`, MIT, 14 skills for Claude Code, Codex CLI, OpenCode, and other coding agents) uses structured tracking files to cut down character drift, dropped setups, and characters knowing things too early.
 
 中文版：[AI 写长篇小说怎么不崩人设](ai-long-novel-character-consistency.md)
 
@@ -40,17 +38,17 @@ Three design rules do the work:
 
 From `story-long-write`'s single-chapter flow:
 
-1. **Reference gate, read before write.** Load the chapter brief, the volume contract and current plot unit selected by the outline tool, and the current tracking state, then record this round's constraints before writing: word range, must-happen, must-not-happen, time anchors, where the chapter stops, what new debt it opens. These project facts override any craft reference.
-2. **Load only what would otherwise be wrong.** For each character on stage, read `设定/角色/{name}.md` (stable characterization) and `追踪/角色状态/{name}.md` (current location, goal, relationships, what they know, open threads). "Xu Tang has an older brother" is characterization. "Xu Tang does not know the letter came from him" is state. Reading them separately is what stops the model from turning a fact into character knowledge.
+1. **Reference gate, read before write.** Load the chapter brief, the volume outline slice and current plot unit selected by the outline tool, and the current tracking state, then record this round's constraints before writing: word range, must-happen, must-not-happen, time anchors, where the chapter stops, and what new thread it opens. These book-specific facts override any craft reference.
+2. **Load only what would otherwise be wrong.** For each character on stage, read `设定/角色/{name}.md` (stable characterization) and `追踪/角色状态/{name}.md` (current location, goal, relationships, what they know, open threads). "Xu Tang has an older brother" is characterization. "Xu Tang does not know the letter came from him" is state. Reading them separately stops the model from turning background facts into character knowledge.
 3. **Write the prose.**
-4. **Check and revise.** Chapter checks cover approved plot points, length, phrasing and degeneration. Consistency review runs when needed, and before commit for a standalone chapter. A separate `/story-review` request provides multi-perspective review, with main-session fallback when agents are unavailable.
-5. **Commit the delta.** After checks, `storyctl.py chapter commit` invokes the tracking transaction to record knowledge, paid-off setups and time changes. Continue only after a successful commit refreshes the derived views.
+4. **Check and revise.** Chapter checks cover approved plot points, length, phrasing, and degeneration. Consistency review runs when needed, and before commit for a standalone chapter. A separate `/story-review` request runs multi-perspective review, falling back to single-session review when specialist agents are unavailable.
+5. **Commit the delta.** After checks, `storyctl.py chapter commit` updates the tracking state to record new knowledge, paid-off setups, and timeline progress. Move to the next chapter only after the commit refreshes the derived files.
 
-This is why a three-chapter batch keeps working: each chapter starts from a fresh state card, not from an ever-growing chat transcript.
+That keeps a three-chapter daily batch steady: every chapter starts from a fresh state card instead of a sprawling chat history.
 
 ## Already 40 chapters in, no tracking files?
 
-Run `/story-setup`, then `/story-import` to reverse-parse the existing manuscript into the structure above. It produces first-pass settings, character states and setups. Inferred facts are listed as "to confirm" rather than written as truth; review them, then continue with `/story-long-write`.
+Run `/story-setup`, then `/story-import` to rebuild the existing manuscript into the directory layout above, generating first-pass settings, character states, and setups. Guessed details are flagged as "to confirm" and held back until you review them; after checking, continue with `/story-long-write`.
 
 ## Limits
 
