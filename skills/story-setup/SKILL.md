@@ -21,7 +21,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ## Phase 1：判断宿主与项目
 
-**先自检参考目录**：以正在执行的本 `SKILL.md` 所在目录为准，列出与它同级的 `references/` 下的子目录，核对下面 9 个名字是否都在**且都非空**——`agent-references`、`templates`、`opencode`、`codex`、`antigravity`、`zcode`、`openclaw`、`reasonix`、`generic`；同级 `references/deploy-*.md`（8 份宿主部署文件）、`scripts/merge-claude-settings.py`、`scripts/merge-codex-hooks.py`、`scripts/merge-antigravity-hooks.py`、`scripts/generate-antigravity-agents.mjs`、`scripts/deploy-antigravity-skills.py`、`scripts/merge-project-instructions.py` 与 `scripts/copy-path-safety.py` 也必须存在（宿主部署步骤、Claude/Codex/Antigravity hooks 合并、Antigravity Skills 物化与 agent 生成、项目指令合并、递归复制安全检查依赖它们）。有缺即 skill 包没装全，**立即停止，不写任何部署文件**，报告里区分「缺目录」「目录为空」和「缺脚本或部署文件」，并给修复指令：「story-setup 参考资料包不完整，缺 {路径}。按你的安装方式重装 oh-story-claudecode（命令行装的重跑 `npx skills add zenstory-ai/oh-story-claudecode -y -g`，marketplace / Plugin Management 装的在面板里重装），再执行 /story-setup。」
+**先自检参考目录**：以正在执行的本 `SKILL.md` 所在目录为准，列出与它同级的 `references/` 下的子目录，核对下面 9 个名字是否都在**且都非空**——`agent-references`、`templates`、`opencode`、`codex`、`antigravity`、`zcode`、`openclaw`、`reasonix`、`generic`；同级 `references/deploy-*.md`（9 份宿主部署文件）、`scripts/merge-claude-settings.py`、`scripts/merge-codex-hooks.py`、`scripts/merge-antigravity-hooks.py`、`scripts/generate-antigravity-agents.mjs`、`scripts/deploy-antigravity-skills.py`、`scripts/merge-project-instructions.py` 与 `scripts/copy-path-safety.py` 也必须存在（宿主部署步骤、Claude/Codex/Antigravity hooks 合并、Antigravity Skills 物化与 agent 生成、项目指令合并、递归复制安全检查依赖它们）。有缺即 skill 包没装全，**立即停止，不写任何部署文件**，报告里区分「缺目录」「目录为空」和「缺脚本或部署文件」，并给修复指令：「story-setup 参考资料包不完整，缺 {路径}。按你的安装方式重装 oh-story-claudecode（命令行装的重跑 `npx skills add zenstory-ai/oh-story-claudecode -y -g`，marketplace / Plugin Management 装的在面板里重装），再执行 /story-setup。」
 
 > 判据是「有没有 `SKILL.md`」：只看正在执行的 `SKILL.md` 同级的 `references/`。项目内 `.claude/skills/story-setup/`、`.codex/skills/story-setup/` 和 OpenCode 的 `skills/story-setup/` 只有 `references/agent-references/`、不含 `SKILL.md`，不会是执行目录，也不要拿它们核对。Antigravity / ZCode / OpenClaw / Reasonix / generic 的项目副本是整份 skill 拷贝、自带 `SKILL.md`，9 个子目录本就齐全，照常核对即可。
 
@@ -36,7 +36,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
    - 无 → 识别为新项目或短篇项目
 3. 检查 `.active-book` 文件是否存在：存在 → 显示当前活跃书目；不存在 → 跳过
 4. **判断当前宿主（能判断就不问作者）**。依次看，第一条能定下来的就用：
-   - 你自身的运行环境：系统提示、可用工具名或 skill 调用语法已表明你运行在 Claude Code、Codex、OpenCode、Google Antigravity（含命令行 `agy`）、ZCode、OpenClaw 或 Reasonix 里；
+   - 你自身的运行环境：系统提示、可用工具名或 skill 调用语法已表明你运行在 Claude Code、Codex、OpenCode、Google Antigravity（含命令行 `agy`）、ZCode、OpenClaw、Reasonix、DeepSeek Harness（DSH）里；
    - 正在执行的本 `SKILL.md` 的安装位置带有宿主专属目录（如 `.claude/`、`.codex/`、`.zcode/`、`.gemini/`、`.openclaw/`、`.opencode/`）；
    - 判断不出（例如网页版 AI、自建 Agent，或以上信号互相矛盾）→ 第 5 步的项目标记只当候选，交第 6 步问作者。
 5. 看项目里已有哪些宿主的标记：
@@ -47,6 +47,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
    - `.zcode/`、`.zcode/config.json`、`zcode.json`、`.zcode/skills/`、`.zcode/commands/`、`AGENTS.md` 中的 ZCode 段 → `target_cli = zcode`
    - `openclaw.json`、`.openclaw/`，或 `AGENTS.md` 中的 OpenClaw 段（标题行含 `网文写作工具集（OpenClaw）`）→ `target_cli = openclaw`
    - `.reasonix/`、`reasonix-plugin.json`、`REASONIX.md`，或 `AGENTS.md` 中的 Reasonix 段（标题行含 `网文写作工具集（Reasonix）`）→ `target_cli = reasonix`
+   - `AGENTS.md` 中的 DSH 段（标题行含 `网文写作工具集（DSH）`），或项目内已有 `.claude/agents/` 注册物且当前宿主是 DeepSeek Harness → `target_cli = dsh`
    - `AGENTS.md` 中的通用段（标题行含 `网文写作工具集（通用 Agent / Web AI）`）→ `target_cli = generic`
    - `CLAUDE.md` / `AGENTS.md` 里的 `<!-- oh-story:{宿主} 开始` 管理块 → `target_cli` 含该宿主
 
@@ -55,7 +56,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
    - 第 4 步定出了当前宿主 → `target_cli` 就是它。项目里另有其他宿主的标记时，用 AskUserQuestion 问一句白话：「这个文件夹之前也给 {其他宿主名} 装过写作工具，这次要一起更新吗？」选项：「只装 {当前宿主名}（推荐）」「一起更新」。作者一开始就说要装多个时照办。
    - 定不出、项目标记恰好只有一个宿主 → AskUserQuestion 问「上次是给 {宿主名} 装的，这次还是它吗？」，是就用它，不是按下一条问。
    - 定不出、其余情况 → 用 AskUserQuestion 问：「你现在是在哪个软件里跟我对话？」选项用产品名加一句说明：Claude Code（Anthropic 的命令行 / 桌面版）、Codex（OpenAI 的命令行）、OpenCode、Google Antigravity（含命令行 agy）、ZCode、OpenClaw、Reasonix（DeepSeek 的命令行）、网页版 AI 或其他工具（NarraFork、自建 Agent 等）、好几个都要用。提问工具一次放不下这么多选项时，把项目标记里出现过的放前面，其余让作者在「其他」里直接写名字。
-   - 作者的答案按「Claude Code → `claude-code`、网页版 AI 或其他工具 → `generic`、其余取小写产品名」换成 `target_cli`；多端为 `claude-code,opencode,codex,antigravity,zcode,openclaw,reasonix,generic` 中选中的端。
+   - 作者的答案按「Claude Code → `claude-code`、网页版 AI 或其他工具 → `generic`、其余取小写产品名」换成 `target_cli`；多端为 `claude-code,opencode,codex,antigravity,zcode,openclaw,reasonix,generic,dsh` 中选中的端。
 7. **确认项目根（通常不问）**：项目根就是当前工作目录。只有当前目录是用户主目录、磁盘根目录、系统目录，或就是本 skill 包自身的安装/源码目录时，才用一句白话问作者：「写作工具要装在哪个文件夹？一般就是放书稿的那个文件夹。」其他情况直接部署，在安装报告的「部署明细」里写明装在哪。
 
 ## Phase 2：部署基础设施
@@ -82,6 +83,7 @@ Phase 2 幂等：复制、写入与各宿主合并重复执行结果一致。受
 | `openclaw` | [references/deploy-openclaw.md](references/deploy-openclaw.md) |
 | `reasonix` | [references/deploy-reasonix.md](references/deploy-reasonix.md) |
 | `generic` | [references/deploy-generic.md](references/deploy-generic.md) |
+| `dsh` | [references/deploy-dsh.md](references/deploy-dsh.md) |
 
 多端部署时几个宿主共用根 `AGENTS.md`，各占一个管理块（见下方「项目指令合并」）；某一端被自己的前置条件拦下（如 OpenCode 版本门、Antigravity 缺 Node）时，按该端部署文件的规定处理，其他端照常部署。
 
@@ -140,6 +142,6 @@ Phase 2 幂等：复制、写入与各宿主合并重复执行结果一致。受
 
 | 文件 | 用途 |
 |------|------|
-| references/deploy-*.md | 8 份宿主部署文件：各自的部署清单、算法、验证与安装报告提示，按 Phase 2 Step 1 只读目标宿主那份 |
+| references/deploy-*.md | 9 份宿主部署文件：各自的部署清单、算法、验证与安装报告提示，按 Phase 2 Step 1 只读目标宿主那份 |
 | [references/diagnostics.md](references/diagnostics.md) | 仅检查模式 |
 | UPGRADING.md | 写给作者：各版本要不要重跑、哪些旧数据要迁移 |

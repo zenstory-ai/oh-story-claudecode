@@ -1,0 +1,60 @@
+# {项目名} — 网文写作工具集（DSH）
+
+本项目在 DeepSeek Harness（DSH）里按项目文件方式接入 oh-story skills：读取 `skills/*/SKILL.md` 并按需读取 `skills/*/references/`。角色（custom agents）复用 claude-code 部署产物 `.claude/agents/`，审查等 skill 用子代理派发工具 spawn 子会话并在 prompt 里注入人设正文；DSH 无 hooks 自动拦截，写作检查由 skill 流程执行。
+
+## Skill 路由表
+
+优先用自然语言点名 skill；DSH 支持 `/命令` 触发时也可以把下表映射成命令。
+
+| 意图 | Skill | 说明 |
+|------|-------|------|
+| 写长篇 / 开书 / 续写 | story-long-write | 长篇网文写作（逐章推进） |
+| 写短篇 | story-short-write | 短篇网文写作（情绪驱动） |
+| 长篇拆文 | story-long-analyze | 长篇小说深度拆解 |
+| 短篇拆文 | story-short-analyze | 短篇小说拆文分析 |
+| 长篇扫榜 | story-long-scan | 长篇小说榜单与市场趋势 |
+| 短篇扫榜 | story-short-scan | 短篇小说榜单与情绪风口 |
+| 去 AI 味 | story-deslop | 去除 AI 写作痕迹 |
+| 封面 | story-cover | 生成封面图 |
+| 发布资料 | story-publish | 发布准备：整理并核对平台书籍资料 |
+| 审查 | story-review | 多视角对抗式审查；注册物可用时并行 spawn reviewer |
+| 导入 | story-import | 逆向导入已有小说到项目结构 |
+| 网文工具箱 | story | 模糊意图自动分发 |
+| 准备写书 / 部署 | story-setup | 通用项目结构与 skill 使用入口 |
+| 浏览器登录态 / 抓取 | browser-cdp | 浏览器 CDP 工具；需平台允许本地脚本/浏览器控制 |
+
+## 文件结构
+
+- `skills/` — 项目本地 skills；Agent 应先读对应 `SKILL.md`，再按需读取 `references/`
+- `.claude/agents/` — DSH 角色注册物（人设真源，与 claude-code 共用）；frontmatter `name` 即角色名
+- `.claude/skills/story-setup/references/agent-references/` — 角色/审查参考资料 canonical 路径
+- `拆文库/` — 拆文分析结果存放目录
+- `{书名}/正文/` — 长篇小说正文章节
+- `{书名}/正文.md` — 短篇小说正文
+- `{书名}/设定/` — 角色设定、世界设定
+- `{书名}/大纲/` — 卷纲、细纲
+- `{书名}/追踪/` — `_tracking-state.json` 为唯一结构化权威；追踪工具生成固定 7 栏 `上下文.md`、逐章记录、核心角色快照、伏笔视图和作者/读者双时间线
+- `{书名}/对标/` — 对标作品分析
+
+## DSH 使用约定
+
+- 写正文前先有大纲：长篇需要 `大纲/细纲_第N章*.md`，短篇需要 `小节大纲.md`。DSH 不消费 `.claude/` hooks，越权写正文不会被自动拦截，Agent 必须在执行写作 skill 时自行检查大纲、上下文和追踪文件。
+- 需要专业角色时（story-architect、character-designer、narrative-writer、consistency-checker 等），用当前运行时的子代理委派工具 spawn 子会话：先读 `.claude/agents/{角色}.md`，把人设正文作为 prompt 前缀注入，再附 skill 规定的任务包；角色文件缺失或 frontmatter 损坏时按 skill 降级 solo 并说明。
+- 角色读参考资料走 `.claude/skills/story-setup/references/agent-references/`（子会话工作目录为项目根时按相对路径解析）。
+- **每章写完先去 AI 味**（没有 hook 替你检查）：正文落盘后同一轮内按写作 skill 的检测器和禁用词表自检、改净；能运行 node 时跑写作 skill 的 `scripts/check-ai-patterns.js --check --fail-on=blocking {章节文件}`。写下一章前先确认上一章已改净。只有作者明确说「这章不去味」时才跳过，并在标题行下加 `<!-- 去味:跳过 -->`。
+
+## 与作者协作
+
+- 回复用作者说话的语言，等后台助手时的进度说明也一样；主体用写书的话说（书、章、大纲、设定），不抛脚本名、字段名或状态名；报错时附原始报错。skill 里标着 `<!-- author-report -->` 的模板块只是格式参考，回复时直接输出其中的文字，不带代码块围栏。
+- 作者要求记住、忘掉或确认一条写作习惯/偏好时（如「记住：这本书对话用直角引号」），按用户明确类型或当前书类型走 story-long-write / story-short-write 的「作者记忆管理」；无当前书的通用习惯默认交长篇入口，限定本书却无法定位时问哪本书，不要求先建书，写入相应工作区或书目录的 `.story/作者记忆/`；不要存进编程工具自带的记忆。一次性要求直接照做，不记录。
+- 不修改项目里已安装的 skill 文件（`SKILL.md`、`references/`、`scripts/`；story-setup 重新部署时覆盖除外）。skill 脚本报错时停下，把报错和所执行的命令告诉作者，不自行修补绕过。
+
+## Compact 后恢复上下文
+
+写作中的关键上下文：
+1. 当前写作项目名称和进度
+2. 最近讨论的角色设定变更
+3. 未完成的伏笔列表
+4. 当前章节的情绪/节奏目标
+
+长篇先读 `{书名}/追踪/上下文.md`；短篇先读 `{书名}/设定.md` 和 `{书名}/小节大纲.md`。

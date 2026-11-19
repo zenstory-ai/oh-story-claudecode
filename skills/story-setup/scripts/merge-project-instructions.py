@@ -28,7 +28,7 @@ import tempfile
 from pathlib import Path
 
 
-HOSTS = ("claude-code", "opencode", "codex", "zcode", "openclaw", "reasonix", "generic")
+HOSTS = ("claude-code", "opencode", "codex", "zcode", "openclaw", "reasonix", "generic", "dsh")
 # 旧模板里有、现模板已删的受管节；迁移旧文件时一并清掉。
 RETIRED_HEADINGS = frozenset({"协作规则"})
 # 名字太常见的节，旧文件里只有带 oh-story 痕迹才算受管，避免误删作者自己的同名节。
