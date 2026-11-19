@@ -3,7 +3,7 @@
 [English](architecture_EN.md)
 
 Oh Story 把长篇写作拆成「文件系统当记忆 + 专业 Agent 分工 + 自动化门禁」三层。
-概览见 README 的[工作原理](../README.md#工作原理)。
+概览见 README 的[这是什么](../README.md#这是什么)。
 
 ## Agent 体系
 

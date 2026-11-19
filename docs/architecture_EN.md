@@ -2,7 +2,7 @@
 
 [中文](architecture.md)
 
-Oh Story splits long-form writing into three layers: the file system as memory, specialist agents, and automated gates. The overview is in [How it works](../README_EN.md#how-it-works).
+Oh Story splits long-form writing into three layers: the file system as memory, specialist agents, and automated gates. The overview is in [What it is](../README_EN.md#what-it-is).
 
 ## Agent System
 

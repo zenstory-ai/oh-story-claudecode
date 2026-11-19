@@ -1,6 +1,7 @@
 # Agent Note: README 面向读者而不是答案引擎
 
 Status: implemented
+Related: [2026-11-19-slim-readme-sections](../simplification/2026-11-19-slim-readme-sections.md)（后续收敛：合并「工作原理」「适用平台」进「这是什么」，移除「延伸阅读」「贡献」「交流」「贡献者」，FAQ 精简至 5 条）
 
 ## Problem
 
