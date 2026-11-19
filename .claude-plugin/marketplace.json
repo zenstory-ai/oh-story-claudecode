@@ -4,13 +4,13 @@
     "name": "zenstory-ai"
   },
   "metadata": {
-    "description": "网络小说创作工具箱 — 扫榜、拆文、写作全流程 Claude Code skill，覆盖长篇与短篇网文",
+    "description": "Agent skill pack for writing long-form and short-form web novels—chart scanning, deconstruction, outlining, drafting, continuity tracking, de-AI-flavor revision, and covers. 网文写作 Agent 技能包：扫榜、拆文、大纲细纲、长短篇连载、伏笔追踪、去 AI 味与封面生成。",
     "version": "0.10.5"
   },
   "plugins": [
     {
       "name": "oh-story",
-      "description": "网络小说创作工具箱：14 个 Skills，覆盖扫榜、拆文、写作、审查、去 AI 味、发布资料和封面生成。",
+      "description": "Agent skill pack for writing web novels: 14 skills covering chart scanning, bestseller deconstruction, outlining, drafting, foreshadowing tracking, de-AI-flavor revision, and cover generation. 网文写作 Agent 技能包：14 个技能覆盖扫榜、拆文、大纲细纲、长短篇连载、伏笔追踪、去 AI 味与封面生成。",
       "source": "./",
       "version": "0.10.5",
       "category": "novel-writing"
