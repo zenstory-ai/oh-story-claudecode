@@ -38,7 +38,7 @@ https://github.com/user-attachments/assets/8f9cc11b-1fb8-4cc5-a084-e0deb05ec791
 
 Oh Story 覆盖长篇与短篇网文全流程：**扫榜选材 → 拆解爆款 → 搭大纲写正文 → 去AI味 → 生成封面图**。它以 14 个 skill 的形式装进你正在用的编程 Agent，直接复用该工具的模型，无需显卡，也不用单独配模型。
 
-- **用文件系统当记忆** — 设定、大纲、正文、追踪分目录落盘，`追踪/_tracking-state.json` 作为唯一底账，自动生成状态卡、伏笔清单、角色状态与「作者真相 / 读者已知」双时间线；压缩上下文或换新会话后照样从文件接着写。
+- **用文件系统当记忆** — 设定、大纲、正文、追踪分目录保存，追踪数据统一记在 `追踪/_tracking-state.json` 里，自动生成状态卡、伏笔清单、角色状态与「作者真相 / 读者已知」双时间线；压缩上下文或换新会话后照样从文件接着写。
 - **7 个专职角色与读写守卫** — 大纲、正文、一致性检查、人设、考据、书稿检索、拆书抽取各司其职；长篇缺细纲或上一章追踪未入账时先拦下，写完自动扫半截断章、大纲词漏入正文与常见 AI 腔（各 skill 按需加载参考资料，详见[架构与目录说明](docs/architecture.md)、[知识库清单](docs/knowledge-base.md)）。
 - **适配 7 款编程 Agent** — Claude Code · Codex CLI · Google Antigravity · OpenCode · ZCode · OpenClaw · Reasonix；支持子代理与 hooks 的工具由 `/story-setup` 自动部署，其他能读项目文件的通用 Agent 环境也能按 skill 流程直接用。
 - **面向主流长短篇平台** — 长篇覆盖起点中文网、番茄小说、晋江文学城、七猫小说、刺猬猫；短篇覆盖知乎盐言故事、番茄短篇、七猫短篇。
@@ -71,7 +71,7 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 
 ### 续写状态卡：连载几百章不崩盘
 
-以作者自己的长篇为例：先用 `/story-import` 把已发布的 20 章整理成连载工程，开写第 21 章前的 `追踪/上下文.md`（固定 7 栏，上限 12 KiB）如下。动笔前只筛出本章用得上的状态，连同本章细纲、相关设定与出场角色卡交给写手，不把整张状态卡塞进提示词：
+以作者自己的长篇为例：先用 `/story-import` 把已发布的 20 章整理成连载工程，开写第 21 章前的 `追踪/上下文.md` 如下。动笔前只挑本章用得上的状态，连同本章细纲、相关设定与出场角色卡交给写手，不把整张状态卡塞进提示词：
 
 ```markdown
 ## 当前位置
@@ -106,7 +106,7 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 追踪文件   tracking_commit.py check    上下文.md / 伏笔.md / 角色状态/ / 时间线/ / 逐章记录/ 全部由 state 重生成，逐字一致
 ```
 
-细纲通过校验后，`narrative-writer` 分两段写完正文，核对设定与伏笔、按需去味润色，再跑完收尾检查。提交后，所有追踪文件都从 `_tracking-state.json` 整份重生成（手改衍生文件会被 `check` 拦下）；对照写前状态卡，本章实际回写了这些变化（节选）：
+细纲通过校验后，`narrative-writer` 分两段写完正文，核对设定与伏笔、按需去味润色，再跑完收尾检查。提交后，所有追踪文件都从 `_tracking-state.json` 自动重生成，不用手动维护；对照写前状态卡，本章实际回写了这些变化（节选）：
 
 ```diff
  ## 当前位置
@@ -153,23 +153,25 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 | 「霍总还不打算让沈暮月母子进门吗？」<br>「没必要，私生子而已。」<br>我正准备推门而入，听到这话，手停在了半空。 | **N1 门口偷听到「私生子而已」**<br>类型{信息} · 情绪{震惊}{−7}<br>手法{开篇即冲突+信息差} |
 | 霍庭煜对我没有爱。<br>我默然抽回了手。<br>该放弃自己的执念了。 | **N2 认清对方无爱，决意放弃执念**<br>类型{情绪} · 情绪{心酸}{−5} |
 
-同一份产出里，`写作手法.md` 直接点出原作的代价：
+同一份产出里，`写作手法.md` 直接点出原作的短板：
 
-> **POV 代价**：男主的转变缺乏过程展示，N47 的内心独白集中倒出「早就原谅、夜不能寐、深爱」，
-> 略显直白说明（tell 多于 show）——这是第一人称追妻文的通病。
+> **第一人称视角的局限**：男主的转变缺少情节铺垫，到 N47 才靠大段内心独白把「早就原谅、夜不能寐、深爱」一次性倒出来，
+> 光靠心理说明，没用细节和行动演出来——这是第一人称追妻文的通病。
 
 写新篇时，`/story-short-write` 直接调用这份报告、情节节点与手法卡构思。完整产出：[`demo/拆文库/曾将爱意私藏/`](demo/拆文库/曾将爱意私藏/)
 
 ### 去 AI 味：先跑句式扫描，再按语境改稿
 
-`/story-deslop` 先用本地脚本扫描高频 AI 句式，标出行号、片段与改写方向。扫描一段人工构造的 AI 腔反例，共命中 8 处（7 处阻断）：
+`/story-deslop` 先用本地脚本扫描高频 AI 句式，标出行号、片段与改写方向。扫描一段人工构造的 AI 腔反例，共命中 8 处（3 处阻断 / 5 处建议）：
 
 ```text
 改前.md:7:20     [blocking] em-dash             (么叫做命运的安排——不是巧合，而是一)
-改前.md:7:22     [blocking] not-is-comparison   (不是巧合，而是一种冥冥之中的注定)
-改前.md:11:1     [blocking] negation-parade     (没有犹豫，没有生涩，)
-改前.md:19:3     [blocking] voice-contrast      (声音不大，却)
-改前.md:21:2     [blocking] not-is-comparison   (不是一次简单的弹奏，而是一场蓄谋已久的惊艳亮相)
+改前.md:23:6     [blocking] trailer-ending      (才刚刚开始)
+改前.md:25:1     [blocking] trailer-ending      (没人知道)
+改前.md:7:22     [advisory] not-is-comparison   (不是巧合，而是一种冥冥之中的注定)
+改前.md:11:1     [advisory] negation-parade     (没有犹豫，没有生涩，)
+改前.md:19:3     [advisory] voice-contrast      (声音不大，却)
+改前.md:21:2     [advisory] not-is-comparison   (不是一次简单的弹奏，而是一场蓄谋已久的惊艳亮相)
 改前.md:3:1      [advisory] cliche-density-tic  (仿佛 一丝 深吸一口气 缓缓 微微)
 ```
 
@@ -270,9 +272,9 @@ flowchart LR
 | Skill | 触发 | 说明 |
 |:------|:-----|:-----|
 | `story-long-analyze` | `/story-long-analyze` `/长篇拆文` | 长篇拆文 · 黄金三章、爽点设计、节奏分析 |
-| `story-long-scan` | `/story-long-scan` `/长篇扫榜` | 长篇扫榜 · 起点/番茄/晋江榜单趋势 |
+| `story-long-scan` | `/story-long-scan` `/长篇扫榜` | 长篇扫榜 · 起点/番茄/晋江/七猫/刺猬猫榜单趋势 |
 | `story-short-analyze` | `/story-short-analyze` `/短篇拆文` | 短篇拆文 · 故事核、结构、情感线、反转、写作手法与共鸣点 |
-| `story-short-scan` | `/story-short-scan` `/短篇扫榜` | 短篇扫榜 · 知乎盐言/番茄短篇热门选题 |
+| `story-short-scan` | `/story-short-scan` `/短篇扫榜` | 短篇扫榜 · 知乎盐言/番茄/七猫/黑岩/点众等短篇热门选题 |
 | `story-import` | `/story-import` `/导入小说` | 逆向导入 · 把已有书稿整理为可续写的标准目录 |
 | `story-review` | `/story-review` `/审查` | 多视角审稿 · full / lean / solo 三档模式 + 番茄/起点/知乎评分标准 |
 | `story-publish` | `/story-publish` | 发布准备 · 根据设定和大纲整理书名、简介与标签（当前适配番茄） |
@@ -298,7 +300,7 @@ flowchart LR
 
 ### 长篇连载怎么避免前后矛盾、漏伏笔或角色未卜先知？
 
-项目把「作者真相」「读者已知」和角色当前状态分开落盘，每章动笔前只挑本章用得上的状态与待回收伏笔交给写手，写完再由脚本统一回写到 `_tracking-state.json`。具体机制见[长篇人设与连贯性说明](docs/ai-long-novel-character-consistency.md)，三章连写实操见[长篇连载一致性指南](https://zenstory.ai/zh/oh-story/long-novel-continuity)。
+项目把「作者真相」「读者已知」和角色当前状态分别存成文件，每章动笔前只挑本章用得上的状态与待回收伏笔交给写手，写完再由脚本统一回写到 `_tracking-state.json`。具体机制见[长篇人设与连贯性说明](docs/ai-long-novel-character-consistency.md)，三章连写实操见[长篇连载一致性指南](https://zenstory.ai/zh/oh-story/long-novel-continuity)。
 
 ### 跑完 `/story-deslop` 去 AI 味，为什么外部检测器还可能标红？
 
@@ -324,9 +326,9 @@ Oh Story 是 [ZenStory AI](https://zenstory.ai/zh) 开源故事创作与改编�
 
 | 项目 | 用途 |
 | --- | --- |
-| [oh-story-claudecode](https://github.com/zenstory-ai/oh-story-claudecode) | 网文写作 skill 包（本仓库） |
-| [drama-skills](https://github.com/zenstory-ai/drama-skills) | AI 短剧 / 漫剧创作 skill 合集：剧本、资产、分镜、图片/视频提示词、独立审查 |
-| [novel-to-game](https://github.com/zenstory-ai/novel-to-game) | 小说改编游戏 skill 合集：原著拆解、目标运行环境构建与实机运行验收 |
-| [video-recap-skills](https://github.com/zenstory-ai/video-recap-skills) | 将支持的视频文件制作成中文解说，可选导出可编辑的剪映/CapCut 草稿 |
-| [oh-story-dsh](https://github.com/zenstory-ai/oh-story-dsh) | DeepSeek Harness 社区插件，提供小说、短剧、游戏和视频解说工作台 |
-| [zenstory](https://github.com/zenstory-ai/zenstory) | 对话即创作的 AI 小说写作工作台（[app.zenstory.ai](https://app.zenstory.ai)） |
+| [oh-story-claudecode](https://github.com/zenstory-ai/oh-story-claudecode) | 网文写作技能包：扫榜、拆文、大纲细纲、长短篇写作、伏笔追踪、去 AI 味与封面生成（本仓库） |
+| [drama-skills](https://github.com/zenstory-ai/drama-skills) | AI 短剧与漫剧制作技能包：原著与对标拆解、剧本、视觉设定、分镜、生图/生视频提示词、确认后生产与剪辑成片 |
+| [novel-to-game](https://github.com/zenstory-ai/novel-to-game) | 小说改游戏技能包：通读拆书、玩法与美术设计、代码构建与盲玩验收，支持网页、互动影游与微信/抖音/TapTap 小游戏 |
+| [video-recap-skills](https://github.com/zenstory-ai/video-recap-skills) | AI 视频解说技能包：自动切镜、看画面写解说词、配音混音合成硬字幕成片，并可导出剪映 / CapCut 草稿 |
+| [oh-story-dsh](https://github.com/zenstory-ai/oh-story-dsh) | DeepSeek Harness 社区插件：集成网文写作、短剧漫剧、小说改游戏与视频解说四个可视化工作台 |
+| [zenstory](https://github.com/zenstory-ai/zenstory) | 对话即创作的 AI 小说与短剧网页工作台（[app.zenstory.ai](https://app.zenstory.ai)） |

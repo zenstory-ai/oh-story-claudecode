@@ -6,9 +6,9 @@
 
 卷纲只用 `outline_view.py --unit {单元编号}` 取全卷段与本段剧情（老卷纲有「作用域：批次底稿」段时加 `--stage outline`），设定从 `设定/` 定点读，不回翻对话；参考文件按 SKILL.md「写前必读」总表「出细纲、补纲」一行读。
 
-已部署 story-architect 时，每批细纲在它的新上下文里出，调用见 [agent-calls.md](agent-calls.md)。没有子代理时主会话按下方「排纲方法」自己出：先给本批走向提案，作者确认后落盘。
+已部署 story-architect 时，每批细纲在它的新上下文里出，调用见 [agent-calls.md](agent-calls.md)。没有子代理时主会话按下方「排纲方法」自己出：先给本批走向提案，作者确认后写入文件。
 
-**收回与验收**：每章细纲落盘后跑 `node scripts/check-outline-contract.js --json --project {书目录} --chapter {N}`（查什么见 outline-template.md）。exit 1 只按 `repair_scope` 补报告点名的字段再复验，最多两轮；仍失败就报告检查 ID 停下，不改其他章。advisory 项逐条人工判断，不强制归零。exit 2、脚本缺失或 node 不可用时如实报告验收未完成，不得声称细纲已合规。出完一批另跑一次 `node scripts/check-outline-contract.js --json --supply {卷纲路径} {单元编号}`，验证排纲笔记里有「写纲前查缺」（含「无缺口」情形）；脚本只验小节存在，内容仍要人工判断。本检查只在新建、补建、回填时执行；既有项目的旧细纲不因此阻断写正文。
+**收回与验收**：每章细纲写入后跑 `node scripts/check-outline-contract.js --json --project {书目录} --chapter {N}`（查什么见 outline-template.md）。exit 1 只按 `repair_scope` 补报告点名的字段再复验，最多两轮；仍失败就报告检查 ID 停下，不改其他章。advisory 项逐条人工判断，不强制归零。exit 2、脚本缺失或 node 不可用时如实报告验收未完成，不得声称细纲已合规。出完一批另跑一次 `node scripts/check-outline-contract.js --json --supply {卷纲路径} {单元编号}`，验证排纲笔记里有「写纲前查缺」（含「无缺口」情形）；脚本只验小节存在，内容仍要人工判断。本检查只在新建、补建、回填时执行；既有项目的旧细纲不因此阻断写正文。
 
 **中途补纲/扩纲小流程**（项目已有大纲；只改细纲不进入正文大修）：
 1. 定位请求范围、已写进度和所属剧情段：读 `大纲/大纲.md`；卷纲先用 `outline_view.py --toc {卷纲路径}` 定位，再 `--unit {单元编号}` 取闭包，尚无剧情段用 `--contract` 取全卷段，不整读。另读 `设定/题材定位.md` 和已有 `追踪/上下文.md`；有正文却缺追踪时停止补纲，提示按 workflow-daily 修复/迁移，不猜进度；无正文也无追踪时以现有纲/设定规划，不为读取状态先初始化。

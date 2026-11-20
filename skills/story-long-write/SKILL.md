@@ -53,7 +53,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 | 场景 | 触发条件 | 执行流程 |
 |------|----------|----------|
-| **结构讨论** | "只讨论/推敲故事结构" | 只交付结构方案，不建工程、不自动落盘；不要求先填完设定或细纲 |
+| **结构讨论** | "只讨论/推敲故事结构" | 只交付结构方案，不建工程、不自动写文件；不要求先填完设定或细纲 |
 | **大纲规划** | "写大纲/规划剧情/规划全书/规划第X卷/开新卷" | 按需取 Phase 1→3，交付所请求大纲/卷纲及必要设定；不自动展开细纲或初始化追踪 |
 | **细纲规划** | "出细纲/补纲/扩纲/补细纲/写或修改第N章细纲" | Phase 3：既有单元内只补/改点名章；需要新单元才走「中途补纲/扩纲小流程」。指定范围不扩到整单元；未指定时按剧情批建纲 |
 | **开书** | "帮我开书"，未限定规划层级 | 按确认点逐个走：定方向→定设定→卷纲→前 10 章细纲，每个确认点作者说继续才往下；**最远停在细纲交付，不自动写正文** |
@@ -112,7 +112,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 #### 追踪
 
-所有追踪写入都走 `scripts/tracking_commit.py`：`追踪/_tracking-state.json` 是唯一底账，`上下文.md`、角色快照、`伏笔.md`、时间线都由它自动生成，禁止手改。体积上限由脚本检查；字段与上限见 [tracking-transaction.md](references/tracking-transaction.md)。
+所有追踪写入都走 `scripts/tracking_commit.py`：追踪数据统一记在 `追踪/_tracking-state.json` 里，`上下文.md`、角色快照、`伏笔.md`、时间线都由它自动生成，禁止手改。体积上限由脚本检查；字段与上限见 [tracking-transaction.md](references/tracking-transaction.md)。
 
 ---
 

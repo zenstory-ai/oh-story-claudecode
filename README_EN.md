@@ -73,7 +73,7 @@ Every example below comes from real skill runs (plus one hand-built AI-flavored 
 
 ### The continuity card: staying consistent across hundreds of chapters
 
-Using the author's own serial as an example: `/story-import` turned 20 published chapters into a continuable project, producing this `追踪/上下文.md` card (7 fixed sections, 12 KiB cap) right before chapter 21. Before drafting, only the state needed for the chapter—alongside its chapter outline, relevant world settings, and active character cards—goes to the writer rather than dumping the entire card into the prompt:
+Using the author's own serial as an example: `/story-import` turned 20 published chapters into a continuable project, producing this `追踪/上下文.md` continuity card right before chapter 21. Before drafting, only the state needed for the chapter—alongside its chapter outline, relevant world settings, and active character cards—goes to the writer rather than dumping the entire card into the prompt:
 
 ```markdown
 ## Current position
@@ -111,7 +111,7 @@ Tracking commit storyctl.py chapter commit  tracking_committed=true · state_rev
 Derived views   tracking_commit.py check    上下文.md / 伏笔.md / 角色状态/ / 时间线/ / 逐章记录/ all re-rendered from state, byte-identical
 ```
 
-Once the chapter outline passes validation, `narrative-writer` drafts the chapter in two parts, checks settings and foreshadowing, polishes AI phrasing if needed, and runs the closing checks. After commit, every tracking file is re-rendered from `_tracking-state.json` (manual edits to generated files are rejected by `check`); compared with the card above, here is what chapter 21 wrote back (excerpt):
+Once the chapter outline passes validation, `narrative-writer` drafts the chapter in two parts, checks settings and foreshadowing, polishes AI phrasing if needed, and runs the closing checks. After commit, every tracking file is automatically re-rendered from `_tracking-state.json`; compared with the card above, here is what chapter 21 wrote back (excerpt):
 
 ```diff
  ## Current position
@@ -159,24 +159,26 @@ Full report: [`demo/拆文库/盘龙/拆文报告.md`](demo/拆文库/盘龙/拆
 | 「霍总还不打算让沈暮月母子进门吗？」<br>「没必要，私生子而已。」<br>我正准备推门而入，听到这话，手停在了半空。 | **N1 Overhears "just a bastard child" at the door**<br>type{information} · emotion{shock}{−7}<br>technique{open on conflict + information gap} |
 | 霍庭煜对我没有爱。<br>我默然抽回了手。<br>该放弃自己的执念了。 | **N2 Accepts he does not love her; resolves to let go**<br>type{emotion} · emotion{bitterness}{−5} |
 
-In the same output, `写作手法.md` calls out the tradeoff in the original draft:
+In the same output, `写作手法.md` calls out a weakness in the original draft:
 
-> **POV cost**: the male lead's turn is never dramatised; the interior monologue at N47 dumps
-> "long forgiven, sleepless, deeply in love" all at once — telling rather than showing, the standard
+> **First-person blind spot**: the male lead's turn has little on-page buildup; at N47 an interior monologue dumps
+> "long forgiven, sleepless, deeply in love" all at once instead of showing it through concrete actions—a classic
 > weakness of first-person stories in this genre.
 
 When planning a new short story, `/story-short-write` draws directly from this report, node list, and technique sheet. Full output: [`demo/拆文库/曾将爱意私藏/`](demo/拆文库/曾将爱意私藏/)
 
 ### De-AI editing: lint known patterns, then rewrite in context
 
-`/story-deslop` runs a local prose linter that matches stock AI sentence patterns, reporting line numbers, spans, and rewrite directions. Scanning a hand-built AI-flavored passage catches 8 hits (7 blocking):
+`/story-deslop` runs a local prose linter that matches stock AI sentence patterns, reporting line numbers, spans, and rewrite directions. Scanning a hand-built AI-flavored passage catches 8 hits (3 blocking / 5 advisory):
 
 ```text
 改前.md:7:20     [blocking] em-dash             (么叫做命运的安排——不是巧合，而是一)
-改前.md:7:22     [blocking] not-is-comparison   (不是巧合，而是一种冥冥之中的注定)
-改前.md:11:1     [blocking] negation-parade     (没有犹豫，没有生涩，)
-改前.md:19:3     [blocking] voice-contrast      (声音不大，却)
-改前.md:21:2     [blocking] not-is-comparison   (不是一次简单的弹奏，而是一场蓄谋已久的惊艳亮相)
+改前.md:23:6     [blocking] trailer-ending      (才刚刚开始)
+改前.md:25:1     [blocking] trailer-ending      (没人知道)
+改前.md:7:22     [advisory] not-is-comparison   (不是巧合，而是一种冥冥之中的注定)
+改前.md:11:1     [advisory] negation-parade     (没有犹豫，没有生涩，)
+改前.md:19:3     [advisory] voice-contrast      (声音不大，却)
+改前.md:21:2     [advisory] not-is-comparison   (不是一次简单的弹奏，而是一场蓄谋已久的惊艳亮相)
 改前.md:3:1      [advisory] cliche-density-tic  (仿佛 一丝 深吸一口气 缓缓 微微)
 ```
 
@@ -277,9 +279,9 @@ flowchart LR
 | Skill | Trigger | Description |
 |:------|:--------|:------------|
 | `story-long-analyze` | `/story-long-analyze` | Long-form deconstruction — Golden Three Chapters, payoff cadence, and pacing analysis |
-| `story-long-scan` | `/story-long-scan` | Long-form chart scan — market trends across Qidian, Fanqie, and Jinjiang |
+| `story-long-scan` | `/story-long-scan` | Long-form chart scan — market trends across Qidian, Fanqie, Jinjiang, Qimao, and Ciweimao |
 | `story-short-analyze` | `/story-short-analyze` | Short-form deconstruction — story core, structure, emotional curve, twists, craft, and reader resonance |
-| `story-short-scan` | `/story-short-scan` | Short-form chart scan — trending topics on Zhihu Yanyan and Fanqie Short-form |
+| `story-short-scan` | `/story-short-scan` | Short-form chart scan — trending topics across Zhihu Yanyan, Fanqie, Qimao, Heiyan, and Dianzhong |
 | `story-import` | `/story-import` | Manuscript import — reverse-parses existing chapters into a continuable project directory |
 | `story-review` | `/story-review` | Multi-angle review — full / lean / solo modes with Fanqie, Qidian, and Zhihu rubrics |
 | `story-publish` | `/story-publish` | Launch prep — turns settings and outlines into platform submission copy (title, synopsis, tags; Fanqie supported) |
@@ -331,9 +333,9 @@ Oh Story is part of [ZenStory AI](https://zenstory.ai) — open-source tools for
 
 | Project | What it does |
 | --- | --- |
-| [oh-story-claudecode](https://github.com/zenstory-ai/oh-story-claudecode) | Web-fiction writing skill pack (this repo) |
-| [drama-skills](https://github.com/zenstory-ai/drama-skills) | AI short-drama / motion-comic suite: scripts, assets, storyboards, image & video prompts, independent review |
-| [novel-to-game](https://github.com/zenstory-ai/novel-to-game) | Agent skills for source-grounded novel adaptation, target-runtime builds, and evidence-based QA |
-| [video-recap-skills](https://github.com/zenstory-ai/video-recap-skills) | Create Chinese-narration recaps from supported video files, with optional editable JianYing/CapCut draft export |
-| [oh-story-dsh](https://github.com/zenstory-ai/oh-story-dsh) | Community DeepSeek Harness plugin with novel, short-drama, game and video-recap workbenches |
-| [zenstory](https://github.com/zenstory-ai/zenstory) | Chat-to-create AI novel-writing workbench ([app.zenstory.ai](https://app.zenstory.ai)) |
+| [oh-story-claudecode](https://github.com/zenstory-ai/oh-story-claudecode) | Web-fiction skill pack: chart scanning, deconstruction, outlining, long/short drafting, continuity tracking, de-AI-flavor polish, and covers (this repo) |
+| [drama-skills](https://github.com/zenstory-ai/drama-skills) | AI short-drama & motion-comic skill suite: source/benchmark breakdown, scripts, visual settings, storyboards, image/video prompts, confirmed production, and final cuts |
+| [novel-to-game](https://github.com/zenstory-ai/novel-to-game) | Novel-to-game skill pack: source analysis, gameplay & art design, builds, and blind-playtest QA for web games, interactive films, and WeChat/Douyin/TapTap mini-games |
+| [video-recap-skills](https://github.com/zenstory-ai/video-recap-skills) | AI video-recap skill pack: auto shot-cutting, visual narration scripting, voiceover/mix with burned-in subtitles, and editable JianYing / CapCut draft export |
+| [oh-story-dsh](https://github.com/zenstory-ai/oh-story-dsh) | Community DeepSeek Harness plugin bundling visual workbenches for novels, short dramas, games, and video recaps |
+| [zenstory](https://github.com/zenstory-ai/zenstory) | Chat-to-create AI web workbench for novels and short dramas ([app.zenstory.ai](https://app.zenstory.ai)) |

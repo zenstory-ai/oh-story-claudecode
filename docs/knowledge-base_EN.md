@@ -18,12 +18,13 @@ Each skill includes a `references/` knowledge base loaded on demand to keep cont
 | Chapter Outline Methods | Target emotion and protagonist choice · Six payoff types and back-planning · Climax formula · Revision diagnosis | long-write |
 | De-AI-ify | Prevention · Rewrite order · Rewrite examples · Banned word list | deslop / long-write / short-write |
 | Quality Checks | General · Long-form specific · Short-form specific · Toxic trope detection | long-write / short-write / short-analyze |
-| Writing Formulas | 21 genre formulas · Three-flip-four-shock (escalating reversal) · Romance four-stage | short-write |
-| Female-oriented Writing | Female reader preferences · Emotional description · Romance patterns · Benchmark analysis | short-write |
+| Writing Formulas | 10 core genre packs · 21 niche genre formulas · Three-flip-four-shock (escalating reversal) · Romance four-stage | short-write |
+| Female-oriented Writing | Female reader preferences · Emotional description · Romance patterns · Benchmark analysis | long-write |
 | Deconstruction Methods | Golden First 3 Chapters · Emotion curves · Structure breakdown · Submission layer (lead-in · paywall break · title and blurb) | long-analyze / short-analyze |
 | Short-form Methodology | Story core · Plot nodes · Explosive point analysis · Writing techniques · Rhythm analysis · Resonance analysis · Character classification · Character contrast · Motivation chain · Character relationships · Romance stages · Platform fit | short-analyze |
-| Reader Profiles | Platform readers · Reader dimensions for topic choice | long-scan |
+| Reader Profiles | Platform and channel differences · Reader needs · Genre selection and working titles | long-write |
 | Market Data | Genre trends · Platform characteristics · Collection formats | long-scan / short-scan |
+| Publish Prep | Fanqie long-form and short-form categories, reading/content tags, and book-entry field rules | story-publish |
 | Cover Styles | 10 genre visual styles · Color composition · Prompt templates | story-cover |
 | Adversarial Review | Multi-perspective review · Scoring rubrics · Toxic trope detection | story-review |
 
