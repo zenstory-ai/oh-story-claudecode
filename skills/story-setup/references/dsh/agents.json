@@ -1,0 +1,26 @@
+{
+  "host": "dsh",
+  "registry_version": 1,
+  "note": "DSH（DeepSeek Harness）角色注册清单。DSH 子代理派发不提供会话级 preset 选择：运行时用委派类工具 spawn 子会话，人设正文从 persona_path 读取后整体注入子代理 prompt，任务 prompt 跟在其后。persona 文件复用 claude-code 部署产物，frontmatter name 即角色名。",
+  "persona_dir": ".claude/agents",
+  "references_dir": ".claude/skills/story-setup/references/agent-references",
+  "review_full_required": [
+    "story-architect",
+    "character-designer",
+    "narrative-writer",
+    "consistency-checker"
+  ],
+  "review_lean_required": [
+    "story-architect",
+    "consistency-checker"
+  ],
+  "roles": [
+    { "name": "story-architect", "persona_path": ".claude/agents/story-architect.md" },
+    { "name": "character-designer", "persona_path": ".claude/agents/character-designer.md" },
+    { "name": "narrative-writer", "persona_path": ".claude/agents/narrative-writer.md" },
+    { "name": "consistency-checker", "persona_path": ".claude/agents/consistency-checker.md" },
+    { "name": "chapter-extractor", "persona_path": ".claude/agents/chapter-extractor.md" },
+    { "name": "story-explorer", "persona_path": ".claude/agents/story-explorer.md" },
+    { "name": "story-researcher", "persona_path": ".claude/agents/story-researcher.md" }
+  ]
+}
