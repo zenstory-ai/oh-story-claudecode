@@ -15,7 +15,7 @@ metadata: {"openclaw":{"requires":{"env":["GPT_IMAGE_API_KEY"],"bins":["curl","j
 ## 生成通路
 
 - **内置生图（优先）**：当前会话可调 Codex `$imagegen` / `image_gen` 或 Antigravity `generate_image` / `image-generator` 时，直接调用生成并保存，无需 `OPENAI_API_KEY` 或 `GPT_IMAGE_API_KEY`，不跑 `curl`。
-- **API 回退**：仅在无内置工具或用户指定 API 时使用，需 `GPT_IMAGE_API_KEY`；变量和命令见 [references/api-fallback.md](references/api-fallback.md)，走该通路再读。工具缺失不等于订阅不支持生图；内置失败先报错，不静默切到收费 API。
+- **API 回退**：仅在无内置工具或用户指定 API 时使用，需 `GPT_IMAGE_API_KEY`；变量和命令见 [references/api-fallback.md](references/api-fallback.md)，走该通路再读。工具缺失不等于订阅不支持生图；内置失败先报错，不会不经提示切到收费 API。
 
 ## 生成流程
 

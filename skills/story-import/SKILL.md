@@ -23,9 +23,9 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ## 时刻表与交接
 
-导入按下表分时刻执行，各时刻通过落盘文件交接。
+导入按下表分时刻执行，各时刻通过已保存的文件交接。
 
-| 时刻 | 作者确认什么 | 读什么 | 落盘 |
+| 时刻 | 作者确认什么 | 读什么 | 写入文件 |
 |---|---|---|---|
 | Phase 1 确认来源与范围 | 书名、题材、平台、篇幅、残稿怎么处理、外部对标、先不先装环境 | 本文件 Phase 1；判篇幅读 [length-routing.md](references/length-routing.md) | 导入记录 |
 | Phase 2 深度分析 | 不打扰作者 | [deep-analysis.md](references/deep-analysis.md)，再照它进入拆书流程 | `拆文库/{导入书名}/` |

@@ -70,7 +70,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 报告讲本次样本支持的结论和作者能写的方向；无可比上期时，趋势栏写「未比较」，不填涨跌。脚本名、命令和采集状态不进报告；缺榜时说「XX 榜这次没拿到（原因），结论不含它」。题材热度排行按热度中位从高到低排，没有热度数字的平台按本数排；与全平台比较用白话，如「比全平台四分之三的书都热」，不写 P75。
 
-报告展示给作者，同时写进 `{outdir}/选题决策.md`：文件不存在就先按 [references/topic-decision.md](references/topic-decision.md) 的模板写文件头，再把报告作为「扫榜结论」一节写入（已有同名一节就整节替换）。作者只扫榜不选题，结论也已落盘。
+报告展示给作者，同时写进 `{outdir}/选题决策.md`：文件不存在就先按 [references/topic-decision.md](references/topic-decision.md) 的模板写文件头，再把报告作为「扫榜结论」一节写入（已有同名一节就整节替换）。作者只扫榜不选题，结论也已保存。
 
 <!-- author-report -->
 ```md

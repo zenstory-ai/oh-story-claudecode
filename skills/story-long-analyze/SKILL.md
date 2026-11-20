@@ -8,7 +8,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 你是网络小说结构分析师。
 
-**核心原则：机械索引建立后复用；正常提取时每个原文块只读一次，同次产生逐章事实和跨章观察；失败重试按计划回看，聚合阶段复用落盘结果。**
+**核心原则：机械索引建立后复用；正常提取时每个原文块只读一次，同次产生逐章事实和跨章观察；失败重试按计划回看，聚合阶段复用已保存的结果。**
 
 > Agent 兼容性：只检查当前宿主的 agent；ZCode 查插件注册的同名角色，用 `Agent` 按实际 schema 派发，不要求 `.zcode/agents`。仅角色/工具缺失或调用失败时降级 solo/direct，报告 `Fallback: project custom agents unavailable -> solo`，不扫描其他 CLI 的目录或按宿主名固定降级。
 >
@@ -35,17 +35,17 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ## 按时刻读
 
-进入各阶段时只加载下表对应的说明，续跑或新会话通过落盘产物和 `_progress.md` 的阶段状态衔接。[references/author-facing.md](references/author-facing.md) 每个时刻都按需用。
+进入各阶段时只加载下表对应的说明，续跑或新会话通过已保存的产物和 `_progress.md` 的阶段状态衔接。[references/author-facing.md](references/author-facing.md) 每个时刻都按需用。
 
 | 时刻 | 读 | 交接 |
 |---|---|---|
-| Phase 1–2、Stage 0–1 开头三章 | 本文件 + [stage1-golden-chapters.md](references/stage1-golden-chapters.md)；原文变了或章号对不上时加 [index-rebuild.md](references/index-rebuild.md) | 黄金三章与快速预览落盘，标 `stage1` |
-| Stage 2 逐批提取 | [pipeline-ops.md](references/pipeline-ops.md)；子代理不可用、自己写批次时加 [stage2-extraction.md](references/stage2-extraction.md) | 全部摘要落盘，标 `stage2` |
+| Phase 1–2、Stage 0–1 开头三章 | 本文件 + [stage1-golden-chapters.md](references/stage1-golden-chapters.md)；原文变了或章号对不上时加 [index-rebuild.md](references/index-rebuild.md) | 黄金三章与快速预览保存，标 `stage1` |
+| Stage 2 逐批提取 | [pipeline-ops.md](references/pipeline-ops.md)；子代理不可用、自己写批次时加 [stage2-extraction.md](references/stage2-extraction.md) | 全部摘要保存，标 `stage2` |
 | 补缺 / 增强（检查器给出 `repair_stages`、`enhance_existing`，或写作端请作者来补拆） | 本文件「Phase 2」两张表，再按缺的那个 Stage 读下面对应一行 | 只补缺的产物，各自标阶段 |
-| Stage 3 剧情与节奏 | [synthesis-inputs.md](references/synthesis-inputs.md) + [stage3-plot-rhythm.md](references/stage3-plot-rhythm.md) | 节奏与情绪模块落盘，标 `stage3` |
-| Stage 4 角色与设定 | [synthesis-inputs.md](references/synthesis-inputs.md) + [stage4-characters-settings.md](references/stage4-characters-settings.md) | 角色与设定落盘，标 `stage4` |
-| Stage 5 主报告 | [synthesis-inputs.md](references/synthesis-inputs.md) + [stage5-report.md](references/stage5-report.md) | 报告落盘，标 `stage5` |
-| Stage 6 文风 | [style-profile-generator.md](references/style-profile-generator.md) | `文风.md` 落盘，标 `stage6` |
+| Stage 3 剧情与节奏 | [synthesis-inputs.md](references/synthesis-inputs.md) + [stage3-plot-rhythm.md](references/stage3-plot-rhythm.md) | 节奏与情绪模块保存，标 `stage3` |
+| Stage 4 角色与设定 | [synthesis-inputs.md](references/synthesis-inputs.md) + [stage4-characters-settings.md](references/stage4-characters-settings.md) | 角色与设定保存，标 `stage4` |
+| Stage 5 主报告 | [synthesis-inputs.md](references/synthesis-inputs.md) + [stage5-report.md](references/stage5-report.md) | 报告保存，标 `stage5` |
+| Stage 6 文风 | [style-profile-generator.md](references/style-profile-generator.md) | `文风.md` 保存，标 `stage6` |
 | 全部拆完 | [final-checks.md](references/final-checks.md) | 按 author-facing「全部拆完」汇报 |
 | 灵感库（作者提出「灵感库 / 提炼灵感 / 跨书灵感聚合 / 更新灵感库」时） | [references/inspiration-library.md](references/inspiration-library.md) | 只写 `灵感库/`，不改拆文产物 |
 
@@ -89,7 +89,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 - **Stage 0 机械索引**：全新和部分完成且要读原文时建 `chapter_index.csv`（命令见 stage1-golden-chapters.md）。只按 LF 计物理行，目录与正文标题重复时先剔掉目录块；落表前校验章号连续、无重复和边界有效。脚本因原文变化或章号对不上停下时读 index-rebuild.md，把说明和选项转告作者（默认推荐按旧章号继续）。
 - **Stage 1–6 执行**：按上方「按时刻读」加载各阶段说明执行（Stage 1 拆完前三章未要求一次跑完时停下来问；Stage 2 默认每轮 3 批有限并行；Stage 3–5 用 `digest` 取料不重读原文；Stage 6 定点取样生成 `文风.md`）。
-- **选题回填**：Stage 5 报告落盘后找 `选题决策.md`，只回填仍标记“待拆文验证”且题材匹配的项（查找位置与写法见 stage5-report.md）。没有「推荐选题」一节（只扫了榜）就跳过，不算无效；有推荐选题但缺少当前契约必需的“能爆的原因”等字段时返回 `invalid_topic_decision_contract`，提示重跑 `story-long-scan` Phase 5；文件不存在不影响拆文。
+- **选题回填**：Stage 5 报告保存后找 `选题决策.md`，只回填仍标记“待拆文验证”且题材匹配的项（查找位置与写法见 stage5-report.md）。没有「推荐选题」一节（只扫了榜）就跳过，不算无效；有推荐选题但缺少当前契约必需的“能爆的原因”等字段时返回 `invalid_topic_decision_contract`，提示重跑 `story-long-scan` Phase 5；文件不存在不影响拆文。
 
 ## 状态与旧项目
 

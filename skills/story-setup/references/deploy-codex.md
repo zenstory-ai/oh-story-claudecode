@@ -19,7 +19,7 @@
 - Agent 文件由 story-setup 管理，可覆盖。Claude Code Markdown 是正文真源；仓库根 `scripts/generate-codex-agents.py` 确定性生成 `references/codex/agents/` TOML，部署只复制这些产物
 - 校验每个 TOML 都能解析，且包含 Codex 必需字段：`name`、`description`、`developer_instructions`
 - 只读职责 agent（`consistency-checker`、`story-explorer`）必须保留 `sandbox_mode = "read-only"`；`chapter-extractor` 要写批次输入文件，不设只读沙箱
-- **部署后必须 trust + 新开 Codex 会话**（报告文案与 fallback 规则见下方「安装报告必须提示」）；hooks 未在 `/hooks` 信任前会被 Codex 静默跳过，包括写正文前的大纲守卫；若运行时返回 `unknown agent_type`，调用方必须降级 solo/direct 并报告 fallback。
+- **部署后必须 trust + 新开 Codex 会话**（报告文案与 fallback 规则见下方「安装报告必须提示」）；hooks 未在 `/hooks` 信任前会被 Codex 直接跳过（不报错也不提示），包括写正文前的大纲守卫；若运行时返回 `unknown agent_type`，调用方必须降级 solo/direct 并报告 fallback。
 - 将 `skills/story-setup/references/agent-references/` 同步复制到 `.codex/skills/story-setup/references/agent-references/`，作为 Codex agent 的项目内参考资料主路径。Codex 只使用当前规范前缀 `.codex/skills/`，不在运行时遍历历史备选路径。
 
 ## Codex hooks.json 合并算法
@@ -47,4 +47,4 @@ Codex 项目 hooks 部署到 `.codex/hooks.json`；运行脚本部署到 `.codex
 
 ## 安装报告必须提示
 
-Codex 需要 trust 项目 `.codex/` 配置层，并在 `/hooks` review/trust 非 managed hooks——**未信任前 Codex 静默跳过这些 hooks，写正文前的大纲守卫也不生效，且不报错**；自动化里的 `codex exec` 可加 `--dangerously-bypass-hook-trust`；部署后新开 Codex 会话让 custom agents 生效；若当前运行时仍返回 `unknown agent_type`，按各 skill 的 fallback 规则降级 solo/direct。
+Codex 需要 trust 项目 `.codex/` 配置层，并在 `/hooks` review/trust 非 managed hooks——**未信任前 Codex 会直接跳过这些 hooks，写正文前的大纲守卫也不生效，且不报错**；自动化里的 `codex exec` 可加 `--dangerously-bypass-hook-trust`；部署后新开 Codex 会话让 custom agents 生效；若当前运行时仍返回 `unknown agent_type`，按各 skill 的 fallback 规则降级 solo/direct。

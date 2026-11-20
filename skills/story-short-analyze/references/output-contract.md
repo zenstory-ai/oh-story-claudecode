@@ -5,7 +5,7 @@ description: story-short-analyze 输出契约。定义 Stage → 文件映射、
 
 # 输出契约：story-short-analyze ↔ story-short-write
 
-`story-short-analyze` 将短篇拆文产出存入 `拆文库/{书名}/`。`story-short-write` 构思新篇时结合报告、节点、手法与原文建立对标，正文阶段从已落盘的对标摘要召回。
+`story-short-analyze` 将短篇拆文产出存入 `拆文库/{书名}/`。`story-short-write` 构思新篇时结合报告、节点、手法与原文建立对标，正文阶段从已保存的对标摘要召回。
 
 ---
 
@@ -74,7 +74,7 @@ description: story-short-analyze 输出契约。定义 Stage → 文件映射、
 - `last_stage_in_progress` 为空且 `stages_completed` 不含 `6` → 从 `max(stages_completed) + 1` 开始；尚无完成阶段时从 Stage 2 开始。
 - `stages_completed` 含 6 → 已完成，只询问用户覆盖或取消。
 
-**Stage 6 完成须同时满足内容写完与验收通过**。验收未过前，`last_stage_in_progress` 保持 `6`，`stages_completed` 不含 `6`。续跑时若综合段与 `structure_counts` 已完整落盘，只重跑验收；验收发现内容缺失则补足对应产出。
+**Stage 6 完成须同时满足内容写完与验收通过**。验收未过前，`last_stage_in_progress` 保持 `6`，`stages_completed` 不含 `6`。续跑时若综合段与 `structure_counts` 已完整保存，只重跑验收；验收发现内容缺失则补足对应产出。
 
 ---
 

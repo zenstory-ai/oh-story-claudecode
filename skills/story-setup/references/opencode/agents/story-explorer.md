@@ -87,11 +87,11 @@ steps: 15
 ├── 正文/
 │   └── 第XXX章_*.md     # 正文章节
 ├── 追踪/
-│   ├── _tracking-state.json     # 唯一底账（默认不载入 prompt）
+│   ├── _tracking-state.json     # 追踪主数据（默认不载入 prompt）
 │   ├── 上下文.md                # 续写状态卡（固定 7 栏，≤12KB）
 │   ├── 逐章记录/第NNN章.md       # 未来相关紧凑记录
-│   ├── 角色状态/{角色名}.md      # 派生核心角色当前快照
-│   ├── 伏笔.md                  # 派生伏笔当前视图
+│   ├── 角色状态/{角色名}.md      # 自动生成的核心角色当前快照
+│   ├── 伏笔.md                  # 自动生成的伏笔当前清单
 │   ├── 时间线/
 │   │   ├── 作者真相.md          # 客观事实 + 读者认知 + 揭示状态
 │   │   └── 读者已知.md
@@ -115,7 +115,7 @@ steps: 15
 
 ### character_status 流程
 
-1. 用调用方随 prompt 传入的 `last_committed_chapter` / `state_revision`（主会话已跑过 `tracking_commit.py check`），与 `追踪/上下文.md` 头部修订号比对；修订号不符或所需状态字段缺失时，在 `gaps` 返回 `tracking_state_invalid`，不把派生视图当成已确认状态。prompt 缺值时只取头部修订号作参考，不自行读取 `_tracking-state.json`（完整 state 不进 prompt）。
+1. 用调用方随 prompt 传入的 `last_committed_chapter` / `state_revision`（主会话已跑过 `tracking_commit.py check`），与 `追踪/上下文.md` 头部修订号比对；修订号不符或所需状态字段缺失时，在 `gaps` 返回 `tracking_state_invalid`，不把自动生成的追踪文件当成已确认状态。prompt 缺值时只取头部修订号作参考，不自行读取 `_tracking-state.json`（完整 state 不进 prompt）。
 2. `Read 追踪/角色状态/{角色名}.md`，直接取得截至最后提交章的身份、位置、目标、状态、能力资源、关键关系、已知信息和未结事项。
 3. `Read 设定/角色/{角色名}.md` 取得静态人设；静态设定不得覆盖动态快照。
 4. 只有查询明确要求“为什么变成这样/哪章变化”时，才 `Grep "{角色名}" 追踪/逐章记录/` 并读取命中小文件；当前状态查询不扫描全历史。
@@ -151,7 +151,7 @@ steps: 15
 ### timeline 流程
 
 1. 读取查询参数 `perspective`：`reader` 读 `追踪/时间线/读者已知.md`，`author` 读 `追踪/时间线/作者真相.md`；未指定时默认 `reader`，防止误泄露真相。
-2. 给定章节范围或角色时先 `Grep` 对应视图，再按范围筛选；查询知识差、揭示状态或派生冲突时同时读取 `作者真相.md` 与 `读者已知.md`，不直接加载完整 state。
+2. 给定章节范围或角色时先 `Grep` 对应文件，再按范围筛选；查询知识差、揭示状态或两份时间线冲突时同时读取 `作者真相.md` 与 `读者已知.md`，不直接加载完整 state。
 3. 如需更多细节，读取对应正文或命中的逐章增量。
 4. 返回结果必须标注 `perspective` 与来源文件。`reader` 结果不得混入 `objective_fact` 中尚未揭示的内容。
 

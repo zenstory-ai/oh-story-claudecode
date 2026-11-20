@@ -1,13 +1,13 @@
 {
   "name": "oh-story-zcode",
-  "description": "oh-story 网络小说创作工具箱的 ZCode 插件市场",
+  "description": "ZCode plugin marketplace for Oh Story, the web-novel writing skill pack. Oh Story 网文写作技能包的 ZCode 插件市场。",
   "version": 1,
   "plugins": [
     {
       "name": "oh-story",
       "source": "./",
       "version": "0.10.5",
-      "description": "14 个网文 Skills、Commands 与 ZCode 写作守卫。"
+      "description": "14 web-novel writing skills, commands, and ZCode prose guards. 14 个网文写作技能、命令与 ZCode 写作守卫。"
     }
   ]
 }

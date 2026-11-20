@@ -14,7 +14,7 @@ The 14 skills in Oh Story, grouped by writing task:
 |---|---|---|
 | Set up | `story-setup` | Deploys files for your coding agent; specialist agents and hooks depend on what that tool supports |
 | Route | `story` | Routes natural-language requests and preference management to the relevant writing skill; starts the local dashboard |
-| Research | `story-long-scan`, `story-short-scan` | Scan 起点/番茄/晋江 and short-fiction charts for repeated patterns, not single rankings |
+| Research | `story-long-scan`, `story-short-scan` | Scan 起点/番茄/晋江/七猫/刺猬猫 and short-fiction charts for repeated patterns, not single rankings |
 | Deconstruct | `story-long-analyze`, `story-short-analyze` | Long-form Stages 0–6 cover chapter indexing, golden opening, block extraction, rhythm, settings, report and style; short-form Stages 2–6 produce its own analysis assets |
 | Draft | `story-long-write`, `story-short-write` | Outline to prose; long-form uses file-first tracking (`_tracking-state.json`, per-chapter deltas ≤3072 bytes), while short-form uses its own setting, outline and story files |
 | Revise | `story-deslop` | Diagnoses expression, narrative emphasis and story causality, then revises within the author's scope and authorization |
@@ -58,5 +58,5 @@ Fiction uses the same machinery for a different kind of state. That state is lar
 - English README: [README_EN.md](../README_EN.md)
 - Site guide for first-time users: https://zenstory.ai/oh-story/agent-skills-for-writers
 - Install to first chapter in Claude Code or Codex, step by step: https://zenstory.ai/oh-story/claude-code-novel-writing
-- Sibling packs by the same org: short drama (`drama-skills`), novel to game (`novel-to-game`), video recap (`video-recap-skills`), DeepSeek harness plugin (`oh-story-dsh`)
+- Sibling packs by the same org: short drama (`drama-skills`), novel to game (`novel-to-game`), video recap (`video-recap-skills`), DeepSeek Harness plugin (`oh-story-dsh`)
 - Continuity mechanism in detail: [keep-ai-novel-consistent-over-100-chapters.md](keep-ai-novel-consistent-over-100-chapters.md)

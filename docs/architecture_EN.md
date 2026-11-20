@@ -80,12 +80,12 @@ Only preferences the author states explicitly are recorded; nothing is inferred 
 │       ├── 文风.md              # Benchmark voice used before daily writing
 │       └── Report.md            # Analyze skill output
 ├── Tracking/                # File-first continuity state
-│   ├── _tracking-state.json # Single source of truth (not loaded into prose prompts)
-│   ├── Context.md           # Derived state card (7 fixed sections, ≤12 KB)
-│   ├── Chapter_Records/     # Compact continuity record / revision overlay (≤3072 bytes)
-│   ├── Character_Status/    # Derived snapshot per core character
-│   ├── Foreshadowing.md     # Derived current foreshadowing list
-│   └── Timeline/            # Derived author-truth and reader-known timelines
+│   ├── _tracking-state.json # Master tracking data (not loaded into prose prompts)
+│   ├── Context.md           # Auto-generated continuity card
+│   ├── Chapter_Records/     # Per-chapter continuity changes
+│   ├── Character_Status/    # Auto-generated snapshot per core character
+│   ├── Foreshadowing.md     # Auto-generated current foreshadowing list
+│   └── Timeline/            # Auto-generated author-truth and reader-known timelines
 ├── References/              # story-researcher output
 │   └── {topic}.md           # Split by research topic
 ```
@@ -94,8 +94,9 @@ Only preferences the author states explicitly are recorded; nothing is inferred 
 
 ```
 短篇/{Title}/
-├── 正文.md                  # Final draft
+├── 设定.md                  # Story core, characters, platform tone, and twist design
 ├── 小节大纲.md              # 8-section structure + emotion curve
+├── 正文.md                  # Final draft
 └── 拆文库/                  # If a reference novel exists (analyze output)
     └── {Book}/
         ├── 拆文报告.md
