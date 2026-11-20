@@ -87,7 +87,7 @@ assert(finalCheck && !finalCheck[1].includes('--check-contract'), 'workflow-revi
 
 // v0.8.2 短篇按作者时刻加载：写正文只靠落盘的设计文件接上构思，不再路由构思时读的方法论
 // （以前写正文要回查反派/钩子/公式/导语/对标召回，换了对话就得整份重读）。
-assert.match(short, /\*\*交接只靠落盘\*\*/, 'short SKILL.md must state the design-to-draft handoff')
+assert.match(short, /\*\*交接只靠文件\*\*/, 'short SKILL.md must state the design-to-draft handoff')
 for (const reference of [
   'workflow-design.md', 'short-reversal.md', 'submission-craft.md', 'villain-and-reveal.md',
   'genre-writing-formulas.md', 'hooks-chapter.md', 'benchmark-recall.md', 'cross-book-recall.md',
