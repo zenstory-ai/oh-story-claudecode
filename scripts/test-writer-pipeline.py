@@ -666,6 +666,8 @@ class PipelineTests(unittest.TestCase):
         # 流程文件只截「排纲方法」：主会话的读取清单与作者汇报模板不进包。
         self.assertIn('## 排纲方法', text)
         self.assertIn('### 排纲刻度', text)
+        self.assertIn('并补齐 `设定/题材定位.md`「题材框架」的「关键转折节点」', text)
+        self.assertIn('**设定/题材定位.md「题材框架」**', text)
         self.assertNotIn('<!-- author-report -->', text)
         self.assertNotIn('## 主会话', text)
         self.assertNotIn('## 细纲（第 N 章）', text)
@@ -745,6 +747,11 @@ class PipelineTests(unittest.TestCase):
         # 定设定多一份全书梗概：任务包点名要写它，模板随包，结局一节写明可空。
         self.assertIn('`设定/全书梗概.md`', world_text)
         self.assertIn('## 结局（目前的设想，可空）', world_text)
+        self.assertIn('「题材框架」留到出卷纲补', world_text)
+        self.assertIn('## 核心设定\n', world_text)
+        self.assertIn('## 题材框架\n', world_text)
+        self.assertNotIn('（定设定时填）', world_text)
+        self.assertNotIn('（出卷纲时补）', world_text)
         # 细纲模板是新写法：「这章怎么走」、默认三列情节点表，「这章不能说破」挪进可选块，不再写字数口径。
         self.assertIn('#### 这章怎么走', outline_text)
         self.assertIn('| # | 情节点（谁做了什么） | 作用 |\n', outline_text)
@@ -1146,6 +1153,24 @@ class ConvertOutlineFormatTests(unittest.TestCase):
 
         again = self.run_py('convert_outline_format.py', self.book)
         self.assertIn('改了 0 个文件', again.stdout)  # 再跑不再改
+
+    def test_convert_genre_strips_moment_notes(self):
+        genre = self.book / '设定' / '题材定位.md'
+        genre.parent.mkdir(parents=True, exist_ok=True)
+        genre.write_text(
+            '# 题材定位\n\n## 核心设定（定设定时填）\n- 主角：江晨\n\n'
+            '## 留到后面的大牌（防写无可写）\n- 大牌（用一次就没了，标最早第几卷亮出）：宿敌\n\n'
+            '## 题材框架（出卷纲时补）\n- 关键转折节点：第一卷码头反杀\n',
+            encoding='utf-8',
+        )
+        done = self.run_py('convert_outline_format.py', self.book)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        converted = genre.read_text(encoding='utf-8')
+        self.assertIn('## 核心设定\n', converted)
+        self.assertIn('## 后面才揭开或用上的东西\n', converted)
+        self.assertIn('## 题材框架\n', converted)
+        self.assertNotIn('定设定时填', converted)
+        self.assertNotIn('出卷纲时补', converted)
 
 
 if __name__ == '__main__':

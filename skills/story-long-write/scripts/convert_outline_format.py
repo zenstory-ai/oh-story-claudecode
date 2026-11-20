@@ -105,6 +105,7 @@ NO_BENCHMARK = ("无对标，按八节点自排", "没有对标书，按常见�
 # 大纲.md 分卷表末列表头、题材定位里那一节
 OVERVIEW_CELLS = [("这卷读者等着看什么、亮哪张大牌", "这卷读者等着看什么、揭开或用上什么")]
 GENRE_HEADING = re.compile(r"^(##\s+)留到后面的大牌.*$")
+GENRE_WORKFLOW_NOTE = re.compile(r"^(##\s+(?:核心设定|题材框架))\s*[（(](?:定设定时填|出卷纲时补)[）)]\s*$")
 GENRE_LABELS = [("大牌（用一次就没了，标最早第几卷亮出）", "用一次就没了的（标最早第几卷揭开或用上）")]
 UNIT_COMMENT = re.compile(r"\s*<!--\s*([A-Za-z]\d+-\d+)\s*-->\s*$")
 DROPPED_TABLES = ("刻度台阶", "打脸债", "压力线轮转")
@@ -296,6 +297,9 @@ def convert_genre(text: str) -> str:
     def handle(_index, line):
         if GENRE_HEADING.match(line):
             return GENRE_HEADING.match(line).group(1) + "后面才揭开或用上的东西"
+        noted = GENRE_WORKFLOW_NOTE.match(line)
+        if noted:
+            return noted.group(1)
         return relabel(line, GENRE_LABELS, risk=False)
 
     return "\n".join(walk(text.split("\n"), handle))

@@ -14,7 +14,7 @@
 
 Prompt：`项目目录：{dir}\n任务包：{任务包路径}\n先完整读取任务包，按包里的流程与模板完成；作者已定的方向、设定和要求都在 设定/，对话内容不会传给你\n交付后只回任务包开头要求的几项`
 
-收回后主会话：设定提案拿给作者逐项确认，按作者意见改文件；新卷纲跑 `outline_view.py --check --strict {卷纲路径}`（往旧卷纲追加单元去掉 `--strict`），细纲每章跑 `check-outline-contract.js`；失败把报错原样交回同一 agent 修一次。按 workflow-volume.md / workflow-outline.md 的汇报模板用故事话告诉作者，不转述任务包。
+收回后主会话：设定提案拿给作者逐项确认，按作者意见改文件；新卷纲跑 `outline_view.py --check --strict {卷纲路径}`（往旧卷纲追加单元去掉 `--strict`）并核对 `设定/题材定位.md`「题材框架」已补齐（未补或仍留占位时交回补齐），细纲每章跑 `check-outline-contract.js`；失败把报错原样交回同一 agent 修一次。按 workflow-volume.md / workflow-outline.md 的汇报模板用故事话告诉作者，不转述任务包。
 
 ## character-designer：细化某个角色（可选）
 
