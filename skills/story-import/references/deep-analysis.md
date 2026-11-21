@@ -9,7 +9,7 @@ Phase 2 先读本文件，再进入对应 analyze skill，由其负责拆文、�
 
 ## 长篇：先兼容识别，再决定是否续跑
 
-先运行 story-long-analyze Phase 1 的只读检查器（`inspect_existing_assets.py`），登记实际文件和覆盖范围；检查建议不能覆盖下列语义规则：
+先运行 story-long-analyze Phase 1 的只读检查器（`inspect_existing_assets.js`），登记实际文件和覆盖范围；检查建议不能覆盖下列语义规则：
 
 新生成或按当前契约续跑的长篇进度保持 `schema_version: 2`；旧成果直接使用不以缺少该字段为失败。
 

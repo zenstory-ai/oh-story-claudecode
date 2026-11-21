@@ -30,7 +30,7 @@ A long-form project in Oh Story looks like this (from the README's project struc
 
 Three design rules do the work:
 
-1. **One authority, everything else derived.** `_tracking-state.json` is the only writable truth. The state card, character snapshots, setup list and both timelines are generated from it deterministically. All writes go through `scripts/tracking_commit.py`; hand-editing derived files is forbidden. `tracking_commit.py check` re-renders from state and compares each derived file to detect drift. A transaction’s expected revision separately prevents stale writes.
+1. **One authority, everything else derived.** `_tracking-state.json` is the only writable truth. The state card, character snapshots, setup list and both timelines are generated from it deterministically. All writes go through `scripts/tracking_commit.js`; hand-editing derived files is forbidden. `tracking_commit.js check` re-renders from state and compares each derived file to detect drift. A transaction’s expected revision separately prevents stale writes.
 2. **Author truth and reader knowledge are separate timelines.** `时间线/作者真相.md` records what actually happened in the story. `时间线/读者已知.md` records what the reader has seen so far. When the model writes chapter 40 it can see who the murderer is, and also that the protagonist does not know yet, so it will not let a character blurt out the answer.
 3. **Per-chapter writes are capped deltas.** Each `逐章记录/第NNN章.md` targets ≤1536 bytes with a hard cap of 3072, and records only changes that affect later chapters. Historical records continue to grow, while the current state card is capped at 12 KiB. Older information is queried when needed; the full history stays out of prose prompts.
 
@@ -42,7 +42,7 @@ From `story-long-write`'s single-chapter flow:
 2. **Load only what would otherwise be wrong.** For each character on stage, read `设定/角色/{name}.md` (stable characterization) and `追踪/角色状态/{name}.md` (current location, goal, relationships, what they know, open threads). "Xu Tang has an older brother" is characterization. "Xu Tang does not know the letter came from him" is state. Reading them separately stops the model from turning background facts into character knowledge.
 3. **Write the prose.**
 4. **Check and revise.** Chapter checks cover approved plot points, length, phrasing, and degeneration. Consistency review runs when needed, and before commit for a standalone chapter. A separate `/story-review` request runs multi-perspective review, falling back to single-session review when specialist agents are unavailable.
-5. **Commit the delta.** After checks, `storyctl.py chapter commit` updates the tracking state to record new knowledge, paid-off setups, and timeline progress. Move to the next chapter only after the commit refreshes the derived files.
+5. **Commit the delta.** After checks, `storyctl.js chapter commit` updates the tracking state to record new knowledge, paid-off setups, and timeline progress. Move to the next chapter only after the commit refreshes the derived files.
 
 That keeps a three-chapter daily batch steady: every chapter starts from a fresh state card instead of a sprawling chat history.
 

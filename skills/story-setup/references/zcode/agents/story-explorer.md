@@ -99,7 +99,7 @@ injectAgentsMd: false
 
 ### character_status 流程
 
-1. 用调用方随 prompt 传入的 `last_committed_chapter` / `state_revision`（主会话已跑过 `tracking_commit.py check`），与 `追踪/上下文.md` 头部修订号比对；修订号不符或所需状态字段缺失时，在 `gaps` 返回 `tracking_state_invalid`，不把自动生成的追踪文件当成已确认状态。prompt 缺值时只取头部修订号作参考，不自行读取 `_tracking-state.json`（完整 state 不进 prompt）。
+1. 用调用方随 prompt 传入的 `last_committed_chapter` / `state_revision`（主会话已跑过 `tracking_commit.js check`），与 `追踪/上下文.md` 头部修订号比对；修订号不符或所需状态字段缺失时，在 `gaps` 返回 `tracking_state_invalid`，不把自动生成的追踪文件当成已确认状态。prompt 缺值时只取头部修订号作参考，不自行读取 `_tracking-state.json`（完整 state 不进 prompt）。
 2. `Read 追踪/角色状态/{角色名}.md`，直接取得截至最后提交章的身份、位置、目标、状态、能力资源、关键关系、已知信息和未结事项。
 3. `Read 设定/角色/{角色名}.md` 取得静态人设；静态设定不得覆盖动态快照。
 4. 只有查询明确要求“为什么变成这样/哪章变化”时，才 `Grep "{角色名}" 追踪/逐章记录/` 并读取命中小文件；当前状态查询不扫描全历史。
@@ -141,7 +141,7 @@ injectAgentsMd: false
 
 ### progress 流程
 
-1. 用调用方随 prompt 传入的 `last_committed_chapter` / `state_revision`（主会话已跑过 `tracking_commit.py check`）；prompt 里没有这两个值时不自行读取 `_tracking-state.json`（完整 state 不进 prompt，读取量不随章数增长），读 `追踪/上下文.md` 的头部修订号与「当前位置」当前章，取得最后提交章和状态修订号。
+1. 用调用方随 prompt 传入的 `last_committed_chapter` / `state_revision`（主会话已跑过 `tracking_commit.js check`）；prompt 里没有这两个值时不自行读取 `_tracking-state.json`（完整 state 不进 prompt，读取量不随章数增长），读 `追踪/上下文.md` 的头部修订号与「当前位置」当前章，取得最后提交章和状态修订号。
 2. `Read 追踪/上下文.md` 获取当前位置、下一章承诺和连贯性风险。
 3. 任一文件缺失或章号不一致时返回 blocking gap，不扫描正文猜测进度。
 
