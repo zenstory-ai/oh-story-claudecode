@@ -12,6 +12,12 @@
 
 const fs = require('fs')
 const path = require('path')
+const {
+  METRIC: CALIBER,
+  parseTargetField: parseWordcountTarget,
+  parseRangeField: parseWordcountRange,
+  parseMetricField,
+} = require('./wordcount_core.js')
 
 const FIELD_NAMES = [
   ['核心事件'], ['字数目标'], ['属于哪段剧情', '单元ID/位置'], ['目标情绪'],
@@ -23,59 +29,11 @@ const SUBSECTIONS = SUBSECTION_NAMES.map((names) => names[0])
 const FIVE_ACT = ['起因', '发展', '转折', '高潮', '结尾']
 const PLOT_HEADER_FIRST = /^(?:#|序号)$/
 const INTENT_FIELDS = ['目标情绪', '主角目标/关键选择']
-const CALIBER = 'visible_chars_v1'
-
-// 与 wordcount_core.py 逐字同构（scripts/test-storyctl.py 双跑同一批写法）。
-const NUMBER = '([1-9][0-9]{0,2}(?:[,，][0-9]{3})+|[1-9][0-9]*)'
-const NOTE = '(?:[（(][^（）()]*[）)])?'
-const TARGET_VALUE = new RegExp(`^(?:约|大约)?[ \\t]*${NUMBER}[ \\t]*字?(?:左右)?[ \\t]*${NOTE}$`)
-const RANGE_VALUE = new RegExp(`^${NUMBER}[ \\t]*字?[ \\t]*(?:-|~|～|—|–|－|至|到)[ \\t]*${NUMBER}[ \\t]*字?[ \\t]*${NOTE}$`)
-const METRIC_VALUE = new RegExp(`^([A-Za-z0-9_-]+)[ \\t]*${NOTE}$`)
-const HAS_DIGIT = /[0-9０-９]/
 const REF_DIR_PREFIX = /^(?:设定|大纲|追踪|正文|读者笔记|对标)\//
 const TEMPLATE_REFERENCES = ['references/outline-template.md', 'references/outline-reverse-rules.md']
   .filter((rel) => fs.existsSync(path.join(__dirname, '..', rel)))
 
-function fieldValues(text, label) {
-  const pattern = new RegExp(`^[ \\t>]*(?:[-*+][ \\t]*)?(?:\\*\\*)?${label}(?:\\*\\*)?[ \\t]*[:：][ \\t]*(.*?)[ \\t]*$`, 'gm')
-  const values = []
-  let match
-  const normalized = text.replace(/\r\n?/g, '\n').replace(/^\uFEFF/, '')
-  while ((match = pattern.exec(normalized)) !== null) values.push(match[1].replace(/\*\*/g, '').trim())
-  return values
-}
-
-const numericFieldValues = (text, label) => fieldValues(text, label).filter((value) => HAS_DIGIT.test(value))
-const toNumber = (raw) => Number(raw.replace(/[,，]/g, ''))
-
-function parseWordcountTarget(text) {
-  const raw = numericFieldValues(text, '字数目标')
-  if (!raw.length) return { status: 'missing', value: null, raw }
-  const matches = raw.map((value) => value.match(TARGET_VALUE))
-  if (!matches.every(Boolean)) return { status: 'invalid', value: null, raw }
-  const values = [...new Set(matches.map((match) => toNumber(match[1])))]
-  if (values.length !== 1) return { status: 'conflict', value: null, raw }
-  return { status: 'ok', value: values[0], raw }
-}
-
-function parseWordcountRange(text) {
-  const raw = numericFieldValues(text, '字数范围')
-  if (!raw.length) return { status: 'missing', value: null, raw }
-  const matches = raw.map((value) => value.match(RANGE_VALUE))
-  if (!matches.every(Boolean)) return { status: 'invalid', value: null, raw }
-  const pairs = [...new Set(matches.map((match) => `${toNumber(match[1])}-${toNumber(match[2])}`))]
-  if (pairs.length !== 1) return { status: 'invalid', value: null, raw }
-  const [min, max] = pairs[0].split('-').map(Number)
-  if (min > max) return { status: 'invalid', value: null, raw }
-  return { status: 'ok', value: { min, max }, raw }
-}
-
-function parseWordcountCaliber(text) {
-  const raw = fieldValues(text, '字数口径')
-  if (!raw.length) return true
-  const matches = raw.map((value) => value.match(METRIC_VALUE))
-  return matches.every(Boolean) && new Set(matches.map((match) => match[1])).size === 1 && matches[0][1] === CALIBER
-}
+const parseWordcountCaliber = (text) => parseMetricField(text).ok
 
 function fieldPattern(name) {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

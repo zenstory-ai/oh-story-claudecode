@@ -62,6 +62,6 @@
 
 **关键产物读取与更新边界**（创建模板见 [references/artifact-protocols.md](artifact-protocols.md)；`追踪/` 体积上限见 tracking-transaction.md）：
 
-- **设定与大纲**：`设定/关系.md` 仅在按需查询或审稿时读，不在每章写作回路里逐章读；`设定/题材正文提示卡.md` 按 `genre-prose-cards.md`「全书题材正文提示卡」在首章写前生成；`大纲/卷纲_第X卷.md` **一律走 `outline_view.py --chapter/--unit/--contract/--toc` 取段，禁止整读**；`.story/排纲笔记/{剧情段编号}.md` 仅在排纲/补纲时读。
+- **设定与大纲**：`设定/关系.md` 仅在按需查询或审稿时读，不在每章写作回路里逐章读；`设定/题材正文提示卡.md` 按 `genre-prose-cards.md`「全书题材正文提示卡」在首章写前生成；`大纲/卷纲_第X卷.md` **一律走 `outline_view.js --chapter/--unit/--contract/--toc` 取段，禁止整读**；`.story/排纲笔记/{剧情段编号}.md` 仅在排纲/补纲时读。
 - **追踪视图**：`追踪/_tracking-state.json` 在首次写正文前初始化（规划阶段不建），不进正文 prompt；`追踪/上下文.md` 日更每章整份读；`伏笔.md`、`时间线/`、`角色状态/`、`逐章记录/` 默认不整读，缺项时按 ID 或角色名定点查。
 - **对标资产**：`/story-long-analyze` 产出在 `拆文库/`，首次引用时同步到项目 `对标/`；对标资料权威顺序与缺失处理见 benchmark-recall.md。每章正文写完直接写入 `正文/` 目录，不要先输出到对话。

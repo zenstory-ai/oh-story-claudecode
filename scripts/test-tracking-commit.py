@@ -3,10 +3,10 @@
 
 from __future__ import annotations
 
-import importlib.util
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -15,12 +15,23 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TOOL = ROOT / "skills/story-long-write/scripts/tracking_commit.py"
-STORYCTL = ROOT / "skills/story-long-write/scripts/storyctl.py"
-STORYCTL_SPEC = importlib.util.spec_from_file_location("storyctl_tracking_tests", STORYCTL)
-assert STORYCTL_SPEC and STORYCTL_SPEC.loader
-storyctl = importlib.util.module_from_spec(STORYCTL_SPEC)
-STORYCTL_SPEC.loader.exec_module(storyctl)
+TOOL = ROOT / "skills/story-long-write/scripts/tracking_commit.js"
+STORYCTL = ROOT / "skills/story-long-write/scripts/storyctl.js"
+WORDCOUNT = ROOT / "skills/story-long-write/scripts/wordcount_core.js"
+NODE = shutil.which("node") or "node"
+
+
+def build_project_wordcount_record(project: Path, chapter: int, *, resolution: str) -> dict[str, object]:
+    script = (
+        'const wc = require(process.argv[1]);'
+        'const res = wc.buildProjectWordcountRecord(process.argv[2], Number(process.argv[3]), { resolution: process.argv[4] });'
+        'process.stdout.write(JSON.stringify(res));'
+    )
+    completed = subprocess.run(
+        [NODE, "-e", script, str(WORDCOUNT), str(project), str(chapter), resolution],
+        text=True, encoding="utf-8", capture_output=True, check=True,
+    )
+    return json.loads(completed.stdout)
 
 
 def position(*, volume: str = "第一卷·军宣整顿", start: int = 1) -> dict[str, object]:
@@ -165,7 +176,7 @@ class TrackingCommitTests(unittest.TestCase):
         *,
         expect: int = 0,
     ) -> subprocess.CompletedProcess[str]:
-        args = [sys.executable, str(TOOL), command, "--project", str(self.project)]
+        args = [NODE, str(TOOL), command, "--project", str(self.project)]
         if document is not None:
             document = json.loads(json.dumps(document, ensure_ascii=False))
             if command == "commit" and "expected_state_revision" not in document:
@@ -212,7 +223,7 @@ class TrackingCommitTests(unittest.TestCase):
         chapter = int(document["chapter"])
         if "expected_state_revision" not in document:
             document["expected_state_revision"] = self.read_state()["state_revision"]
-        document["wordcount"] = storyctl.build_project_wordcount_record(
+        document["wordcount"] = build_project_wordcount_record(
             self.project,
             chapter,
             resolution=resolution,
@@ -311,7 +322,7 @@ class TrackingCommitTests(unittest.TestCase):
             paths.append(path)
         processes = [
             subprocess.Popen(
-                [sys.executable, str(TOOL), "commit", "--project", str(self.project), "--input", str(path)],
+                [NODE, str(TOOL), "commit", "--project", str(self.project), "--input", str(path)],
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -384,26 +395,31 @@ class TrackingCommitTests(unittest.TestCase):
 
     def test_partial_view_write_keeps_old_authority_and_same_transaction_can_retry(self) -> None:
         self.init()
-        module = load_tool_module()
         document = transaction(1, character=True, foreshadow=True, timeline=True)
         document["expected_state_revision"] = 0
-        original = module.atomic_write_text
-
-        def fail_on_foreshadow(path: Path, payload: str) -> None:
-            if path.name == "伏笔.md":
-                raise OSError("injected derived-view failure")
-            original(path, payload)
-
-        module.atomic_write_text = fail_on_foreshadow
-        with self.assertRaises(OSError):
-            module.apply_transaction(self.project, document)
+        fail_script = (
+            'const path = require("path");'
+            'const mod = require(process.argv[1]);'
+            'const doc = JSON.parse(process.argv[3]);'
+            'const orig = mod._hooks.atomicWriteText;'
+            'mod._hooks.atomicWriteText = (p, payload) => {'
+            '  if (path.basename(p) === "伏笔.md") { const e = new Error("injected derived-view failure"); e.code = "EIO"; throw e; }'
+            '  return orig(p, payload);'
+            '};'
+            'try { mod.applyTransaction(process.argv[2], doc); process.exit(1); }'
+            'catch (err) { if (err.message !== "injected derived-view failure") throw err; }'
+        )
+        completed = subprocess.run(
+            [NODE, "-e", fail_script, str(TOOL), str(self.project), json.dumps(document, ensure_ascii=False)],
+            text=True, encoding="utf-8", capture_output=True, check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
 
         self.assertEqual(self.read_state()["state_revision"], 0)
         self.assertIn("状态修订：1", (self.project / "追踪/上下文.md").read_text(encoding="utf-8"))
         self.run_tool("check", expect=2)
 
-        module.atomic_write_text = original
-        module.apply_transaction(self.project, document)
+        self.run_tool("commit", document)
         self.assertEqual(self.read_state()["state_revision"], 1)
         self.run_tool("check")
 
@@ -501,7 +517,7 @@ class TrackingCommitTests(unittest.TestCase):
         (self.project / "大纲").mkdir(exist_ok=True)
         (self.project / "大纲" / "细纲_第001章.md").write_text("### 第 1 章：看片会\n", encoding="utf-8")
         completed = subprocess.run(
-            [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"],
+            [NODE, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"],
             text=True, capture_output=True, check=False, encoding="utf-8")
         self.assertEqual(completed.returncode, 0, completed.stderr)
         guide = json.loads(completed.stdout)
@@ -526,7 +542,7 @@ class TrackingCommitTests(unittest.TestCase):
         draft_path.write_text(json.dumps(draft, ensure_ascii=False), encoding="utf-8")
         # 重跑 draft 只刷新修订号，不冲掉已填内容。
         again = subprocess.run(
-            [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"],
+            [NODE, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"],
             text=True, capture_output=True, check=False, encoding="utf-8")
         self.assertEqual(again.returncode, 0, again.stderr)
         self.assertIn("原样保留", json.loads(again.stdout)["fill"])
@@ -608,7 +624,7 @@ class TrackingCommitTests(unittest.TestCase):
     def test_draft_shows_entry_shapes_from_the_validator_constants(self) -> None:
         self.init()
         completed = subprocess.run(
-            [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"],
+            [NODE, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"],
             text=True, capture_output=True, check=False, encoding="utf-8")
         self.assertEqual(completed.returncode, 0, completed.stderr)
         shapes = json.loads(completed.stdout)["shapes"]
@@ -626,7 +642,7 @@ class TrackingCommitTests(unittest.TestCase):
         self.init()
         (self.project / "大纲").mkdir(exist_ok=True)
         (self.project / "大纲" / "细纲_第001章.md").write_text("### 第 1 章：看片会\n", encoding="utf-8")
-        draft_cmd = [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"]
+        draft_cmd = [NODE, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"]
         first = subprocess.run(draft_cmd, text=True, capture_output=True, check=False, encoding="utf-8")
         draft_path = Path(json.loads(first.stdout)["draft"])
         state = self.read_state()
@@ -653,7 +669,7 @@ class TrackingCommitTests(unittest.TestCase):
         self.init()
         (self.project / "大纲").mkdir(exist_ok=True)
         (self.project / "大纲" / "细纲_第001章.md").write_text("### 第 1 章：看片会\n", encoding="utf-8")
-        draft_cmd = [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"]
+        draft_cmd = [NODE, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"]
         first = subprocess.run(draft_cmd, text=True, capture_output=True, check=False, encoding="utf-8")
         draft_path = Path(json.loads(first.stdout)["draft"])
         state = self.read_state()
@@ -678,7 +694,7 @@ class TrackingCommitTests(unittest.TestCase):
         self.init()
         self.run_tool("commit", transaction(1))
         # 修订草稿：中间可能插进新章并退役条目，旧草稿多出的条目不能自动带回。
-        draft_cmd = [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"]
+        draft_cmd = [NODE, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"]
         first = subprocess.run(draft_cmd, text=True, capture_output=True, check=False, encoding="utf-8")
         self.assertEqual(json.loads(first.stdout)["mode"], "revision")
         draft_path = Path(json.loads(first.stdout)["draft"])
@@ -702,7 +718,7 @@ class TrackingCommitTests(unittest.TestCase):
 
     def draft(self, chapter: int) -> tuple[dict[str, object], Path]:
         completed = subprocess.run(
-            [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", str(chapter)],
+            [NODE, str(TOOL), "draft", "--project", str(self.project), "--chapter", str(chapter)],
             text=True, capture_output=True, check=False, encoding="utf-8")
         self.assertEqual(completed.returncode, 0, completed.stderr)
         guide = json.loads(completed.stdout)
@@ -1056,7 +1072,7 @@ class TrackingCommitTests(unittest.TestCase):
                 (self.project / "大纲").mkdir()
                 (self.project / "大纲" / "细纲_第001章.md").write_text("### 第 1 章：家宴\n", encoding="utf-8")
                 drafted = subprocess.run(
-                    [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"],
+                    [NODE, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"],
                     text=True, capture_output=True, check=False, encoding="utf-8")
                 self.assertEqual(drafted.returncode, 0, drafted.stderr)
                 draft_path = Path(json.loads(drafted.stdout)["draft"])
@@ -1228,7 +1244,7 @@ class TrackingCommitTests(unittest.TestCase):
         draft62_path.write_text(json.dumps(draft62, ensure_ascii=False), encoding="utf-8")
         storyctl_commit = subprocess.run(
             [
-                sys.executable, str(STORYCTL), "chapter", "commit",
+                NODE, str(STORYCTL), "chapter", "commit",
                 "--project", str(self.project), "--chapter", "62", "--input", str(draft62_path),
             ],
             text=True, capture_output=True, check=False, encoding="utf-8",
@@ -1276,12 +1292,12 @@ class TrackingCommitTests(unittest.TestCase):
         self.assertGreater(len((self.project / "追踪/角色状态/钟离.md").read_bytes()), 11000)
 
         for copy_rel in (
-            "skills/story-long-write/scripts/tracking_commit.py",
-            "skills/story-import/scripts/tracking_commit.py",
-            "skills/story-review/scripts/tracking_commit.py",
+            "skills/story-long-write/scripts/tracking_commit.js",
+            "skills/story-import/scripts/tracking_commit.js",
+            "skills/story-review/scripts/tracking_commit.js",
         ):
             checked = subprocess.run(
-                [sys.executable, str(ROOT / copy_rel), "check", "--project", str(self.project)],
+                [NODE, str(ROOT / copy_rel), "check", "--project", str(self.project)],
                 text=True, capture_output=True, check=False, encoding="utf-8",
             )
             self.assertEqual(checked.returncode, 0, f"{copy_rel}: {checked.stderr}")

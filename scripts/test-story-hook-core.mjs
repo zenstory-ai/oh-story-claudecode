@@ -14,8 +14,8 @@ const require = createRequire(import.meta.url)
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const CORE_PATH = path.join(REPO_ROOT, "skills/story-setup/references/templates/hooks/story_hook_core.js")
 const DETECTOR_PATH = path.join(REPO_ROOT, "skills/story-long-write/scripts/check-ai-patterns.js")
-const STORYCTL_PATH = path.join(REPO_ROOT, "skills/story-long-write/scripts/storyctl.py")
-const TRACKING_PATH = path.join(REPO_ROOT, "skills/story-long-write/scripts/tracking_commit.py")
+const STORYCTL_PATH = path.join(REPO_ROOT, "skills/story-long-write/scripts/storyctl.js")
+const TRACKING_PATH = path.join(REPO_ROOT, "skills/story-long-write/scripts/tracking_commit.js")
 
 const core = require(CORE_PATH)
 
@@ -399,7 +399,7 @@ test("proseBlockReason, outlineIsEmpty, debt gate, trackingCheckpointIssue, and 
     write(path.join(many, "大纲/细纲_第2章.md"), filled)
     write(path.join(many, "正文/第1章_旧.md"), "# 第1章 旧\n" + Array.from({ length: 8 }, (_, i) => `声音不大，却带着第${i + 1}股狠劲。`).join("\n") + "\n他把门关上了。\n")
     writeCleanState(many, 1)
-    assert.match(core.proseBlockReason(root, path.join(many, "正文/第2章_新.md")), /另有 2 处，完整检查：\{PYTHON\} <story-long-write>\/scripts\/storyctl\.py chapter check --project <书目录> --chapter 1/)
+    assert.match(core.proseBlockReason(root, path.join(many, "正文/第2章_新.md")), /另有 2 处，完整检查：node <story-long-write>\/scripts\/storyctl\.js chapter check --project <书目录> --chapter 1/)
 
     // Empty outline boundary: 29 vs 30 chars, BOM+CRLF, dup, heading content, non-UTF8 GBK
     const body29 = "他推门进屋看见师父坐在柜台后面他推门进屋看见师父"
@@ -452,7 +452,7 @@ test("proseBlockReason, outlineIsEmpty, debt gate, trackingCheckpointIssue, and 
     // toxicRescanHint
     assert.equal(
       core.toxicRescanHint("/p/书/正文/第012章_夜路.md"),
-      "完整检查：{PYTHON} <story-long-write>/scripts/storyctl.py chapter check --project <书目录> --chapter 12"
+      "完整检查：node <story-long-write>/scripts/storyctl.js chapter check --project <书目录> --chapter 12"
     )
     for (const sample of ["/p/书/正文.md", "/p/书/草稿/第3章.md", ""]) {
       assert.equal(core.toxicRescanHint(sample), "完整扫描：node <skill>/scripts/check-ai-patterns.js --check <正文文件>")
@@ -493,12 +493,10 @@ test("bounded directory discovery (depth 4, pruned hidden/node_modules, no symli
 })
 
 test("detectStoryGaps foreshadowing, gaps, incomplete analyses, and protocol/storyctl constant sync", () => {
-  // 1) Protocol FORESHADOW_STATUSES sync with tracking_commit.py
-  const trackingSrc = fs.readFileSync(TRACKING_PATH, "utf8")
-  const m = trackingSrc.match(/^FORESHADOW_STATUSES = \(([^)]+)\)/m)
-  assert.ok(m, "FORESHADOW_STATUSES not found in tracking_commit.py")
-  const protocolStatuses = [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1])
-  assert.ok(protocolStatuses.length >= 4)
+  // 1) Protocol FORESHADOW_STATUSES sync with tracking_commit.js
+  const trackingMod = require(TRACKING_PATH)
+  const protocolStatuses = trackingMod.FORESHADOW_STATUSES
+  assert.ok(Array.isArray(protocolStatuses) && protocolStatuses.length >= 4, "FORESHADOW_STATUSES not found in tracking_commit.js")
   for (const status of protocolStatuses) {
     assert.ok(
       core.FORESHADOW_NORMAL_STATUSES.has(status) || core.FORESHADOW_WARN_STATUSES.has(status),
@@ -506,11 +504,12 @@ test("detectStoryGaps foreshadowing, gaps, incomplete analyses, and protocol/sto
     )
   }
 
-  // 2) DESLOP_SKIP_MARKER sync with storyctl.py
-  const storyctlSrc = fs.readFileSync(STORYCTL_PATH, "utf8")
-  assert.ok(
-    storyctlSrc.includes(core.DESLOP_SKIP_MARKER.source),
-    `storyctl.py DESLOP_SKIP drifted from story_hook_core.js DESLOP_SKIP_MARKER (${core.DESLOP_SKIP_MARKER.source})`
+  // 2) DESLOP_SKIP_MARKER sync with storyctl.js
+  const storyctlMod = require(STORYCTL_PATH)
+  assert.equal(
+    storyctlMod.DESLOP_SKIP.source,
+    core.DESLOP_SKIP_MARKER.source,
+    `storyctl.js DESLOP_SKIP drifted from story_hook_core.js DESLOP_SKIP_MARKER (${core.DESLOP_SKIP_MARKER.source})`
   )
 
   // 3) Behavioral detectStoryGaps matrix

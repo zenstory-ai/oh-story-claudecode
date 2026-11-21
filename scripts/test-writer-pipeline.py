@@ -12,9 +12,18 @@ import unittest
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / 'skills/story-long-write/scripts'
-sys.path.insert(0, str(SCRIPTS))
-from build_architect_brief import template_block  # noqa: E402
-sys.path.pop(0)
+NODE = shutil.which('node') or 'node'
+
+
+def template_block(text, tag):
+    completed = subprocess.run(
+        [NODE, '-e',
+         'const fs=require("fs");const m=require(process.argv[1]);'
+         'process.stdout.write(m.templateBlock(fs.readFileSync(0,"utf8"),process.argv[2]));',
+         str(SCRIPTS / 'build_architect_brief.js'), tag],
+        input=text, text=True, encoding='utf-8', capture_output=True, check=True,
+    )
+    return completed.stdout
 
 
 class PipelineTests(unittest.TestCase):
@@ -36,15 +45,16 @@ class PipelineTests(unittest.TestCase):
         return file
 
     def call(self, script, *args, env=None):
-        return subprocess.run([sys.executable, str(SCRIPTS / script), *map(str, args)],
+        script_js = script[:-3] + '.js' if script.endswith('.py') else script
+        return subprocess.run([NODE, str(SCRIPTS / script_js), *map(str, args)],
                               cwd=self.tmp.name, capture_output=True, encoding='utf-8',
-                              env={**os.environ, 'PYTHONIOENCODING': 'ascii', **(env or {})})
+                              env={**os.environ, **(env or {})})
 
     def view(self, *args):
-        return self.call('outline_view.py', *args, self.volume)
+        return self.call('outline_view.js', *args, self.volume)
 
     def build(self):
-        return self.call('build_writer_prompt.py', '--project', self.book, '--chapter', 1)
+        return self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 1)
 
     def volume_text(self, unit='L1-01'):
         return f'''# 第一卷
@@ -779,7 +789,7 @@ class PipelineTests(unittest.TestCase):
 class ImportOutlineBriefTests(unittest.TestCase):
     """导入逐批反推细纲：任务包只带本批规则、抽好的摘要要点、测好的长度与重叠的剧情单元卡。"""
 
-    SCRIPT = ROOT / 'skills/story-import/scripts/build_outline_brief.py'
+    SCRIPT = ROOT / 'skills/story-import/scripts/build_outline_brief.js'
     SUMMARY = ('## 第{n}章\n\n**概要**：概要不进包{n}\n\n**关键事件**：\n1. 江晨推门{n}\n2. 看见雨\n\n'
                '**因果**：雨夜来信\n\n**局面结果**：信被收下\n\n**涉及**：江晨，老周\n\n**信息变化**：读者知道信是假的\n\n'
                '**状态变化**：江晨 犹疑→决定\n\n**三维节奏**：三维节奏不进包\n\n**章尾钩子**：悬念：信里写了谁\n\n'
@@ -818,9 +828,8 @@ class ImportOutlineBriefTests(unittest.TestCase):
                  '## 人物弧线\n> 作用域：卷级常任\n\n| 角色 | 本卷起点 |\n|---|---|\n| 甲 | 第1-99章 |\n')
 
     def call(self, chapters):
-        return subprocess.run([sys.executable, str(self.SCRIPT), '--project', str(self.book), '--chapters', chapters],
-                              cwd=self.root, capture_output=True, encoding='utf-8',
-                              env={**os.environ, 'PYTHONIOENCODING': 'ascii'})
+        return subprocess.run([NODE, str(self.SCRIPT), '--project', str(self.book), '--chapters', chapters],
+                              cwd=self.root, capture_output=True, encoding='utf-8')
 
     def brief(self, chapters):
         result = self.call(chapters)
@@ -916,8 +925,8 @@ class ImportOutlineBriefTests(unittest.TestCase):
         self.put('大纲/卷纲_第1卷.md', template.replace('第{A}-{B}章', '第1-25章') + '\n')
         volume = self.book / '大纲' / '卷纲_第1卷.md'
         view = lambda *args: subprocess.run(
-            [sys.executable, str(SCRIPTS / 'outline_view.py'), *args, str(volume)],
-            capture_output=True, encoding='utf-8', env={**os.environ, 'PYTHONIOENCODING': 'utf-8'})
+            [NODE, str(SCRIPTS / 'outline_view.js'), *args, str(volume)],
+            capture_output=True, encoding='utf-8')
         check = view('--check', '--strict')
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
         self.assertIn('问题 0 ／ 告警 0', check.stdout)
@@ -927,8 +936,8 @@ class ImportOutlineBriefTests(unittest.TestCase):
         _, text = self.brief('1-12')
         self.assertIn('### 第一段剧情：{一句话} <!-- L1-01 -->', text)
         # 导入带的取段器副本与写作端是同一份，两边解析不会分叉。
-        self.assertEqual((ROOT / 'skills/story-import/scripts/outline_view.py').read_bytes(),
-                         (SCRIPTS / 'outline_view.py').read_bytes())
+        self.assertEqual((ROOT / 'skills/story-import/scripts/outline_view.js').read_bytes(),
+                         (SCRIPTS / 'outline_view.js').read_bytes())
 
     def test_batch_bounds(self):
         too_many = self.call('1-21')
@@ -951,9 +960,8 @@ class ImportOutlineBriefTests(unittest.TestCase):
         vol.parent.mkdir(parents=True, exist_ok=True)
         vol.write_text('# 第一卷 卷纲\n\n### 第一段剧情：开局 <!-- L1-01 -->\n- 章节范围：第1-4章\n- 单元节拍/章功能分配：起笔\n', encoding='utf-8')
         partial_ok = subprocess.run(
-            [sys.executable, str(self.SCRIPT), '--project', str(partial), '--chapters', '1-4'],
+            [NODE, str(self.SCRIPT), '--project', str(partial), '--chapters', '1-4'],
             cwd=self.root, capture_output=True, encoding='utf-8',
-            env={**os.environ, 'PYTHONIOENCODING': 'ascii'},
         )
         self.assertEqual(partial_ok.returncode, 0, partial_ok.stderr)
         self.assertEqual(json.loads(partial_ok.stdout)['chapters'], '1-4')
@@ -982,8 +990,8 @@ class VolumeTemplateContractTests(unittest.TestCase):
             volume.parent.mkdir()
             volume.write_text(template + '\n', encoding='utf-8')
             run = lambda *args: subprocess.run(
-                [sys.executable, str(SCRIPTS / 'outline_view.py'), *args, str(volume)],
-                capture_output=True, encoding='utf-8', env={**os.environ, 'PYTHONIOENCODING': 'utf-8'})
+                [NODE, str(SCRIPTS / 'outline_view.js'), *args, str(volume)],
+                capture_output=True, encoding='utf-8')
             check = run('--check', '--strict')
             self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
             self.assertIn('问题 0 ／ 告警 0', check.stdout)

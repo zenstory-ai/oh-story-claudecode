@@ -14,9 +14,10 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-STORYCTL = ROOT / "skills/story-long-write/scripts/storyctl.py"
-TRACKING = ROOT / "skills/story-long-write/scripts/tracking_commit.py"
-BUILD_PROMPT = ROOT / "skills/story-long-write/scripts/build_writer_prompt.py"
+STORYCTL = ROOT / "skills/story-long-write/scripts/storyctl.js"
+TRACKING = ROOT / "skills/story-long-write/scripts/tracking_commit.js"
+BUILD_PROMPT = ROOT / "skills/story-long-write/scripts/build_writer_prompt.js"
+NODE = shutil.which("node") or "node"
 
 
 def position() -> dict[str, object]:
@@ -97,7 +98,7 @@ class FinalChapterFlowTests(unittest.TestCase):
     def run_tracking(self, command: str, document: dict[str, object]) -> dict[str, object]:
         path = self.write_input(command, document)
         return self.run_process(
-            [sys.executable, str(TRACKING), command, "--project", str(self.project), "--input", str(path)]
+            [NODE, str(TRACKING), command, "--project", str(self.project), "--input", str(path)]
         )
 
     def run_chapter(
@@ -105,7 +106,7 @@ class FinalChapterFlowTests(unittest.TestCase):
         extra: list[str] | None = None, env: dict[str, str] | None = None,
     ) -> dict[str, object]:
         args = [
-            sys.executable, str(STORYCTL), "chapter", command,
+            NODE, str(STORYCTL), "chapter", command,
             "--project", str(self.project), "--chapter", str(chapter), *(extra or []),
         ]
         if document is not None:
@@ -141,7 +142,7 @@ class FinalChapterFlowTests(unittest.TestCase):
         self.assertEqual(plain["status"], "blocked")
         self.assertEqual(plain["quality"]["status"], "fail")
         self.assertNotIn("punctuation_fixed", plain)
-        args = [sys.executable, str(STORYCTL), "chapter", "check", "--project", str(self.project),
+        args = [NODE, str(STORYCTL), "chapter", "check", "--project", str(self.project),
                 "--chapter", "1", "--fix-punctuation"]
         fixed = self.run_process(args)
         self.assertTrue(fixed["punctuation_fixed"])
@@ -156,7 +157,7 @@ class FinalChapterFlowTests(unittest.TestCase):
         segment.write_text("# 前半段\n" + "字" * 500, encoding="utf-8")
         before = self.state()
         checkpoint = self.run_process(
-            [sys.executable, str(STORYCTL), "wordcount", "checkpoint", "--file", str(segment), "--target", "1000"]
+            [NODE, str(STORYCTL), "wordcount", "checkpoint", "--file", str(segment), "--target", "1000"]
         )
         self.assertEqual(checkpoint["remaining_user_range"], {"min": 350, "max": 650})
         self.assertEqual(self.state(), before)
@@ -259,7 +260,7 @@ class FinalChapterFlowTests(unittest.TestCase):
         record = self.state()["wordcount_records"]["1"]
         self.assertEqual(record["author_range"], {"min": 1000, "max": 1300})
         self.assertEqual(record["status"], "internal_pass")
-        self.run_process([sys.executable, str(TRACKING), "check", "--project", str(self.project)])
+        self.run_process([NODE, str(TRACKING), "check", "--project", str(self.project)])
         # 超长时的删除字数也按作者区间算。
         self.write_contract(2, 1400, target=1200, extra="- 字数范围：1100-1300\n")
         over = self.run_chapter("check", 2)
@@ -289,19 +290,28 @@ class FinalChapterFlowTests(unittest.TestCase):
         self.assertTrue(accepted["tracking_committed"])
         self.assertEqual(self.state()["wordcount_records"]["2"]["actual"], 1400)
 
-    def test_missing_node_is_a_tool_error_not_a_prose_finding(self) -> None:
+    def test_missing_detector_is_a_tool_error_not_a_prose_finding(self) -> None:
         self.write_contract(1, 1000)
-        empty_bin = self.root / "empty-bin"
-        empty_bin.mkdir()
-        env = {**os.environ, "PATH": str(empty_bin)}
-        checked = self.run_chapter("check", 1, expect=3, env=env)
+        runtime = self.root / "missing-detectors"
+        runtime.mkdir()
+        for name in ("storyctl.js", "wordcount_core.js", "tracking_commit.js"):
+            shutil.copy2(STORYCTL.parent / name, runtime / name)
+        checked = self.run_process(
+            [NODE, str(runtime / "storyctl.js"), "chapter", "check", "--project", str(self.project), "--chapter", "1"],
+            expect=3,
+        )
         self.assertEqual(checked["status"], "tool_unavailable")
         self.assertEqual(checked["quality"]["status"], "unavailable")
         self.assertEqual(checked["quality"]["blocking_findings"], [])
-        self.assertIn("Node.js", checked["quality"]["tool_errors"][0]["message"])
+        self.assertIn("missing", checked["quality"]["tool_errors"][0]["message"])
         self.assertEqual(checked["length"]["status"], "internal_pass")
-        refused = self.run_chapter(
-            "commit", 1, document=transaction(1, self.state()["state_revision"]), expect=3, env=env
+        refused = self.run_process(
+            [
+                NODE, str(runtime / "storyctl.js"), "chapter", "commit",
+                "--project", str(self.project), "--chapter", "1",
+                "--input", str(self.write_input("chapter-1-missing", transaction(1, self.state()["state_revision"]))),
+            ],
+            expect=3,
         )
         self.assertEqual((refused["schema"], refused["error_code"]), ("story-chapter-error/v1", "TOOL_UNAVAILABLE"))
 
@@ -309,7 +319,7 @@ class FinalChapterFlowTests(unittest.TestCase):
         # 用桩检测器替身跑真实 storyctl：finding 原样透传，review 缺省按语义类计数。
         runtime = self.root / "runtime"
         runtime.mkdir()
-        for name in ("storyctl.py", "wordcount_core.py", "tracking_commit.py"):
+        for name in ("storyctl.js", "wordcount_core.js", "tracking_commit.js"):
             shutil.copy2(STORYCTL.parent / name, runtime / name)
         findings = [
             {"type": "voice", "severity": "advisory", "review": "semantic", "line": 1},
@@ -328,7 +338,7 @@ class FinalChapterFlowTests(unittest.TestCase):
             (runtime / name).write_text("process.exit(0)\n", encoding="utf-8")
         self.write_contract(1, 1000)
         checked = self.run_process([
-            sys.executable, str(runtime / "storyctl.py"), "chapter", "check",
+            NODE, str(runtime / "storyctl.js"), "chapter", "check",
             "--project", str(self.project), "--chapter", "1",
         ])
         self.assertEqual(
@@ -344,11 +354,11 @@ class FinalChapterFlowTests(unittest.TestCase):
         self.run_chapter("commit", 1, document=transaction(1, self.state()["state_revision"]))
         self.write_contract(1, 950)
         draft = self.run_process([
-            sys.executable, str(TRACKING), "draft", "--project", str(self.project), "--chapter", "1",
+            NODE, str(TRACKING), "draft", "--project", str(self.project), "--chapter", "1",
         ])
         self.assertEqual(draft["mode"], "revision")
         committed = self.run_process([
-            sys.executable, str(STORYCTL), "chapter", "commit", "--project", str(self.project),
+            NODE, str(STORYCTL), "chapter", "commit", "--project", str(self.project),
             "--chapter", "1", "--input", draft["draft"],
         ])
         self.assertEqual(committed["mode"], "revision")
@@ -362,7 +372,7 @@ class FinalChapterFlowTests(unittest.TestCase):
         self.write_contract(1, 1000)
         document = transaction(1, self.state()["state_revision"])
         committed = self.run_process([
-            sys.executable, str(STORYCTL), "chapter", "commit", "--project", str(self.root), "--chapter", "1",
+            NODE, str(STORYCTL), "chapter", "commit", "--project", str(self.root), "--chapter", "1",
             "--input", str(self.write_input("chapter-1", document)),
         ])
         self.assertTrue(committed["tracking_committed"])
@@ -376,7 +386,7 @@ class FinalChapterFlowTests(unittest.TestCase):
             outputs = []
             for project in (self.project, self.root):
                 completed = subprocess.run(
-                    [sys.executable, str(script), *args, "--project", str(project)],
+                    [NODE, str(script), *args, "--project", str(project)],
                     cwd=ROOT, text=True, encoding="utf-8", capture_output=True, check=False,
                 )
                 outputs.append((completed.returncode, completed.stdout, completed.stderr))
@@ -385,7 +395,7 @@ class FinalChapterFlowTests(unittest.TestCase):
     def test_active_book_pointing_outside_the_workspace_names_the_fix(self) -> None:
         (self.root / ".active-book").write_text("../elsewhere\n", encoding="utf-8")
         completed = subprocess.run(
-            [sys.executable, str(TRACKING), "check", "--project", str(self.root)],
+            [NODE, str(TRACKING), "check", "--project", str(self.root)],
             cwd=ROOT, text=True, encoding="utf-8", capture_output=True, check=False,
         )
         self.assertEqual(completed.returncode, 2)
@@ -405,7 +415,7 @@ class FinalChapterFlowTests(unittest.TestCase):
                 json.dumps(transaction(1, self.state()["state_revision"]), ensure_ascii=False), encoding="utf-8"
             )
             return self.run_process([
-                sys.executable, str(STORYCTL), "chapter", "commit", "--project", str(self.project),
+                NODE, str(STORYCTL), "chapter", "commit", "--project", str(self.project),
                 "--chapter", "1", "--input", str(tracking_input),
             ], expect=expect)
 

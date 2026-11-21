@@ -120,14 +120,17 @@ const generatedWeight = (gen) => {
   const key = `gen:${gen.script} ${(gen.args || []).join(" ")}`;
   if (cache.has(key)) return cache.get(key);
   let value;
-  const py = findPython();
+  const isNode = gen.script.endsWith(".js") || gen.script.endsWith(".mjs");
+  const py = isNode ? null : findPython();
   const script = path.join(repoRoot, gen.script);
-  if (!py) value = { error: "找不到 Python 3（依次试 python3、python、py -3）" };
+  if (!isNode && !py) value = { error: "找不到 Python 3（依次试 python3、python、py -3）" };
   else if (!fs.existsSync(script)) value = { error: `拼包脚本不存在：${gen.script}` };
   else {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "doc-budget-"));
-    const run = spawnSync(py[0], [...py[1], script, "--project", tmp, ...(gen.args || [])], {
+    const [cmd, pre] = isNode ? [process.execPath, []] : py;
+    const run = spawnSync(cmd, [...pre, script, "--project", tmp, ...(gen.args || [])], {
       encoding: "utf8",
+      windowsHide: true,
     });
     const last = (run.stdout || "").trim().split("\n").pop() || "";
     let chars = null;

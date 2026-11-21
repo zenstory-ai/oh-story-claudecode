@@ -19,8 +19,8 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
-CHECK_RE = re.compile(r'storyctl\.py\S*\s+chapter\s+check\b.*?--chapter\s+(\d+)', re.S)
-COMMIT_RE = re.compile(r'storyctl\.py\S*\s+chapter\s+(commit|accept-current-length)\b.*?--chapter\s+(\d+)', re.S)
+CHECK_RE = re.compile(r'storyctl\.(?:js|py)\S*\s+chapter\s+check\b.*?--chapter\s+(\d+)', re.S)
+COMMIT_RE = re.compile(r'storyctl\.(?:js|py)\S*\s+chapter\s+(commit|accept-current-length)\b.*?--chapter\s+(\d+)', re.S)
 
 
 def jl(path):

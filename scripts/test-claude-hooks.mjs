@@ -133,7 +133,7 @@ test("Claude post-tool-prose-check: zero over-capture, hard signals, whitelist, 
     }
     const ctrlOut = run(path.join(root, "对照书/正文/第001章_开场.md"))
     assert.match(ctrlOut, /voice-contrast/)
-    assert.match(ctrlOut, /storyctl\.py chapter check --project <书目录> --chapter 1/)
+    assert.match(ctrlOut, /storyctl\.js chapter check --project <书目录> --chapter 1/)
     assert.ok(!ctrlOut.includes("check-ai-patterns.js"))
     assert.match(ctrlOut, /截断\/拒绝语\/工程词→重写该段；毒句式→就地改写/)
     assert.ok(!run(path.join(root, "白名单书/正文/第001章_开场.md")).includes("毒句式"))

@@ -2,7 +2,7 @@
 
 Phase 4 完整读取本文件、[tracking-initialization.md](tracking-initialization.md) 的事务骨架与 [character-state-reverse.md](character-state-reverse.md) 的快照规则。截止章、残稿决定与卷划分取自导入记录；证据取自已落盘的拆文库和项目 `大纲/`，不重读原文。
 
-导入项目必须通过本 skill 自带的 `scripts/tracking_commit.py init` 一次性生成追踪状态，禁止模型分别写最终文件。
+导入项目必须通过本 skill 自带的 `scripts/tracking_commit.js init` 一次性生成追踪状态，禁止模型分别写最终文件。
 
 ## 语义准备顺序
 
@@ -11,11 +11,11 @@ Phase 4 完整读取本文件、[tracking-initialization.md](tracking-initializa
 3. **伏笔当前行**：从有正文证据的铺垫/回收事件生成 `foreshadow`（识别方法见下）。每个 ID 只保留当前状态一行；尚未实际埋设的未来设计留在大纲，不写 `伏笔.md`。
 4. **事实与读者认知**：把关键事件生成到 `timeline_events`（提取方法见下）。同一事件同时写客观事实、读者截至 N 章已知内容和实际揭示状态；未来计划揭示章不得伪装成已发生事实。
 5. **续写状态卡输入**：准备当前位置、长期约束、活跃核心角色、近三章速记、下一章承诺和连贯性风险。`上下文.md` 由工具生成固定 7 栏，不把文风、文件索引、普通待办或质检计数塞进续写状态卡。
-6. **执行初始化**：事务写到 `{书目录}/.story/work/init.json`（成功前保留，不写系统 `/tmp`、书根、`大纲/` 或 `正文/`；已有旧追踪文件时 `init` 会自动将其原样移入 `追踪/_旧追踪存档/`，只在 `_tracking-state.json` 不存在时执行）。按当前平台探测 Python 3（`python3` → `python` → `py -3`），执行：
+6. **执行初始化**：事务写到 `{书目录}/.story/work/init.json`（成功前保留，不写系统 `/tmp`、书根、`大纲/` 或 `正文/`；已有旧追踪文件时 `init` 会自动将其原样移入 `追踪/_旧追踪存档/`，只在 `_tracking-state.json` 不存在时执行），用 Node.js 18+ 执行：
 
    ```text
-   {PYTHON} {story-import skill 根}/scripts/tracking_commit.py init --project {书目录} --input {书目录}/.story/work/init.json
-   {PYTHON} {story-import skill 根}/scripts/tracking_commit.py check --project {书目录}
+   node {story-import skill 根}/scripts/tracking_commit.js init --project {书目录} --input {书目录}/.story/work/init.json
+   node {story-import skill 根}/scripts/tracking_commit.js check --project {书目录}
    ```
 
 半成品最后一章为残稿时，`last_chapter`、角色快照和其他当前语义检查点一律截至最后完整章；残稿处理策略（导入记录里作者的决定）写入 `continuity_risks`，不把未完成动作登记成既成事实。
@@ -80,7 +80,7 @@ Phase 4 完整读取本文件、[tracking-initialization.md](tracking-initializa
 │   └── 读者已知.md
 ```
 
-- [ ] `tracking_commit.py check` 通过，`_tracking-state.json` 与全部自动生成的追踪文件一致
+- [ ] `tracking_commit.js check` 通过，`_tracking-state.json` 与全部自动生成的追踪文件一致
 - [ ] `_tracking-state.json.imported_through_chapter` 等于最后完整导入章
 - [ ] `追踪/伏笔.md` 每个 ID 至多一行，未来尚未埋设的设计没有混入
 - [ ] `_tracking-state.json.timeline` 已登记关键事实与读者认知，`读者已知.md` 无真相泄露

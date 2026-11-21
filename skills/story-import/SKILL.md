@@ -104,7 +104,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ## Phase 4：追踪初始化（仅长篇）
 
-读 [import-tracking.md](references/import-tracking.md)，用本 skill 自带的 `scripts/tracking_commit.py init` 一次性生成 `追踪/`，`check` 通过后勾进度。
+读 [import-tracking.md](references/import-tracking.md)，用本 skill 自带的 `scripts/tracking_commit.js init` 一次性生成 `追踪/`，`check` 通过后勾进度。
 
 ## Phase 5：汇报与激活
 

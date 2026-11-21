@@ -26,7 +26,7 @@
 
 ## Step 2：按范围加载
 
-- 都要：待改章全文、`大纲/细纲_第{X}章.md`、`tracking_commit.py check`（取 `state_revision`）与 `追踪/上下文.md`；缺 state 时停止，已有正文的项目先经 `story-import` 生成标准追踪。
+- 都要：待改章全文、`大纲/细纲_第{X}章.md`、`tracking_commit.js check`（取 `state_revision`）与 `追踪/上下文.md`；缺 state 时停止，已有正文的项目先经 `story-import` 生成标准追踪。
 - 局部修改：前一章只看最后几段（第 1 章没有就不看）、后一章存在时只看开头几段，确认衔接；涉及的角色读 `设定/角色/{名}.md` 与 `追踪/角色状态/{名}.md`。
 - 整章重写：前后两章全文，加上细纲点名的角色与设定；第 1 章没有前一章时看 `设定/题材定位.md`。
 
@@ -34,9 +34,9 @@
 
 ## Step 3：改写与提交前检查
 
-1. **备份**：原文复制为 `正文/第{X}章_章名_原稿_{YYYYMMDD}.md`；用 `{PYTHON} {skill 根}/scripts/storyctl.py wordcount measure --file {正文文件}` 记下原字数。
+1. **备份**：原文复制为 `正文/第{X}章_章名_原稿_{YYYYMMDD}.md`；用 `node {skill 根}/scripts/storyctl.js wordcount measure --file {正文文件}` 记下原字数。
 2. **改写**：已部署 narrative-writer 时按 [agent-calls.md](agent-calls.md)「改写一章」交给它；否则主会话自己改（读什么见 SKILL.md「写前必读」总表「大修」一行）。局部修改只动点到的段落，其余一字不改；不借改稿新增细纲外的剧情。
-3. **检测**：`{PYTHON} {skill 根}/scripts/storyctl.py chapter check --project {项目根} --chapter {X} --fix-punctuation --plain`，按白话结论走：可以提交就往下；有必须改的（含工程词泄漏）改到净再重跑；字数出了范围时欠字不补，超字把删除区间交写手按 agent-calls「超字一次净删」删一次（自己改就同样只删不加），复检仍超用下面的字数问法请作者选；检查工具没跑起来就停下、不提交，把原因告诉作者（缺 Node 时提示安装 Node.js 18 或更新版本）；没查成按它说的修文件或命令重跑。
+3. **检测**：`node {skill 根}/scripts/storyctl.js chapter check --project {项目根} --chapter {X} --fix-punctuation --plain`，按白话结论走：可以提交就往下；有必须改的（含工程词泄漏）改到净再重跑；字数出了范围时欠字不补，超字把删除区间交写手按 agent-calls「超字一次净删」删一次（自己改就同样只删不加），复检仍超用下面的字数问法请作者选；检查工具没跑起来就停下、不提交，把原因告诉作者（缺 Node 时提示安装 Node.js 18 或更新版本）；没查成按它说的修文件或命令重跑。
 4. **人物与节奏**：改后的角色行为与设定、前后章一致；改动没把这章的节奏打散。
 5. **篇幅**：与原文差异超过 30% 或 800 字（取较大）时告诉作者「改后约 X 字，比原来多/少 Y 字，比目标多/少 Z 字」；字数本身不触发再改一遍。
 6. 发现外部事实待核时先交 `story-researcher` 查证，再回到改写与检测；不可用则主会话查，不带未核实的事实提交。
@@ -47,12 +47,12 @@
 
 用一次 `mode=revision` 追踪事务更新，[tracking-transaction.md](tracking-transaction.md) 只在报错时读：
 
-1. **重算修订章记录**：先跑 `{PYTHON} {skill 根}/scripts/tracking_commit.py draft --project {项目根} --chapter {X}`，草稿已按本章现有记录预填；对照新正文，仍有效的保留，被推翻的改写或删掉，不清空重写。
+1. **重算修订章记录**：先跑 `node {skill 根}/scripts/tracking_commit.js draft --project {项目根} --chapter {X}`，草稿已按本章现有记录预填；对照新正文，仍有效的保留，被推翻的改写或删掉，不清空重写。
 2. **伏笔当前值**：对受影响 ID 从第 X 章检查到最后已写章 M，提交修订后的**截至 M 章当前状态**。若修订删除了埋设，但后文仍引用该 ID，先列为正文冲突；确定整条线不存在时才用 `action=delete`。
 3. **时间与读者认知**：为受影响事件提交客观事实、读者截至 M 章的当前认知、实际揭示状态/章节；删掉的事件用 `action=delete`。未来揭示计划仍留大纲。工具重建作者/读者视图，禁止手改。
 4. **角色当前快照**：对受影响核心角色从 X 检查到 M，按身份、位置、目标、能力资源、关系对象、已知信息、未结事项分别重算，提交一份截至 M 的完整快照；不得用最后一条单维度变化覆盖其它维度。
 5. **导入截止范围**：若 X ≤ `_tracking-state.json.imported_through_chapter`，事务为第 X 章新增覆盖记录；导入截止章不变，当前结构化状态按修订结果更新。
-6. **提交与重试**：跑 `{PYTHON} {skill 根}/scripts/storyctl.py chapter commit --project {项目根} --chapter {X} --input {项目根}/.story/work/第{XXX}章/tracking.json`。带外时先问作者：
+6. **提交与重试**：跑 `node {skill 根}/scripts/storyctl.js chapter commit --project {项目根} --chapter {X} --input {项目根}/.story/work/第{XXX}章/tracking.json`。带外时先问作者：
 
 <!-- author-report -->
 ```md
@@ -64,7 +64,7 @@
 ```
 
 不到目标一半时选项 1 不标推荐。选 1 → 改用 `chapter accept-current-length`，不到目标一半、或超字还没压缩过一次会被拒，把差多少字告诉作者，作者明确坚持才加 `--force`；选 2 → 回 Step 3；选 3 → 用备份原稿覆盖回去，不提交。失败时保留草稿，修正后重跑同一命令；通过 `check` 前不修下一章、不写新章。
-7. **收口**：`{PYTHON} {skill 根}/scripts/tracking_commit.py check --project {项目根}` 验证 state 与自动生成的视图一致。改变了角色状态、关系或世界观设定的，扫一遍后续章正文，把受影响的列进汇报。
+7. **收口**：`node {skill 根}/scripts/tracking_commit.js check --project {项目根}` 验证 state 与自动生成的视图一致。改变了角色状态、关系或世界观设定的，扫一遍后续章正文，把受影响的列进汇报。
 
 ---
 

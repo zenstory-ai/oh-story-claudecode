@@ -48,7 +48,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 ## 核心方法
 
 - **按题材选写法**：确定题材后选用[题材包](references/genre-styles/)的腔调、开篇、钩子、情绪烈度、金句、套路与收尾；追妻按时代变体及小三/死人文学分支选择。冷门题材用公式安排结构，腔调按 `short-craft.md`。写法冲突时的先后见 short-craft 开头。
-- **复用作者习惯**：有作者记忆时，正文前用 `scripts/author_memory_commit.py query --workspace {工作区} --book-root {项目目录} --kind prose_style --kind story_design [--genre {题材}] [--workflow 短篇]`（改写、去味只带 `--kind prose_style`），把输出的 `lines` 原样交正文/改写 agent 作自然倾向，不逐条追求命中，不牺牲连贯、节奏和字数；硬门禁、当前请求和本篇设定优先；没装下的交稿时用原话告诉作者。长期声明在收尾按上方作者记忆管理入口处理。
+- **复用作者习惯**：有作者记忆时，正文前用 `scripts/author_memory_commit.js query --workspace {工作区} --book-root {项目目录} --kind prose_style --kind story_design [--genre {题材}] [--workflow 短篇]`（改写、去味只带 `--kind prose_style`），把输出的 `lines` 原样交正文/改写 agent 作自然倾向，不逐条追求命中，不牺牲连贯、节奏和字数；硬门禁、当前请求和本篇设定优先；没装下的交稿时用原话告诉作者。长期声明在收尾按上方作者记忆管理入口处理。
 
 ---
 

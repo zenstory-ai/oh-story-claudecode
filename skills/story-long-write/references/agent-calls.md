@@ -10,11 +10,11 @@
 
 ## story-architect：定设定、出卷纲、出一批细纲（换新上下文）
 
-先跑 `{PYTHON} {skill 根}/scripts/build_architect_brief.py --project {书目录} --task world`（卷纲 `--task volume --volume {N}`，细纲 `--task outline --chapters {A-B}`，一批最多 10 章），只取输出里的任务包路径，不读包的内容。交接前确认作者在对话里定下的方向、偏好和否掉的方案都已写进 `设定/`。
+先跑 `node {skill 根}/scripts/build_architect_brief.js --project {书目录} --task world`（卷纲 `--task volume --volume {N}`，细纲 `--task outline --chapters {A-B}`，一批最多 10 章），只取输出里的任务包路径，不读包的内容。交接前确认作者在对话里定下的方向、偏好和否掉的方案都已写进 `设定/`。
 
 Prompt：`项目目录：{dir}\n任务包：{任务包路径}\n先完整读取任务包，按包里的流程与模板完成；作者已定的方向、设定和要求都在 设定/，对话内容不会传给你\n交付后只回任务包开头要求的几项`
 
-收回后主会话：设定提案拿给作者逐项确认，按作者意见改文件；新卷纲跑 `outline_view.py --check --strict {卷纲路径}`（往旧卷纲追加单元去掉 `--strict`）并核对 `设定/题材定位.md`「题材框架」已补齐（未补或仍留占位时交回补齐），细纲每章跑 `check-outline-contract.js`；失败把报错原样交回同一 agent 修一次。按 workflow-volume.md / workflow-outline.md 的汇报模板用故事话告诉作者，不转述任务包。
+收回后主会话：设定提案拿给作者逐项确认，按作者意见改文件；新卷纲跑 `outline_view.js --check --strict {卷纲路径}`（往旧卷纲追加单元去掉 `--strict`）并核对 `设定/题材定位.md`「题材框架」已补齐（未补或仍留占位时交回补齐），细纲每章跑 `check-outline-contract.js`；失败把报错原样交回同一 agent 修一次。按 workflow-volume.md / workflow-outline.md 的汇报模板用故事话告诉作者，不转述任务包。
 
 ## character-designer：细化某个角色（可选）
 
@@ -22,7 +22,7 @@ Prompt：`项目目录：{dir}\n任务包：{任务包路径}\n先完整读取�
 
 ## consistency-checker：写正文后的事实核对
 
-Prompt：`项目目录：{dir}\n检查范围：{本次写作的章节}\n检查类型：事实冲突+伏笔断线+角色属性不一致\n本章新增申报：{申报表原样粘贴，无则写 0}；同时核对正文有无未申报的跨章事实，逐处列原文和细纲出处。只读与新增项和本章出场角色相关的设定、角色卡与追踪条目。冲突按 S1-S4 报出，申报项逐条给出登记/修复/先问作者的建议\n状态：last_committed_chapter={N}，state_revision={R}（取自 tracking_commit.py check）`
+Prompt：`项目目录：{dir}\n检查范围：{本次写作的章节}\n检查类型：事实冲突+伏笔断线+角色属性不一致\n本章新增申报：{申报表原样粘贴，无则写 0}；同时核对正文有无未申报的跨章事实，逐处列原文和细纲出处。只读与新增项和本章出场角色相关的设定、角色卡与追踪条目。冲突按 S1-S4 报出，申报项逐条给出登记/修复/先问作者的建议\n状态：last_committed_chapter={N}，state_revision={R}（取自 tracking_commit.js check）`
 
 ## narrative-writer：审查+去AI味
 

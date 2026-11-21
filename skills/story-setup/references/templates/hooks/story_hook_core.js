@@ -111,7 +111,7 @@ function trackingCheckpointIssue(book, requireState = false, expectedLastCommitt
   const state = path.join(book, "追踪", "_tracking-state.json")
   if (!fs.existsSync(state)) {
     return requireState
-      ? `追踪/_tracking-state.json 缺失；已有正文项目走 /story-import 的「旧追踪项目迁移」重建追踪（不必重跑全书拆解），新书先用 tracking_commit.py init 初始化`
+      ? `追踪/_tracking-state.json 缺失；已有正文项目走 /story-import 的「旧追踪项目迁移」重建追踪（不必重跑全书拆解），新书先用 tracking_commit.js init 初始化`
       : null
   }
   let document
@@ -172,7 +172,7 @@ function continuityFindings(root) {
         const contextTime = fs.statSync(context).mtimeMs
         if (newest > contextTime + 1000) {
           const latest = chapters.reduce((left, right) => fs.statSync(left).mtimeMs > fs.statSync(right).mtimeMs ? left : right)
-          messages.push(`[continuity] ${safeRelative(root, book)}：正文已更新到「${path.basename(latest)}」但续写状态卡更早——为该章提交 tracking_commit.py 事务、check 通过后再续写，禁止分别手改 上下文.md/伏笔.md。`)
+          messages.push(`[continuity] ${safeRelative(root, book)}：正文已更新到「${path.basename(latest)}」但续写状态卡更早——为该章提交 tracking_commit.js 事务、check 通过后再续写，禁止分别手改 上下文.md/伏笔.md。`)
         }
       } catch {}
     }
@@ -182,7 +182,7 @@ function continuityFindings(root) {
       try {
         const contextSize = fs.statSync(context).size
         if (contextSize > 12288) {
-          messages.push(`[continuity] ${safeRelative(root, book)}：追踪/上下文.md 已 ${contextSize} 字节，超出续写状态卡预算 12288 字节——提交一份 mode=revision 事务让 tracking_commit.py 整份重建，不要手改也不要继续追加。`)
+          messages.push(`[continuity] ${safeRelative(root, book)}：追踪/上下文.md 已 ${contextSize} 字节，超出续写状态卡预算 12288 字节——提交一份 mode=revision 事务让 tracking_commit.js 整份重建，不要手改也不要继续追加。`)
         }
       } catch {}
     }
@@ -944,7 +944,7 @@ function maskStyleText(text, whitelist) {
 function toxicRescanHint(absolute) {
   const match = absolute ? path.basename(absolute).match(/^第0*(\d+)章.*\.md$/) : null
   if (match && path.basename(path.dirname(absolute)) === "正文") {
-    return `完整检查：{PYTHON} <story-long-write>/scripts/storyctl.py chapter check --project <书目录> --chapter ${match[1]}`
+    return `完整检查：node <story-long-write>/scripts/storyctl.js chapter check --project <书目录> --chapter ${match[1]}`
   }
   return "完整扫描：node <skill>/scripts/check-ai-patterns.js --check <正文文件>"
 }
@@ -1360,7 +1360,7 @@ function stagedMarkdownWarnings(root) {
   return warnings.length ? `=== Story Commit Warnings（advisory only）===\n${warnings.join("\n")}\n=== End Warnings ===` : ""
 }
 
-// 与 tracking_commit.py FORESHADOW_STATUSES 保持同步（由 test-story-hook-core.mjs 校验）。
+// 与 tracking_commit.js FORESHADOW_STATUSES 保持同步（由 test-story-hook-core.mjs 校验）。
 const FORESHADOW_NORMAL_STATUSES = new Set(["已埋", "已回收", "放弃"])
 const FORESHADOW_WARN_STATUSES = new Set(["已过期"])
 

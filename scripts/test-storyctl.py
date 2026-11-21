@@ -1,28 +1,116 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import importlib.util
 import json
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
-import unittest.mock
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-STORYCTL_PATH = ROOT / "skills/story-long-write/scripts/storyctl.py"
-SPEC = importlib.util.spec_from_file_location("storyctl", STORYCTL_PATH)
-assert SPEC and SPEC.loader
-storyctl = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(storyctl)
+STORYCTL_PATH = ROOT / "skills/story-long-write/scripts/storyctl.js"
+WORDCOUNT_PATH = ROOT / "skills/story-long-write/scripts/wordcount_core.js"
+TRACKING_PATH = ROOT / "skills/story-long-write/scripts/tracking_commit.js"
+NODE = shutil.which("node") or "node"
+
+
+class WordcountError(ValueError):
+    pass
+
+
+def _node_call(module_path: Path, fn_name: str, args: list[object]) -> object:
+    code = (
+        'const fs = require("fs");'
+        'const mod = require(process.argv[1]);'
+        'const args = JSON.parse(fs.readFileSync(0, "utf8"));'
+        'try {'
+        '  const out = mod[process.argv[2]](...args);'
+        '  process.stdout.write(JSON.stringify({ ok: true, value: out }));'
+        '} catch (err) {'
+        '  process.stdout.write(JSON.stringify({ ok: false, name: err.name, message: err.message }));'
+        '}'
+    )
+    completed = subprocess.run(
+        [NODE, "-e", code, str(module_path), fn_name],
+        input=json.dumps(args, ensure_ascii=False),
+        cwd=ROOT, text=True, encoding="utf-8", capture_output=True, check=True,
+    )
+    res = json.loads(completed.stdout)
+    if not res["ok"]:
+        if res.get("name") == "WordcountError":
+            raise WordcountError(res["message"])
+        raise RuntimeError(f"{res.get('name')}: {res.get('message')}")
+    return res["value"]
+
+
+class _StoryctlProxy:
+    WordcountError = WordcountError
+    CHECK_EXIT_CODES = {"ready": 0, "needs_decision": 0, "blocked": 1, "invalid": 1, "tool_unavailable": 3}
+
+    def count_visible_chars(self, text: str) -> int:
+        return int(_node_call(WORDCOUNT_PATH, "countVisibleChars", [text]))
+
+    def compute_wordcount_bands(self, target: object, author_range: object = None) -> dict[str, object]:
+        return _node_call(WORDCOUNT_PATH, "computeWordcountBands", [target, author_range])
+
+    def evaluate_wordcount(self, body: str, target: object, *, chapter: object = None, author_range: object = None) -> dict[str, object]:
+        return _node_call(WORDCOUNT_PATH, "evaluateWordcount", [body, target, {"chapter": chapter, "authorRange": author_range}])
+
+    def checkpoint_wordcount(self, body: str, target: object, *, chapter: object = None, author_range: object = None) -> dict[str, object]:
+        return _node_call(WORDCOUNT_PATH, "checkpointWordcount", [body, target, {"chapter": chapter, "authorRange": author_range}])
+
+    def target_from_outline(self, text: str) -> int:
+        return int(_node_call(WORDCOUNT_PATH, "targetFromOutline", [text]))
+
+    def range_from_outline(self, text: str) -> object:
+        return _node_call(WORDCOUNT_PATH, "rangeFromOutline", [text])
+
+    def check_blocking_quality(self, outline: Path, body: Path) -> dict[str, object]:
+        return _node_call(STORYCTL_PATH, "checkBlockingQuality", [str(outline), str(body)])
+
+    def deslop_skipped(self, body: Path) -> bool:
+        return bool(_node_call(STORYCTL_PATH, "deslopSkipped", [str(body)]))
+
+    def _check_status(self, length: dict[str, object], quality: dict[str, object]) -> str:
+        return str(_node_call(STORYCTL_PATH, "checkStatus", [length, quality]))
+
+    def fragmentation(self, text: str) -> dict[str, object]:
+        return _node_call(STORYCTL_PATH, "fragmentation", [text])
+
+    def prose_balance(self, text: str) -> dict[str, object]:
+        return _node_call(STORYCTL_PATH, "proseBalance", [text])
+
+    def plain_report(self, result: dict[str, object]) -> list[str]:
+        return _node_call(STORYCTL_PATH, "plainReport", [result])
+
+    def chapter_check_with_pass_quality(self, project: Path, chapter: int) -> dict[str, object]:
+        code = (
+            'const mod = require(process.argv[1]);'
+            'mod._hooks.checkBlockingQuality = () => ({ status: "pass", blocking_findings: [], advisories: [], semantic_advisories: 0, tool_errors: [] });'
+            'process.stdout.write(JSON.stringify(mod.chapterCheck(process.argv[2], Number(process.argv[3]))));'
+        )
+        completed = subprocess.run(
+            [NODE, "-e", code, str(STORYCTL_PATH), str(project), str(chapter)],
+            cwd=ROOT, text=True, encoding="utf-8", capture_output=True, check=True,
+        )
+        return json.loads(completed.stdout)
+
+    def _tracking_module(self):
+        return self
+
+    def initialize(self, project: Path, document: dict[str, object]) -> dict[str, object]:
+        return _node_call(TRACKING_PATH, "initialize", [str(project), document])
+
+
+storyctl = _StoryctlProxy()
 
 
 def run_cli(*arguments: str) -> tuple[subprocess.CompletedProcess[str], dict[str, object]]:
     completed = subprocess.run(
-        [sys.executable, str(STORYCTL_PATH), *arguments],
+        [NODE, str(STORYCTL_PATH), *arguments],
         cwd=ROOT,
         text=True,
         encoding="utf-8",
@@ -484,20 +572,29 @@ class ToolFailureTests(unittest.TestCase):
     """检测器崩溃或输出坏掉时不能把章节当成通过：一律按工具不可用（exit 3）处理。"""
 
     def _quality_with(self, script: str, returncode: int, stdout: str) -> dict[str, object]:
-        real_run = subprocess.run
-
-        def fake_run(command, *args, **kwargs):
-            if len(command) > 1 and Path(command[1]).name == script:
-                return subprocess.CompletedProcess(command, returncode, stdout, "boom")
-            return real_run(command, *args, **kwargs)
-
         with tempfile.TemporaryDirectory(prefix="storyctl-tool-") as directory:
             outline = Path(directory) / "细纲_第001章.md"
             outline.write_text("- 字数目标：1000 字\n", encoding="utf-8")
             body = Path(directory) / "第001章_测试.md"
             body.write_text("## 第1章 测试\n他推门进去，屋里没人。\n", encoding="utf-8")
-            with unittest.mock.patch.object(storyctl.subprocess, "run", fake_run):
-                return storyctl.check_blocking_quality(outline, body)
+            code = (
+                'const path = require("path");'
+                'const mod = require(process.argv[1]);'
+                'const orig = mod._hooks.runNodeScript;'
+                'const targetScript = process.argv[2];'
+                'const rc = Number(process.argv[3]);'
+                'const out = process.argv[4];'
+                'mod._hooks.runNodeScript = (scriptPath, args) => {'
+                '  if (path.basename(scriptPath) === targetScript) return { status: rc, stdout: out, stderr: "boom" };'
+                '  return orig(scriptPath, args);'
+                '};'
+                'process.stdout.write(JSON.stringify(mod.checkBlockingQuality(process.argv[5], process.argv[6])));'
+            )
+            completed = subprocess.run(
+                [NODE, "-e", code, str(STORYCTL_PATH), script, str(returncode), stdout, str(outline), str(body)],
+                cwd=ROOT, text=True, encoding="utf-8", capture_output=True, check=True,
+            )
+            return json.loads(completed.stdout)
 
     @unittest.skipUnless(shutil.which("node"), "node absent")
     def test_unparseable_detector_output_is_tool_unavailable(self) -> None:
@@ -618,9 +715,7 @@ class FragmentationTests(unittest.TestCase):
                 "- 字数目标：1000 字\n- 字数口径：visible_chars_v1\n", encoding="utf-8")
             (project / "正文/第001章_测试.md").write_text("# 第一章\n" + "短。\n" * 10, encoding="utf-8")
             _init_tracking(project)
-            with unittest.mock.patch.object(storyctl, "check_blocking_quality", return_value={
-                "status": "pass", "blocking_findings": [], "advisories": [], "semantic_advisories": 0, "tool_errors": []}):
-                result = storyctl.chapter_check(project, 1)
+            result = storyctl.chapter_check_with_pass_quality(project, 1)
             lines = storyctl.plain_report(result)
             text = "\n".join(lines)
             self.assertIn("字数不在范围里，要请作者定", lines[0])
@@ -630,7 +725,7 @@ class FragmentationTests(unittest.TestCase):
             for jargon in ("needs_decision", "blocking", "status", "advisory"):
                 self.assertNotIn(jargon, text)
             completed = subprocess.run(
-                [sys.executable, str(STORYCTL_PATH), "chapter", "check", "--project", str(project), "--chapter", "9", "--plain"],
+                [NODE, str(STORYCTL_PATH), "chapter", "check", "--project", str(project), "--chapter", "9", "--plain"],
                 text=True, encoding="utf-8", capture_output=True, check=False)
             self.assertEqual(completed.returncode, 2)
             self.assertIn("第 9 章没有细纲", completed.stdout)
@@ -663,9 +758,7 @@ class FragmentationTests(unittest.TestCase):
             ) + "\n"
             (project / "正文/第001章_测试.md").write_text(skewed, encoding="utf-8")
             _init_tracking(project)
-            with unittest.mock.patch.object(storyctl, "check_blocking_quality", return_value={
-                "status": "pass", "blocking_findings": [], "advisories": [], "semantic_advisories": 0, "tool_errors": []}):
-                result = storyctl.chapter_check(project, 1)
+            result = storyctl.chapter_check_with_pass_quality(project, 1)
             self.assertEqual(result["status"], "ready")
             self.assertEqual(result["prose_balance"]["body_action_sentence_ratio"], 1.0)
             self.assertEqual(result["prose_balance"]["thought_causal_sentence_ratio"], 0.0)

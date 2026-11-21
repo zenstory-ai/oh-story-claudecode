@@ -16,15 +16,15 @@
 
 ## 运行工具
 
-先探测 Python 3 解释器（依次试 `python3`、`python`、`py -3`）：
+使用 Node.js 18+ 运行：
 
 ```text
-{PYTHON} {当前 skill 根}/scripts/tracking_commit.py init   --project {书项目根} --input {书项目根}/.story/work/init.json
-{PYTHON} {当前 skill 根}/scripts/tracking_commit.py check  --project {书项目根}
-{PYTHON} {当前 skill 根}/scripts/tracking_commit.py draft  --project {书项目根} --chapter {N}
-{PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter check   --project {书项目根} --chapter {N} [--min-chars {下限} --max-chars {上限}]
-{PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter commit  --project {书项目根} --chapter {N} --input {书项目根}/.story/work/第{NNN}章/tracking.json
-{PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter accept-current-length --project {书项目根} --chapter {N} --input {书项目根}/.story/work/第{NNN}章/tracking.json
+node {当前 skill 根}/scripts/tracking_commit.js init   --project {书项目根} --input {书项目根}/.story/work/init.json
+node {当前 skill 根}/scripts/tracking_commit.js check  --project {书项目根}
+node {当前 skill 根}/scripts/tracking_commit.js draft  --project {书项目根} --chapter {N}
+node {story-long-write skill 根}/scripts/storyctl.js chapter check   --project {书项目根} --chapter {N} [--min-chars {下限} --max-chars {上限}]
+node {story-long-write skill 根}/scripts/storyctl.js chapter commit  --project {书项目根} --chapter {N} --input {书项目根}/.story/work/第{NNN}章/tracking.json
+node {story-long-write skill 根}/scripts/storyctl.js chapter accept-current-length --project {书项目根} --chapter {N} --input {书项目根}/.story/work/第{NNN}章/tracking.json
 ```
 
 - `init`：仅在 `_tracking-state.json` 不存在时执行（旧追踪文件自动移入 `追踪/_旧追踪存档/`）；执行前读 [tracking-initialization.md](tracking-initialization.md)。
