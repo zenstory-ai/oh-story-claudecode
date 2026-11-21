@@ -30,13 +30,11 @@ jobs:
           python3 scripts/test-shared-assets.py
           python3 scripts/test-shared-references.py
           python3 scripts/test-agent-permissions.py
-      - name: Source & hook policy guards
+      - name: Source & runtime policy guards
         run: |
-          bash scripts/check-hook-regex-sync.sh
           bash scripts/check-scan-runtime-policy.sh
           python3 scripts/test-scan-runtime-policy.py
           bash scripts/check-python-invocation.sh
-          bash scripts/check-hook-locale-safety.sh
       - name: Check story-setup deployment
         run: bash scripts/check-story-setup-deployment.sh
       - name: Check 7 host adapters
@@ -95,25 +93,20 @@ jobs:
           python scripts/test-long-analyze-runtime.py
           python scripts/test-inspiration-index.py
           python scripts/test-scan-aggregate.py
-      - name: Hook & continuity regressions
-        shell: bash
-        run: |
-          bash scripts/test-prose-backstop-hook.sh
-          bash scripts/test-prose-net-parity.sh
-          bash scripts/test-story-continuity.sh
-          bash scripts/test-codex-hooks.sh
-          bash scripts/test-zcode-hooks.sh
-          node scripts/test-antigravity-hooks.mjs
-      # Generate a GBK-class locale on Ubuntu so Part 2 of hook encoding test runs end-to-end.
+      # Generate a GBK-class locale on Ubuntu so the GBK test in test-claude-hooks.mjs runs end-to-end.
       - name: Generate zh_CN.GBK locale (Chinese Windows simulation)
         if: matrix.os == 'ubuntu-latest'
         run: sudo localedef -f GBK -i zh_CN zh_CN.GBK || sudo locale-gen zh_CN.GBK || true
-      - name: Portable char-count & hook path-encoding tests
+      - name: Hook & continuity regressions
+        shell: bash
+        run: |
+          node --test scripts/test-story-hook-core.mjs scripts/test-claude-hooks.mjs scripts/test-codex-hooks.mjs scripts/test-antigravity-hooks.mjs scripts/test-opencode-plugin.mjs
+          bash scripts/test-zcode-hooks.sh
+      - name: Portable char-count tests
         shell: bash
         run: |
           bash scripts/test-charcount-portable.sh
           bash scripts/test-charcount-portable.sh --stub
-          bash scripts/test-hook-encoding-portable.sh
       - name: Setup Chrome
         if: matrix.os != 'ubuntu-latest'
         uses: browser-actions/setup-chrome@c785b87e244131f27c9f19c1a33e2ead956ab7ce # v1

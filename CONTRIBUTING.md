@@ -82,13 +82,12 @@ PR 自动运行 `.github/workflows/cross-platform.yml`，拆为两个 job：`rep
 - `python3 scripts/test-static-check.py` / `python3 scripts/test-current-skill-contracts.py` / `python3 scripts/test-doc-budget.py` / `python3 scripts/test-shared-assets.py` / `python3 scripts/test-shared-references.py` — 仓库守卫行为回归
 - `python3 scripts/test-handoff-contracts.py` — 跨 skill 交接契约回归（拆文、扫榜、导入产物到写作端，写作端平台到审稿，派助手与派写手去味的字段和标签）
 - `node --test scripts/test-ai-patterns.mjs scripts/test-degeneration.mjs scripts/test-outline-copy.mjs` — AI 句式、模型退化、细纲照搬检测器原生 Node 回归
-- `scripts/check-hook-regex-sync.sh` — hook 伏笔状态检测与正则同步校验
 - `scripts/check-scan-runtime-policy.sh` + `python3 scripts/test-scan-runtime-policy.py` — scraper 本地日期依赖与 CDP 源码策略守卫
 - `python3 scripts/test-scan-aggregate.py` — 扫榜聚合脚本的解析、去重、分布与抽样行为回归
 - `scripts/check-story-setup-deployment.sh` — story-setup 部署完整性
 - `python3 scripts/check-plugin-packaging.py` + `python3 scripts/test-plugin-packaging.py` — Claude/ZCode/Reasonix catalog 与 manifest 打包检查及黑盒变异回归
 - 七个宿主适配检查：`check-claude-adapter.sh`、`check-codex-adapter.sh`、`check-antigravity-adapter.sh`、`check-opencode-adapter.sh`、`check-openclaw-skills.sh`、`check-zcode-adapter.sh`、`check-reasonix-adapter.sh`
-- Hook 行为回归：`test-prose-backstop-hook.sh`、`test-prose-net-parity.sh`、`test-story-continuity.sh`、`test-codex-hooks.sh`、`test-zcode-hooks.sh`、`node scripts/test-antigravity-hooks.mjs`
+- Hook 行为回归（Claude / Codex / OpenCode / Antigravity / ZCode 五端统一基于 Node.js 18+ 共享核 `story_hook_core.js`）：`node --test scripts/test-story-hook-core.mjs scripts/test-claude-hooks.mjs scripts/test-codex-hooks.mjs scripts/test-antigravity-hooks.mjs scripts/test-opencode-plugin.mjs`、`test-zcode-hooks.sh`
 - 核心运行时回归：`test-storyctl.py`、`test-writer-pipeline.py`、`test-chapter-completion-lifecycle.py`、`test-tracking-commit.py`、`test-author-memory-commit.py`、`test-long-analyze-runtime.py`、`test-inspiration-index.py`、`test-publish-format.py`、`test-style-precedence.py`
 - 采集脚本 `node --check` 语法校验
 
@@ -124,12 +123,8 @@ python3 scripts/test-author-memory-commit.py
 python3 scripts/test-long-analyze-runtime.py
 python3 scripts/test-inspiration-index.py
 python3 scripts/test-scan-aggregate.py
-bash scripts/check-hook-regex-sync.sh
 bash scripts/check-scan-runtime-policy.sh
 python3 scripts/test-scan-runtime-policy.py
-bash scripts/test-prose-backstop-hook.sh
-bash scripts/test-prose-net-parity.sh
-bash scripts/test-story-continuity.sh
 bash scripts/check-story-setup-deployment.sh
 bash scripts/check-claude-adapter.sh
 bash scripts/check-codex-adapter.sh
@@ -138,12 +133,9 @@ bash scripts/check-opencode-adapter.sh
 bash scripts/check-openclaw-skills.sh
 bash scripts/check-zcode-adapter.sh
 bash scripts/check-reasonix-adapter.sh
-bash scripts/test-codex-hooks.sh
+node --test scripts/test-story-hook-core.mjs scripts/test-claude-hooks.mjs scripts/test-codex-hooks.mjs scripts/test-antigravity-hooks.mjs scripts/test-opencode-plugin.mjs
 bash scripts/test-zcode-hooks.sh
-node scripts/test-antigravity-hooks.mjs
 bash scripts/check-python-invocation.sh
-bash scripts/check-hook-locale-safety.sh
-bash scripts/test-hook-encoding-portable.sh
 bash scripts/test-charcount-portable.sh
 bash scripts/test-charcount-portable.sh --stub
 
@@ -364,10 +356,10 @@ ZCode 采用「原生 plugin + `story-setup` workspace 部署」双入口：
 python3 scripts/generate-zcode-agents.py --check
 bash scripts/check-zcode-adapter.sh
 bash scripts/test-zcode-hooks.sh
-bash scripts/test-prose-net-parity.sh
+node --test scripts/test-story-hook-core.mjs
 ```
 
-更新正文轻量确定性网时，必须同步 Claude、OpenCode、Codex、Antigravity、ZCode 五端，并让 shared-assets / parity / Antigravity hook 测试通过。
+更新正文轻量确定性网时，只需修改 canonical `story_hook_core.js` 并运行 `python3 scripts/sync-shared-assets.py sync` 同步到 Claude、OpenCode、Codex、Antigravity、ZCode 五端，并确保 `python3 scripts/lint-repo.py --only shared` 与各端 hook 测试通过。
 
 ## Reasonix 适配维护
 
@@ -390,17 +382,16 @@ REASONIX_REAL_CHECK=1 bash scripts/check-reasonix-adapter.sh  # 本机安装 rea
 本项目同时支持 Codex CLI（repo skills 发现 + `$story-setup` 项目部署）：
 
 - repo-local skills：`.agents/skills` 是指向 `skills/` 的相对 symlink（`../skills`，agentskills.io 标准路径），Codex 扫描它发现 skill，别复制第二份。必须是有效相对 symlink（`check-codex-adapter.sh` 守卫 target=`../skills`；无效/绝对会让发现失效，见 openai/codex#11314）；Windows 需 git `core.symlinks=true`。OpenClaw 原生扫 workspace `skills/`，不依赖它。
-- project deployment hooks：`skills/story-setup/references/codex/hooks/hooks.json` 面向 `$story-setup` 部署到写作项目。POSIX `command` 与 Windows `commandWindows` 都从当前目录向上寻找 `.codex/hooks/run-story-hook.*`，不依赖 Git 仓库；找到后由共享 launcher 统一完成事件白名单、解释器探测、`CODEX_PROJECT_DIR` 注入与 Python hook 调度。
-- Windows hooks：Codex 在 Windows 下用 `%COMSPEC% /C`（cmd.exe）启动 `commandWindows`。当前注册命令用 PowerShell 做逐级向上定位，再调用 `run-story-hook.cmd`；因此嵌套工作目录与 POSIX 行为一致，而不是只支持项目根目录。改事件清单或 launcher 后必须重跑生成器和适配检查，禁止在六个注册项里手工复制探测逻辑。
+- project deployment hooks：`skills/story-setup/references/codex/hooks/hooks.json` 面向 `$story-setup` 部署到写作项目。POSIX `command` 与 Windows `commandWindows` 都从当前目录向上寻找 `.codex/hooks/run-story-hook.*`，不依赖 Git 仓库；找到后由共享 launcher 统一完成事件白名单、Node.js 18+ 探测、`CODEX_PROJECT_DIR` 注入与 `story_codex_hook.js`（复用共享 `story_hook_core.js`）调度。
+- Windows hooks：Codex 在 Windows 下用 `%COMSPEC% /C`（cmd.exe）启动 `commandWindows`。当前注册命令用 PowerShell 做逐级向上定位，再调用 `run-story-hook.cmd`；因此嵌套工作目录与 POSIX 行为一致，而不是只支持项目根目录。改事件清单或 launcher 后必须重跑适配检查，禁止在六个注册项里手工复制探测逻辑。
 - custom agents：`skills/story-setup/references/codex/agents/*.toml` 由 `scripts/generate-codex-agents.py` 从 `references/templates/agents/*.md` 生成。修改 Claude agent 模板后必须重新生成并提交。
 
 ### Codex 同步步骤
 
 ```bash
 python3 scripts/generate-codex-agents.py
-python3 scripts/generate-codex-hooks.py
 bash scripts/check-codex-adapter.sh
-bash scripts/test-codex-hooks.sh
+node --test scripts/test-codex-hooks.mjs
 ```
 
 ### Codex 关键兼容性问题
