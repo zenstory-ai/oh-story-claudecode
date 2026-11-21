@@ -88,18 +88,18 @@ SENTINEL
 
 run_from_nested() {
   local root="$1"
-  local script="$2"
+  local event="$2"
   local nested="$root/nested/a/b"
   mkdir -p "$nested"
-  (cd "$nested" && CLAUDE_PROJECT_DIR="$root" bash "$root/.claude/hooks/$script")
+  (cd "$nested" && CLAUDE_PROJECT_DIR="$root" bash "$root/.claude/hooks/run-story-hook.sh" "$event")
 }
 
 run_from_nested_no_project_dir() {
   local root="$1"
-  local script="$2"
+  local event="$2"
   local nested="$root/nested/a/b"
   mkdir -p "$nested"
-  (cd "$nested" && unset CLAUDE_PROJECT_DIR && bash "$root/.claude/hooks/$script")
+  (cd "$nested" && unset CLAUDE_PROJECT_DIR && bash "$root/.claude/hooks/run-story-hook.sh" "$event")
 }
 
 setup_git_repo() {
@@ -112,7 +112,7 @@ setup_git_repo() {
 run_commit_hook_command() {
   local root="$1"
   local command_text="$2"
-  (cd "$root" && CLAUDE_PROJECT_DIR="$root" STORY_COMMIT_COMMAND="$command_text" bash .claude/hooks/validate-story-commit.sh 2>&1 || true)
+  (cd "$root" && CLAUDE_PROJECT_DIR="$root" STORY_COMMIT_COMMAND="$command_text" bash .claude/hooks/run-story-hook.sh pre-tool-commit-advisory 2>&1 || true)
 }
 
 assert_commit_warns() {
@@ -130,66 +130,58 @@ echo "============================"
 echo "Repo: $REPO_ROOT"
 
 # TS1 — Hook dependency completeness
-assert_file "$HOOKS_DIR/lib/common.sh"
-assert_file "$HOOKS_DIR/lib/sentinel.sh"
-runtime_artifacts="$(find "$HOOKS_DIR" -maxdepth 4 \( -path '*/.omc*' -o -name '.DS_Store' -o -name '*.tmp' -o -name '*.log' \) -print 2>/dev/null || true)"
-[ -z "$runtime_artifacts" ] || fail "hook templates contain runtime artifacts that would be recursively deployed: $runtime_artifacts"
-while IFS= read -r src; do
-  [ -n "$src" ] || continue
-  case "$src" in
-    '$(dirname "$0")/'*)
-      rel="${src#'$(dirname "$0")/'}"
-      assert_file "$HOOKS_DIR/$rel"
-      ;;
-    "\$(dirname \"\$0\")/"*)
-      rel="${src#"\$(dirname \"\$0\")/"}"
-      assert_file "$HOOKS_DIR/$rel"
-      ;;
-  esac
-done < <(grep -RhoE '^source[[:space:]]+"[^"]+"' "$HOOKS_DIR"/*.sh | sed -E 's/^source[[:space:]]+"//;s/"$//' | sort -u)
-# node 共享核 + CLI 桥：正文网/路径抽取/git commit 侦测/连续性的单一实现，被 bash hook 经
-# `node "$(dirname "$0")/story_hook_cli.js"` 调用。大纲阻断判定与 staged markdown warnings 未归核，
-# 仍是各端独立实现（Claude 纯 bash；codex↔core 由 test-prose-net-parity.sh Part C 锁 parity）。
-# 这两条不是 source 依赖，上面的 grep 抓不到，显式断言存在 + 语法有效，否则 hook 静默退化
-# （node 缺失时 hook 自身 exit 0、session-start.sh 会话起点提示一次，此处按开发机有 node 校验）。
+assert_file "$HOOKS_DIR/run-story-hook.sh"
 assert_file "$HOOKS_DIR/story_hook_core.js"
 assert_file "$HOOKS_DIR/story_hook_cli.js"
+runtime_artifacts="$(find "$HOOKS_DIR" -maxdepth 4 \( -path '*/.omc*' -o -name '.DS_Store' -o -name '*.tmp' -o -name '*.log' \) -print 2>/dev/null || true)"
+[ -z "$runtime_artifacts" ] || fail "hook templates contain runtime artifacts that would be recursively deployed: $runtime_artifacts"
+bash -n "$HOOKS_DIR/run-story-hook.sh" || fail "run-story-hook.sh bash syntax invalid"
 if command -v node >/dev/null 2>&1; then
   node --check "$HOOKS_DIR/story_hook_core.js" || fail "story_hook_core.js node syntax invalid"
   node --check "$HOOKS_DIR/story_hook_cli.js" || fail "story_hook_cli.js node syntax invalid"
 fi
-# 这是依赖方向的静态策略，不冒充行为测试：四个 bash hook 必须经 CLI 桥复用共享核，禁止
-# 重新内嵌第五份 Python 实现。运行行为另由 test-prose-net-parity / hook 回归覆盖。
-for hook in check-prose-after-write guard-outline-before-prose validate-story-commit detect-story-gaps; do
-  if grep -q "<<'PY'" "$HOOKS_DIR/$hook.sh"; then
-    fail "$hook.sh must not embed a duplicate Python implementation"
-  fi
-  assert_grep 'story_hook_cli\.js' "$HOOKS_DIR/$hook.sh" "$hook.sh must delegate to story_hook_cli.js"
-done
+assert_grep 'story_hook_cli\.js' "$HOOKS_DIR/run-story-hook.sh" "run-story-hook.sh must delegate to story_hook_cli.js"
 assert_grep '递归复制完整目录树|recursive' "$DEPLOY_CLAUDE" "Claude deploy file must require recursive hook deployment"
-assert_grep 'lib/common\.sh' "$DEPLOY_CLAUDE" "Claude deploy file must mention hooks/lib/common.sh"
-assert_grep 'lib/sentinel\.sh' "$DEPLOY_CLAUDE" "Claude deploy file must mention hooks/lib/sentinel.sh"
+assert_grep 'run-story-hook\.sh' "$DEPLOY_CLAUDE" "Claude deploy file must mention run-story-hook.sh"
+assert_grep 'story_hook_cli\.js' "$DEPLOY_CLAUDE" "Claude deploy file must mention story_hook_cli.js"
 echo "  OK TS1 hook dependency completeness"
 
-# TS1b — SessionStart 部署自检名单必须覆盖所有 hook 脚本（防新增 hook 漏登记，#195 review）。
-# *.js 一并枚举：story_hook_cli.js/story_hook_core.js 是承重共享核，被删时正文兜底/commit 侦测/
-# 连续性检查全部静默退化，同样必须登记进自检名单。
-selfcheck_line="$(grep -E 'for hook in .*; do' "$HOOKS_DIR/session-start.sh" | head -1)"
-[ -n "$selfcheck_line" ] || fail "session-start.sh 缺少 hook 自检 for 循环"
-# 名单里最后一个 hook 后面紧跟的是 `;` 而不是空格（grep 命中行按 pattern 必然以 `; do` 收尾），
-# 直接拿原始行做 *" $base "* 会把「排在最后的、其实已登记」的 hook 误报成漏列。先把分号换成
-# 空格并两端补空格，让首位/末位都能被同一条 case 命中，而不是要求名单保持某种排序。
-selfcheck_tokens=" ${selfcheck_line//;/ } "
-while IFS= read -r hookfile; do
-  base="$(basename "$hookfile")"
-  case "$selfcheck_tokens" in
-    *" $base "*) : ;;
-    # ${base} 必须加花括号：macOS bash 3.2 在 UTF-8 区域会把全角「（」的首字节并进变量名，
-    # set -u 于是抛 base?: unbound variable，真正漏列时反而看不到是哪个 hook。
-    *) fail "session-start.sh 部署自检名单漏列 hook：${base}（新增 hook 须同步加入该名单）" ;;
-  esac
-done < <(find "$HOOKS_DIR" -maxdepth 1 \( -name '*.sh' -o -name '*.js' \) -type f)
-echo "  OK TS1b session-start self-check lists all hook scripts and node cores"
+# TS1b — SessionStart 部署自检名单必须覆盖所有 hook 文件，且 settings-hooks.json 的事件 token
+# 与 run-story-hook.sh / story_hook_cli.js 的白名单逐一对齐。
+python3 - "$HOOKS_DIR" "$SETTINGS_FILE" <<'PY' || fail "Claude hook self-check or event allowlist drifted"
+import json, re, sys
+from pathlib import Path
+
+hooks_dir = Path(sys.argv[1])
+settings = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))["hooks"]
+cli_text = (hooks_dir / "story_hook_cli.js").read_text(encoding="utf-8")
+launcher_text = (hooks_dir / "run-story-hook.sh").read_text(encoding="utf-8")
+
+m = re.search(r"const REQUIRED_HOOK_FILES = \[([^\]]+)\]", cli_text)
+assert m, "story_hook_cli.js missing REQUIRED_HOOK_FILES"
+listed = set(re.findall(r'"([^"]+)"', m.group(1)))
+actual = {p.name for p in hooks_dir.iterdir() if p.is_file() and p.suffix in (".sh", ".js")}
+assert listed == actual, f"REQUIRED_HOOK_FILES mismatch: listed={sorted(listed)}, actual={sorted(actual)}"
+
+registered = []
+for blocks in settings.values():
+    for block in blocks:
+        for h in block.get("hooks", []):
+            cmd = h["command"]
+            assert "/.claude/hooks/run-story-hook.sh " in cmd, cmd
+            registered.append(cmd.rsplit(" ", 1)[-1])
+assert len(registered) == len(set(registered)), f"duplicate Claude hook events: {registered}"
+
+case_block = re.search(r'case[ \t]+"\$EVENT"[ \t]+in(.*?)esac', launcher_text, re.S)
+assert case_block, "run-story-hook.sh missing EVENT case allowlist"
+sh_tokens = set()
+for arm in re.findall(r'^[ \t]*([a-z0-9|-]+)\)', case_block.group(1), re.M):
+    sh_tokens.update(arm.split("|"))
+cli_tokens = set(re.findall(r'command === "([a-z0-9-]+)"', cli_text)) - {"analysis-input-guard"}
+assert sh_tokens == set(registered), f"launcher allowlist drift: {sh_tokens} vs {set(registered)}"
+assert cli_tokens == set(registered), f"story_hook_cli allowlist drift: {cli_tokens} vs {set(registered)}"
+PY
+echo "  OK TS1b session-start self-check and event allowlists match all hook files"
 
 # TS2a — 按宿主拆分：入口路由到每个宿主的部署文件，每份文件都有完整的清单/验证/报告提示。
 # 缺一份或入口漏路由，那个宿主的作者就拿不到部署步骤；缺一节就是该宿主的行为被拆丢了。
@@ -506,11 +498,11 @@ from pathlib import Path
 hooks = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))["hooks"]["PreToolUse"]
 assert any(
     "Bash" in block.get("matcher", "").split("|")
-    and any("guard-outline-before-prose.sh" in hook.get("command", "") for hook in block.get("hooks", []))
+    and any("run-story-hook.sh pre-tool-prose-guard" in hook.get("command", "") for hook in block.get("hooks", []))
     for block in hooks
 )
 PY
-# v24 → v25 实际迁移：同 command 不能让旧 matcher 留存；混在旧 block 的用户 hook 要保留，且复跑幂等。
+# v24/v44 → v45 实际迁移：旧独立脚本注册全部清掉，替换为 run-story-hook.sh；混在旧 block 的用户 hook 保留，且复跑幂等。
 assert_file "$CLAUDE_MERGE"
 cat > "$TMP_DIR/claude-v24.json" <<'JSON'
 {
@@ -533,18 +525,20 @@ cat > "$TMP_DIR/claude-v24.json" <<'JSON'
 }
 JSON
 python3 "$CLAUDE_MERGE" --existing "$TMP_DIR/claude-v24.json" --template "$SETTINGS_FILE" --output "$TMP_DIR/claude-v25.json"
-python3 - "$TMP_DIR/claude-v25.json" <<'PY' || fail "Claude v24→v25 hook migration failed"
+python3 - "$TMP_DIR/claude-v25.json" <<'PY' || fail "Claude v24/v44→v45 hook migration failed"
 import json, sys
 doc=json.load(open(sys.argv[1],encoding="utf-8"))
 assert doc["permissions"] == {"allow":["Read"]} and doc["customTop"] == "keep"
-hits=[]; user=[]
+hits=[]; legacy=[]; user=[]
 for event, blocks in doc["hooks"].items():
     if not isinstance(blocks,list): continue
     for block in blocks:
         for hook in block.get("hooks",[]):
             cmd=hook.get("command","")
-            if "guard-outline-before-prose.sh" in cmd: hits.append((event,block.get("matcher"),hook))
+            if "run-story-hook.sh pre-tool-prose-guard" in cmd: hits.append((event,block.get("matcher"),hook))
+            if "guard-outline-before-prose.sh" in cmd: legacy.append(cmd)
             if "user-pre-hook.sh" in cmd: user.append((event,block.get("matcher"),hook))
+assert not legacy, f"legacy Claude hook registrations survived upgrade: {legacy}"
 assert len(hits)==1, hits
 assert hits[0][0]=="PreToolUse" and hits[0][1]=="Bash|Write|Edit|MultiEdit", hits
 assert hits[0][2].get("timeout")==10, hits
@@ -688,7 +682,7 @@ touch "$root/拆文库/sample/_progress.md"
 mkdir -p "$root/拆文库/done"
 printf '# 深度拆解进度：done\n\n- 最终状态：completed\n- schema_version: 2\n' > "$root/拆文库/done/_progress.md"
 
-out_start="$(run_from_nested "$root" session-start.sh || true)"
+out_start="$(run_from_nested "$root" session-start || true)"
 echo "$out_start" | grep -q '当前位置' || fail "session-start did not resolve active book from project root"
 echo "$out_start" | grep -q '未完成拆文' || fail "session-start did not resolve 拆文库 from project root"
 echo "$out_start" | grep -q '有 1 个未完成拆文' || fail "session-start counted completed 拆文 as unfinished"
@@ -696,13 +690,13 @@ if echo "$out_start" | grep -q '参考资料包缺失'; then
   fail "session-start reported missing reference bundle after deployed refs were copied"
 fi
 
-out_pre="$(run_from_nested "$root" pre-compact.sh || true)"
+out_pre="$(run_from_nested "$root" pre-compact || true)"
 echo "$out_pre" | grep -q 'Writing context: book/追踪/上下文.md' || fail "pre-compact did not resolve context from project root"
 
-out_post="$(run_from_nested "$root" post-compact.sh || true)"
+out_post="$(run_from_nested "$root" post-compact || true)"
 echo "$out_post" | grep -q 'Read book/追踪/上下文.md' || fail "post-compact did not resolve context from project root"
 
-out_gaps="$(run_from_nested "$root" detect-story-gaps.sh || true)"
+out_gaps="$(run_from_nested "$root" detect-story-gaps || true)"
 if [ -n "$out_gaps" ] && echo "$out_gaps" | grep -q "$root/nested"; then
   fail "detect-story-gaps leaked nested cwd paths"
 fi
@@ -720,7 +714,7 @@ copy_agent_refs "$fallback_root"
 write_sentinel "$fallback_root"
 printf 'book\n' > "$fallback_root/.active-book"
 printf '# 写作进度\n' > "$fallback_root/book/追踪/上下文.md"
-out_fallback="$(run_from_nested_no_project_dir "$fallback_root" pre-compact.sh || true)"
+out_fallback="$(run_from_nested_no_project_dir "$fallback_root" pre-compact || true)"
 echo "$out_fallback" | grep -q 'Writing context: book/追踪/上下文.md' || fail "pre-compact did not resolve context via git root fallback without CLAUDE_PROJECT_DIR"
 
 echo "  OK TS4 hook root resolution"
@@ -731,9 +725,9 @@ mkdir -p "$broken_root"
 setup_git_repo "$broken_root"
 copy_hooks "$broken_root"
 write_sentinel "$broken_root"
-rm -f "$broken_root/.claude/hooks/lib/sentinel.sh"
-broken_out="$(run_from_nested "$broken_root" session-start.sh 2>&1 || true)"
-echo "$broken_out" | grep -q 'hook 函数库缺失' || fail "session-start did not explain missing hook libraries before sourcing"
+rm -f "$broken_root/.claude/hooks/story_hook_core.js"
+broken_out="$(run_from_nested "$broken_root" session-start 2>&1 || true)"
+echo "$broken_out" | grep -q 'story_hook_cli.js / story_hook_core.js' || fail "session-start did not explain missing hook runtime files: $broken_out"
 
 bad_sentinel_root="$TMP_DIR/bad-sentinel"
 mkdir -p "$bad_sentinel_root"
@@ -746,7 +740,7 @@ setup_skill_version: $CURRENT_SETUP_VERSION
 resolver_strategy: project-local-skill-reference
 references_dir: .claude/skills/story-setup/references/agent-references
 SENTINEL
-bad_sentinel_out="$(run_from_nested "$bad_sentinel_root" session-start.sh 2>&1 || true)"
+bad_sentinel_out="$(run_from_nested "$bad_sentinel_root" session-start 2>&1 || true)"
 echo "$bad_sentinel_out" | grep -q '缺少 target_cli' || fail "session-start did not warn for missing sentinel target_cli"
 echo "$bad_sentinel_out" | grep -q '参考资料包缺失或为空' || fail "session-start did not warn for missing deployed reference bundle"
 
@@ -762,7 +756,7 @@ target_cli: claude-code
 resolver_strategy: project-local-skill-reference
 references_dir: .claude/skills/story-setup/references/agent-references
 SENTINEL
-stale_previous_out="$(run_from_nested "$stale_previous_root" session-start.sh 2>&1 || true)"
+stale_previous_out="$(run_from_nested "$stale_previous_root" session-start 2>&1 || true)"
 echo "$stale_previous_out" | grep -q "低于 v$CURRENT_AGENTS_VERSION" || fail "session-start did not warn for agents_version $PREVIOUS_AGENTS_VERSION stale v$CURRENT_AGENTS_VERSION deployment"
 
 newer_project_root="$TMP_DIR/newer-project"
@@ -777,7 +771,7 @@ target_cli: claude-code
 resolver_strategy: project-local-skill-reference
 references_dir: .claude/skills/story-setup/references/agent-references
 SENTINEL
-newer_project_out="$(run_from_nested "$newer_project_root" session-start.sh 2>&1 || true)"
+newer_project_out="$(run_from_nested "$newer_project_root" session-start 2>&1 || true)"
 echo "$newer_project_out" | grep -q "高于本 hook 支持的 v$CURRENT_AGENTS_VERSION" || fail "session-start did not reject agents_version $NEXT_AGENTS_VERSION downgrade"
 echo "$newer_project_out" | grep -q '不要降级覆盖' || fail "session-start did not explain future-version safety"
 
@@ -794,7 +788,7 @@ target_cli: claude-code
 resolver_strategy: project-local-skill-reference
 references_dir: .claude/skills/story-setup/references/agent-references
 SENTINEL
-mixed_version_out="$(run_from_nested "$mixed_version_root" session-start.sh 2>&1 || true)"
+mixed_version_out="$(run_from_nested "$mixed_version_root" session-start 2>&1 || true)"
 # agents_version 是唯一运行时过期权威；setup_skill_version 落后不触发重部署（设计如此）
 if echo "$mixed_version_out" | grep -q "低于 v$CURRENT_AGENTS_VERSION"; then
   fail "session-start incorrectly nagged '低于 v$CURRENT_AGENTS_VERSION' for current agents_version=$CURRENT_AGENTS_VERSION just because setup_skill_version lags"
@@ -820,13 +814,13 @@ target_cli: claude-code,codex
 resolver_strategy: project-local-skill-reference
 references_dir: .claude/skills/story-setup/references/agent-references,.codex/skills/story-setup/references/agent-references
 SENTINEL
-multi_end_out="$(run_from_nested "$multi_end_root" session-start.sh 2>&1 || true)"
+multi_end_out="$(run_from_nested "$multi_end_root" session-start 2>&1 || true)"
 if echo "$multi_end_out" | grep -q '参考资料包缺失或为空'; then
   fail "session-start falsely reported missing references for a complete multi-end deployment"
 fi
 
 rm -rf "$multi_end_root/.codex"
-multi_end_partial_out="$(run_from_nested "$multi_end_root" session-start.sh 2>&1 || true)"
+multi_end_partial_out="$(run_from_nested "$multi_end_root" session-start 2>&1 || true)"
 echo "$multi_end_partial_out" | grep -q '参考资料包缺失或为空' \
   || fail "session-start did not warn when one end of a multi-end references_dir is missing"
 echo "$multi_end_partial_out" | grep -q '\.codex/skills/story-setup/references/agent-references' \
@@ -847,9 +841,9 @@ printf 'story\n' > "$short_root/.active-book"
 cat > "$short_root/story/正文.md" <<'TXT'
 正文
 TXT
-run_from_nested "$short_root" session-end.sh >"$TMP_DIR/story-session-end.out" 2>&1 || true
+run_from_nested "$short_root" session-end >"$TMP_DIR/story-session-end.out" 2>&1 || true
 [ ! -d "$short_root/story/追踪" ] || fail "session-end created 追踪/ for short project without opt-in"
-(cd "$short_root/nested/a/b" && CLAUDE_PROJECT_DIR="$short_root" STORY_SESSION_LOG=1 bash "$short_root/.claude/hooks/session-end.sh") >"$TMP_DIR/story-session-end-opt.out" 2>&1 || true
+(cd "$short_root/nested/a/b" && CLAUDE_PROJECT_DIR="$short_root" STORY_SESSION_LOG=1 bash "$short_root/.claude/hooks/run-story-hook.sh" session-end) >"$TMP_DIR/story-session-end-opt.out" 2>&1 || true
 [ ! -d "$short_root/story/追踪" ] || fail "session-end created 追踪/ for short project even with STORY_SESSION_LOG=1"
 echo "  OK TS6 short project non-mutation"
 
@@ -885,7 +879,7 @@ for cmd in 'echo git commit docs' 'grep "git commit" file'; do
   non_commit_out="$(run_commit_hook_command "$commit_root" "$cmd")"
   [ -z "$non_commit_out" ] || fail "validate-story-commit warned for non-commit command '$cmd': $non_commit_out"
 done
-stdin_out="$(cd "$commit_root" && unset STORY_COMMIT_COMMAND CLAUDE_TOOL_INPUT && printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | CLAUDE_PROJECT_DIR="$commit_root" bash .claude/hooks/validate-story-commit.sh 2>&1 || true)"
+stdin_out="$(cd "$commit_root" && unset STORY_COMMIT_COMMAND CLAUDE_TOOL_INPUT && printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | CLAUDE_PROJECT_DIR="$commit_root" bash .claude/hooks/run-story-hook.sh pre-tool-commit-advisory 2>&1 || true)"
 echo "$stdin_out" | grep -q 'Story Commit Warnings' || fail "validate-story-commit did not read stdin hook payload"
 echo "$stdin_out" | grep -q 'short/正文.md' || fail "validate-story-commit did not inspect short-story 正文.md"
 echo "$stdin_out" | grep -q 'book/设定/角色.md' || fail "validate-story-commit did not inspect staged setting markdown"
@@ -899,7 +893,7 @@ cat > "$project_root/book/正文/第1章.md" <<'TXT'
 身高:181
 TXT
 git -C "$mono_root" add "story-project/book/正文/第1章.md"
-mono_out="$(cd "$project_root" && CLAUDE_PROJECT_DIR="$project_root" STORY_COMMIT_COMMAND='git commit -m test' bash .claude/hooks/validate-story-commit.sh 2>&1 || true)"
+mono_out="$(cd "$project_root" && CLAUDE_PROJECT_DIR="$project_root" STORY_COMMIT_COMMAND='git commit -m test' bash .claude/hooks/run-story-hook.sh pre-tool-commit-advisory 2>&1 || true)"
 echo "$mono_out" | grep -q '正文硬编码角色属性' || fail "validate-story-commit missed staged files when CLAUDE_PROJECT_DIR differs from git root"
 echo "  OK TS7 commit hook self-gating"
 
@@ -911,7 +905,7 @@ copy_hooks "$multi_root"
 printf 'long\n' > "$multi_root/.active-book"
 printf '长篇正文\n' > "$multi_root/long/正文/第1章.md"
 printf '短篇正文\n' > "$multi_root/short/正文.md"
-multi_out="$(run_from_nested "$multi_root" detect-story-gaps.sh || true)"
+multi_out="$(run_from_nested "$multi_root" detect-story-gaps || true)"
 echo "$multi_out" | grep -q '^检查：long$' || fail "detect-story-gaps did not inspect long project when .active-book is set"
 echo "$multi_out" | grep -q '^检查：short$' || fail "detect-story-gaps did not inspect short project alongside long project"
 long_count="$(printf '%s\n' "$multi_out" | grep -c '^检查：long$' || true)"
@@ -1002,13 +996,13 @@ mkdir -p "$guard_root/book/正文" "$guard_root/book/大纲" "$guard_root/book/�
          "$guard_root/impshort" "$guard_root/拆文库/impshort"
 setup_git_repo "$guard_root"
 copy_hooks "$guard_root"
-assert_file "$guard_root/.claude/hooks/guard-outline-before-prose.sh"
+assert_file "$guard_root/.claude/hooks/run-story-hook.sh"
 
 run_guard() {
   # $1 = file_path ; prints the hook exit code (0 allow, 2 block)
   local fp="$1" ec=0
   printf '{"tool_name":"Write","tool_input":{"file_path":"%s","content":"x"}}' "$fp" \
-    | CLAUDE_PROJECT_DIR="$guard_root" bash "$guard_root/.claude/hooks/guard-outline-before-prose.sh" >/dev/null 2>&1 || ec=$?
+    | CLAUDE_PROJECT_DIR="$guard_root" bash "$guard_root/.claude/hooks/run-story-hook.sh" pre-tool-prose-guard >/dev/null 2>&1 || ec=$?
   printf '%s' "$ec"
 }
 
@@ -1021,23 +1015,17 @@ print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]}}, 
 PY
 )"
   printf '%s' "$payload" \
-    | CLAUDE_PROJECT_DIR="$guard_root" bash "$guard_root/.claude/hooks/guard-outline-before-prose.sh" >/dev/null 2>&1 || ec=$?
+    | CLAUDE_PROJECT_DIR="$guard_root" bash "$guard_root/.claude/hooks/run-story-hook.sh" pre-tool-prose-guard >/dev/null 2>&1 || ec=$?
   printf '%s' "$ec"
 }
 
 # 长篇授权流：缺细纲拦截 / 有细纲放行 / 章号补零容忍
 [ "$(run_guard 'book/正文/第1章_开端.md')" = "2" ] || fail "guard did not BLOCK long prose when 细纲 missing"
 write_outline "$guard_root/book/大纲/细纲_第1章.md"
-# 细纲齐了还要过追踪检查点（issue #305 起 Claude 侧也有这道门，与另三端同序）。
-# 本节测的是细纲门与路径分类，不是追踪门，所以先落一份有效 state 把追踪这一维固定住。
-# last_committed 取一个大于本节所有用例章号的值：章号已在追踪范围内即跳过顺序校验，
-# 于是 第1/7/123/124 章都只被细纲门判定。顺序校验本身由 test-prose-net-parity.sh Part D
-# 的场景矩阵覆盖，不在这里重复。
 mkdir -p "$guard_root/book/追踪"
 printf '{"schema_version":4,"state_revision":0,"last_committed_chapter":200}\n' > "$guard_root/book/追踪/_tracking-state.json"
 printf '> 状态修订：0。\n' > "$guard_root/book/追踪/上下文.md"
 [ "$(run_guard 'book/正文/第1章_开端.md')" = "0" ] || fail "guard wrongly blocked long prose when 细纲 present"
-# 追踪门本身：state 移走即拦（Claude 端此前静默放行，写出无追踪正文）
 mv "$guard_root/book/追踪/_tracking-state.json" "$guard_root/book/追踪/_state.bak"
 [ "$(run_guard 'book/正文/第1章_开端.md')" = "2" ] || fail "guard did not BLOCK long prose when tracking state missing"
 mv "$guard_root/book/追踪/_state.bak" "$guard_root/book/追踪/_tracking-state.json"
@@ -1065,9 +1053,8 @@ if command -v node >/dev/null 2>&1; then
     || fail "Claude Bash write bypassed prose pre-guard"
   [ "$(run_bash_guard 'grep -n book/正文/第8章_x.md notes.md')" = "0" ] \
     || fail "Claude Bash read-only mention was wrongly blocked"
-  # 缺细纲文案给补零的规范名；目标含未展开 shell 变量时仍拦，但说路径没解析出来、不谎报缺细纲。
   pad_err="$(printf '{"tool_name":"Write","tool_input":{"file_path":"book/正文/第8章_x.md","content":"x"}}' \
-    | CLAUDE_PROJECT_DIR="$guard_root" bash "$guard_root/.claude/hooks/guard-outline-before-prose.sh" 2>&1 >/dev/null || true)"
+    | CLAUDE_PROJECT_DIR="$guard_root" bash "$guard_root/.claude/hooks/run-story-hook.sh" pre-tool-prose-guard 2>&1 >/dev/null || true)"
   printf '%s' "$pad_err" | grep -q '细纲_第008章\.md' || fail "missing-outline block must name the zero-padded outline file: $pad_err"
   var_payload="$(python3 - <<'PY'
 import json
@@ -1076,11 +1063,10 @@ PY
 )"
   var_ec=0
   var_err="$(printf '%s' "$var_payload" \
-    | CLAUDE_PROJECT_DIR="$guard_root" bash "$guard_root/.claude/hooks/guard-outline-before-prose.sh" 2>&1 >/dev/null)" || var_ec=$?
+    | CLAUDE_PROJECT_DIR="$guard_root" bash "$guard_root/.claude/hooks/run-story-hook.sh" pre-tool-prose-guard 2>&1 >/dev/null)" || var_ec=$?
   [ "$var_ec" = "2" ] || fail "Claude Bash write behind an unexpanded shell variable must stay blocked"
   printf '%s' "$var_err" | grep -q '未展开的 shell 变量' || fail "shell-variable target block must say the path was not resolved: $var_err"
 
-  # 相对 Bash 目标必须按 hook cwd 解，不得总按项目根；根 book 有第8章细纲，nested/book 没有。
   write_outline "$guard_root/book/大纲/细纲_第8章.md"
   mkdir -p "$guard_root/nested/book/正文"
   cwd_payload="$(python3 - "$guard_root/nested" <<'PY'
@@ -1090,7 +1076,7 @@ PY
 )"
   cwd_ec=0
   printf '%s' "$cwd_payload" \
-    | CLAUDE_PROJECT_DIR="$guard_root" bash "$guard_root/.claude/hooks/guard-outline-before-prose.sh" >/dev/null 2>&1 || cwd_ec=$?
+    | CLAUDE_PROJECT_DIR="$guard_root" bash "$guard_root/.claude/hooks/run-story-hook.sh" pre-tool-prose-guard >/dev/null 2>&1 || cwd_ec=$?
   [ "$cwd_ec" = "2" ] || fail "Claude Bash relative target ignored hook cwd"
 
   # 共享核损坏时保持 fail-open，但必须显式告警，不能把运行时错误伪装成“无写入目标”。
@@ -1103,7 +1089,7 @@ PY
 )"
   broken_ec=0
   broken_err="$(printf '%s' "$broken_payload" \
-    | CLAUDE_PROJECT_DIR="$guard_root" bash "$guard_root/.claude/hooks/guard-outline-before-prose.sh" 2>&1 >/dev/null)" || broken_ec=$?
+    | CLAUDE_PROJECT_DIR="$guard_root" bash "$guard_root/.claude/hooks/run-story-hook.sh" pre-tool-prose-guard 2>&1 >/dev/null)" || broken_ec=$?
   mv "$guard_root/.claude/hooks/story_hook_core.js.bak" "$guard_root/.claude/hooks/story_hook_core.js"
   [ "$broken_ec" = "0" ] || fail "broken Bash guard core must preserve documented fail-open behavior"
   printf '%s' "$broken_err" | grep -q '守卫解析失败' \
@@ -1111,69 +1097,28 @@ PY
 fi
 echo "  OK TS11 outline-before-prose guard"
 
-# TS11b — 阻断守卫在无 node 时必须回落纯 bash 抽取、仍然 exit 2（不得 fail-open）。
-# 官方现推荐原生二进制装 Claude Code（不带 Node），只有 npm 装法才有 node；原实现只探测 node、
-# 探不到就放行，会让"缺细纲写正文"被静默放过（#243 回归）。用一个恒退非零的假 node 垫片模拟
-# "node 不可用"，其余工具(sed/grep/bash)仍在 PATH。垫片若未能遮蔽真 node（个别 Windows 主机）
-# 则跳过，避免环境导致假失败。
+# TS11b — 全宿主统一要求 Node.js 18+（见 2026-11-21-unify-hooks-single-node-core.md）：
+# 缺 Node 时 run-story-hook.sh 显式告警后 fail-open（session-start 输出单行安装指引，
+# pre-tool-prose-guard 写 stderr 告警并 exit 0）。
 nonode_shim="$TMP_DIR/nonode-shim"
 mkdir -p "$nonode_shim"
 printf '#!/bin/sh\nexit 1\n' > "$nonode_shim/node"
 chmod +x "$nonode_shim/node"
-run_guard_nonode() {
-  local fp="$1" ec=0
-  printf '{"tool_name":"Write","tool_input":{"file_path":"%s","content":"x"}}' "$fp" \
-    | CLAUDE_PROJECT_DIR="$guard_root" PATH="$nonode_shim:$PATH" \
-      bash "$guard_root/.claude/hooks/guard-outline-before-prose.sh" >/dev/null 2>&1 || ec=$?
-  printf '%s' "$ec"
-}
 if ! PATH="$nonode_shim:$PATH" node -e "" >/dev/null 2>&1; then
-  # 缺细纲 -> 仍须拦截（bash 兜底解析出目标路径，照常 exit 2）
-  [ "$(run_guard_nonode 'book/正文/第123章_无纲.md')" = "2" ] \
-    || fail "guard fail-OPEN without node (regression #243): 缺细纲写正文必须仍拦截（bash 兜底）"
-  # 空细纲 -> 仍须拦截（空细纲门是纯 bash 字节计数，不依赖 node）
-  : > "$guard_root/book/大纲/细纲_第123章.md"
-  [ "$(run_guard_nonode 'book/正文/第123章_无纲.md')" = "2" ] \
-    || fail "guard(no-node) must block long prose when 细纲 is empty (纯 bash 空细纲门)"
-  write_outline "$guard_root/book/大纲/细纲_第123章.md"
-  # 有细纲 -> 放行（bash 兜底不误伤）
-  [ "$(run_guard_nonode 'book/正文/第123章_无纲.md')" = "0" ] \
-    || fail "guard(no-node) wrongly blocked long prose when 细纲 present (bash 兜底)"
-  # 非正文目标 -> 放行
-  [ "$(run_guard_nonode 'book/设定/角色.md')" = "0" ] \
-    || fail "guard(no-node) wrongly blocked a non-prose file (bash 兜底)"
-  echo "  OK TS11b outline guard fail-closed without node"
+  nonode_start="$(CLAUDE_PROJECT_DIR="$guard_root" PATH="$nonode_shim:$PATH" \
+    bash "$guard_root/.claude/hooks/run-story-hook.sh" session-start 2>&1 || true)"
+  echo "$nonode_start" | grep -q 'Node.js 18+' \
+    || fail "session-start must emit a clear Node.js 18+ missing warning when node is unavailable: $nonode_start"
+  nonode_ec=0
+  nonode_err="$(printf '{"tool_name":"Write","tool_input":{"file_path":"book/正文/第123章_无纲.md","content":"x"}}' \
+    | CLAUDE_PROJECT_DIR="$guard_root" PATH="$nonode_shim:$PATH" \
+      bash "$guard_root/.claude/hooks/run-story-hook.sh" pre-tool-prose-guard 2>&1 >/dev/null)" || nonode_ec=$?
+  [ "$nonode_ec" = "0" ] || fail "pre-tool-prose-guard must fail open when node is absent (got $nonode_ec)"
+  echo "$nonode_err" | grep -q 'Node.js 18+' \
+    || fail "pre-tool-prose-guard must warn on stderr when node is absent: $nonode_err"
+  echo "  OK TS11b unified Node.js 18+ missing fail-open + warning"
 else
   echo "  SKIP TS11b (假 node 垫片未能遮蔽真 node，跳过 no-node 回归)"
-fi
-
-# TS11c — node 在场但抽取失败（旧 node 不识 node: 前缀 / 部署核损坏时探测通过、跑脚本抛错）时，
-# 阻断守卫必须回落纯 bash、仍 exit 2。原实现用 if/else：node 探测一过就只走 node 分支，抽空即放行，
-# 正是 #243 复盘发现的第二个 fail-open 面。垫片「node -e '' 退 0、跑真实脚本退非零」模拟坏 node；
-# 只有确认解析到的 node 就是垫片时才跑（否则真 node 会让断言因错误原因通过）。
-brokennode_shim="$TMP_DIR/brokennode-shim"
-mkdir -p "$brokennode_shim"
-printf '#!/bin/sh\n[ "$1" = "-e" ] && exit 0\nexit 1\n' > "$brokennode_shim/node"
-chmod +x "$brokennode_shim/node"
-run_guard_brokennode() {
-  local fp="$1" ec=0
-  printf '{"tool_name":"Write","tool_input":{"file_path":"%s","content":"x"}}' "$fp" \
-    | CLAUDE_PROJECT_DIR="$guard_root" PATH="$brokennode_shim:$PATH" \
-      bash "$guard_root/.claude/hooks/guard-outline-before-prose.sh" >/dev/null 2>&1 || ec=$?
-  printf '%s' "$ec"
-}
-resolved_node="$(PATH="$brokennode_shim:$PATH" bash -c 'command -v node' 2>/dev/null || true)"
-if [ "$resolved_node" = "$brokennode_shim/node" ]; then
-  # node 探测通过但 CLI 抽取抛错 -> 缺细纲仍须拦截（bash 兜底解析目标路径）
-  [ "$(run_guard_brokennode 'book/正文/第124章_坏node.md')" = "2" ] \
-    || fail "guard fail-OPEN with broken node (regression #243): node 在但抽取失败时必须回落 bash 仍拦截"
-  write_outline "$guard_root/book/大纲/细纲_第124章.md"
-  # 有细纲 -> 放行（bash 兜底不误伤）
-  [ "$(run_guard_brokennode 'book/正文/第124章_坏node.md')" = "0" ] \
-    || fail "guard(broken-node) wrongly blocked long prose when 细纲 present (bash 兜底)"
-  echo "  OK TS11c outline guard fail-closed when node present-but-broken"
-else
-  echo "  SKIP TS11c (假 node 垫片未能遮蔽真 node，跳过 broken-node 回归)"
 fi
 
 # TS12 — Agents-pending-restart one-shot confirmation
@@ -1187,14 +1132,14 @@ touch "$restart_root/.claude/.agents-pending-restart"
 # compact / clear 不是新会话：不能声称 agents 已重新加载，也不能吃掉标记
 for restart_source in compact clear; do
   restart_out="$(printf '{"hook_event_name":"SessionStart","source":"%s"}' "$restart_source" \
-    | run_from_nested "$restart_root" session-start.sh || true)"
+    | run_from_nested "$restart_root" session-start || true)"
   if echo "$restart_out" | grep -q '现已注册可用'; then
     fail "session-start claimed agents reloaded on source=$restart_source"
   fi
   [ -f "$restart_root/.claude/.agents-pending-restart" ] || fail "session-start cleared the restart flag on source=$restart_source"
 done
 restart_out="$(printf '{"hook_event_name":"SessionStart","source":"startup"}' \
-  | run_from_nested "$restart_root" session-start.sh || true)"
+  | run_from_nested "$restart_root" session-start || true)"
 echo "$restart_out" | grep -q '现已注册可用' || fail "session-start did not confirm agents registered after restart flag"
 [ ! -f "$restart_root/.claude/.agents-pending-restart" ] || fail "session-start did not clear the one-shot .agents-pending-restart flag"
 echo "  OK TS12 restart-flag confirmation"

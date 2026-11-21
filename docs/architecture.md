@@ -23,18 +23,18 @@ Agent 按任务读取 `references/` 中的角色设计、对话、反转等资�
 
 ## 自动化 Hooks
 
-`/story-setup` 为 Claude Code 部署 8 个自动化 hook：
+`/story-setup` 为 Claude Code 部署统一 Node.js 18+ Hook 运行时（`run-story-hook.sh` + `story_hook_cli.js` + 与 Codex/OpenCode/ZCode/Antigravity 共享的 `story_hook_core.js`），覆盖 8 个自动化事件：
 
-| Hook | 触发时机 | 功能 |
+| 事件 | 触发时机 | 功能 |
 |:-----|:---------|:-----|
-| session-start.sh | 会话开始 | 显示分支、进度快照、拆文状态 |
-| session-end.sh | 会话结束 | 记录会话日志到 `追踪/session-log.txt` |
-| detect-story-gaps.sh | 会话开始 | 检测设定缺口、大纲缺失、伏笔断线 |
-| pre-compact.sh | 上下文压缩前 | 保存进度快照路径和行数摘要 |
-| post-compact.sh | 上下文压缩后 | 提示读取进度快照恢复上下文 |
-| validate-story-commit.sh | git commit 时 | 检查硬编码属性、设定必填字段（仅警告，不阻断） |
-| guard-outline-before-prose.sh | 写正文前（Write/Edit） | 缺对应细纲/小节大纲时阻止首次创建正文（阻断），强制先搭大纲 |
-| check-prose-after-write.sh | 正文写入后（Write/Edit） | 轻量扫描截断、工程词和毒句式（提醒，不阻断；字数由写作流程交付前统一测量） |
+| `session-start` | 会话开始 | 显示分支、进度快照、拆文状态与部署自检 |
+| `detect-story-gaps` | 会话开始 | 检测设定缺口、大纲缺失、伏笔断线与跨批连续性 |
+| `session-end` | 会话结束 | 按需记录会话日志到 `追踪/session-log.txt`（需 `STORY_SESSION_LOG=1`） |
+| `pre-compact` | 上下文压缩前 | 保存进度快照路径和行数摘要 |
+| `post-compact` | 上下文压缩后 | 提示读取进度快照恢复上下文 |
+| `pre-tool-commit-advisory` | git commit 时 | 检查硬编码属性、设定必填字段（仅警告，不阻断） |
+| `pre-tool-prose-guard` | 写正文前（Bash/Write/Edit） | 缺对应细纲/小节大纲、追踪检查点不成立或上一章有未清毒句式时阻止写入（阻断） |
+| `post-tool-prose-check` | 正文写入后（Write/Edit） | 轻量扫描截断、工程词和毒句式（提醒，不阻断；字数由写作流程交付前统一测量） |
 
 ## 项目文件结构
 

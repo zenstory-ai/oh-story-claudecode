@@ -21,6 +21,7 @@ from typing import Any
 
 MANAGED_HOOK_SCRIPTS = frozenset(
     {
+        "run-story-hook.sh",
         "check-prose-after-write.sh",
         "detect-story-gaps.sh",
         "guard-outline-before-prose.sh",

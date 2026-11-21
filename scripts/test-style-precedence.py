@@ -1,23 +1,18 @@
 #!/usr/bin/env python3
-"""Book-local expression exceptions through the public scanners and both hook runtimes.
+"""Book-local expression exceptions through the public scanners and shared hook runtime.
 
 0.10 删掉了文风裁决（style_resolution 槽与长篇的 style-resolution.md），但书级白名单
 `.deslop-whitelist` 仍在用（规则在 long-format「书级白名单」一节），本测试守的是它的运行时行为，保留。
 """
-import importlib.util
 import json
 from pathlib import Path
 import subprocess
-import sys
 import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / 'skills/story-deslop/scripts'
 HOOK = ROOT / 'skills/story-setup/references/templates/hooks/story_hook_core.js'
-spec = importlib.util.spec_from_file_location('codex_hook', ROOT / 'skills/story-setup/references/codex/hooks/story_codex_hook.py')
-pyhook = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(pyhook)
 APPROVED = '不是退让，而是给彼此留条路。'
 NOT_IS_PAD = '这不是巧合，而是早有预谋。这不是失误，而是故意试探。'
 BLOCKING_NOT_IS = APPROVED + NOT_IS_PAD
@@ -91,15 +86,12 @@ class StyleTests(unittest.TestCase):
         self.allow.unlink()
         self.assertEqual(self.scan().returncode, 1)
 
-    def test_hook_runtime_parity_and_structural_findings_survive(self):
+    def test_hook_runtime_and_structural_findings_survive(self):
         text = BLOCKING_NOT_IS + BLOCKING_VOICE + '\nTODO\n最后还没'
         self.file.write_text(text, encoding='utf-8')
         self.allow.write_text(APPROVED + '\nTODO\n最后还没\n', encoding='utf-8')
-        expected = pyhook.prose_net_findings(text, pyhook.load_style_whitelist(self.file), pyhook.toxic_rescan_hint(self.file))
-        result = self.node('-e', "const fs=require('fs'), h=require(process.argv[1]); console.log(h.proseAfterWrite(process.argv[2],process.argv[3]));", HOOK, self.root, self.file)
+        result = self.node('-e', "const h=require(process.argv[1]); console.log(h.proseAfterWrite(process.argv[2],process.argv[3]));", HOOK, self.root, self.file)
         self.assertEqual(result.returncode, 0, result.stderr)
-        for finding in expected:
-            self.assertIn(finding, result.stdout)
         self.assertNotIn('not-is-comparison', result.stdout)
         self.assertIn('voice-contrast', result.stdout)
         self.assertIn('占位符', result.stdout)
@@ -120,14 +112,16 @@ class StyleTests(unittest.TestCase):
         ]:
             self.file.write_text(body, encoding='utf-8')
             self.allow.write_text(approved, encoding='utf-8')
-            expected = pyhook.prose_block_reason(self.root, next_file)
             result = self.node('-e', "console.log(JSON.stringify(require(process.argv[1]).proseBlockReason(process.argv[2],process.argv[3])));", HOOK, self.root, next_file)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(json.loads(result.stdout), expected)
-            self.assertEqual(expected is not None, should_block)
-            if should_block: self.assertIn('毒句式', expected)
+            reason = json.loads(result.stdout)
+            self.assertEqual(reason is not None, should_block)
+            if should_block:
+                self.assertIn('毒句式', reason)
         (self.book / '大纲/细纲_第002章.md').unlink()
-        self.assertIn('缺少细纲', pyhook.prose_block_reason(self.root, next_file))
+        result = self.node('-e', "console.log(JSON.stringify(require(process.argv[1]).proseBlockReason(process.argv[2],process.argv[3])));", HOOK, self.root, next_file)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('缺少细纲', json.loads(result.stdout))
 
     def test_short_book_lookup(self):
         self.file = self.book / '正文.md'
@@ -135,7 +129,9 @@ class StyleTests(unittest.TestCase):
         self.assertEqual(self.scan().returncode, 1)
         self.allow.write_text(APPROVED, encoding='utf-8')
         self.assertEqual(self.scan().returncode, 0)
-        self.assertEqual(pyhook.load_style_whitelist(self.file), [APPROVED])
+        result = self.node('-e', "console.log(JSON.stringify(require(process.argv[1]).loadStyleWhitelist(process.argv[2])));", HOOK, self.file)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout), [APPROVED])
 
 
 if __name__ == '__main__':
