@@ -34,7 +34,7 @@ Hook 依赖 PATH 中的 `node`。部署后新开一个会话，可从项目目�
 
 仓库内直接使用：Codex 会扫描 `$REPO_ROOT/.agents/skills`（指向 `skills/` 的 symlink）发现 14 个 skill，用 `$story`、`$story-setup` 或 `/skills` 调用。Windows 上 git 需开启 `core.symlinks=true`，否则 symlink 失效，改走下方 `$story-setup` 部署。
 
-跑 `$story-setup` 部署到写作项目后，会写入 `.codex/agents/*.toml`、`.codex/hooks.json`、`.codex/hooks/{story_codex_hook.py,run-story-hook.sh,run-story-hook.cmd}` 和 `.codex/skills/story-setup/references/agent-references/`。请信任项目 `.codex/` 配置层，在 `/hooks` 里检查并信任 hooks，再新开 Codex 会话让自定义 agents 生效。**在 `/hooks` 信任之前，Codex 会直接跳过这些 hooks（包括写正文前的大纲守卫）**，不报错也不提示；自动化里的 `codex exec` 可加 `--dangerously-bypass-hook-trust`。
+跑 `$story-setup` 部署到写作项目后，会写入 `.codex/agents/*.toml`、`.codex/hooks.json`、`.codex/hooks/{story_codex_hook.js,story_hook_core.js,run-story-hook.sh,run-story-hook.cmd}` 和 `.codex/skills/story-setup/references/agent-references/`（Hook 依赖 PATH 中的 Node.js 18+）。请信任项目 `.codex/` 配置层，在 `/hooks` 里检查并信任 hooks，再新开 Codex 会话让自定义 agents 生效。**在 `/hooks` 信任之前，Codex 会直接跳过这些 hooks（包括写正文前的大纲守卫）**，不报错也不提示；自动化里的 `codex exec` 可加 `--dangerously-bypass-hook-trust`。
 
 ## ZCode
 

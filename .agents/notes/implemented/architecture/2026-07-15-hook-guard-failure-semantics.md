@@ -1,6 +1,7 @@
 # Agent Note: 阻断守卫 fail-closed，Bash 命令面 best-effort fail-open
 
 Status: implemented
+Superseded-by: [2026-11-21-unify-hooks-single-node-core.md](2026-11-21-unify-hooks-single-node-core.md)（Node.js 18+ 成为五端统一 Hook 运行时，Claude Code 退役纯 Bash 无 Node 回退）
 
 ## Problem
 

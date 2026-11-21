@@ -114,8 +114,11 @@ def deploy_codex(pkg, proj, contract):
     for f in (ref / 'agents').glob('*.toml'):
         shutil.copy2(f, codex / 'agents' / f.name)
     (codex / 'hooks').mkdir(exist_ok=True)
-    for name in ('story_codex_hook.py', 'run-story-hook.sh', 'run-story-hook.cmd'):
-        shutil.copy2(ref / 'hooks' / name, codex / 'hooks' / name)
+    for name in ('story_codex_hook.js', 'story_hook_core.js', 'run-story-hook.sh', 'run-story-hook.cmd'):
+        if (ref / 'hooks' / name).is_file():
+            shutil.copy2(ref / 'hooks' / name, codex / 'hooks' / name)
+    if (ref / 'hooks' / 'story_codex_hook.py').is_file():
+        shutil.copy2(ref / 'hooks' / 'story_codex_hook.py', codex / 'hooks' / 'story_codex_hook.py')
     (codex / 'hooks/run-story-hook.sh').chmod(0o755)
     subprocess.run([sys.executable, str(setup / 'scripts/merge-codex-hooks.py'),
                     '--existing', str(codex / 'hooks.json'), '--template', str(ref / 'hooks/hooks.json'),

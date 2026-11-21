@@ -32,7 +32,7 @@ Hooks require `node` on PATH. Open a fresh conversation after deployment; for CL
 
 Use it in-place: Codex scans `$REPO_ROOT/.agents/skills` (a symlink to `skills/`) and discovers all 14 skills; invoke via `$story`, `$story-setup`, or `/skills`. On Windows, enable git `core.symlinks=true`; otherwise the symlink breaks and you should use the `$story-setup` deployment below.
 
-After `$story-setup` deploys into a writing project, it creates `.codex/agents/*.toml`, `.codex/hooks.json`, `.codex/hooks/{story_codex_hook.py,run-story-hook.sh,run-story-hook.cmd}`, and `.codex/skills/story-setup/references/agent-references/`. Trust the project `.codex/` layer, review and trust the hooks in `/hooks`, and open a fresh Codex session so custom agents load. **Until the hooks are trusted in `/hooks`, Codex skips them (including the outline-before-prose guard)** with no error or notice; `codex exec` in automation can pass `--dangerously-bypass-hook-trust`.
+After `$story-setup` deploys into a writing project, it creates `.codex/agents/*.toml`, `.codex/hooks.json`, `.codex/hooks/{story_codex_hook.js,story_hook_core.js,run-story-hook.sh,run-story-hook.cmd}`, and `.codex/skills/story-setup/references/agent-references/` (hooks require Node.js 18+ on PATH). Trust the project `.codex/` layer, review and trust the hooks in `/hooks`, and open a fresh Codex session so custom agents load. **Until the hooks are trusted in `/hooks`, Codex skips them (including the outline-before-prose guard)** with no error or notice; `codex exec` in automation can pass `--dangerously-bypass-hook-trust`.
 
 ## ZCode
 
