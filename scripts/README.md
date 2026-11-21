@@ -46,12 +46,12 @@
 | `test-scan-runtime.js` | CDP argv 边界/报错/JSON 契约与 7 个 scraper 无副作用 import；七猫、起点书库翻页与反爬字体解码 | CI（三平台） |
 | `test-scan-runtime-policy.py` | 变异验证 scan/browser 静态策略不会被无关或死代码关键词骗过 | CI（Linux）；改 `check-scan-runtime-policy.sh` 后 |
 | `test-scan-aggregate.py` | 扫榜聚合 `aggregate-rank.js` 的解析、去重、分布、样本不足标注与抽样取回原文回归 | CI（三平台） |
-| `test-publish-format.py` | story-publish 发布资料检查：元信息与格式版本、字段取值、平台规则、标签/分类上限、书名长度提醒与中文路径只读行为 | CI（三平台） |
+| `test-publish-format.py` | `skills/story-publish/scripts/check-publish-format.js` 回归：元信息与格式版本、字段取值、平台规则、标签/分类上限、书名长度提醒与中文路径只读行为 | CI（三平台） |
 | `test-writer-pipeline.py` | 长篇取段器与 prompt 组装器公开 CLI：存量卷纲、新旧段头写法、退役历史、原生路径、必需资料与召回降档 | CI（三平台） |
 | `test-style-precedence.py` | 书级表达豁免在深扫、标点整理、写后和下一章门禁中一致生效且不跨书 | CI（三平台） |
 | `test-tracking-commit.py` | 单权威追踪行为：原子 state、字数事件链、hash 失效、激活边界、幂等与并发提交 | CI（三平台） |
 | `test-storyctl.py` | `visible_chars_v1`、双层区间与作者范围、「字数目标」两端解析一致、章节检查状态与去味豁免、提交记录与 demo 同口径证据 | CI（三平台） |
-| `test-chapter-completion-lifecycle.py` | 公开 CLI 的 checkpoint、正常提交、欠长接受、超长单次压缩区间、blocking quality 阻断与下一章继续 | CI（三平台） |
+| `test-chapter-completion-lifecycle.py` | 公开 CLI 的 checkpoint、正常提交、欠长接受、超长压缩建议与放行、blocking quality 阻断与下一章继续 | CI（三平台） |
 | `test-author-memory-commit.py` | 工作区作者记忆行为：单事件回执、交写手的行 ≤2KB、证据候选、冲突替代、撤回、失败零写入、旧修订、幂等重放与派生修复 | CI（三平台） |
 | `test-long-analyze-runtime.py` | 长篇拆文单状态运行时：机械章节索引与逐章 hash、旧成果识别、只读计划、范围批次、旧章号与楔子对齐、原子提交、缓存恢复与关系图中文字体回退 | CI（三平台） |
 | `test-inspiration-index.py` | 三层灵感库索引：EM 卡登记幂等、专名泄漏拦截、NM/CBA 闭包与计数、卡内路径引用拒绝、标签检索 | CI（三平台） |
@@ -79,8 +79,9 @@
 | `generate-codex-agents.py` | 从 Claude agent 模板生成 Codex `.toml` agents | 改 agent 模板后手动跑；被 `check-codex-adapter.sh` 调验确定性 |
 | `generate-zcode-agents.py` | 从 Claude agent 模板生成 ZCode 插件 Markdown agents；继承模型、保留工具白名单，不移植 inline hooks；`--check` 只读验同步 | 改 agent 模板后；被 `check-zcode-adapter.sh` 调用 |
 | `skills/story-setup/scripts/generate-antigravity-agents.mjs` | 从 Claude agent 真源生成 Antigravity `.agents/agents/agent-name/agent.md`，转换官方工具名、模型档、reference root 与调用术语 | story-setup 部署时 + 被 `check-antigravity-adapter.sh` 调验 |
-| `skills/story-setup/scripts/merge-antigravity-hooks.py` | 原子替换 `.agents/hooks.json` 的 `oh-story` named group，保留所有用户 groups | story-setup 部署时 + merge 回归 |
-| `skills/story-setup/scripts/deploy-antigravity-skills.py` | 把 14 个 oh-story Skills 物化为项目 `.agents/skills` 真实目录；只替换已知名、保留用户 Skill，symlink 需显式迁移且不穿透写目标 | story-setup 部署时 + materialization 回归 |
+| `skills/story-setup/scripts/merge-hooks.js` | 统一合并 Claude / Codex / Antigravity 宿主 hook 配置（`--host claude\|codex\|antigravity`），原子替换管理组并保留所有用户配置 | story-setup 部署时 + merge 回归 |
+| `skills/story-setup/scripts/deploy-antigravity-skills.js` | 把 14 个 oh-story Skills 物化为项目 `.agents/skills` 真实目录；只替换已知名、保留用户 Skill，symlink 需显式迁移且不穿透写目标 | story-setup 部署时 + materialization 回归 |
+| `skills/story-setup/scripts/copy-path-safety.js` / `merge-project-instructions.js` | Node.js 18+ 部署路径安全校验与项目指令模板合并 | story-setup 部署时 + 被 `check-story-setup-deployment.sh` 调验 |
 | `shared-assets.json` + `sync-shared-assets.py` | 为必须随 skill 独立部署的重复 runtime 脚本指定唯一源和目标 | 改共享 runtime 后跑 `sync`；CI 由 `lint-repo.py --only shared` 跑 `check` |
 | `shared-references.json` + `shared-references.py` | 为自包含 Skill 的重复 reference 指定 canonical source、语义别名 target 与完整目录镜像 | 改共享 reference 后跑 `sync`；CI 由 `lint-repo.py --only shared` 跑 `check` |
 
