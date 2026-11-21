@@ -3,18 +3,23 @@
 
 from __future__ import annotations
 
-import importlib.util
 import json
+import subprocess
 import tempfile
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = ROOT / "skills/story-setup/scripts/merge-antigravity-hooks.py"
-SPEC = importlib.util.spec_from_file_location("merge_antigravity_hooks", MODULE_PATH)
-assert SPEC and SPEC.loader
-MODULE = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(MODULE)
+MERGER_PATH = ROOT / "skills/story-setup/scripts/merge-hooks.js"
+
+
+def run_antigravity_merge(existing_path: Path, template_path: Path):
+    return subprocess.run(
+        ["node", str(MERGER_PATH), "--host", "antigravity", str(existing_path), str(template_path)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
 
 
 def main() -> None:
@@ -24,27 +29,35 @@ def main() -> None:
         "metadata": {"owner": "user"},
     }
     template = {"oh-story": {"PreInvocation": [{"type": "command", "command": "current"}]}}
-    merged = MODULE.merge(existing, template)
-    assert merged["oh-story"] == template["oh-story"]
-    assert merged["user-checks"] == existing["user-checks"]
-    assert merged["metadata"] == existing["metadata"]
-    assert MODULE.merge(merged, template) == merged
 
     with tempfile.TemporaryDirectory(prefix="oh-story-antigravity-merge-") as directory:
-        target = Path(directory) / ".agents/hooks.json"
+        root = Path(directory)
+        target = root / ".agents/hooks.json"
+        template_path = root / "template.json"
         target.parent.mkdir(parents=True)
         target.write_text(json.dumps(existing), encoding="utf-8")
         target.chmod(0o640)
-        MODULE.atomic_write(target, merged)
-        assert json.loads(target.read_text(encoding="utf-8")) == merged
+        template_path.write_text(json.dumps(template), encoding="utf-8")
+
+        proc = run_antigravity_merge(target, template_path)
+        assert proc.returncode == 0, proc.stderr
+        first_bytes = target.read_bytes()
+        merged = json.loads(first_bytes.decode("utf-8"))
+        assert merged["oh-story"] == template["oh-story"]
+        assert merged["user-checks"] == existing["user-checks"]
+        assert merged["metadata"] == existing["metadata"]
         assert target.stat().st_mode & 0o777 == 0o640
 
-    try:
-        MODULE.merge({}, {"other": {}})
-    except MODULE.MergeError:
-        pass
-    else:
-        raise AssertionError("template without object-valued oh-story must fail")
+        proc_again = run_antigravity_merge(target, template_path)
+        assert proc_again.returncode == 0, proc_again.stderr
+        assert target.read_bytes() == first_bytes, "merge must be idempotent"
+
+        bad_template = root / "bad-template.json"
+        bad_template.write_text(json.dumps({"other": {}}), encoding="utf-8")
+        bad_target = root / "bad-target.json"
+        bad_target.write_text(json.dumps({}), encoding="utf-8")
+        proc_bad = run_antigravity_merge(bad_target, bad_template)
+        assert proc_bad.returncode != 0, "template without object-valued oh-story must fail"
 
     print("Antigravity hook merge tests passed.")
 

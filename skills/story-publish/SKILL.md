@@ -106,4 +106,4 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ## 格式检查
 
-保存后依次探测 `python3`、`python`、`py`，运行本 skill 根目录下的 `scripts/check-publish-format.py <发布资料文件>`。脚本只读：FAIL 是文件不合契约，或填了平台没有的选项和标签，要修正后重跑；WARN 是已确认的值可能被平台拒收（如书名、长度），转告作者，不替作者改。环境不能运行脚本时，重读文件逐项核对，并告诉作者没跑自动检查。
+保存后使用 Node.js 运行本 skill 根目录下的 `node scripts/check-publish-format.js <发布资料文件>`。脚本只读：FAIL 是文件不合契约，或填了平台没有的选项和标签，要修正后重跑；WARN 是已确认的值可能被平台拒收（如书名、长度），转告作者，不替作者改。环境不能运行脚本时，重读文件逐项核对，并告诉作者没跑自动检查。

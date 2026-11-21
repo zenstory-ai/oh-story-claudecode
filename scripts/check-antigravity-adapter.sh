@@ -23,8 +23,8 @@ for file in \
   "$CORE" \
   "$ROOT/rules/oh-story.md" \
   "$GENERATOR" \
-  skills/story-setup/scripts/deploy-antigravity-skills.py \
-  skills/story-setup/scripts/merge-antigravity-hooks.py; do
+  skills/story-setup/scripts/deploy-antigravity-skills.js \
+  skills/story-setup/scripts/merge-hooks.js; do
   assert_file "$file"
 done
 
@@ -32,6 +32,8 @@ python3 -m json.tool "$ROOT/hooks/hooks.json" >/dev/null
 node --check "$HOOK"
 node --check "$CORE"
 node --check "$GENERATOR"
+node --check skills/story-setup/scripts/deploy-antigravity-skills.js
+node --check skills/story-setup/scripts/merge-hooks.js
 cmp -s "$CORE" skills/story-setup/references/templates/hooks/story_hook_core.js \
   || fail "Antigravity shared hook core is stale"
 

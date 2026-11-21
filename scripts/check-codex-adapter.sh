@@ -34,7 +34,7 @@ assert_file "$CODEX_DIR/hooks/run-story-hook.cmd"
 assert_path "$CODEX_DIR/agents"
 assert_file "scripts/generate-codex-agents.py"
 assert_file "scripts/test-codex-hook-merge.py"
-assert_file "skills/story-setup/scripts/merge-codex-hooks.py"
+assert_file "skills/story-setup/scripts/merge-hooks.js"
 
 python3 -m json.tool "$CODEX_DIR/hooks/hooks.json" >/dev/null
 python3 - <<'PY'
@@ -44,6 +44,7 @@ for name in ('scripts/generate-codex-agents.py',):
 PY
 node --check "$CODEX_DIR/hooks/story_codex_hook.js"
 node --check "$CODEX_DIR/hooks/story_hook_core.js"
+node --check "skills/story-setup/scripts/merge-hooks.js"
 python3 scripts/test-codex-hook-merge.py
 
 echo "  OK JSON/Node/Python syntax"
@@ -376,7 +377,7 @@ assert_grep 'target_cli:.*codex|codex.*target_cli' skills/story-setup/SKILL.md "
 assert_grep 'references/deploy-codex\.md' skills/story-setup/SKILL.md "story-setup entry must route codex to its deploy file"
 assert_grep 'references/codex' skills/story-setup/references/deploy-codex.md "story-setup must document Codex references"
 assert_grep 'target_cli` 写入 `codex`' skills/story-setup/references/deploy-codex.md "Codex deploy file must write codex into target_cli"
-assert_grep 'merge-codex-hooks\.py' skills/story-setup/references/deploy-codex.md "Codex deploy file must merge hooks through the helper"
+assert_grep 'merge-hooks\.js" --host codex' skills/story-setup/references/deploy-codex.md "Codex deploy file must merge hooks through the helper"
 assert_grep 'dangerously-bypass-hook-trust' skills/story-setup/references/deploy-codex.md "Codex deploy file must keep the hook trust install-report prompt"
 assert_grep '\.codex/agents|\.codex/hooks\.json' skills/story-review/SKILL.md "story-review must check Codex agents"
 
