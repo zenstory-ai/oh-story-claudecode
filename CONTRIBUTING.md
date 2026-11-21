@@ -322,7 +322,7 @@ OPENCLAW_REAL_CHECK=1 bash scripts/check-openclaw-skills.sh  # 本机安装 open
 
 Antigravity 2.0 与 `agy` CLI 共用 `.agents/` workspace customization，但发版前仍建议分别实机 smoke test。支持面全部由 `story-setup` 部署到写作项目，部署器不写 `~/.gemini/`：
 
-- 14 个 Skills 物化到真实 `.agents/skills/{name}/`。`deploy-antigravity-skills.py` 只替换已知名称、保留用户 Skills；现有 symlink 默认 fail-closed，只有用户明确同意才迁移，且不得沿链接写到目标目录。
+- 14 个 Skills 物化到真实 `.agents/skills/{name}/`。`deploy-antigravity-skills.js` 只替换已知名称、保留用户 Skills；现有 symlink 默认 fail-closed，只有用户明确同意才迁移，且不得沿链接写到目标目录。
 - 7 个 custom subagents 由 Claude Markdown 真源在部署时生成到 `.agents/agents/agent-name/agent.md`（`agent-name` 替换为实际名称）。工具名必须来自官方清单，调用用 `invoke_subagent` + 同名 `TypeName`；生成器只替换 7 个已知定义并保留其他用户 agent。
 - Always-On Rule 固定为 `.agents/rules/oh-story.md`，文件必须小于 12,000 字符。它负责 skill 路由和 compact 后重新读取 `追踪/上下文.md`；不要假设 Antigravity 有 Claude 的 PreCompact/PostCompact。
 - `.agents/hooks.json` 是顶层 named-group mapping。合并器只替换 `oh-story` group，保留所有用户 groups。当前注册 `PreToolUse`、`PostToolUse`、`PreInvocation`、`Stop`：PreToolUse 必须输出 `decision`，PostToolUse 必须精确输出 `{}`；写后 findings 存到本会话 `artifactDirectoryPath`，下一次 PreInvocation 注入，Stop 最多强制 continue 一次。

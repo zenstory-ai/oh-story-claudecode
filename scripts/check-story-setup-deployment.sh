@@ -20,8 +20,8 @@ DEPLOY_OPENCLAW="$(deploy_file openclaw)"
 DEPLOY_REASONIX="$(deploy_file reasonix)"
 DEPLOY_GENERIC="$(deploy_file generic)"
 SETTINGS_FILE="$SKILL_DIR/references/templates/settings-hooks.json"
-CLAUDE_MERGE="$SKILL_DIR/scripts/merge-claude-settings.py"
-COPY_PATH_SAFETY="$SKILL_DIR/scripts/copy-path-safety.py"
+CLAUDE_MERGE="$SKILL_DIR/scripts/merge-hooks.js"
+COPY_PATH_SAFETY="$SKILL_DIR/scripts/copy-path-safety.js"
 TMP_DIR="$(mktemp -d)"
 CURRENT_AGENTS_VERSION="$(node -e 'process.stdout.write(String(require(process.argv[1]).agents_version))' "$SCRIPT_DIR/current-contract.json")"
 CURRENT_SETUP_VERSION="$(node -e 'process.stdout.write(String(require(process.argv[1]).setup_skill_version))' "$SCRIPT_DIR/current-contract.json")"
@@ -225,8 +225,8 @@ assert_file "$SKILL_DIR/references/antigravity/hooks/hooks.json"
 assert_file "$SKILL_DIR/references/antigravity/hooks/story_antigravity_hook.js"
 assert_file "$SKILL_DIR/references/antigravity/hooks/story_hook_core.js"
 assert_file "$SKILL_DIR/scripts/generate-antigravity-agents.mjs"
-assert_file "$SKILL_DIR/scripts/deploy-antigravity-skills.py"
-assert_file "$SKILL_DIR/scripts/merge-antigravity-hooks.py"
+assert_file "$SKILL_DIR/scripts/deploy-antigravity-skills.js"
+assert_file "$SKILL_DIR/scripts/merge-hooks.js"
 # OpenCode shares the same prose-guard core (byte-identity guarded by check-opencode-adapter.sh);
 # it deploys alongside plugin.ts as .opencode/plugins/lib/story_hook_core.js (lib/ subdir so it
 # escapes OpenCode's single-level .opencode/plugins/*.js plugin auto-discovery).
@@ -257,7 +257,7 @@ assert_grep 'target_cli' "$SKILL_FILE" "sentinel target_cli must be documented"
 
 # 部署清单的 Source 相对 skill 包、Target 相对项目根，两个基准目录在 skills-only 端会重合。
 # 任何一行写成裸相同路径，执行方就会把目录复制进自身。
-assert_grep 'copy-path-safety\.py' "$SKILL_FILE" "deployment must invoke the recursive-copy path safety helper"
+assert_grep 'copy-path-safety\.js' "$SKILL_FILE" "deployment must invoke the recursive-copy path safety helper"
 assert_grep 'Path\.resolve.*realpath' "$SKILL_FILE" "deployment must canonicalize copy paths through symlinks"
 assert_grep 'samefile' "$SKILL_FILE" "deployment must compare existing source/target filesystem identity"
 assert_grep 'target-descendant|目标位于源目录内' "$SKILL_FILE" "deployment must reject recursive-copy targets inside their source"
@@ -272,10 +272,8 @@ mkdir -p "$path_fixture/project/skills/story-setup/references/agent-references" 
 
 python3 - "$COPY_PATH_SAFETY" "$path_fixture" <<'PY' || fail "copy path safety helper behavior regressed"
 import json
-import importlib.util
 import subprocess
 import sys
-from unittest import mock
 from pathlib import Path
 
 helper = sys.argv[1]
@@ -284,7 +282,7 @@ root = Path(sys.argv[2])
 
 def run(source, target):
     proc = subprocess.run(
-        [sys.executable, helper, str(source), str(target)],
+        ["node", helper, str(source), str(target)],
         text=True,
         capture_output=True,
     )
@@ -325,14 +323,26 @@ assert code != 0
 assert payload["status"] == "source_missing"
 assert payload["copy_allowed"] is False
 
-spec = importlib.util.spec_from_file_location("copy_path_safety", helper)
-module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(module)
-with mock.patch.object(module.os.path, "samefile", side_effect=OSError("identity unavailable")):
-    payload = module.classify_copy(source, root / "sibling")
-assert payload["status"] == "filesystem_identity_error"
-assert payload["copy_allowed"] is False
-assert module.status_exit_code(payload["status"]) != 0
+identity_check = subprocess.run(
+    [
+        "node",
+        "-e",
+        (
+            "const m = require(process.argv[1]);"
+            "m.ops.sameFile = () => { throw new Error('identity unavailable'); };"
+            "const p = m.classifyCopy(process.argv[2], process.argv[3]);"
+            "if (p.status !== 'filesystem_identity_error' || p.copy_allowed !== false || m.statusExitCode(p.status) === 0) {"
+            "  console.error(JSON.stringify(p)); process.exit(1);"
+            "}"
+        ),
+        helper,
+        str(source),
+        str(root / "sibling"),
+    ],
+    text=True,
+    capture_output=True,
+)
+assert identity_check.returncode == 0, identity_check.stderr
 
 # --prune-orphans 清理退役参考文件（如已删的 style-craft.md / emotion-on-page.md），保留源端仍在的文件与同级用户目录；
 # status == same 或目标本身是 symlink 时零删除。
@@ -352,7 +362,7 @@ user_sibling.mkdir(parents=True)
 (user_sibling / "SKILL.md").write_text("user", encoding="utf-8")
 
 proc = subprocess.run(
-    [sys.executable, helper, "--prune-orphans", str(prune_src), str(prune_dst)],
+    ["node", helper, "--prune-orphans", str(prune_src), str(prune_dst)],
     text=True,
     capture_output=True,
 )
@@ -375,7 +385,7 @@ assert (user_sibling / "SKILL.md").exists()
 # status == same 时零改动
 (prune_src / "only-in-same.md").write_text("keep", encoding="utf-8")
 proc_same = subprocess.run(
-    [sys.executable, helper, "--prune-orphans", str(prune_src), str(prune_src)],
+    ["node", helper, "--prune-orphans", str(prune_src), str(prune_src)],
     text=True,
     capture_output=True,
 )
@@ -396,7 +406,7 @@ except OSError:
     pass
 else:
     proc_sym = subprocess.run(
-        [sys.executable, helper, "--prune-orphans", str(prune_src), str(sym_target)],
+        ["node", helper, "--prune-orphans", str(prune_src), str(sym_target)],
         text=True,
         capture_output=True,
     )
@@ -524,7 +534,7 @@ cat > "$TMP_DIR/claude-v24.json" <<'JSON'
   }
 }
 JSON
-python3 "$CLAUDE_MERGE" --existing "$TMP_DIR/claude-v24.json" --template "$SETTINGS_FILE" --output "$TMP_DIR/claude-v25.json"
+node "$CLAUDE_MERGE" --host claude --existing "$TMP_DIR/claude-v24.json" --template "$SETTINGS_FILE" --output "$TMP_DIR/claude-v25.json"
 python3 - "$TMP_DIR/claude-v25.json" <<'PY' || fail "Claude v24/v44→v45 hook migration failed"
 import json, sys
 doc=json.load(open(sys.argv[1],encoding="utf-8"))
@@ -544,13 +554,13 @@ assert hits[0][0]=="PreToolUse" and hits[0][1]=="Bash|Write|Edit|MultiEdit", hit
 assert hits[0][2].get("timeout")==10, hits
 assert len(user)==1 and user[0][0]=="PreToolUse" and user[0][1]=="Write|Edit|MultiEdit", user
 PY
-python3 "$CLAUDE_MERGE" --existing "$TMP_DIR/claude-v25.json" --template "$SETTINGS_FILE" --output "$TMP_DIR/claude-v25-again.json"
+node "$CLAUDE_MERGE" --host claude --existing "$TMP_DIR/claude-v25.json" --template "$SETTINGS_FILE" --output "$TMP_DIR/claude-v25-again.json"
 cmp -s "$TMP_DIR/claude-v25.json" "$TMP_DIR/claude-v25-again.json" \
   || fail "Claude settings merge is not idempotent"
 
 # 项目指令合并：每个宿主一个管理块。旧版无标记文件迁移一次，作者自己的节留在块外；
 # 重跑整块替换、字节幂等；名字常见但不带 oh-story 痕迹的作者节不能被当成旧部署删掉。
-INSTR_MERGE="$SKILL_DIR/scripts/merge-project-instructions.py"
+INSTR_MERGE="$SKILL_DIR/scripts/merge-project-instructions.js"
 assert_file "$INSTR_MERGE"
 python3 - "$INSTR_MERGE" "$SKILL_DIR/references" "$TMP_DIR/instr-merge" <<'PY' || fail "project instruction managed-block merge regressed"
 import json, subprocess, sys
@@ -563,7 +573,7 @@ templates = {
     **{h: refs / h / "AGENTS.md.tmpl" for h in ("codex", "zcode", "openclaw", "reasonix", "generic")},
 }
 def run(host, path, name="我的书"):
-    proc = subprocess.run([sys.executable, helper, "--host", host, "--template", str(templates[host]),
+    proc = subprocess.run(["node", helper, "--host", host, "--template", str(templates[host]),
                            "--existing", str(path), "--output", str(path), "--project-name", name],
                           capture_output=True, text=True)
     assert proc.returncode == 0, proc.stdout + proc.stderr

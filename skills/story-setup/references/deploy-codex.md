@@ -10,7 +10,7 @@
 | `skills/story-setup/references/codex/agents/` | `.codex/agents/` | story-setup managed | replace | 7 TOML agent files parse and contain `name`/`description`/`developer_instructions` |
 | `skills/story-setup/references/codex/hooks/hooks.json` | `.codex/hooks.json` | user+managed | replace managed registrations by stable hook identity | hook JSON valid; all stale direct/launcher registrations removed, current 6 registrations present exactly once |
 | `skills/story-setup/references/codex/hooks/{story_codex_hook.js,story_hook_core.js,run-story-hook.sh,run-story-hook.cmd}` | `.codex/hooks/` 同名文件 | story-setup managed | replace | Node 适配器、共享核与 shell/cmd launcher 文件齐全；`story_hook_core.js` 与 Claude/OpenCode/ZCode/Antigravity 副本字节一致 |
-| `skills/story-setup/scripts/merge-codex-hooks.py` | 部署时执行，不复制到项目 | story-setup helper | execute | 替换已知管理注册、保留用户 hooks 与未知顶层字段，结果幂等 |
+| `skills/story-setup/scripts/merge-hooks.js` | 部署时执行，不复制到项目 | story-setup helper | execute (`--host codex`) | 替换已知管理注册、保留用户 hooks 与未知顶层字段，结果幂等 |
 | `skills/story-setup/references/agent-references/` | `.codex/skills/story-setup/references/agent-references/` | story-setup managed | replace | every reference resolves |
 
 ## 部署 Codex Agents
@@ -27,8 +27,8 @@
 Codex 项目 hooks 部署到 `.codex/hooks.json`；运行脚本部署到 `.codex/hooks/story_codex_hook.js`、`story_hook_core.js`、`run-story-hook.sh`、`run-story-hook.cmd`。JSON 只负责定位项目根与传递 event，Node.js 运行时探测由平台 launcher 统一处理。
 
 1. 定位当前 story-setup skill 目录，读取 `references/codex/hooks/hooks.json` 作为唯一当前模板，读取项目 `.codex/hooks.json`（不存在时视为空对象）。
-2. 按现有跨平台规则探测可用 Python：`for PYBIN in python3 python py; do "$PYBIN" -c "" 2>/dev/null && break; done`；无可用解释器时停止，不手写或简化 JSON 合并。
-3. 调用 `"$PYBIN" "{story-setup skill目录}/scripts/merge-codex-hooks.py" --existing "{项目}/.codex/hooks.json" --template "{story-setup skill目录}/references/codex/hooks/hooks.json" --output "{项目}/.codex/hooks.json"`。该 helper 会识别旧直调 `story_codex_hook.py`、当前 `run-story-hook.sh` 和 `run-story-hook.cmd` 三类管理身份，先移除所有已知管理注册，再追加当前模板。
+2. 确认 PATH 中存在 `node`（Node.js 18+）；不可用时停止，不手写或简化 JSON 合并。
+3. 调用 `node "{story-setup skill目录}/scripts/merge-hooks.js" --host codex --existing "{项目}/.codex/hooks.json" --template "{story-setup skill目录}/references/codex/hooks/hooks.json" --output "{项目}/.codex/hooks.json"`。该 helper 会识别旧直调 `story_codex_hook.py`、当前 `run-story-hook.sh` 和 `run-story-hook.cmd` 三类管理身份，先移除所有已知管理注册，再追加当前模板。
 4. 保留用户已有的非 story-setup hooks、matcher 块与未知顶层字段。重复执行必须幂等；禁止再按原始 `command` 字符串追加去重，否则 v17 直调命令会与 v18 launcher 双重注册。
 5. 写入后解析 JSON 验证：旧直调 `story_codex_hook.py` 命令数为 0，当前模板 6 个注册各存在且仅存在一次，用户 hook 与未知顶层字段仍在。然后提示用户：项目 `.codex/` 层需要被 Codex trust，非 managed command hooks 还需要在 `/hooks` 中 review/trust 后才会运行；Windows 下走 `commandWindows`，launcher 从当前目录向上定位项目 `.codex/hooks/`，与 POSIX 路径的嵌套目录行为一致。
 
