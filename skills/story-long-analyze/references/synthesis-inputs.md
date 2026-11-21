@@ -7,8 +7,8 @@ Stage 3、4、5 各自的时刻都读本文件。
 用只读的 `digest` 按需提取跨章观察和逐章字段，避免重复读取缓存里的章节正文；输出为 Markdown：
 
 ```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" digest --root "{拆文目录}" --part observations [--chapters 1-60]
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" digest --root "{拆文目录}" --part chapters --chapters 1-60 --fields 三维节奏,涉及,状态变化 --points brief
+node "{story-long-analyze skill 根}/scripts/manage_analysis_run.js" digest --root "{拆文目录}" --part observations [--chapters 1-60]
+node "{story-long-analyze skill 根}/scripts/manage_analysis_run.js" digest --root "{拆文目录}" --part chapters --chapters 1-60 --fields 三维节奏,涉及,状态变化 --points brief
 ```
 
 - `observations`：按章序汇总已提交批次的跨章观察（剧情点、关键事件与披露候选、关系变化、三维峰谷、跨批状态），是 Stage 3–4 的主语料；
@@ -32,7 +32,7 @@ Stage 3、4、5 各自的时刻都读本文件。
 Stage 3–5 各运行一次，失败后按缺口重试。文件成功落盘后再标记：
 
 ```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" mark-stage \
+node "{story-long-analyze skill 根}/scripts/manage_analysis_run.js" mark-stage \
   --root "{拆文目录}" --stage stage3 --output "剧情/节奏.md"
 ```
 

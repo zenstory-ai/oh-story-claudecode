@@ -32,7 +32,7 @@ story-long-analyze 的可选后置管道：把 Stage 3 已抽象好的 EM 机制
 ### 1. 原子灵感登记（确定性机械步骤）
 
 ```text
-{PYTHON} "{story-long-analyze skill 根}/scripts/inspiration_index.py" register-atoms --root "{灵感库}" --module "{拆文目录}/剧情/情绪模块.md" --book "{书名}"
+node "{story-long-analyze skill 根}/scripts/inspiration_index.js" register-atoms --root "{灵感库}" --module "{拆文目录}/剧情/情绪模块.md" --book "{书名}"
 ```
 
 - 完整卡（读者想看什么/情绪链/戏剧单元/可替换项/不可照搬 五字段齐）登记为 `grade=full`；「其他机制索引」条目登记为 `grade=index`。

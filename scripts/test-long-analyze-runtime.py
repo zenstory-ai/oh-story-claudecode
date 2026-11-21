@@ -18,9 +18,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 RUNTIME = ROOT / "skills" / "story-long-analyze" / "scripts"
-INDEX = RUNTIME / "build_chapter_index.py"
-INSPECT = RUNTIME / "inspect_existing_assets.py"
-MANAGE = RUNTIME / "manage_analysis_run.py"
+INDEX = RUNTIME / "build_chapter_index.js"
+INSPECT = RUNTIME / "inspect_existing_assets.js"
+MANAGE = RUNTIME / "manage_analysis_run.js"
+NODE = shutil.which("node")
 
 
 def require(condition: bool, message: str) -> None:
@@ -29,8 +30,13 @@ def require(condition: bool, message: str) -> None:
 
 
 def run(script: Path, *args: object, extra_env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    if script.suffix == ".js":
+        require(bool(NODE), "node binary required to run long-analyze runtime scripts")
+        cmd = [NODE, str(script), *map(str, args)]
+    else:
+        cmd = [sys.executable, "-B", str(script), *map(str, args)]
     return subprocess.run(
-        [sys.executable, "-B", str(script), *map(str, args)],
+        cmd,
         text=True,
         encoding="utf-8",
         env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONDONTWRITEBYTECODE": "1", **(extra_env or {})},
@@ -737,7 +743,7 @@ def build_index(root: Path, *extra: str) -> subprocess.CompletedProcess[str]:
 
 
 def author_text_is_plain(message: str) -> bool:
-    return bool(message) and not re.search(r"[A-Za-z]+_[A-Za-z_]+|RAW-|REUSE-|\.py|\.csv|--", message)
+    return bool(message) and not re.search(r"[A-Za-z]+_[A-Za-z_]+|RAW-|REUSE-|\.py|\.js|\.csv|--", message)
 
 
 def test_legacy_prologue_alignment() -> None:

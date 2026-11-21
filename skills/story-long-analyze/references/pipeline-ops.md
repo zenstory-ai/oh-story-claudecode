@@ -4,9 +4,9 @@
 
 拆文运行使用三个脚本：
 
-1. `build_chapter_index.py`：建立机械章界和逐章原文 hash；
-2. `inspect_existing_assets.py`：只读识别旧成果、当前成果、缺章和修复阶段；
-3. `manage_analysis_run.py`：只读计划，并负责批次提交、拆分、恢复和阶段标记。
+1. `build_chapter_index.js`：建立机械章界和逐章原文 hash；
+2. `inspect_existing_assets.js`：只读识别旧成果、当前成果、缺章和修复阶段；
+3. `manage_analysis_run.js`：只读计划，并负责批次提交、拆分、恢复和阶段标记。
 
 Stage 4 另用 `render_relation_chart.py` 从 `角色/角色关系.md` 生成人物关系图，不参与运行状态。
 
@@ -17,12 +17,12 @@ Stage 4 另用 `render_relation_chart.py` 从 `角色/角色关系.md` 生成人
 
 既有项目中的 `schema_version: 2` 沿用且不修改；该值只供报告，不用于否定旧成果。
 
-计划只打印到标准输出，由当前运行直接消费；不另建计划、检查点或逐批回执文件。`{PYTHON}` 与路径占位见 SKILL.md「运行约定」。
+计划只打印到标准输出，由当前运行直接消费；不另建计划、检查点或逐批回执文件。运行与路径占位见 SKILL.md「运行约定」。
 
 ## 1. 先检查目录
 
 ```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/inspect_existing_assets.py" --root "{拆文目录}" --compact
+node "{story-long-analyze skill 根}/scripts/inspect_existing_assets.js" --root "{拆文目录}" --compact
 ```
 
 - 路径不存在、不是目录或不可读：非零退出，先修正路径。
@@ -37,7 +37,7 @@ Stage 4 另用 `render_relation_chart.py` 从 `角色/角色关系.md` 生成人
 完整旧成果直接使用，纯增强无需建索引；全新或部分完成且仍需读取原文时运行（只补文风时按 style-profile-generator.md 单独建索引）：
 
 ```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/build_chapter_index.py" \
+node "{story-long-analyze skill 根}/scripts/build_chapter_index.js" \
   --source "{拆文目录}/原文/原文.txt" \
   --output "{拆文目录}/chapter_index.csv" \
   --locator-path "原文/原文.txt"
@@ -48,7 +48,7 @@ Stage 4 另用 `render_relation_chart.py` 从 `角色/角色关系.md` 生成人
 ## 3. 生成只读计划
 
 ```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" plan \
+node "{story-long-analyze skill 根}/scripts/manage_analysis_run.js" plan \
   --root "{拆文目录}" \
   --intent continue
 ```
@@ -79,7 +79,7 @@ Stage 4 另用 `render_relation_chart.py` 从 `角色/角色关系.md` 生成人
 子代理不可用时主会话自己写批次：先读 [stage2-extraction.md](stage2-extraction.md)，提取规则与包裹标记照其中「批次提交格式」：
 
 ```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" commit \
+node "{story-long-analyze skill 根}/scripts/manage_analysis_run.js" commit \
   --root "{拆文目录}" \
   --input "{拆文目录}/_analysis_cache/输入-RAW-4-6.md" \
   --batch-id "RAW-4-6" \
@@ -94,7 +94,7 @@ Stage 4 另用 `render_relation_chart.py` 从 `角色/角色关系.md` 生成人
 模型输出不完整时不提交。批次过大或连续失败时拆批（可用 `--at` 指定切分章）：
 
 ```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" split \
+node "{story-long-analyze skill 根}/scripts/manage_analysis_run.js" split \
   --root "{拆文目录}" --batch-id "RAW-4-6"
 ```
 
@@ -105,7 +105,7 @@ Stage 4 另用 `render_relation_chart.py` 从 `角色/角色关系.md` 生成人
 先重新运行 `plan`（已成功的批次不会重复出现）。若缓存已完整，但摘要或进度最后一步尚未落盘：
 
 ```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" repair-progress --root "{拆文目录}"
+node "{story-long-analyze skill 根}/scripts/manage_analysis_run.js" repair-progress --root "{拆文目录}"
 ```
 
 缓存缺结束标记或范围 hash 失效时报告错误并重跑相应批次。
@@ -115,7 +115,7 @@ Stage 4 另用 `render_relation_chart.py` 从 `角色/角色关系.md` 生成人
 Stage 1 黄金三章与快速预览落盘后标 `stage1`；计划不再有批次、全部摘要落盘后标 `stage2`：
 
 ```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" mark-stage --root "{拆文目录}" --stage stage2
+node "{story-long-analyze skill 根}/scripts/manage_analysis_run.js" mark-stage --root "{拆文目录}" --stage stage2
 ```
 
 Stage 3–5 的取料（`digest`）与标记见 [synthesis-inputs.md](synthesis-inputs.md)，Stage 6 见 [style-profile-generator.md](style-profile-generator.md)，全部拆完后的收尾检查见 [final-checks.md](final-checks.md)。
