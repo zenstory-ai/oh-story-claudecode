@@ -4,8 +4,6 @@
 from __future__ import annotations
 
 import json
-import os
-import shlex
 import subprocess
 import sys
 import tempfile
@@ -278,28 +276,14 @@ with tempfile.TemporaryDirectory(prefix="shared-assets-reference-runtime-") as t
     assert allowed.returncode == 0, allowed.stderr + allowed.stdout
 
 
-with tempfile.TemporaryDirectory(prefix="python-store-stub-") as tmp:
-    stub_dir = Path(tmp)
-    python3_stub = stub_dir / "python3"
-    python3_stub.write_text("#!/bin/sh\nexit 49\n", encoding="utf-8")
-    python3_stub.chmod(0o755)
-    python_fallback = stub_dir / "python"
-    python_fallback.write_text(
-        "#!/bin/sh\nexec {} \"$@\"\n".format(shlex.quote(sys.executable)),
-        encoding="utf-8",
-    )
-    python_fallback.chmod(0o755)
-    environment = os.environ.copy()
-    environment["PATH"] = str(stub_dir) + os.pathsep + environment.get("PATH", "")
-    wrapper = subprocess.run(
-        ["bash", str(REPO_ROOT / "scripts" / "check-shared-files.sh")],
-        cwd=REPO_ROOT,
-        env=environment,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    assert wrapper.returncode == 0, wrapper.stderr + wrapper.stdout
-    assert "Shared File Governance Check" in wrapper.stdout
+shared_check = subprocess.run(
+    [sys.executable, str(REPO_ROOT / "scripts" / "lint-repo.py"), "--only", "shared"],
+    cwd=REPO_ROOT,
+    text=True,
+    capture_output=True,
+    check=False,
+)
+assert shared_check.returncode == 0, shared_check.stderr + shared_check.stdout
+assert "Shared File Governance Check" in shared_check.stdout
 
 print("OK: shared asset manifest detects drift and syncs atomically")

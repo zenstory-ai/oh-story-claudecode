@@ -5,7 +5,7 @@ permissions:
   contents: read
 
 jobs:
-  static-check:
+  repo-lint-and-adapters:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -17,128 +17,37 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.x'
-      - name: Run skill static check
-        run: bash scripts/static-check.sh
-      - name: Structured static-check regression
-        run: python3 scripts/test-static-check.py
-      - name: Publishing preparation regression
-        run: python3 scripts/test-publish-format.py
-      - name: Check agent decision notes
-        run: python3 scripts/check-agent-notes.py
-      - name: Agent decision notes regression
-        run: python3 scripts/test-agent-notes.py
-      - name: Check author-facing report templates
+      - name: Repo lint & doc budget
         run: |
-          python3 scripts/check-author-reports.py --self-test
-          python3 scripts/check-author-reports.py
-      - name: Check workflow numbering
-        run: python3 scripts/skill-numbering.py check
-      - name: Workflow numbering regression
-        run: bash scripts/test-skill-numbering.sh
-      - name: Check current-only skill contracts
-        run: bash scripts/check-current-skill-contracts.sh
-      - name: Current-only skill contract regression
-        run: python3 scripts/test-current-skill-contracts.py
-      - name: Analysis and scan handoff contracts
-        run: python3 scripts/test-handoff-contracts.py
-      - name: Long-analysis runtime and compatibility regression
-        run: python3 scripts/test-long-analyze-runtime.py
-      - name: Inspiration index regression
-        run: python3 scripts/test-inspiration-index.py
-      - name: Agent permission behavior regression
-        run: python3 scripts/test-agent-permissions.py
-      - name: Check hot-path doc budget
-        run: bash scripts/check-doc-budget.sh
-      - name: Check long-form reference routing, agent copies and template tags
+          python3 scripts/lint-repo.py
+          node scripts/check-doc-budget.mjs
+      - name: Repo guard & contract regressions
         run: |
-          python3 scripts/check-reference-routing.py --self-test
-          python3 scripts/check-reference-routing.py
-      - name: Document budget behavior regression
-        run: python3 scripts/test-doc-budget.py
-      - name: Check hook-regex sync
-        run: bash scripts/check-hook-regex-sync.sh
-      - name: Check shared-file consistency
-        run: bash scripts/check-shared-files.sh
-      - name: Shared-asset manifest regression
-        run: python3 scripts/test-shared-assets.py
-      - name: Shared-reference manifest regression
-        run: python3 scripts/test-shared-references.py
-      - name: Punctuation normalizer regression
-        run: node scripts/test-normalize-punctuation.js
-      - name: Scan runtime regression
-        run: node scripts/test-scan-runtime.js
-      - name: Check scan/browser runtime source policies
-        run: bash scripts/check-scan-runtime-policy.sh
-      - name: Scan/browser source-policy mutation regression
-        run: python3 scripts/test-scan-runtime-policy.py
-      - name: Scan rank aggregate regression
-        run: python3 scripts/test-scan-aggregate.py
-      - name: AI-pattern detector regression
-        run: bash scripts/test-ai-patterns.sh
-      - name: Outline-copy detector regression
-        run: bash scripts/test-outline-copy.sh
-      - name: Phase 2 contract verifier regression
+          python3 scripts/test-static-check.py
+          python3 scripts/test-current-skill-contracts.py
+          python3 scripts/test-handoff-contracts.py
+          python3 scripts/test-doc-budget.py
+          python3 scripts/test-shared-assets.py
+          python3 scripts/test-shared-references.py
+          python3 scripts/test-agent-permissions.py
+      - name: Source & hook policy guards
         run: |
-          node scripts/test-phase2-contract.js
-          node scripts/test-delivery-contract.js
-          node scripts/check-reference-gates.js
-          node scripts/test-outline-contract.js
-      - name: Writer pipeline CLI regression
-        run: |
-          python scripts/test-writer-pipeline.py
-          python scripts/test-style-precedence.py
-      - name: Degeneration detector regression
-        run: bash scripts/test-degeneration.sh
-      - name: Prose backstop hook regression
-        run: bash scripts/test-prose-backstop-hook.sh
-      - name: Prose net 3-CLI parity
-        run: bash scripts/test-prose-net-parity.sh
-      - name: Story continuity backstop regression
-        run: bash scripts/test-story-continuity.sh
-      - name: Tracking transaction behavior regression
-        run: python3 scripts/test-tracking-commit.py
-      - name: Wordcount core behavior regression
-        run: python3 scripts/test-storyctl.py
-      - name: Chapter completion lifecycle regression
-        run: python3 scripts/test-chapter-completion-lifecycle.py
-      - name: Author memory transaction behavior regression
-        run: python3 scripts/test-author-memory-commit.py
+          bash scripts/check-hook-regex-sync.sh
+          bash scripts/check-scan-runtime-policy.sh
+          python3 scripts/test-scan-runtime-policy.py
+          bash scripts/check-python-invocation.sh
+          bash scripts/check-hook-locale-safety.sh
       - name: Check story-setup deployment
         run: bash scripts/check-story-setup-deployment.sh
-      - name: Plugin packaging regression
-        run: python3 scripts/test-plugin-packaging.py
-      - name: Check Claude Code adapter
-        run: bash scripts/check-claude-adapter.sh
-      - name: Check Codex adapter
-        run: bash scripts/check-codex-adapter.sh
-      - name: Check Antigravity adapter
-        run: bash scripts/check-antigravity-adapter.sh
-      - name: Check OpenCode adapter
-        run: bash scripts/check-opencode-adapter.sh
-      - name: Check OpenClaw skill compatibility
-        run: bash scripts/check-openclaw-skills.sh
-      - name: Check ZCode adapter
-        run: bash scripts/check-zcode-adapter.sh
-      - name: Check Reasonix adapter
-        run: bash scripts/check-reasonix-adapter.sh
-      - name: Test Codex hook adapter
-        run: bash scripts/test-codex-hooks.sh
-      - name: Test ZCode hook adapter
-        run: bash scripts/test-zcode-hooks.sh
-      - name: Guard against bare python3 invocations
-        run: bash scripts/check-python-invocation.sh
-      - name: Guard hook locale safety (LC_ALL=C + no full-width char classes)
-        run: bash scripts/check-hook-locale-safety.sh
-      # Generate a GBK-class locale so the hook test's Part 2 runs end-to-end here,
-      # not just on macOS. Best-effort: if it fails the test self-skips Part 2.
-      - name: Generate zh_CN.GBK locale (Chinese Windows simulation)
-        run: sudo localedef -f GBK -i zh_CN zh_CN.GBK || sudo locale-gen zh_CN.GBK || true
-      - name: Hook path-encoding portability (drive paths + real GBK locale)
-        run: bash scripts/test-hook-encoding-portable.sh
-      - name: Portable char-count (real interpreter)
-        run: bash scripts/test-charcount-portable.sh
-      - name: Portable char-count (simulated Windows Store stub)
-        run: bash scripts/test-charcount-portable.sh --stub
+      - name: Check 7 host adapters
+        run: |
+          bash scripts/check-claude-adapter.sh
+          bash scripts/check-codex-adapter.sh
+          bash scripts/check-antigravity-adapter.sh
+          bash scripts/check-opencode-adapter.sh
+          bash scripts/check-openclaw-skills.sh
+          bash scripts/check-zcode-adapter.sh
+          bash scripts/check-reasonix-adapter.sh
       - name: Syntax-check collection scripts
         run: |
           find skills \( -name '*-scraper.js' -o -name 'cdp-utils.js' -o -name 'aggregate-rank.js' -o -name 'setup-cdp-chrome.js' \) -print0 |
@@ -147,186 +56,71 @@ jobs:
             node --check "$f"
           done
 
-  windows:
-    runs-on: windows-latest
+  cross-platform-runtime:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: 22
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.x'
       - name: Cross-runtime plugin packaging
-        shell: bash
         run: |
-          python3 scripts/check-plugin-packaging.py
-          python3 scripts/test-plugin-packaging.py
-      - name: Publishing preparation regression
-        run: python3 scripts/test-publish-format.py
-      - name: AI-pattern detector regression
-        shell: bash
-        run: bash scripts/test-ai-patterns.sh
-      - name: Outline-copy detector regression
-        shell: bash
-        run: bash scripts/test-outline-copy.sh
-      - name: Phase 2 contract verifier regression
+          python scripts/check-plugin-packaging.py
+          python scripts/test-plugin-packaging.py
+      - name: Native Node detector & contract tests
         run: |
+          node --test scripts/test-ai-patterns.mjs scripts/test-degeneration.mjs scripts/test-outline-copy.mjs
           node scripts/test-phase2-contract.js
           node scripts/test-delivery-contract.js
-          node scripts/check-reference-gates.js
           node scripts/test-outline-contract.js
-      - name: Writer pipeline CLI regression
+          node scripts/test-normalize-punctuation.js
+          node scripts/test-scan-runtime.js
+      - name: Python runtime regressions
         run: |
+          python scripts/test-publish-format.py
           python scripts/test-writer-pipeline.py
           python scripts/test-style-precedence.py
-      - name: Degeneration detector regression
+          python scripts/test-tracking-commit.py
+          python scripts/test-storyctl.py
+          python scripts/test-chapter-completion-lifecycle.py
+          python scripts/test-author-memory-commit.py
+          python scripts/test-long-analyze-runtime.py
+          python scripts/test-inspiration-index.py
+          python scripts/test-scan-aggregate.py
+      - name: Hook & continuity regressions
         shell: bash
-        run: bash scripts/test-degeneration.sh
-      - name: Prose backstop hook regression
+        run: |
+          bash scripts/test-prose-backstop-hook.sh
+          bash scripts/test-prose-net-parity.sh
+          bash scripts/test-story-continuity.sh
+          bash scripts/test-codex-hooks.sh
+          bash scripts/test-zcode-hooks.sh
+          node scripts/test-antigravity-hooks.mjs
+      # Generate a GBK-class locale on Ubuntu so Part 2 of hook encoding test runs end-to-end.
+      - name: Generate zh_CN.GBK locale (Chinese Windows simulation)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo localedef -f GBK -i zh_CN zh_CN.GBK || sudo locale-gen zh_CN.GBK || true
+      - name: Portable char-count & hook path-encoding tests
         shell: bash
-        run: bash scripts/test-prose-backstop-hook.sh
-      - name: Prose net 3-CLI parity
-        shell: bash
-        run: bash scripts/test-prose-net-parity.sh
-      - name: Story continuity backstop regression
-        shell: bash
-        run: bash scripts/test-story-continuity.sh
-      - name: Tracking transaction behavior regression
-        run: python scripts/test-tracking-commit.py
-      - name: Wordcount core behavior regression
-        run: python scripts/test-storyctl.py
-      - name: Chapter completion lifecycle regression
-        run: python scripts/test-chapter-completion-lifecycle.py
-      - name: Author memory transaction behavior regression
-        run: python scripts/test-author-memory-commit.py
-      - name: Workflow numbering regression
-        shell: bash
-        run: bash scripts/test-skill-numbering.sh
-      - name: Long-analysis runtime and compatibility regression
-        run: python scripts/test-long-analyze-runtime.py
-      - name: Inspiration index regression
-        run: python scripts/test-inspiration-index.py
-      - name: Check shared-file consistency (Windows Git Bash)
-        shell: bash
-        run: bash scripts/check-shared-files.sh
-      - name: Punctuation normalizer regression
-        run: node scripts/test-normalize-punctuation.js
-      - name: Scan runtime regression
-        run: node scripts/test-scan-runtime.js
-      - name: Scan rank aggregate regression
-        run: python scripts/test-scan-aggregate.py
-      - name: Test Codex hook adapter
-        shell: bash
-        run: bash scripts/test-codex-hooks.sh
-      - name: Test ZCode hook adapter
-        shell: bash
-        run: bash scripts/test-zcode-hooks.sh
-      - name: Test Antigravity hook adapter
-        run: node scripts/test-antigravity-hooks.mjs
+        run: |
+          bash scripts/test-charcount-portable.sh
+          bash scripts/test-charcount-portable.sh --stub
+          bash scripts/test-hook-encoding-portable.sh
       - name: Setup Chrome
+        if: matrix.os != 'ubuntu-latest'
         uses: browser-actions/setup-chrome@c785b87e244131f27c9f19c1a33e2ead956ab7ce # v1
         with:
           chrome-version: stable
-      - name: Verify sleep blocks
-        run: node -e "const { sleep } = require('./skills/story-short-scan/scripts/cdp-utils.js'); const t0 = Date.now(); sleep(100); const ms = Date.now() - t0; console.log('slept', ms, 'ms'); if (ms < 90) { console.error('sleep(100) returned after ' + ms + 'ms'); process.exit(1); }"
-      - name: Verify setup script dry-run
-        run: node skills/browser-cdp/scripts/setup-cdp-chrome.js 9222 --dry-run
-      # Run under Git Bash (shell: bash on windows-latest), matching how Claude Code
-      # executes its Bash tool on Windows — this is where the python3 exit-49 bug bites.
-      - name: Portable char-count (real interpreter)
-        shell: bash
-        run: bash scripts/test-charcount-portable.sh
-      - name: Portable char-count (simulated Windows Store stub)
-        shell: bash
-        run: bash scripts/test-charcount-portable.sh --stub
-      # Real Windows Git Bash: Part 1c exercises real drive-letter paths (issue #184) via cygpath.
-      - name: Hook path-encoding portability (drive paths + GBK locale if present)
-        shell: bash
-        run: bash scripts/test-hook-encoding-portable.sh
-
-  macos:
-    runs-on: macos-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 20
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with:
-          python-version: '3.x'
-      - name: Cross-runtime plugin packaging
-        shell: bash
+      - name: Verify Chrome CDP helpers & setup dry-run
+        if: matrix.os != 'ubuntu-latest'
         run: |
-          python3 scripts/check-plugin-packaging.py
-          python3 scripts/test-plugin-packaging.py
-      - name: Publishing preparation regression
-        run: python3 scripts/test-publish-format.py
-      - name: AI-pattern detector regression
-        run: bash scripts/test-ai-patterns.sh
-      - name: Outline-copy detector regression
-        run: bash scripts/test-outline-copy.sh
-      - name: Phase 2 contract verifier regression
-        run: |
-          node scripts/test-phase2-contract.js
-          node scripts/test-delivery-contract.js
-          node scripts/check-reference-gates.js
-          node scripts/test-outline-contract.js
-      - name: Writer pipeline CLI regression
-        run: |
-          python scripts/test-writer-pipeline.py
-          python scripts/test-style-precedence.py
-      - name: Degeneration detector regression
-        run: bash scripts/test-degeneration.sh
-      - name: Prose backstop hook regression
-        run: bash scripts/test-prose-backstop-hook.sh
-      - name: Prose net 3-CLI parity
-        run: bash scripts/test-prose-net-parity.sh
-      - name: Story continuity backstop regression
-        run: bash scripts/test-story-continuity.sh
-      - name: Tracking transaction behavior regression
-        run: python3 scripts/test-tracking-commit.py
-      - name: Wordcount core behavior regression
-        run: python3 scripts/test-storyctl.py
-      - name: Chapter completion lifecycle regression
-        run: python3 scripts/test-chapter-completion-lifecycle.py
-      - name: Author memory transaction behavior regression
-        run: python3 scripts/test-author-memory-commit.py
-      - name: Workflow numbering regression
-        run: bash scripts/test-skill-numbering.sh
-      - name: Long-analysis runtime and compatibility regression
-        run: python3 scripts/test-long-analyze-runtime.py
-      - name: Inspiration index regression
-        run: python3 scripts/test-inspiration-index.py
-      - name: Punctuation normalizer regression
-        run: node scripts/test-normalize-punctuation.js
-      - name: Scan runtime regression
-        run: node scripts/test-scan-runtime.js
-      - name: Scan rank aggregate regression
-        run: python3 scripts/test-scan-aggregate.py
-      - name: Check shared-file consistency (macOS Bash 3)
-        run: bash scripts/check-shared-files.sh
-      - name: Check Codex adapter
-        run: bash scripts/check-codex-adapter.sh
-      - name: Test Codex hook adapter
-        run: bash scripts/test-codex-hooks.sh
-      - name: Test ZCode hook adapter
-        run: bash scripts/test-zcode-hooks.sh
-      - name: Test Antigravity hook adapter
-        run: node scripts/test-antigravity-hooks.mjs
-      - name: Setup Chrome
-        uses: browser-actions/setup-chrome@c785b87e244131f27c9f19c1a33e2ead956ab7ce # v1
-        with:
-          chrome-version: stable
-      - name: Verify sleep blocks
-        run: node -e "const { sleep } = require('./skills/story-short-scan/scripts/cdp-utils.js'); const t0 = Date.now(); sleep(100); const ms = Date.now() - t0; console.log('slept', ms, 'ms'); if (ms < 90) { console.error('sleep(100) returned after ' + ms + 'ms'); process.exit(1); }"
-      - name: Verify setup script dry-run
-        run: node skills/browser-cdp/scripts/setup-cdp-chrome.js 9222 --dry-run
-      - name: Portable char-count (real interpreter)
-        run: bash scripts/test-charcount-portable.sh
-      - name: Portable char-count (simulated Windows Store stub)
-        run: bash scripts/test-charcount-portable.sh --stub
-      - name: Hook path-encoding portability (drive paths + GBK locale if present)
-        run: bash scripts/test-hook-encoding-portable.sh
+          node -e "const { sleep } = require('./skills/story-short-scan/scripts/cdp-utils.js'); const t0 = Date.now(); sleep(100); const ms = Date.now() - t0; console.log('slept', ms, 'ms'); if (ms < 90) { console.error('sleep(100) returned after ' + ms + 'ms'); process.exit(1); }"
+          node skills/browser-cdp/scripts/setup-cdp-chrome.js 9222 --dry-run

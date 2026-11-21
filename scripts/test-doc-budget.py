@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CHECKER = REPO_ROOT / "scripts" / "check-doc-budget.sh"
+CHECKER = REPO_ROOT / "scripts" / "check-doc-budget.mjs"
 
 
 class DocBudgetCliTests(unittest.TestCase):
@@ -26,7 +26,7 @@ class DocBudgetCliTests(unittest.TestCase):
             manifest_path = root / "budget.json"
             manifest_path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
             return subprocess.run(
-                ["bash", str(CHECKER), "--root", str(root), "--manifest", str(manifest_path)],
+                ["node", str(CHECKER), "--root", str(root), "--manifest", str(manifest_path)],
                 text=True,
                 encoding="utf-8",
                 stdout=subprocess.PIPE,
