@@ -266,7 +266,7 @@ class FinalChapterFlowTests(unittest.TestCase):
         self.assertEqual(over["compression"]["remove_to_user_band"], {"min": 100, "max": 300})
         self.assertEqual(over["compression"]["remove_to_internal_band"], {"min": 100, "max": 300})
 
-    def test_accept_current_length_has_a_floor_and_needs_one_compression_first(self) -> None:
+    def test_accept_current_length_enforces_floor_and_accepts_over_length(self) -> None:
         self.write_contract(1, 289, target=1000)
         refused = self.run_chapter(
             "accept-current-length", 1, document=transaction(1, self.state()["state_revision"]), expect=2
@@ -278,26 +278,16 @@ class FinalChapterFlowTests(unittest.TestCase):
         )
         self.assertEqual(self.state()["wordcount_records"]["1"]["actual"], 289)
 
+        # 超长章节仍提供 compress-once 与删除区间指引，但不再靠 SHA-256 基线硬拦截 accept-current-length。
         self.write_contract(2, 1400)
-        refused = self.run_chapter(
-            "accept-current-length", 2, document=transaction(2, self.state()["state_revision"]), expect=2
-        )
-        self.assertEqual(refused["error_code"], "COMPRESSION_REQUIRED")
-        self.assertEqual(self.run_chapter("check", 2)["available_actions"][0], "compress-once")
-        # 删一个字不算压缩：基线 1400、作者范围上限 1150，至少要删到差额（250）的一半，即 ≤1275。
-        for token_cut in (1399, 1276):
-            self.write_contract(2, token_cut)
-            refused = self.run_chapter(
-                "accept-current-length", 2, document=transaction(2, self.state()["state_revision"]), expect=2
-            )
-            self.assertEqual(refused["error_code"], "COMPRESSION_REQUIRED", token_cut)
-            self.assertIn("1275", refused["message"])
-        self.write_contract(2, 1270)  # 真压过一次仍超长：现在可以接受。
+        checked = self.run_chapter("check", 2)
+        self.assertEqual(checked["available_actions"][0], "compress-once")
+        self.assertEqual(checked["compression"]["remove_to_user_band"], {"min": 250, "max": 550})
         accepted = self.run_chapter(
             "accept-current-length", 2, document=transaction(2, self.state()["state_revision"])
         )
         self.assertTrue(accepted["tracking_committed"])
-        self.assertEqual(accepted["work_dir_removed"], ".story/work/第002章")
+        self.assertEqual(self.state()["wordcount_records"]["2"]["actual"], 1400)
 
     def test_missing_node_is_a_tool_error_not_a_prose_finding(self) -> None:
         self.write_contract(1, 1000)

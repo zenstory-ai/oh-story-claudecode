@@ -82,12 +82,6 @@ def test_manifest_contract() -> None:
         _, f = VALIDATOR.load_manifest(p)
         require("manifest-artifact-duplicate" in finding_codes(f), "duplicate primary artifacts must be rejected")
 
-        no_fences = {k: v for k, v in raw.items() if k != "template_fences"}
-        p = tmpdir / "no-fences.json"
-        p.write_text(json.dumps(no_fences, ensure_ascii=False), encoding="utf-8")
-        m, f = VALIDATOR.load_manifest(p)
-        require(not f and m is not None, "template_fences should be optional for forward compatibility")
-
 
 def test_structured_sentinel_contract() -> None:
     manifest = repository_manifest()

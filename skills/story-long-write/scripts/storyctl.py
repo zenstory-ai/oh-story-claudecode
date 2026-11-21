@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import importlib.util
 import json
 import re
@@ -325,7 +324,6 @@ def check_blocking_quality(outline: Path, body: Path) -> dict[str, Any]:
 CHECK_EXIT_CODES = {"ready": 0, "needs_decision": 0, "blocked": 1, "invalid": 1, "tool_unavailable": 3}
 ERROR_EXIT_CODES = {"TOOL_UNAVAILABLE": 3}
 ACCEPT_FLOOR_RATIO = 0.5
-BASELINE_FILE = "over_length_baseline.json"
 
 
 class ChapterRefused(WordcountError):
@@ -342,24 +340,6 @@ def _check_status(length: dict[str, Any], quality: dict[str, Any]) -> str:
     if length["status"] == "invalid":
         return "invalid"
     return "ready" if length["status"] in {"internal_pass", "borderline"} else "needs_decision"
-
-
-def _body_digest(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def _record_over_baseline(project: Path, chapter: int, body_path: Path, actual: int) -> None:
-    """第一次看到 over 时记下原稿指纹：接受超长前要证明那一次净删压缩真的做过。"""
-    path = chapter_work_dir(project, chapter) / BASELINE_FILE
-    try:
-        previous = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError):
-        previous = None
-    # 已有基线且这次更短：是压缩后的复检，保留基线；更长则是重写出的新稿，重新记。
-    if isinstance(previous, dict) and isinstance(previous.get("actual"), int) and actual <= previous["actual"]:
-        return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"body_sha256": _body_digest(body_path), "actual": actual}), encoding="utf-8")
 
 
 def chapter_check(project: Path, chapter: int, author_range: Any = None) -> dict[str, Any]:
@@ -395,7 +375,6 @@ def chapter_check(project: Path, chapter: int, author_range: Any = None) -> dict
                 "max": actual - length["user_band"]["min"],
             },
         }
-        _record_over_baseline(project, chapter, body_path, actual)
     return {
         "schema": CHAPTER_CHECK_SCHEMA,
         "status": status,
@@ -429,11 +408,8 @@ def fix_punctuation(project: Path, chapter: int, author_range: Any = None) -> bo
     return body.read_bytes() != before
 
 
-def _require_acceptable_length(
-    project: Path, chapter: int, checked: dict[str, Any], *, force: bool, author_range: Any = None,
-) -> None:
-    """接受当前长度的两道底线：欠长不低于目标一半；超长先做过一次净删压缩（删掉原稿到作者范围上限
-    差额的至少一半）。作者明确拍板用 --force 越过。"""
+def _require_acceptable_length(checked: dict[str, Any], *, force: bool) -> None:
+    """接受当前长度的底线：欠长不低于目标一半。作者明确拍板用 --force 越过。"""
     if force:
         return
     length = checked["length"]
@@ -443,32 +419,6 @@ def _require_acceptable_length(
             f"本章 {length['actual']} 字，不到字数目标 {length['target']} 的一半，不能直接按当前长度接受；"
             "先补细纲或改字数目标，作者明确要这个长度时加 --force",
         )
-    if length["status"] == "over":
-        path = chapter_work_dir(project, chapter) / BASELINE_FILE
-        try:
-            baseline = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, json.JSONDecodeError):
-            baseline = None
-        _, body_path, _, _ = _project_files(project, chapter, author_range)
-        valid = isinstance(baseline, dict) and isinstance(baseline.get("actual"), int)
-        # 压缩要真删：至少删掉原稿到作者字数范围上限差额的一半（至少 1 字），删一两个字不算做过。
-        ceiling = None
-        if valid:
-            gap = baseline["actual"] - length["user_band"]["max"]
-            ceiling = baseline["actual"] - max(1, (gap + 1) // 2)
-        compressed = (
-            valid
-            and baseline.get("body_sha256") != _body_digest(body_path)
-            and length["actual"] <= ceiling
-        )
-        if not compressed:
-            detail = (f"（原稿 {baseline['actual']} 字，压缩后要不超过 {ceiling} 字，现在 {length['actual']} 字）"
-                      if valid else "")
-            raise ChapterRefused(
-                "COMPRESSION_REQUIRED",
-                f"超长章节先按 compress-once 做一次净删压缩并重跑 chapter check{detail}，仍超长再接受当前长度；"
-                "作者明确不压缩时加 --force",
-            )
 
 
 def chapter_commit(
@@ -487,7 +437,7 @@ def chapter_commit(
     in_user_band = length_status in {"internal_pass", "borderline"}
     if accept_current_length:
         require(length_status in {"under", "over"}, "accept-current-length requires a valid out-of-band chapter")
-        _require_acceptable_length(project, chapter, checked, force=force, author_range=author_range)
+        _require_acceptable_length(checked, force=force)
         resolution = "accepted_current_length"
     else:
         if not in_user_band:
@@ -660,7 +610,7 @@ def _build_parser() -> StructuredArgumentParser:
                                    help="用白话输出结论（给作者和主会话看），不输出 JSON；退出码不变")
         if command == "accept-current-length":
             subparser.add_argument("--force", action="store_true",
-                                   help="作者明确拍板：越过欠长一半下限与超长先压缩一次的要求")
+                                   help="作者明确拍板：越过欠长一半下限")
     return parser
 
 

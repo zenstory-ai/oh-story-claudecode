@@ -621,8 +621,7 @@ REQUIRED_MANIFEST_KEYS = {
     "primary_benchmark_artifacts",
     "required_outline_sections",
 }
-OPTIONAL_MANIFEST_KEYS = {"template_fences"}
-ALLOWED_MANIFEST_KEYS = REQUIRED_MANIFEST_KEYS | OPTIONAL_MANIFEST_KEYS
+ALLOWED_MANIFEST_KEYS = REQUIRED_MANIFEST_KEYS
 SEMVER_RE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
 ARTIFACT_PATH_RE = re.compile(r"(?:[^/\s]+/)+[^/\s]+\.md")
 SCHEMA_VERSION_PIN_RE = re.compile(r"schema_version:\s*([0-9]+)")
@@ -647,7 +646,6 @@ class ContractManifest:
     progress_schema_version: int
     primary_benchmark_artifacts: Tuple[str, ...]
     required_outline_sections: Tuple[Tuple[str, str], ...]
-    template_fences: Tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -788,22 +786,6 @@ def load_manifest(path: Path) -> Tuple[Optional[ContractManifest], List[Finding]
             )
         )
 
-    fences = raw.get("template_fences")
-    if fences is not None:
-        if not isinstance(fences, list) or not fences or any(
-            not isinstance(item, str) or not item.strip() or any(ch.isspace() for ch in item)
-            for item in fences
-        ):
-            findings.append(
-                Finding(
-                    "manifest-template-fences",
-                    "template_fences must be a non-empty array of tag names without whitespace",
-                    path,
-                )
-            )
-        elif len(set(fences)) != len(fences):
-            findings.append(Finding("manifest-template-fences", "template_fences must be unique", path))
-
     if findings:
         return None, findings
 
@@ -817,7 +799,6 @@ def load_manifest(path: Path) -> Tuple[Optional[ContractManifest], List[Finding]
         progress_schema_version=raw["progress_schema_version"],
         primary_benchmark_artifacts=tuple(artifacts),
         required_outline_sections=tuple((item["rule"], item["demo"]) for item in sections),
-        template_fences=tuple(fences) if isinstance(fences, list) else (),
     )
     return manifest, []
 
