@@ -7,7 +7,7 @@ Stage 5 时刻读本文件与 [synthesis-inputs.md](synthesis-inputs.md)。`拆�
 生成新的 `拆文报告.md` 前先执行：
 
 ```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" mark-stage --root "{拆文目录}" --stage stage5 --prepare
+node "{story-long-analyze skill 根}/scripts/manage_analysis_run.js" mark-stage --root "{拆文目录}" --stage stage5 --prepare
 ```
 
 若有旧报告，命令会完整复制到 `_analysis_cache/legacy/拆文报告.md`；已存在的首份备份不覆盖。旧报告与首份备份内容不同时，另存一份带内容 hash 的历史备份。其他旧产物与已有摘要不得覆盖。新报告和完整概要落盘后再用不带 `--prepare` 的 `mark-stage` 标记完成。

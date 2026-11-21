@@ -5,17 +5,161 @@ from __future__ import annotations
 
 import csv
 import io
-import runpy
+import json
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-MODULE = runpy.run_path(
-    str(ROOT / "skills" / "story-long-analyze" / "scripts" / "inspiration_index.py"),
-    run_name="test",
+SCRIPT = ROOT / "skills" / "story-long-analyze" / "scripts" / "inspiration_index.js"
+NODE = shutil.which("node")
+COLUMNS = (
+    "item_id",
+    "layer",
+    "title",
+    "source_book",
+    "path",
+    "source_ids",
+    "novel_count",
+    "atom_count",
+    "grade",
+    "tags",
+    "status",
 )
+
+
+def _run_cli(*args: object) -> tuple[int, dict]:
+    if not NODE:
+        raise AssertionError("node binary required to test inspiration_index.js")
+    proc = subprocess.run(
+        [NODE, str(SCRIPT), *map(str, args)],
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        check=False,
+    )
+    if not proc.stdout.strip():
+        raise AssertionError(f"empty stdout from inspiration_index.js (rc={proc.returncode}): {proc.stderr}")
+    return proc.returncode, json.loads(proc.stdout)
+
+
+def _run_node_helper(code: str, stdin_text: str = "") -> object:
+    if not NODE:
+        raise AssertionError("node binary required to test inspiration_index.js")
+    proc = subprocess.run(
+        [NODE, "-e", code, str(SCRIPT)],
+        input=stdin_text,
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise AssertionError(f"node helper failed (rc={proc.returncode}): {proc.stderr}")
+    return json.loads(proc.stdout)
+
+
+def _csv_text(rows: list[dict[str, str]]) -> str:
+    buffer = io.StringIO(newline="")
+    writer = csv.DictWriter(buffer, fieldnames=COLUMNS, lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+    return "\ufeff" + buffer.getvalue()
+
+
+def _register_atoms(root: Path, module_path: Path, book: str, workspace: Path | None = None) -> dict:
+    args: list[object] = ["register-atoms", "--root", root, "--module", module_path, "--book", book]
+    if workspace is not None:
+        args.extend(["--workspace", workspace])
+    rc, payload = _run_cli(*args)
+    if rc != 0:
+        raise ValueError("\n".join(payload.get("errors") or [payload.get("error", "")]))
+    return payload
+
+
+def _check_atoms(root: Path, module_path: Path, book: str, workspace: Path | None = None) -> dict:
+    args: list[object] = ["check-atoms", "--root", root, "--module", module_path, "--book", book]
+    if workspace is not None:
+        args.extend(["--workspace", workspace])
+    rc, payload = _run_cli(*args)
+    expected_rc = 0 if payload.get("ok") else 1
+    if rc != expected_rc:
+        raise AssertionError(f"check-atoms rc mismatch: got {rc}, expected {expected_rc}, payload={payload}")
+    return payload
+
+
+def _validate(root: Path, workspace: Path | None = None) -> list[str]:
+    args: list[object] = ["validate", "--root", root]
+    if workspace is not None:
+        args.extend(["--workspace", workspace])
+    rc, payload = _run_cli(*args)
+    expected_rc = 0 if payload.get("ok") else 1
+    if rc != expected_rc:
+        raise AssertionError(f"validate rc mismatch: got {rc}, expected {expected_rc}, payload={payload}")
+    return list(payload.get("errors") or [])
+
+
+def _coverage(root: Path) -> dict:
+    rc, payload = _run_cli("coverage", "--root", root)
+    if rc != 0:
+        raise ValueError(payload.get("error", ""))
+    return payload
+
+
+def _query(root: Path, tags: list[str], limit: int) -> dict:
+    args: list[object] = ["query", "--root", root, "--limit", limit]
+    for tag in tags:
+        args.extend(["--tag", tag])
+    rc, payload = _run_cli(*args)
+    if rc != 0:
+        raise ValueError(payload.get("error", ""))
+    return payload
+
+
+def _resolve(root: Path, refs: list[str]) -> dict:
+    args: list[object] = ["resolve", "--root", root]
+    for ref in refs:
+        args.extend(["--ref", ref])
+    rc, payload = _run_cli(*args)
+    expected_rc = 0 if payload.get("ok") else 1
+    if rc != expected_rc:
+        raise AssertionError(f"resolve rc mismatch: got {rc}, expected {expected_rc}, payload={payload}")
+    return payload
+
+
+def _load_vocabulary(root: Path) -> dict[str, list[str]] | None:
+    return _run_node_helper(
+        "const m = require(process.argv[1]); const fs = require('fs'); "
+        "const root = fs.readFileSync(0, 'utf8'); "
+        "process.stdout.write(JSON.stringify(m.load_vocabulary(root)));",
+        str(root),
+    )
+
+
+def _parse_em_module(text: str) -> tuple[list[dict[str, str]], list[list[str]], list[str]]:
+    res = _run_node_helper(
+        "const m = require(process.argv[1]); const fs = require('fs'); "
+        "const text = fs.readFileSync(0, 'utf8'); "
+        "process.stdout.write(JSON.stringify(m.parse_em_module(text)));",
+        text,
+    )
+    return res[0], res[1], res[2]
+
+
+MODULE = {
+    "COLUMNS": COLUMNS,
+    "csv_text": _csv_text,
+    "register_atoms": _register_atoms,
+    "check_atoms": _check_atoms,
+    "validate": _validate,
+    "coverage": _coverage,
+    "query": _query,
+    "resolve": _resolve,
+    "load_vocabulary": _load_vocabulary,
+    "parse_em_module": _parse_em_module,
+}
 
 EM_MODULE_TEXT = """# 情绪模块：测试书
 
