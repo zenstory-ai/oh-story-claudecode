@@ -42,12 +42,12 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 本地正文先运行确定性预检，只报告不改写。下列命令均从本 skill 根执行，正文参数使用绝对路径：
 
 ```bash
-node scripts/check-ai-patterns.js --check --fail-on=blocking <正文文件...>
+node scripts/check-ai-patterns.js --check --fail-on=review_required <正文文件...>
 ```
 
-脚本命中是定位线索，零命中不代替三层扫描。每类提示归哪层、判断什么，见 expression.md 末节的索引；blocking 要改到净或按白名单保留（见 Phase 4），advisory 回到语境判断，不为归零机械改稿。完整词条仅在需要定位某种表达时查 [references/banned-words.md](references/banned-words.md)。
+脚本命中是定位线索，零命中不代替三层扫描。每类提示归哪层、判断什么，见 expression.md 末节的索引；风格规则高风险命中标为 `review_required`（重点复核：优先改写，确为剧情需要可说明理由保留或登记白名单），`advisory` 回到语境判断，不为归零机械改稿。完整词条仅在需要定位某种表达时查 [references/banned-words.md](references/banned-words.md)。
 
-文件前 6 行内、章节标题下有 `<!-- 去味:跳过 -->` 而作者这次要求去味时，照常处理：blocking 清零后删掉这一行；仍有剩余阻塞时保留，并在报告里告诉作者这章仍按跳过处理。
+文件前 6 行内、章节标题下有 `<!-- 去味:跳过 -->` 而作者这次要求去味时，照常处理：`review_required` 清零后删掉这一行；仍有剩余项时保留，并在报告里告诉作者这章仍按跳过处理。
 
 ### Phase 2：定位问题与确定改法
 
@@ -92,15 +92,15 @@ node scripts/check-ai-patterns.js --check --fail-on=blocking <正文文件...>
 文件改稿保存后先复扫：
 
 ```bash
-node scripts/check-ai-patterns.js --check --fail-on=blocking <正文文件...>
+node scripts/check-ai-patterns.js --check --fail-on=review_required <正文文件...>
 node scripts/check-degeneration.js --check --fail-on=blocking <正文文件...>
 ```
 
-- 两个脚本只报告；退出 1 表示有 blocking，退出 2 是命令或文件错误。
-- 句式 blocking：保留叙事功能自然改写；作者明确选择的原句按文风裁决文件登记白名单；两样都做不到就列为剩余阻塞。破折号按功能改写，不留给标点脚本机械替换。advisory 按文风和语境判断，功能性写法可以保留并说明。
-- 退化 blocking（逐字复读、打转、截断、占位符或工程词泄漏）重新生成受损段，再核对已有事实；advisory 只作提示。
+- 两个脚本只报告；退出 1 表示有 `review_required`（句式）或 `blocking`（退化），退出 2 是命令或文件错误。
+- 句式 `review_required`：保留叙事功能自然改写；确认剧情需要或作者明确选择的原句可说明理由保留（长篇提交时传 `--ack <rule-id>:<理由>`）或登记白名单，不强迫改坏正文。破折号按功能改写，不留给标点脚本机械替换。advisory 按文风和语境判断，功能性写法可以保留并说明。
+- 退化 `blocking`（逐字复读、打转、截断、占位符或工程词泄漏）必须重新生成受损段，再核对已有事实；advisory 只作提示。
 
-语义改完、复扫没有 blocking 后再整理标点。整份文件的完整去味默认整理；只改指定段落或问题时不跑，在范围内人工整理，范围外问题只作提示：
+语义改完、复扫无硬阻断后再整理标点。整份文件的完整去味默认整理；只改指定段落或问题时不跑，在范围内人工整理，范围外问题只作提示：
 
 ```bash
 node scripts/normalize-punctuation.js <正文文件...>

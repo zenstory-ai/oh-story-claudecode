@@ -153,8 +153,12 @@ describe("check-ai-patterns.js", () => {
     const f7 = writeFixture("fixture-blocking.md", ["她停住——没说话。"]);
     const r7Json = runDetector(["--json", f7]);
     const r7Blk = runDetector(["--fail-on=blocking", f7]);
-    assert.equal(r7Json.json().findings.find((f) => f.type === "em-dash")?.severity, "blocking");
-    assert.equal(r7Blk.status, 1);
+    const r7Rev = runDetector(["--fail-on=review_required", f7]);
+    assert.equal(r7Json.json().findings.find((f) => f.type === "em-dash")?.severity, "review_required");
+    assert.equal(r7Json.json().review_required, 1);
+    assert.equal(r7Json.json().blocking, 0);
+    assert.equal(r7Blk.status, 0);
+    assert.equal(r7Rev.status, 1);
 
     const f7q = writeFixture("fixture-quoted-em-dash.md", [
       "“钥匙在——”他没说完。",
@@ -162,7 +166,7 @@ describe("check-ai-patterns.js", () => {
       "【警告——权限不足】",
       "“话还没说完——",
     ]);
-    const r7q = runDetector(["--json", "--fail-on=blocking", f7q]);
+    const r7q = runDetector(["--json", "--fail-on=review_required", f7q]);
     assert.equal(r7q.status, 0);
     assert.equal(r7q.json().findings.filter((f) => f.type === "em-dash").length, 0);
   });
@@ -182,6 +186,7 @@ describe("check-ai-patterns.js", () => {
     assert.equal(ni8[0].severity, "advisory");
     assert.equal(ni8[0].review, "semantic");
     assert.equal(runDetector(["--fail-on=blocking", f8]).status, 0);
+    assert.equal(runDetector(["--fail-on=review_required", f8]).status, 0);
 
     const f8b = writeFixture("fixture-notis-blocking.md", [
       "不是退让，而是试探。",
@@ -193,8 +198,10 @@ describe("check-ai-patterns.js", () => {
       .json()
       .findings.filter((f) => f.type === "not-is-comparison" || f.type === "reverse-not-is");
     assert.equal(hits8b.length, 3);
-    assert.ok(hits8b.every((f) => f.severity === "blocking" && f.review === "mechanical"));
-    assert.equal(runDetector(["--fail-on=blocking", f8b]).status, 1);
+    assert.ok(hits8b.every((f) => f.severity === "review_required" && f.review === "mechanical"));
+    assert.equal(r8b.json().review_required, 3);
+    assert.equal(runDetector(["--fail-on=blocking", f8b]).status, 0);
+    assert.equal(runDetector(["--fail-on=review_required", f8b]).status, 1);
 
     const f9 = writeFixture("fixture-dialogue-notis.md", [
       "“你们看见了啊，不是我要闹，是物业非法限制人身自由。”",
@@ -695,13 +702,14 @@ describe("check-ai-patterns.js", () => {
     assert.equal(vc1[0].severity, "advisory");
     assert.equal(vc1[0].review, "semantic");
     assert.ok(!vc1[0].excerpt.includes("火气"));
-    assert.equal(runDetector(["--fail-on=blocking", fVoice]).status, 0);
+    assert.equal(runDetector(["--fail-on=review_required", fVoice]).status, 0);
 
     fs.appendFileSync(fVoice, "他声音不大，却让整条走廊安静下来。\n", "utf8");
     const vc2 = runDetector(["--json", fVoice]).json().findings.filter((x) => x.type === "voice-contrast");
     assert.equal(vc2.length, 2);
-    assert.ok(vc2.every((f) => f.severity === "blocking" && f.review === "mechanical"));
-    assert.equal(runDetector(["--fail-on=blocking", fVoice]).status, 1);
+    assert.ok(vc2.every((f) => f.severity === "review_required" && f.review === "mechanical"));
+    assert.equal(runDetector(["--fail-on=blocking", fVoice]).status, 0);
+    assert.equal(runDetector(["--fail-on=review_required", fVoice]).status, 1);
 
     const fParade = writeFixture("fixture-negation-parade.md", [
       "没有伴奏，没有和声，没有提词器。",
@@ -715,7 +723,7 @@ describe("check-ai-patterns.js", () => {
     ]);
     const np = runDetector(["--json", fParade]).json().findings.filter((x) => x.type === "negation-parade");
     assert.deepEqual(np.map((f) => f.line), [1, 2, 8]);
-    assert.ok(np.every((f) => f.severity === "blocking"));
+    assert.ok(np.every((f) => f.severity === "review_required"));
 
     const fCh21 = writeFixture("fixture-ch21-ai-flavor-gap.md", [
       "至于拍不拍，怎么拍，等他把话说完再决定。",
@@ -771,14 +779,15 @@ describe("check-ai-patterns.js", () => {
     ]);
     const te = runDetector(["--json", fTrailer]).json().findings.filter((x) => x.type === "trailer-ending");
     assert.equal(te.length, 3);
-    assert.ok(te.every((f) => f.severity === "blocking"));
+    assert.ok(te.every((f) => f.severity === "review_required"));
     assert.ok(!te.some((f) => f.line === 1));
     assert.ok(!te.some((f) => f.excerpt.includes("下一场") || f.excerpt.includes("拉开序幕")));
     const teExcerpts = te.map((f) => f.excerpt).join(" | ");
     for (const marker of ["没人知道", "这才刚刚开头", "压了过去"]) {
       assert.ok(teExcerpts.includes(marker), teExcerpts);
     }
-    assert.equal(runDetector(["--fail-on=blocking", fTrailer]).status, 1);
+    assert.equal(runDetector(["--fail-on=blocking", fTrailer]).status, 0);
+    assert.equal(runDetector(["--fail-on=review_required", fTrailer]).status, 1);
 
     const fUnaware = writeFixture("fixture-trailer-unaware.md", [
       "她不知道该说什么，只好低头收拾行李。",
@@ -827,8 +836,9 @@ describe("check-ai-patterns.js", () => {
     ]);
     const ts = runDetector(["--json", fTs]).json().findings.filter((x) => x.type === "trailer-summary");
     assert.equal(ts.length, 2);
-    assert.ok(ts.every((f) => f.severity === "blocking"));
-    assert.equal(runDetector(["--fail-on=blocking", fTs]).status, 1);
+    assert.ok(ts.every((f) => f.severity === "review_required"));
+    assert.equal(runDetector(["--fail-on=blocking", fTs]).status, 0);
+    assert.equal(runDetector(["--fail-on=review_required", fTs]).status, 1);
 
     const fTsNorm = writeFixture("fixture-trailer-summary-normal.md", [
       "就这样，一年的时间过去了，账本从抽屉挪进了保险柜。",
@@ -863,7 +873,7 @@ describe("check-ai-patterns.js", () => {
       "-->",
       "他回头看了一眼——门已经关了。",
     ]);
-    const rHtml = runDetector(["--json", "--fail-on=blocking", fHtml]);
+    const rHtml = runDetector(["--json", "--fail-on=review_required", fHtml]);
     assert.equal(rHtml.status, 1);
     const findings = rHtml.json().findings;
     assert.equal(
@@ -874,6 +884,7 @@ describe("check-ai-patterns.js", () => {
     assert.equal(dashes.length, 1);
     assert.equal(dashes[0].line, 9);
     assert.equal(dashes[0].column, 8);
+    assert.equal(dashes[0].severity, "review_required");
 
     const fMarker = writeFixture("fixture-marker-only.md", [
       "# 第3章 夜路",
@@ -882,7 +893,7 @@ describe("check-ai-patterns.js", () => {
       "他推门出去，雨还在下。",
       "她把伞递给他，他没接。",
     ]);
-    assert.equal(runDetector(["--json", "--fail-on=blocking", fMarker]).status, 0);
+    assert.equal(runDetector(["--json", "--fail-on=review_required", fMarker]).status, 0);
 
     const fUnclosed = writeFixture("fixture-unclosed-comment.md", [
       "# 第1章",
@@ -892,7 +903,7 @@ describe("check-ai-patterns.js", () => {
       "她声音不高，却把话钉死了。",
       "他把门带上。",
     ]);
-    const rU = runDetector(["--json", "--fail-on=blocking", fUnclosed]);
+    const rU = runDetector(["--json", "--fail-on=review_required", fUnclosed]);
     assert.equal(rU.status, 1);
     const types = rU.json().findings.map((f) => `${f.line}:${f.type}`);
     for (const want of ["3:not-is-comparison", "4:voice-contrast", "5:voice-contrast"]) {
@@ -953,7 +964,7 @@ describe("check-ai-patterns.js", () => {
         assert.ok(key in f, `missing ${key}`);
       }
       assert.ok(f.review === "semantic" || f.review === "mechanical");
-      if (f.severity === "blocking") assert.equal(f.review, "mechanical");
+      if (f.severity === "blocking" || f.severity === "review_required") assert.equal(f.review, "mechanical");
     }
   });
 
@@ -1040,9 +1051,10 @@ describe("check-ai-patterns.js", () => {
       "fixture-large-pipe.md",
       Array.from({ length: 650 }, (_, i) => `第${i}段：他回头看了一眼——门已经关了。`).join("\n\n") + "\n"
     );
-    const rLarge = runDetector(["--json", "--fail-on=blocking", fLarge]);
+    const rLarge = runDetector(["--json", "--fail-on=review_required", fLarge]);
     assert.equal(rLarge.status, 1);
     assert.ok(rLarge.json().findings.length >= 650, `large pipe JSON truncated: ${rLarge.json().findings.length}`);
+    assert.ok(rLarge.json().review_required >= 650);
 
     const fUnclosedDash = writeFixture("fixture-unclosed-dash.md", [
       "他猛地抬头：“你敢——",
@@ -1072,13 +1084,14 @@ describe("check-ai-patterns.js", () => {
     const fShortSparse = writeFixture("fixture-short-sparse.md", `${pad}\n\n${threeHits}\n`);
     const fShortDense = writeFixture("fixture-short-dense.md", `${pad}\n\n${sixHits}\n`);
 
-    const rSparse = runDetector(["--json", "--fail-on=blocking", fShortSparse]);
+    const rSparse = runDetector(["--json", "--fail-on=review_required", fShortSparse]);
     assert.equal(rSparse.status, 0);
     const sparseHits = rSparse.json().findings.filter((x) => x.type === "not-is-comparison");
     assert.equal(sparseHits.length, 3);
     assert.ok(sparseHits.every((f) => f.severity === "advisory"));
 
-    const rDense = runDetector(["--json", "--fail-on=blocking", fShortDense]);
+    const rDense = runDetector(["--json", "--fail-on=review_required", fShortDense]);
     assert.equal(rDense.status, 1);
+    assert.equal(runDetector(["--json", "--fail-on=blocking", fShortDense]).status, 0);
   });
 });

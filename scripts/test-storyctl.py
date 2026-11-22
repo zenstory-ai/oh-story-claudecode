@@ -48,7 +48,14 @@ def _node_call(module_path: Path, fn_name: str, args: list[object]) -> object:
 
 class _StoryctlProxy:
     WordcountError = WordcountError
-    CHECK_EXIT_CODES = {"ready": 0, "needs_decision": 0, "blocked": 1, "invalid": 1, "tool_unavailable": 3}
+    CHECK_EXIT_CODES = {
+        "ready": 0,
+        "review_required": 0,
+        "needs_decision": 0,
+        "blocked": 1,
+        "invalid": 1,
+        "tool_unavailable": 3,
+    }
 
     def count_visible_chars(self, text: str) -> int:
         return int(_node_call(WORDCOUNT_PATH, "countVisibleChars", [text]))
@@ -433,11 +440,15 @@ class StoryctlCliTests(unittest.TestCase):
             prose = "他站在门口。声音不大，却让屋里的人都停了手。她声音不高，却把账念得清清楚楚。\n"
             body.write_text("## 第1章 测试\n" + prose, encoding="utf-8")
             plain = storyctl.check_blocking_quality(outline, body)
-            self.assertEqual(plain["status"], "fail", plain)
-            # 作者说本章不去味：标题行下的豁免标记让 AI 句式降为提示，章节可以提交。
+            self.assertEqual(plain["status"], "review_required", plain)
+            self.assertEqual(plain["blocking_findings"], [], plain)
+            self.assertEqual(len(plain["review_required_items"]), 2, plain)
+            self.assertEqual(storyctl._check_status({"status": "internal_pass"}, plain), "review_required")
+            # 作者说本章不去味：标题行下的豁免标记让 AI 句式降为提示，章节无需 --ack 即可提交。
             body.write_text("## 第1章 测试\n<!-- 去味:跳过 -->\n" + prose, encoding="utf-8")
             skipped = storyctl.check_blocking_quality(outline, body)
             self.assertEqual(skipped["status"], "pass", skipped)
+            self.assertEqual(skipped["review_required_items"], [], skipped)
             self.assertTrue(any(item.get("exempted") for item in skipped["advisories"]), skipped)
             # 标记语法与 hooks（JS core / codex py / bash guard）同一套：注释内 ASCII 空格/Tab 可有可无，
             # 冒号全角半角都认；裸写（不在注释里）或用全角空格隔开的都不算豁免。
@@ -448,19 +459,30 @@ class StoryctlCliTests(unittest.TestCase):
             ):
                 body.write_text("## 第1章 测试\n" + marker + "\n" + prose, encoding="utf-8")
                 self.assertEqual(storyctl.deslop_skipped(body), exempt, marker)
-            # 豁免只管 AI 句式：退化类（拒绝语/元信息泄漏）带着标记照样拦。
+            # 豁免只管 AI 句式：退化类（拒绝语/元信息泄漏）带着标记照样硬拦。
             leak = "作为AI，我无法继续创作这部分内容。\n"
             body.write_text("## 第1章 测试\n<!-- 去味:跳过 -->\n" + prose + leak, encoding="utf-8")
             degenerate = storyctl.check_blocking_quality(outline, body)
             self.assertEqual(degenerate["status"], "fail", degenerate)
             self.assertEqual({row["source"] for row in degenerate["blocking_findings"]}, {"degeneration"}, degenerate)
+            # 未闭合 HTML 注释仍属确定性硬阻断。
+            body.write_text("## 第1章 测试\n<!-- 忘了闭合\n他推门进去。\n", encoding="utf-8")
+            unclosed = storyctl.check_blocking_quality(outline, body)
+            self.assertEqual(unclosed["status"], "fail", unclosed)
+            self.assertEqual(unclosed["blocking_findings"][0]["type"], "PUNCTUATION_NOT_NORMALIZED", unclosed)
+            # 仅旁白破折号不走标点硬拦，而归入 review_required 走 Review-and-Ack。
+            body.write_text("## 第1章 测试\n他回头——门已经关了。\n", encoding="utf-8")
+            em_dash_only = storyctl.check_blocking_quality(outline, body)
+            self.assertEqual(em_dash_only["status"], "review_required", em_dash_only)
+            self.assertEqual(em_dash_only["blocking_findings"], [], em_dash_only)
+            self.assertEqual([r["rule_id"] for r in em_dash_only["review_required_items"]], ["em-dash"])
             # 标记只在首 6 行内生效（与 hooks 同窗口）：落在第 7 行的不豁免。
             filler = "".join(f"第{index}句。\n" for index in range(1, 6))
             body.write_text("## 第1章 测试\n" + filler + "<!-- 去味:跳过 -->\n" + prose, encoding="utf-8")
             late = storyctl.check_blocking_quality(outline, body)
             self.assertFalse(storyctl.deslop_skipped(body))
-            self.assertEqual(late["status"], "fail", late)
-            self.assertTrue(any(row["source"] == "ai-pattern" for row in late["blocking_findings"]), late)
+            self.assertEqual(late["status"], "review_required", late)
+            self.assertTrue(any(row["source"] == "ai-pattern" for row in late["review_required_items"]), late)
 
     def test_wordcount_measure_returns_actual_without_a_target(self) -> None:
         with tempfile.TemporaryDirectory(prefix="storyctl-measure-") as directory:
