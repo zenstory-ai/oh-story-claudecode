@@ -554,6 +554,26 @@ test("detectStoryGaps foreshadowing, gaps, incomplete analyses, and protocol/sto
     assert.match(out, /正文 11 章，但设定文件只有 0 个/)
     assert.match(out, /拆文未完成：拆文库\/pending\/_progress\.md/)
     assert.ok(!out.includes("拆文库/done/_progress.md"))
+
+    // safeRelative canonicalizes alias roots (symlink on POSIX / 8.3 short path on Windows)
+    if (process.platform !== "win32") {
+      const realRoot = path.join(root, "real-alias-root")
+      const linkRoot = path.join(root, "link-alias-root")
+      write(path.join(realRoot, "book/大纲/细纲_第1章.md"), "# 细纲\n")
+      fs.symlinkSync(realRoot, linkRoot)
+      assert.equal(
+        core.safeRelative(realRoot, path.join(linkRoot, "book/大纲/细纲_第1章.md")),
+        "book/大纲/细纲_第1章.md"
+      )
+      assert.equal(
+        core.safeRelative(realRoot, path.join(linkRoot, "book/大纲/细纲_第999章.md")),
+        "book/大纲/细纲_第999章.md"
+      )
+      assert.equal(
+        core.safeRelative(realRoot, path.join(realRoot, "..draft/第1章.md")),
+        "..draft/第1章.md"
+      )
+    }
   } finally {
     fs.rmSync(root, { recursive: true, force: true })
   }

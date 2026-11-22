@@ -4,10 +4,32 @@ const fs = require("node:fs")
 const path = require("node:path")
 const { spawnSync } = require("node:child_process")
 
+function realpathNative(value) {
+  return typeof fs.realpathSync.native === "function"
+    ? fs.realpathSync.native(value)
+    : fs.realpathSync(value)
+}
+
+function canonicalPath(value) {
+  let cur = path.resolve(value)
+  const tail = []
+  while (true) {
+    try {
+      const real = realpathNative(cur)
+      return tail.length ? path.join(real, ...tail.reverse()) : real
+    } catch {
+      const parent = path.dirname(cur)
+      if (parent === cur) return path.resolve(value)
+      tail.push(path.basename(cur))
+      cur = parent
+    }
+  }
+}
+
 function existingDir(value) {
   if (typeof value !== "string" || !value.trim()) return null
   try {
-    const resolved = fs.realpathSync(path.resolve(value))
+    const resolved = realpathNative(path.resolve(value))
     return fs.statSync(resolved).isDirectory() ? resolved : null
   } catch {
     return null
@@ -16,8 +38,13 @@ function existingDir(value) {
 
 function safeRelative(root, target) {
   try {
+    const isInsideRel = (rel) =>
+      Boolean(rel) && rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel)
     const rel = path.relative(path.resolve(root), path.resolve(target))
-    return rel && !rel.startsWith("..") ? rel.split(path.sep).join("/") : String(target)
+    if (isInsideRel(rel)) return rel.split(path.sep).join("/")
+    const canonRel = path.relative(canonicalPath(root), canonicalPath(target))
+    if (isInsideRel(canonRel)) return canonRel.split(path.sep).join("/")
+    return String(target)
   } catch {
     return String(target)
   }
