@@ -12,9 +12,30 @@ compare 链接；小节名使用 Keep a Changelog 的六个英文类别（`Added
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-22
+
+> 本版 `agents_version: 45`、`setup_skill_version: 1.3.13`。更新技能包后，在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`），再新开会话，让零依赖 Node.js 运行时、五端统一写后钩子与分层写作门禁生效。书稿、设定和追踪不用迁移。
+
+核心运行时全部收口为零依赖 Node.js 18+ 并统一五端共享 Hook 引擎；将写作门禁分层重构为「确定性硬底线 + 有摩擦软门禁」，保留硬故障拦截并把风格复核与协作约束转为可确认放行的软提醒；同时将长篇角色快照容量提升至 64 KiB、退役断链三层灵感库，修复本地工作台边界与多端运行时缺陷，并全仓同步文档与参考资料。
+
+### Added
+
+- **去味检查新增全知预告式章尾检测。** `check-ai-patterns.js` 补入「她并不知道 / 他还不知道」类全知上帝视角剧透结尾识别，并在去味、审稿与长短篇写作技能副本同步生效。
+
 ### Changed
 
-- **提升长篇角色快照容量，并补齐逐章草稿的按需角色快照文件。** `tracking_commit.py` 将核心角色快照单文件目标提醒从 4096 字节调至 16384 字节（仅提醒、不阻断提交），硬上限从 8192 字节提高到 65536 字节（64 KiB，约 2.15 万字），四个列表单项上限调至 600 字节（约 200 字），同时保留 `上下文.md` 的 12288 字节独立热预算与存量项目追踪格式不变；`draft` 将全部核心角色（含不在上一章活跃列表内的久别回归角色）当前快照写入 `.story/work/第NNN章/snapshots/{角色名}.json` 并控制标准输出内联体积，补齐 `init` 多字段超长一次性字数汇总提示与既有角色列表误清空提醒，`story-long-write`、`story-import`、`story-review` 同步生效。（#548）
+- **全部核心运行时收口为零依赖 Node.js 18+，五端共享统一 Hook 引擎。** 长短篇写作、拆文、导入、审稿、发布准备与项目部署的核心脚本全部迁至零依赖 Node.js 18+；Claude Code、Codex、OpenCode、Antigravity、ZCode 五个支持 Hook 的宿主共用 `story_hook_core.js`（Claude Code `.claude/hooks/` 收敛为 `run-story-hook.sh` + `story_hook_cli.js` + `story_hook_core.js`，重跑 `/story-setup` 自动清理旧版 `.sh` 残留；Codex 切换至 `story_codex_hook.js`；OpenCode `pre-commit` 复用共享核）；Python 3 改为可选（仅长篇拆文可选关系图 PNG 渲染 `render_relation_chart.py` 需要），缺 Node.js 18+ 时会在会话起点发出提示。（#559）
+- **分层重构写作门禁为「确定性硬底线 + 有摩擦软门禁」。** 写正文前仅在缺细纲或空壳细纲、缺小节大纲、`_tracking-state.json` 缺失或损坏等硬故障时拦截，上一章未提交、上章句式提醒等改为写前软提示；去 AI 味风格规则降为 `review_required` 复核态（可改写或附理由 `--ack` 放行），仅退化、截断与机械标点保持硬阻断；追踪状态卡（12 KiB）与逐章记录（3072B）改为软提醒并统一 64 KiB 硬上限，手改追踪文件默认报 `drift_warnings` 而不阻断（加 `--strict` 才拒），并支持 `--allow-gap` 跳章提交；细纲、短篇构思与交付校验改为 `hard_failures` / `soft_warnings` 双轨输出（`--strict` 将软警告升为失败）。（#563）
+- **提升长篇角色快照容量，并补齐逐章草稿的按需角色快照文件。** `tracking_commit.js` 将核心角色快照单文件目标提醒从 4096 字节调至 16384 字节（仅提醒、不阻断提交），硬上限从 8192 字节提高到 65536 字节（64 KiB，约 2.15 万字），四个列表单项上限调至 600 字节（约 200 字），同时保留 `上下文.md` 的 12288 字节独立热预算与存量项目追踪格式不变；`draft` 将全部核心角色（含不在上一章活跃列表内的久别回归角色）当前快照写入 `.story/work/第NNN章/snapshots/{角色名}.json` 并控制标准输出内联体积，补齐 `init` 多字段超长一次性字数汇总提示与既有角色列表误清空提醒，`story-long-write`、`story-import`、`story-review` 同步生效。（#548, #549）
+- **统一五端版本过期提醒，全仓同步文档并精简 CI 守卫。** 五端共享 Hook 补齐 `agents_version` 过期检测与六条毒句规则一致性；同步 README、七端部署文档、各技能参考资料与示例至硬底线/软门禁与统一 Node.js 运行时口径，精简非核心说明与翻译腔，补齐 Claude 插件清单双语描述；仓库静态守卫收拢至 `lint-repo.py`，去重跨平台 CI 触发并同步发版策略任务名。（#553, #554, #555, #558, #560, #561, #564）
+
+### Removed
+
+- **退役断链的三层灵感库与已弃用的 Python 运行时脚本。** 移除不再使用的 `灵感库/` 三层路径引用、冗余契约字段及已被 Node.js 运行时替代的旧脚本，统一作者汇报白话口径。（#559, #561）
+
+### Fixed
+
+- **修复本地工作台隐藏目录边界、五端 Hook 书目发现及运行时并发缺陷。** 封堵本地 Dashboard 隐藏目录访问绕过并收紧工作区边界校验；五端 Hook 书目发现跳过 `拆文库/` 与 `对标/` 目录避免误识别；修复长篇出卷纲时回填 `题材定位.md` 题材框架并清理模板标题括注、Windows 8.3 短路径规范化及多处运行时脚本并发与守卫边界问题。（#557, #559, #562）
 
 ## [0.10.5] - 2026-11-13
 
@@ -1452,7 +1473,8 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 - 初始版本：长篇/短篇写作、拆文、扫榜、去 AI 味、浏览器操控
 - 用 52000+ 本真实数据增强知识库
 
-[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.5...HEAD
+[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.5...v0.11.0
 [0.10.5]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.4...v0.10.5
 [0.10.4]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.3...v0.10.4
 [0.10.3]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.2...v0.10.3

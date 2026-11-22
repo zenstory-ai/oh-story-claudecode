@@ -2,9 +2,9 @@
 
 ## 当前版本
 
-助手版本 45（待发布版本 / Unreleased）。已有项目更新技能包后，在项目根重跑 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或直接点名），再新开会话。
+助手版本 45（v0.11.0）。已有项目更新技能包后，在项目根重跑 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或直接点名），再新开会话。
 
-- `setup_skill_version: 1.3.12`
+- `setup_skill_version: 1.3.13`
 - `agents_version: 45`
 
 `.story-deployed` 字段不全，或 `agents_version` 不是整数、低于 45，都算待更新，重跑 story-setup 即可。项目里的 `agents_version` 大于 45，说明本机技能包比项目旧：先更新 oh-story-claudecode，不要用旧包覆盖。各版本改了什么见仓库根目录 `CHANGELOG.md`。
@@ -17,7 +17,7 @@
 4. 正在写的长篇：确认每本书有 `追踪/_tracking-state.json`。没有就按下方「追踪模型迁移」重建，否则写下一章会被拦。
 5. 拆文成果或细纲不满足当前格式时，按检查提示定点补齐，不因单项缺口整本重拆。
 
-## 待发布版本（Unreleased，助手版本 45，更新后必须重跑 story-setup）
+## v0.11.0 的改动（助手版本 45，更新后必须重跑 story-setup）
 
 - **零依赖 Node.js 18+ 运行时与五端共享 Hook**：全部核心技能运行时脚本与五个支持 Hook 的宿主（Claude Code、Codex、OpenCode、Antigravity、ZCode）全部收口到 Node.js 18+；五端 Hook 共用 `story_hook_core.js`（Claude Code `.claude/hooks/` 收敛为 `run-story-hook.sh` + `story_hook_cli.js` + `story_hook_core.js`，重跑自动清理旧版 `.sh` 并刷新 `.claude/settings.local.json`；Codex 改用 `story_codex_hook.js`；OpenCode `pre-commit` 复用共享核）。Python 3 改为可选（仅长篇拆文可选关系图 PNG 渲染 `render_relation_chart.py` 需要）；缺 Node.js 18+ 时会在会话起点发出提示。
 - **门禁分层重构（确定性硬底线 + 软门禁）**：写正文前仅在缺细纲/空壳细纲、缺小节大纲、`_tracking-state.json` 缺失或损坏等硬故障时拦截，上一章未提交、上章句式提醒等改为写前软提示；去 AI 味句式规则降为 `review_required`（可改写或附理由 `--ack` 放行），仅退化/截断/机械标点硬阻断；追踪状态卡（12 KiB）与逐章记录（3072B）改为软提醒、统一 64 KiB 硬上限，手改追踪文件默认报 `drift_warnings` 而不阻断（`--strict` 才拒），并支持 `--allow-gap` 跳章提交；细纲、短篇构思与交付校验改为 `hard_failures`/`soft_warnings` 双轨（加 `--strict` 才把软警告升为失败）。
