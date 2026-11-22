@@ -109,6 +109,11 @@ describe("check-ai-patterns.js", () => {
       "他停住。",
       "心一沉。",
       "她借着月光看清了桌上那张纸的边角——那是一张旧纸。",
+      "门外突然响起急促的脚步声——越来越近。",
+      "手电筒的光晃过窗台——照亮半截锁链。",
+      "墙角那只旧箱子开了条缝——里面空无一物。",
+      "楼梯间传来重物落地的闷响——随即死寂。",
+      "他猛地回头看向门把手——锁芯被人动过。",
       longPara,
     ]);
     const r2 = runDetector(["--json", f2]);
@@ -118,6 +123,7 @@ describe("check-ai-patterns.js", () => {
     const counts = findings2.reduce((m, f) => ((m[f.type] = (m[f.type] || 0) + 1), m), {});
     assert.deepEqual(counts, { "period-stutter": 1, "em-dash": 1, "long-paragraph": 1 });
     assert.equal(findings2.find((f) => f.type === "period-stutter").line, 1);
+    assert.equal(findings2.find((f) => f.type === "em-dash").severity, "advisory");
 
     const f3 = writeFixture("fixture-mixed-quote.md", [
       "他站起。他看见“门”。风进来。他回头。灯灭了。心一沉。",
@@ -150,11 +156,29 @@ describe("check-ai-patterns.js", () => {
     assert.ok(r6All.json().findings.length > 0);
     assert.ok(r6All.json().findings.every((f) => f.severity === "advisory"));
 
-    const f7 = writeFixture("fixture-blocking.md", ["她停住——没说话。"]);
+    // Long-mode em-dash tiered density gate:
+    // <6 hits silent; 6-9 hits & >=1.5/k -> advisory; >=10 hits & >=2.5/k -> review_required.
+    const f7Few = writeFixture("fixture-emdash-few.md", ["她停住——没说话。", "系统提示——任务开启。"]);
+    assert.equal(runDetector(["--json", "--fail-on=all", f7Few]).status, 0);
+
+    const f7Adv = writeFixture(
+      "fixture-emdash-advisory.md",
+      Array.from({ length: 6 }, (_, i) => `第${i + 1}次停顿——门外传来响动。`)
+    );
+    const r7Adv = runDetector(["--json", f7Adv]);
+    assert.equal(r7Adv.json().findings.find((f) => f.type === "em-dash")?.severity, "advisory");
+    assert.equal(r7Adv.json().findings.find((f) => f.type === "em-dash")?.review, "semantic");
+    assert.equal(runDetector(["--fail-on=review_required", f7Adv]).status, 0);
+
+    const f7 = writeFixture(
+      "fixture-blocking.md",
+      Array.from({ length: 10 }, (_, i) => `第${i + 1}次停顿——没说话。`)
+    );
     const r7Json = runDetector(["--json", f7]);
     const r7Blk = runDetector(["--fail-on=blocking", f7]);
     const r7Rev = runDetector(["--fail-on=review_required", f7]);
     assert.equal(r7Json.json().findings.find((f) => f.type === "em-dash")?.severity, "review_required");
+    assert.equal(r7Json.json().findings.find((f) => f.type === "em-dash")?.review, "mechanical");
     assert.equal(r7Json.json().review_required, 1);
     assert.equal(r7Json.json().blocking, 0);
     assert.equal(r7Blk.status, 0);
@@ -165,6 +189,7 @@ describe("check-ai-patterns.js", () => {
       '「等等——」『别动——』"快走——"',
       "【警告——权限不足】",
       "“话还没说完——",
+      "“继续——”“再等等——”“别动——”“快看——”“停下——”“住手——”",
     ]);
     const r7q = runDetector(["--json", "--fail-on=review_required", f7q]);
     assert.equal(r7q.status, 0);
@@ -688,6 +713,18 @@ describe("check-ai-patterns.js", () => {
       runDetector(["--json", f28]).json().findings.filter((x) => x.type === "low-connective-density-tic").length,
       0
     );
+
+    // Mobile web-novel short paragraphs (~22c single-sentence lines) must NOT trigger low-connective or overcompressed
+    const f28Mobile = writeFixture(
+      "fixture-mobile-webnovel-rhythm.md",
+      Array.from(
+        { length: 65 },
+        (_, i) => `林尘扫了一眼面板上的第${i + 1}条战力数值，嘴角微微一扬。`
+      ).join("\n") + "\n"
+    );
+    const mobileFindings = runDetector(["--json", f28Mobile]).json().findings;
+    assert.equal(mobileFindings.filter((x) => x.type === "low-connective-density-tic").length, 0);
+    assert.equal(mobileFindings.filter((x) => x.type === "overcompressed-prose-tic").length, 0);
   });
 
   test("field-caught patterns A-E: voice-contrast, negation-parade, formulaic-parallelism, reverse-not-is, trailer-ending, quote-emphasis-tic, trailer-summary", () => {
@@ -803,6 +840,11 @@ describe("check-ai-patterns.js", () => {
       "他是被请来“把关”的，来之前心里还揣着句现成的话。",
       "这段“掉马神演”，正被一帧一帧拍下、剪好、甩上网。",
       "没人出声，几千人像被那朵“花”钉在了座位上。",
+      "他以为自己拿捏了“体面”，转身就露了馅。",
+      "那纸“婚书”被压在最底下，没人敢翻。",
+      "这个“局”他布了整整三年，今天才收网。",
+      "那笔“彩礼”其实全是借来的，连利息都没还清。",
+      "满屋亲戚全盯着他手里的“底牌”不敢动弹。",
       "她说“好”，转身就走。",
       "他笑道“行”，也没多留。",
       "只听“唰”的一声，帘子拉上了。",
@@ -816,13 +858,14 @@ describe("check-ai-patterns.js", () => {
     const qe = runDetector(["--json", fQe]).json().findings.filter((x) => x.type === "quote-emphasis-tic");
     assert.equal(qe.length, 1);
     assert.equal(qe[0].severity, "advisory");
-    assert.ok(qe[0].message.includes("3 处"));
+    assert.ok(qe[0].message.includes("8 处"));
     assert.ok(qe[0].excerpt.includes("把关"));
     assert.equal(runDetector(["--fail-on=blocking", fQe]).status, 0);
 
     const fQeNorm = writeFixture("fixture-quote-emphasis-normal.md", [
       "凌晨十二点十分，番城旅游官网出现苏阳的照片，手里的海报变成了“我在番城”。",
       "他是被请来“把关”的，来之前心里还揣着句现成的话。",
+      "众人盯着“系统”面板上的“星云”称号，不敢再喊他“废材”。",
     ]);
     assert.equal(
       runDetector(["--json", fQeNorm]).json().findings.filter((x) => x.type === "quote-emphasis-tic").length,
@@ -871,7 +914,7 @@ describe("check-ai-patterns.js", () => {
       "<!--",
       "多行注释里的破折号——不算，声音不大，却不算。",
       "-->",
-      "他回头看了一眼——门已经关了。",
+      ...Array.from({ length: 10 }, (_, i) => `他第${i + 1}次回头看了一眼——门已经关了。`),
     ]);
     const rHtml = runDetector(["--json", "--fail-on=review_required", fHtml]);
     assert.equal(rHtml.status, 1);
@@ -883,7 +926,7 @@ describe("check-ai-patterns.js", () => {
     const dashes = findings.filter((f) => f.type === "em-dash");
     assert.equal(dashes.length, 1);
     assert.equal(dashes[0].line, 9);
-    assert.equal(dashes[0].column, 8);
+    assert.equal(dashes[0].column, 11);
     assert.equal(dashes[0].severity, "review_required");
 
     const fMarker = writeFixture("fixture-marker-only.md", [
@@ -944,7 +987,7 @@ describe("check-ai-patterns.js", () => {
       "声音不高，第一句却稳稳压住了整个大厅。",
       "没有伴奏，没有和声，没有提词器。",
       "是真嗓子，不是修音修出来的。",
-      "他回头看了一眼——门已经关了。",
+      ...Array.from({ length: 6 }, (_, i) => `他第${i + 1}次回头看了一眼——门已经关了。`),
       "她指尖微微一颤。",
       "他指节泛白，攥紧了拳头。",
       "她眼眶发红。",
@@ -1028,6 +1071,8 @@ describe("check-ai-patterns.js", () => {
       "雨一直下……门外的脚步声越来越近……他握着门把没动。",
       "走廊里的灯闪了一下……又暗下去……连呼吸声都听不见了。",
       "风从窗缝灌进来……桌上的纸翻了一页……落在地砖上。",
+      "楼梯间传来回声……停在拐角……又慢慢散开。",
+      "墙角的水滴落下来……砸在瓷砖上……半晌没有动静。",
       "“你……你别过来……”她低声喊，【警告……信号中断……】",
     ]);
     const rEll = runDetector(["--json", "--fail-on=blocking", fEll]);
@@ -1036,7 +1081,7 @@ describe("check-ai-patterns.js", () => {
     assert.equal(ed.length, 1);
     assert.equal(ed[0].severity, "advisory");
     assert.equal(ed[0].review, "semantic");
-    assert.ok(ed[0].message.includes("6 处"));
+    assert.ok(ed[0].message.includes("10 处"));
 
     const fEllSparse = writeFixture("fixture-ellipsis-sparse.md", [
       "他站在院门口，看着远处的山影发了很久的呆……直到母亲喊他进屋吃饭才转身。",
@@ -1049,7 +1094,7 @@ describe("check-ai-patterns.js", () => {
 
     const fLarge = writeFixture(
       "fixture-large-pipe.md",
-      Array.from({ length: 650 }, (_, i) => `第${i}段：他回头看了一眼——门已经关了。`).join("\n\n") + "\n"
+      Array.from({ length: 650 }, (_, i) => `第${i}段：声音不大，却稳稳压住了全场。`).join("\n\n") + "\n"
     );
     const rLarge = runDetector(["--json", "--fail-on=review_required", fLarge]);
     assert.equal(rLarge.status, 1);
@@ -1059,12 +1104,13 @@ describe("check-ai-patterns.js", () => {
     const fUnclosedDash = writeFixture("fixture-unclosed-dash.md", [
       "他猛地抬头：“你敢——",
       '"等等——',
-      "他——猛地抬头：“你敢——",
+      ...Array.from({ length: 6 }, (_, i) => `他——第${i + 1}次抬头：“你敢——`),
     ]);
     const dashes = runDetector(["--json", fUnclosedDash]).json().findings.filter((x) => x.type === "em-dash");
     assert.equal(dashes.length, 1);
     assert.equal(dashes[0].line, 3);
     assert.equal(dashes[0].column, 2);
+    assert.ok(dashes[0].message.includes("6 处"));
 
     const pad = Array.from(
       { length: 230 },
@@ -1117,16 +1163,26 @@ describe("check-ai-patterns.js", () => {
     fs.writeFileSync(shortBodyB, "他回头看了一眼——门已经关了。\n", "utf8");
     assert.equal(runDetector(["--json", "--fail-on=review_required", shortBodyB]).status, 0);
 
-    // Explicit --mode=long overrides auto-short detection
+    // Explicit --mode=long overrides auto-short detection (10 dense dashes -> review_required in long, advisory in short)
+    fs.writeFileSync(
+      shortBodyA,
+      Array.from({ length: 10 }, (_, i) => `第${i + 1}次转身——真相浮出水面。`).join("\n") + "\n",
+      "utf8"
+    );
+    assert.equal(runDetector(["--json", "--fail-on=review_required", shortBodyA]).status, 0);
     const rForceLong = runDetector(["--mode=long", "--json", "--fail-on=review_required", shortBodyA]);
-    assert.equal(rForceLong.status, 1, "--mode=long must still flag narration em-dash as review_required");
-    assert.equal(rForceLong.json().findings.filter((f) => f.type === "em-dash").length, 2);
+    assert.equal(rForceLong.status, 1, "--mode=long must escalate 10 dense narration em-dashes to review_required");
+    assert.equal(rForceLong.json().findings.filter((f) => f.type === "em-dash").length, 1);
 
-    // Without sibling 设定.md / 小节大纲.md, 正文.md stays in long mode
+    // Without sibling 设定.md / 小节大纲.md, 正文.md stays in long mode (3 not-is hits -> review_required)
     const plainDir = path.join(tmpDir, "auto-long-plain");
     fs.mkdirSync(plainDir, { recursive: true });
     const plainBody = path.join(plainDir, "正文.md");
-    fs.writeFileSync(plainBody, "他回头看了一眼——门已经关了。\n", "utf8");
+    fs.writeFileSync(
+      plainBody,
+      "他不是心软，而是怕曝光。\n那不是巧合，而是设局。\n她不是不懂，而是装傻。\n",
+      "utf8"
+    );
     assert.equal(runDetector(["--json", "--fail-on=review_required", plainBody]).status, 1);
 
     // 2) em-dash in short mode: advisory density gate (>=6 hits AND >=1.5/k)
@@ -1224,7 +1280,7 @@ describe("check-ai-patterns.js", () => {
       1
     );
 
-    // 7) quote-emphasis-tic & negation-pair-tic: 5 silent in short mode, 6 triggers
+    // 7) quote-emphasis-tic (8 threshold) & negation-pair-tic (6 threshold in short mode)
     const qeLines = [
       "他是被请来“把关”的，早有准备。",
       "这段“神反转”迅速传遍全网。",
@@ -1232,15 +1288,17 @@ describe("check-ai-patterns.js", () => {
       "他的“体面”瞬间碎了一地。",
       "这个“局”他布了整整三年。",
       "那笔“彩礼”其实全是借的。",
+      "那份“协议”早被公证过了。",
+      "他口中的“真爱”转头就跑了。",
     ];
-    const fQe5 = writeFixture("short-qe-5.md", qeLines.slice(0, 5));
-    const fQe6 = writeFixture("short-qe-6.md", qeLines);
+    const fQe7 = writeFixture("short-qe-7.md", qeLines.slice(0, 7));
+    const fQe8 = writeFixture("short-qe-8.md", qeLines);
     assert.equal(
-      runDetector(["--mode=short", "--json", fQe5]).json().findings.filter((f) => f.type === "quote-emphasis-tic").length,
+      runDetector(["--mode=short", "--json", fQe7]).json().findings.filter((f) => f.type === "quote-emphasis-tic").length,
       0
     );
     assert.equal(
-      runDetector(["--mode=short", "--json", fQe6]).json().findings.filter((f) => f.type === "quote-emphasis-tic").length,
+      runDetector(["--mode=short", "--json", fQe8]).json().findings.filter((f) => f.type === "quote-emphasis-tic").length,
       1
     );
 

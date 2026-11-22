@@ -337,9 +337,9 @@ function normalizePausePunctuationPass(line, lineNo, commentSpans, mode = 'long'
       continue;
     }
 
-    // 对话引号内的破折号（话被打断或拖音，真人网文约 13% 章节使用）：`——` 原样保留，单 `—` / 多 `———` / `--` 统一为 `——`。
-    // 短篇模式（mode === 'short'）下叙述旁白同样保留标准 `——` 并将非标 `—`/`--` 统一为 `——`（数字区间仍转「到」）。
-    if ((inDialogueQuote || mode === 'short') && hasDash) {
+    // 破折号（对话引号内与叙述旁白均保留标准 `——`）：长短篇网文均用 `——` 做打断、拖音、系统提示或转折揭底拍，
+    // 不再机械删改标准 `——`；仅把非标 `—` / `———` / `--` 统一为 `——`（引号外数字区间 `10--20` 仍转为「到」）。
+    if (hasDash) {
       const before = previousNonSpace(original, match.index - 1);
       const after = nextNonSpace(original, match.index + token.length);
       if (!inDialogueQuote && token.startsWith('-') && /\d/.test(before) && /\d/.test(after)) {
@@ -362,7 +362,7 @@ function normalizePausePunctuationPass(line, lineNo, commentSpans, mode = 'long'
           line: lineNo,
           column: match.index + 1,
           type: getPauseType(token),
-          message: inDialogueQuote ? '引号内的破折号统一为「——」。' : '短篇旁白破折号统一为「——」。',
+          message: inDialogueQuote ? '引号内的破折号统一为「——」。' : '破折号统一为「——」。',
         });
       }
       continue;

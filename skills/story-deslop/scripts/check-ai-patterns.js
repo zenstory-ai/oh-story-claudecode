@@ -58,9 +58,12 @@ const STUTTER_MAX_SENTENCE = 5;
 // 长段落：单段原始字符数超过阈值即提示按镜头断段（长篇保守阈值 200；短篇竖屏阅读收紧到 100）。
 const LONG_PARAGRAPH_CHARS = 200;
 const SHORT_LONG_PARAGRAPH_CHARS = 100;
-// 短篇旁白破折号密度门槛：短篇旁白允许用 —— 做转折/揭底拍，仅高密度聚集时 advisory。
-const SHORT_EM_DASH_MIN_HITS = 6;
-const SHORT_EM_DASH_PER_KILO = 1.5;
+// 旁白破折号密度门槛（真人网文长篇/短篇均常用 —— 做系统提示、拖音与转折揭底拍）：
+// 全文 ≥6 处且 ≥1.5/千字给 advisory；长篇 ≥10 处且 ≥2.5/千字升为 review_required（短篇始终 advisory）。
+const EM_DASH_ADVISORY_MIN_HITS = 6;
+const EM_DASH_ADVISORY_PER_KILO = 1.5;
+const LONG_EM_DASH_REVIEW_MIN_HITS = 10;
+const LONG_EM_DASH_REVIEW_PER_KILO = 2.5;
 // 短篇套式反应细节门槛：实测真人网文短篇 74% 含常规情绪/生理速记，短篇抬高到 8 处且 3.0/千字。
 const SHORT_STOCK_REACTION_MIN_HITS = 8;
 const SHORT_STOCK_REACTION_PER_KILO = 3.0;
@@ -171,24 +174,26 @@ const NOTICE_FORMAL_MIN_HITS = 12;
 const NOTICE_FORMAL_CORE_MIN_HITS = 5;
 const NOTICE_FORMAL_PER_KILO = 60;
 
-// 过度精炼短段：过度处理样本里常见大量 15 字以内叙述段，且“的/了/就/着/过/呢/吧/啊”等
-// 自然连接偏少；对照文本通常保留更多自然连接。此项只做 advisory，禁止机械注水。
+// 过度精炼短段：仅抓极端“提纲/电报体”（大量 ≤10 字极碎叙述段且几乎无自然虚词），
+// 不误伤手机竖屏网文正常的 15-30 字短段节奏。此项只做 advisory，禁止机械注水。
 const OVERCOMPRESSED_PROSE_PARTICLE_PATTERN = /[的了就着过呢吧啊呀嘛]/g;
 const OVERCOMPRESSED_PROSE_MIN_CHARS = 1200;
 const OVERCOMPRESSED_PROSE_MIN_PARAS = 45;
-const OVERCOMPRESSED_PROSE_SHORT_MAX_CHARS = 15;
-const OVERCOMPRESSED_PROSE_SHORT_RATIO = 0.58;
-const OVERCOMPRESSED_PROSE_PARTICLE_PER_KILO = 85;
+const OVERCOMPRESSED_PROSE_SHORT_MAX_CHARS = 10;
+const OVERCOMPRESSED_PROSE_SHORT_RATIO = 0.55;
+const OVERCOMPRESSED_PROSE_PARTICLE_PER_KILO = 50;
 
-// 低连接密度：单纯低功能词会误抓有大量中长句的文本；
-// 因此必须叠加“中长句不足”，并只看引号外叙述。这是 overcompressed 的短窗口补充，只做 advisory。
+// 低连接密度：仅抓极端机械大纲电报体（≥50% 叙述句为 ≤10 字碎片、自然连接极低且几乎无 ≥25 字承接句），
+// 不误伤番茄/七猫等手机竖屏网文（70%+ 段落 ≤30 字）。只做 advisory。
 const LOW_CONNECTIVE_FUNCTION_TERMS = ['的', '了', '就', '在', '是', '也', '都', '还', '又', '把', '被', '给', '这个', '那个', '里面', '以后', '时候', '现在', '因为', '所以', '但是', '不过', '然后', '已经', '还是', '起来', '出来', '下去'];
 const LOW_CONNECTIVE_PLAIN_TERMS = ['的', '了', '就', '也', '还', '又', '这个', '那个', '东西', '事情', '时候', '里面', '以后', '一下', '一点', '有点', '还是'];
 const LOW_CONNECTIVE_MIN_CHARS = 800;
-const LOW_CONNECTIVE_FUNCTION_PER_KILO = 100;
-const LOW_CONNECTIVE_PLAIN_PER_KILO = 65;
-const LOW_CONNECTIVE_LONG_SENTENCE_CHARS = 30;
-const LOW_CONNECTIVE_LONG_SENTENCE_RATIO = 0.08;
+const LOW_CONNECTIVE_FUNCTION_PER_KILO = 55;
+const LOW_CONNECTIVE_PLAIN_PER_KILO = 30;
+const LOW_CONNECTIVE_TINY_SENTENCE_CHARS = 10;
+const LOW_CONNECTIVE_TINY_SENTENCE_RATIO = 0.50;
+const LOW_CONNECTIVE_LONG_SENTENCE_CHARS = 25;
+const LOW_CONNECTIVE_LONG_SENTENCE_RATIO = 0.05;
 
 // either-or「不是A就是B / 不是A也是B」里紧贴的「是」是连词的一部分，不是肯定项系动词。
 // 含「不」以沿用「不是A，也不是B」第二个否定段不算翻转的旧排除。
@@ -267,7 +272,7 @@ const shortSpoilerFindings = new WeakSet();
 // 「这一切都结束了」「新的人生才刚刚开始」「命运的齿轮」）。与 trailer-ending 共用文末窗口，
 // 区别是它盖章过去、trailer-ending 预告将来；收的都是 banned-words 已按名禁掉的形态。
 // 不收「(这|那)一刻…终于明白」：真人语料里那是正常的认知节拍，短篇第一人称审判句还是卖点
-// （short-craft「审判金句 / 心死余韵」），密度型由 advisory 的 abstract-summary-tic 兜。
+// （short-deslop.md「审判金句 / 直白收尾」），密度型由 advisory 的 abstract-summary-tic 兜。
 // 各分支都要求落在句末断言位，否则会吃进条件从句（等这一切结束了，我们就…）、动补
 // （这一切都说明得非常清楚）、成语跨匹配（这一刻…命中注定）、系表（这一战的结果是注定的）、
 // 及物用法（就这样…才结束了这个话题）、场内报幕（就这样…宣布…圆满落幕）和否定认知
@@ -284,17 +289,17 @@ const TRAILER_SUMMARY_PATTERN = /这一(?:夜|天|刻|战|年|局|役)[，,]?[^�
 // 前 6 字/后 3 字邻接的极短台词、引号内含句读的台词、引号外无叙述的行（独立台词/
 // 弹幕流/拟声词连发）、引号套引号（台词内强调）。全文 ≥3 处报一条——单处强调是
 // 正常修辞，密度高才是模板腔。
-// 校准：demo 前 20 章 0 章过阈值；《万疆》20 章 2 章过阈值（海报标语“我在番城”系列、
-// “邀战书”等转述载体，真人也这么写），所以该规则只做 advisory，不升 blocking。
-const QUOTE_EMPHASIS_MIN_HITS = 3;
+// 校准：真人网文单章常有 4-6 处设定词/称号/系统名词引号（如“系统”“废材”），按篇幅比例抬高到
+// Math.max(8, Math.round(4 * scale))，只抓高频泛滥强调。
+const QUOTE_EMPHASIS_MIN_HITS = 8;
 const QUOTE_EMPHASIS_MAX_VISIBLE = 4;
 const QUOTE_EMPHASIS_SPEECH_VERB_PATTERN = /[说道问喊答念叫回吼骂写读唱笑叹应哼嗤啐呸嘀咕]|开口|摇头|点头|出声|冷笑|苦笑|轻声|低声|沉声/;
 
-// 叙述旁白省略号密度：真人网文近三分之一章节在自由间接引语和悬念停顿处使用旁白 `……`（番茄 P90 约 3.0/千字），
-// 单处或少量留白正常保留；全章引号与面板外 ≥6 处且 ≥3.5/千字才报 advisory。
+// 叙述旁白省略号密度：真人网文（尤其番茄男频/女频）常用旁白 `……` 表达停顿/心理吐槽，
+// 少量留白正常保留；全章引号与面板外 ≥10 处且 ≥6.0/千字才报 advisory。
 const ELLIPSIS_DENSITY_PATTERN = /…+|\.{3,}|。{3,}/g;
-const ELLIPSIS_DENSITY_MIN_HITS = 6;
-const ELLIPSIS_DENSITY_PER_KILO = 3.5;
+const ELLIPSIS_DENSITY_MIN_HITS = 10;
+const ELLIPSIS_DENSITY_PER_KILO = 6.0;
 
 // 单章密度分级门槛（800 章真人长篇 + 500 篇真人短篇误报校准）：偶发 1 处（not-is 族 1-2 处）常承担正常纠错、转折或章末钩子，
 // 降为 advisory + semantic 交上下文判断；同章高频连刷升为 blocking + mechanical 强制清零。
@@ -607,15 +612,15 @@ function applyDensitySeverityGates(findings, proseChars = 0, mode = 'long') {
   }
 }
 
-// 段落级检测：碎句号（连续短叙述句）、长段落、旁白破折号（按功能改写，对白引号与面板内豁免）。
+// 段落级检测：碎句号（连续短叙述句）、长段落、旁白破折号密度（对白引号与面板内豁免）。
 function scanProsePatterns(proseLines, mode = 'long', scale = 1) {
   const findings = [];
   const longParaLimit = mode === 'short' ? SHORT_LONG_PARAGRAPH_CHARS : LONG_PARAGRAPH_CHARS;
-  let shortDashHits = 0;
-  let shortDashNarrativeChars = 0;
-  let shortDashFirstLine = null;
-  let shortDashFirstCol = 1;
-  const shortDashSamples = [];
+  let dashHits = 0;
+  let dashNarrativeChars = 0;
+  let dashFirstLine = null;
+  let dashFirstCol = 1;
+  const dashSamples = [];
 
   for (const { text, lineNo } of proseLines) {
     const trimmed = text.trim();
@@ -623,30 +628,16 @@ function scanProsePatterns(proseLines, mode = 'long', scale = 1) {
 
     const dashScanText = maskQuotedWithUnclosed(text);
     const dashPattern = /——|—|--+/g;
-    if (mode === 'short') {
-      shortDashNarrativeChars += visibleLength(stripQuoted(trimmed));
-      let dash;
-      while ((dash = dashPattern.exec(dashScanText)) !== null) {
-        shortDashHits += 1;
-        if (shortDashFirstLine === null) {
-          shortDashFirstLine = lineNo;
-          shortDashFirstCol = dash.index + 1;
-        }
-        const ex = compact(text.slice(Math.max(0, dash.index - 8), dash.index + dash[0].length + 8));
-        if (shortDashSamples.length < 5 && ex && !shortDashSamples.includes(ex)) shortDashSamples.push(ex);
+    dashNarrativeChars += visibleLength(stripQuoted(trimmed));
+    let dash;
+    while ((dash = dashPattern.exec(dashScanText)) !== null) {
+      dashHits += 1;
+      if (dashFirstLine === null) {
+        dashFirstLine = lineNo;
+        dashFirstCol = dash.index + 1;
       }
-    } else {
-      let dash;
-      while ((dash = dashPattern.exec(dashScanText)) !== null) {
-        findings.push({
-          line: lineNo,
-          column: dash.index + 1,
-          type: 'em-dash',
-          severity: 'review_required',
-          message: '叙述旁白不用破折号，按功能改写：打断→动作或抢白，停顿→逗号或省略，插入说明→逗号/冒号；勿一律改句号。',
-          excerpt: compact(text.slice(Math.max(0, dash.index - 8), dash.index + dash[0].length + 8)),
-        });
-      }
+      const ex = compact(text.slice(Math.max(0, dash.index - 8), dash.index + dash[0].length + 8));
+      if (dashSamples.length < 5 && ex && !dashSamples.includes(ex)) dashSamples.push(ex);
     }
 
     if (trimmed.length > longParaLimit) {
@@ -661,17 +652,27 @@ function scanProsePatterns(proseLines, mode = 'long', scale = 1) {
     }
   }
 
-  if (mode === 'short' && shortDashHits >= SHORT_EM_DASH_MIN_HITS && shortDashNarrativeChars > 0) {
-    const perKilo = (shortDashHits / shortDashNarrativeChars) * 1000;
-    if (perKilo >= SHORT_EM_DASH_PER_KILO) {
+  if (dashHits >= EM_DASH_ADVISORY_MIN_HITS && dashNarrativeChars > 0) {
+    const perKilo = (dashHits / dashNarrativeChars) * 1000;
+    if (mode !== 'short' && dashHits >= LONG_EM_DASH_REVIEW_MIN_HITS && perKilo >= LONG_EM_DASH_REVIEW_PER_KILO) {
       findings.push({
-        line: shortDashFirstLine,
-        column: shortDashFirstCol,
+        line: dashFirstLine,
+        column: dashFirstCol,
+        type: 'em-dash',
+        severity: 'review_required',
+        review: 'mechanical',
+        message: `叙述旁白破折号过密：${dashHits} 处（${perKilo.toFixed(1)}/千字）；保留关键系统提示、拖音或转折揭底拍，其余按功能改为逗号、冒号或动作，勿高频刷屏。`,
+        excerpt: compact(dashSamples.join(' | ')),
+      });
+    } else if (perKilo >= EM_DASH_ADVISORY_PER_KILO) {
+      findings.push({
+        line: dashFirstLine,
+        column: dashFirstCol,
         type: 'em-dash',
         severity: 'advisory',
         review: 'semantic',
-        message: `短篇旁白破折号偏密：${shortDashHits} 处（${perKilo.toFixed(1)}/千字）；保留关键反转或情绪揭底拍，其余按功能改逗号或冒号。`,
-        excerpt: compact(shortDashSamples.join(' | ')),
+        message: `${mode === 'short' ? '短篇' : ''}旁白破折号偏密：${dashHits} 处（${perKilo.toFixed(1)}/千字）；保留关键反转、系统提示或情绪揭底拍，其余按功能改逗号或冒号。`,
+        excerpt: compact(dashSamples.join(' | ')),
       });
     }
   }
@@ -965,7 +966,7 @@ function findQuoteEmphasisTic(proseLines, mode = 'long', scale = 1) {
     }
   }
 
-  const minHits = mode === 'short' ? Math.max(6, Math.round(3 * scale)) : QUOTE_EMPHASIS_MIN_HITS;
+  const minHits = Math.max(QUOTE_EMPHASIS_MIN_HITS, Math.round(4 * scale));
   if (hits < minHits) return [];
 
   return [{
@@ -1422,6 +1423,8 @@ function findLowConnectiveDensityTic(proseLines) {
   if (functionPerKilo >= LOW_CONNECTIVE_FUNCTION_PER_KILO) return [];
   const plainPerKilo = (plainHits / bodyChars) * 1000;
   if (plainPerKilo >= LOW_CONNECTIVE_PLAIN_PER_KILO) return [];
+  const tinySentenceRatio = sentences.filter((len) => len <= LOW_CONNECTIVE_TINY_SENTENCE_CHARS).length / sentences.length;
+  if (tinySentenceRatio < LOW_CONNECTIVE_TINY_SENTENCE_RATIO) return [];
   const longSentenceRatio = sentences.filter((len) => len >= LOW_CONNECTIVE_LONG_SENTENCE_CHARS).length / sentences.length;
   if (longSentenceRatio >= LOW_CONNECTIVE_LONG_SENTENCE_RATIO) return [];
 
@@ -1430,7 +1433,7 @@ function findLowConnectiveDensityTic(proseLines) {
     column: 1,
     type: 'low-connective-density-tic',
     severity: 'advisory',
-    message: `低连接密度：引号外叙述功能词 ${functionPerKilo.toFixed(1)}/千字、白话连接 ${plainPerKilo.toFixed(1)}/千字，且≥${LOW_CONNECTIVE_LONG_SENTENCE_CHARS}字承接句仅 ${(longSentenceRatio * 100).toFixed(0)}%；容易像提纲/电报体。通读后补必要连接和中长句群，别机械注水。`,
+    message: `疑似大纲电报体：引号外叙述≤${LOW_CONNECTIVE_TINY_SENTENCE_CHARS}字碎句占比 ${(tinySentenceRatio * 100).toFixed(0)}%、功能词 ${functionPerKilo.toFixed(1)}/千字、白话连接 ${plainPerKilo.toFixed(1)}/千字；通读检查是否有动作跳跃或主语/因果残缺，有意快切镜头可保留，别机械注水。`,
     excerpt: compact(samples.join(' | ')),
   }];
 }
