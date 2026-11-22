@@ -55,10 +55,17 @@ jobs:
           done
 
   cross-platform-runtime:
+    name: ${{ matrix.name }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - name: ubuntu
+            os: ubuntu-latest
+          - name: windows
+            os: windows-latest
+          - name: macos
+            os: macos-latest
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
