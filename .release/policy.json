@@ -72,7 +72,8 @@
     {
       "file": "cross-platform.yml",
       "jobs": [
-        "static-check",
+        "repo-lint-and-adapters",
+        "ubuntu",
         "windows",
         "macos"
       ]
