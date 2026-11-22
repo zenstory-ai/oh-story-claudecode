@@ -105,7 +105,6 @@ jobs:
           python scripts/test-chapter-completion-lifecycle.py
           python scripts/test-author-memory-commit.py
           python scripts/test-long-analyze-runtime.py
-          python scripts/test-inspiration-index.py
           python scripts/test-scan-aggregate.py
       # Generate a GBK-class locale on Ubuntu so the GBK test in test-claude-hooks.mjs runs end-to-end.
       - name: Generate zh_CN.GBK locale (Chinese Windows simulation)
@@ -114,9 +113,8 @@ jobs:
       - name: Hook & continuity regressions
         shell: bash
         run: |
-          node --test scripts/test-story-hook-core.mjs scripts/test-claude-hooks.mjs scripts/test-codex-hooks.mjs scripts/test-antigravity-hooks.mjs
+          node --test scripts/test-story-hook-core.mjs scripts/test-claude-hooks.mjs scripts/test-codex-hooks.mjs scripts/test-antigravity-hooks.mjs scripts/test-zcode-hooks.mjs
           node --experimental-strip-types --test scripts/test-opencode-plugin.mjs
-          bash scripts/test-zcode-hooks.sh
       - name: Portable char-count tests
         shell: bash
         run: |

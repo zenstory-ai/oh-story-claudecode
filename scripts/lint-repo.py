@@ -616,10 +616,8 @@ REQUIRED_MANIFEST_KEYS = {
     "manifest_version",
     "setup_skill_version",
     "agents_version",
-    "topic_decision_phase",
     "progress_schema_version",
     "primary_benchmark_artifacts",
-    "required_outline_sections",
 }
 ALLOWED_MANIFEST_KEYS = REQUIRED_MANIFEST_KEYS
 SEMVER_RE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
@@ -642,10 +640,8 @@ class ContractManifest:
     manifest_version: int
     setup_skill_version: str
     agents_version: int
-    topic_decision_phase: int
     progress_schema_version: int
     primary_benchmark_artifacts: Tuple[str, ...]
-    required_outline_sections: Tuple[Tuple[str, str], ...]
 
 
 @dataclass(frozen=True)
@@ -732,7 +728,7 @@ def load_manifest(path: Path) -> Tuple[Optional[ContractManifest], List[Finding]
     elif not SEMVER_RE.fullmatch(setup_version):
         findings.append(Finding("manifest-value-format", "setup_skill_version must be x.y.z", path))
 
-    for key in ("agents_version", "topic_decision_phase", "progress_schema_version"):
+    for key in ("agents_version", "progress_schema_version"):
         if key not in raw:
             continue
         if not _is_int(raw[key]):
@@ -752,53 +748,16 @@ def load_manifest(path: Path) -> Tuple[Optional[ContractManifest], List[Finding]
             Finding("manifest-artifact-format", "primary benchmark artifacts must be relative Markdown paths", path)
         )
 
-    sections = raw.get("required_outline_sections")
-    valid_sections = (
-        isinstance(sections, list)
-        and bool(sections)
-        and all(
-            isinstance(item, dict)
-            and set(item) == {"rule", "demo"}
-            and isinstance(item.get("rule"), str)
-            and bool(item["rule"].strip())
-            and isinstance(item.get("demo"), str)
-            and bool(item["demo"].strip())
-            for item in sections or []
-        )
-    )
-    if not valid_sections:
-        findings.append(
-            Finding(
-                "manifest-outline-type",
-                "required_outline_sections must be an array of exact {rule, demo} string objects",
-                path,
-            )
-        )
-    elif (
-        len({item["rule"] for item in sections}) != len(sections)
-        or len({item["demo"] for item in sections}) != len(sections)
-    ):
-        findings.append(
-            Finding(
-                "manifest-outline-duplicate",
-                "required_outline_sections must use unique rule and demo names",
-                path,
-            )
-        )
-
     if findings:
         return None, findings
 
     assert isinstance(artifacts, list)
-    assert isinstance(sections, list)
     manifest = ContractManifest(
         manifest_version=raw["manifest_version"],
         setup_skill_version=raw["setup_skill_version"],
         agents_version=raw["agents_version"],
-        topic_decision_phase=raw["topic_decision_phase"],
         progress_schema_version=raw["progress_schema_version"],
         primary_benchmark_artifacts=tuple(artifacts),
-        required_outline_sections=tuple((item["rule"], item["demo"]) for item in sections),
     )
     return manifest, []
 

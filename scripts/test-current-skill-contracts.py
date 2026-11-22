@@ -70,11 +70,15 @@ def test_manifest_contract() -> None:
         _, f = VALIDATOR.load_manifest(p)
         require("manifest-value-type" in finding_codes(f), "string agents_version must be rejected")
 
-        malformed = dict(raw, required_outline_sections=[{"rule": "阶段位置"}])
-        p = tmpdir / "malformed.json"
-        p.write_text(json.dumps(malformed, ensure_ascii=False), encoding="utf-8")
-        _, f = VALIDATOR.load_manifest(p)
-        require("manifest-outline-type" in finding_codes(f), "incomplete outline-section objects must be rejected")
+        for removed_key, sample_val in (
+            ("topic_decision_phase", 5),
+            ("required_outline_sections", [{"rule": "阶段位置", "demo": "阶段位置"}]),
+        ):
+            legacy = dict(raw, **{removed_key: sample_val})
+            p = tmpdir / f"legacy-{removed_key}.json"
+            p.write_text(json.dumps(legacy, ensure_ascii=False), encoding="utf-8")
+            _, f = VALIDATOR.load_manifest(p)
+            require("manifest-key-unknown" in finding_codes(f), f"removed key {removed_key} must be rejected")
 
         dup = dict(raw, primary_benchmark_artifacts=["剧情/节奏.md", "剧情/节奏.md"])
         p = tmpdir / "dup.json"

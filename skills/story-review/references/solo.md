@@ -47,7 +47,6 @@
 {仅分批审查填写；否则删掉本节}
 
 下一步：{一句话}
-技术备注：Mode {full | lean | solo}→solo · Fallback {…} · Rubric {…} ({file | embedded})
 ```
 
 ---

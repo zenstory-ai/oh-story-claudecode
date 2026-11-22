@@ -4,6 +4,7 @@ Status: implemented
 Date: 2026-09-23
 Issue: PR #387 / #439（维护者接手）
 Related: [2026-09-22-inspiration-library-em-pipeline](../feature/2026-09-22-inspiration-library-em-pipeline.md)、[2026-09-22-inspiration-pipeline-hardening](../bug-fix/2026-09-22-inspiration-pipeline-hardening.md)、[2026-09-23-long-analyze-runtime-takeover](2026-09-23-long-analyze-runtime-takeover.md)
+Superseded-by: [2026-11-21-retire-inspiration-library-and-fix-drift](2026-11-21-retire-inspiration-library-and-fix-drift.md)——三层灵感库管道已退役
 
 ## Problem
 

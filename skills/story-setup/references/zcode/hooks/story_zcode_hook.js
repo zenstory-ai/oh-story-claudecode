@@ -10,6 +10,8 @@ const path = require("node:path")
 const { spawnSync } = require("node:child_process")
 const core = require("./story_hook_core.js")
 const {
+  readSentinel,
+  agentsVersionNotice,
   existingDir,
   safeRelative,
   resolveTarget,
@@ -32,14 +34,17 @@ const {
 } = core
 
 let hookInput = {}
-try {
-  const raw = fs.readFileSync(0, "utf8")
-  if (raw.trim()) {
-    const parsed = JSON.parse(raw)
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) hookInput = parsed
-  }
-} catch {
-  hookInput = {}
+
+function readHookInput() {
+  if (process.stdin.isTTY) return {}
+  try {
+    const raw = fs.readFileSync(0, "utf8")
+    if (raw.trim()) {
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed
+    }
+  } catch {}
+  return {}
 }
 
 function emit(value) {
@@ -89,14 +94,14 @@ function projectRoot() {
 function sessionStart() {
   const root = projectRoot()
   const messages = []
-  const sentinel = path.join(root, ".story-deployed")
-  if (fs.existsSync(sentinel)) {
-    let text = ""
-    try { text = fs.readFileSync(sentinel, "utf8") } catch {}
-    const match = text.match(/^target_cli:\s*(.+)$/m)
-    if (!match) {
+  const sentinel = readSentinel(root)
+  if (sentinel !== null) {
+    const versionNotice = agentsVersionNotice(root, { sentinel, setupCommand: "$story-setup" })
+    if (versionNotice) messages.push(versionNotice)
+    const targetCli = sentinel.target_cli || ""
+    if (!targetCli) {
       messages.push("[story-setup] .story-deployed 缺少 target_cli；建议重新运行 $story-setup。")
-    } else if (!match[1].split(",").map((item) => item.trim()).includes("zcode")) {
+    } else if (!targetCli.split(",").map((item) => item.trim()).includes("zcode")) {
       messages.push("[story-setup] 当前部署标记未包含 zcode；如需 ZCode 项目适配，请重新运行 $story-setup 并选择 ZCode。")
     }
   }
@@ -188,6 +193,7 @@ function postToolProseCheck() {
 
 function main() {
   const event = process.argv[2] || ""
+  hookInput = readHookInput()
   try {
     if (event === "session-start") sessionStart()
     else if (event === "pre-tool-prose-guard") preToolProseGuard()

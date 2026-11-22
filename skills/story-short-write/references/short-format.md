@@ -87,28 +87,26 @@
 整篇字数只认交付检查（`scripts/check-delivery-contract.js`）报的非空白字数，不自写计数，不要模型估算。要找哪节明显偏短时，用下面的命令逐节报非空白字符数：
 
 ```bash
-for PYBIN in python3 python py; do "$PYBIN" -c "" 2>/dev/null && break; done
-"$PYBIN" -c "
-import re
-from pathlib import Path
-pat = re.compile(r'###\s*\d+\.|###\s*第[一二三四五六七八九十百千万两〇零0-9]+章|\d+\.')
-cur, buf, out = None, [], []
-for line in Path('正文.md').read_text(encoding='utf-8').splitlines():
-    if pat.fullmatch(line.strip()):
-        out.append((cur, buf)); cur, buf = line.strip(), []
-    else:
-        buf.append(line)
-out.append((cur, buf))
-for name, body in out:
-    n = len(''.join(''.join(body).split()))
-    if name is not None or n:
-        print(name or '导语', n)
-"
+node -e '
+const fs = require("fs");
+const pat = /^(?:###\s*\d+\.|###\s*第[一二三四五六七八九十百千万两〇零0-9]+章|\d+\.)$/;
+let cur = null, buf = [], out = [];
+for (const line of fs.readFileSync("正文.md", "utf8").split(/\r?\n/)) {
+  const s = line.trim();
+  if (pat.test(s)) { out.push([cur, buf]); cur = s; buf = []; }
+  else buf.push(line);
+}
+out.push([cur, buf]);
+for (const [name, body] of out) {
+  const n = [...body.join("").replace(/\s+/g, "")].length;
+  if (name !== null || n) console.log(name || "导语", n);
+}
+'
 ```
 
 分布只用来定位异常节：某节明显短于相邻节时，回大纲核对该节批准的情节点、动作和后果是否已经写完；写完就保留，不为拉齐长度补戏。
 
-先按上面的 `python3→python→py` 探测可用解释器，避免直接调用 Windows 的 Microsoft Store 占位程序；禁止用统计字节的 `wc -c`。交付检查跑不了时声明“未完成机器字数验证”，不得声称通过。
+以上命令使用 Node.js 18+ 运行；禁止用统计字节的 `wc -c`。交付检查跑不了时声明“未完成机器字数验证”，不得声称通过。
 
 ---
 

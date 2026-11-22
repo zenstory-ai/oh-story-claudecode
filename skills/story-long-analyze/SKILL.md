@@ -1,7 +1,7 @@
 ---
 name: story-long-analyze
 version: 1.0.0
-description: "长篇网文拆文。保留黄金三章、逐章摘要、剧情、情绪、节奏、角色、设定和文风接口，以连续章节块完成因果、双时间线、关系与三维节奏分析；兼容旧成果直接使用、按需增强和断点续跑。含可选三层灵感库管道（灵感库、跨书灵感聚合、更新灵感库）。触发方式：/story-long-analyze、/长篇拆文、「帮我拆这本书」「拆这本书」「分析黄金三章」「深度拆解」「完整拆解」或提供小说文本文件路径。"
+description: "长篇网文拆文。保留黄金三章、逐章摘要、剧情、情绪、节奏、角色、设定和文风接口，以连续章节块完成因果、双时间线、关系与三维节奏分析；兼容旧成果直接使用、按需增强和断点续跑。触发方式：/story-long-analyze、/长篇拆文、「帮我拆这本书」「拆这本书」「分析黄金三章」「深度拆解」「完整拆解」或提供小说文本文件路径。"
 metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudecode"}}
 ---
 # story-long-analyze：长篇网文拆文
@@ -47,7 +47,6 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | Stage 5 主报告 | [synthesis-inputs.md](references/synthesis-inputs.md) + [stage5-report.md](references/stage5-report.md) | 报告保存，标 `stage5` |
 | Stage 6 文风 | [style-profile-generator.md](references/style-profile-generator.md) | `文风.md` 保存，标 `stage6` |
 | 全部拆完 | [final-checks.md](references/final-checks.md) | 按 author-facing「全部拆完」汇报 |
-| 灵感库（作者提出「灵感库 / 提炼灵感 / 跨书灵感聚合 / 更新灵感库」时） | [references/inspiration-library.md](references/inspiration-library.md) | 只写 `灵感库/`，不改拆文产物 |
 
 ## Phase 1：确认对象并检查目录
 
@@ -75,7 +74,7 @@ node "{story-long-analyze skill 根}/scripts/inspect_existing_assets.js" --root 
 | `stage6_style` | Stage 6：文风 |
 | `stage3`、`stage4`、`stage5`、`stage6` | 没标完成：产物都在且合格就只 `mark-stage`，不重写；缺了才重做 |
 
-有多项时按 Stage 顺序逐项补完并标记。情绪模块卡字段不全（灵感库登记报错）时，检查器不会报缺：作者同意后把旧 `剧情/情绪模块.md` 复制到 `_analysis_cache/legacy/`，按 Stage 3 只改出错的卡，再标 `stage3`。Stage 3–5 只用已有成果和批次缓存，不读原文；没有批次缓存的旧项目用 `digest` 取逐章字段，再加上已有剧情、关系资料。写作端「对标书还缺情绪/节奏分析」「缺文风」分别对应这里的 Stage 3、Stage 6。
+有多项时按 Stage 顺序逐项补完并标记。Stage 3–5 只用已有成果和批次缓存，不读原文；没有批次缓存的旧项目用 `digest` 取逐章字段，再加上已有剧情、关系资料。写作端「对标书还缺情绪/节奏分析」「缺文风」分别对应这里的 Stage 3、Stage 6。
 
 ### 固定交付接口
 

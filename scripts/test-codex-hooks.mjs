@@ -172,11 +172,31 @@ test("Codex pre-tool-prose-guard, commit advisory, session-start, compact, and s
     assert.match(commitOut.hookSpecificOutput.additionalContext, /short\/正文\.md/)
     assert.equal(invoke("pre-tool-commit-advisory", { tool_name: "Bash", tool_input: { command: "echo git commit docs" } }), "")
 
-    // SessionStart + compact + stop sweep
-    write(path.join(root, ".story-deployed"), "agents_version: 45\ntarget_cli: codex\n")
+    // SessionStart + agents_version staleness + compact + stop sweep
+    const contract = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "scripts/current-contract.json"), "utf8"))
+    const currentAgentsVer = contract.agents_version
     write(path.join(root, ".active-book"), "book\n")
+
+    write(path.join(root, ".story-deployed"), `agents_version: ${currentAgentsVer - 1}\ntarget_cli: codex\n`)
+    const ssStale = JSON.parse(invoke("session-start", { hook_event_name: "SessionStart" }))
+    assert.match(ssStale.hookSpecificOutput.additionalContext, new RegExp(`低于 v${currentAgentsVer}`))
+    assert.match(ssStale.hookSpecificOutput.additionalContext, /\$story-setup/)
+
+    write(path.join(root, ".story-deployed"), `agents_version: ${currentAgentsVer + 1}\ntarget_cli: codex\n`)
+    const ssFuture = JSON.parse(invoke("session-start", { hook_event_name: "SessionStart" }))
+    assert.match(ssFuture.hookSpecificOutput.additionalContext, new RegExp(`高于本 hook 支持的 v${currentAgentsVer}`))
+    assert.match(ssFuture.hookSpecificOutput.additionalContext, /不要降级覆盖/)
+
+    write(path.join(root, ".story-deployed"), "target_cli: codex\n")
+    const ssMissingVer = JSON.parse(invoke("session-start", { hook_event_name: "SessionStart" }))
+    assert.match(ssMissingVer.hookSpecificOutput.additionalContext, /缺少数字 agents_version/)
+
+    write(path.join(root, ".story-deployed"), `agents_version: ${currentAgentsVer}\ntarget_cli: codex\n`)
     const ss = JSON.parse(invoke("session-start", { hook_event_name: "SessionStart" }))
     assert.match(ss.hookSpecificOutput.additionalContext, /Active book/)
+    assert.ok(!ss.hookSpecificOutput.additionalContext.includes(`低于 v${currentAgentsVer}`))
+    assert.ok(!ss.hookSpecificOutput.additionalContext.includes("高于本 hook"))
+    assert.ok(!ss.hookSpecificOutput.additionalContext.includes("缺少数字 agents_version"))
     const preC = JSON.parse(invoke("pre-compact", { hook_event_name: "PreCompact" }))
     assert.match(preC.systemMessage, /Story Compact Summary/)
     const postC = JSON.parse(invoke("post-compact", { hook_event_name: "PostCompact" }))

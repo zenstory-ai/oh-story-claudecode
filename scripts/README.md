@@ -54,12 +54,11 @@
 | `test-chapter-completion-lifecycle.py` | 公开 CLI 的 checkpoint、正常提交、欠长接受、超长压缩建议与放行、blocking quality 阻断与下一章继续 | CI（三平台） |
 | `test-author-memory-commit.py` | 工作区作者记忆行为：单事件回执、交写手的行 ≤2KB、证据候选、冲突替代、撤回、失败零写入、旧修订、幂等重放与派生修复 | CI（三平台） |
 | `test-long-analyze-runtime.py` | 长篇拆文单状态运行时：机械章节索引与逐章 hash、旧成果识别、只读计划、范围批次、旧章号与楔子对齐、原子提交、缓存恢复与关系图中文字体回退 | CI（三平台） |
-| `test-inspiration-index.py` | 三层灵感库索引：EM 卡登记幂等、专名泄漏拦截、NM/CBA 闭包与计数、卡内路径引用拒绝、标签检索 | CI（三平台） |
 | `test-story-hook-core.mjs` | 五端（Claude / Codex / OpenCode / Antigravity / ZCode）共享 Node.js 18+ 钩子核心 `story_hook_core.js` 原生 `node:test` 回归：正文兜底轻量网、写前大纲守卫、跨批连续性缺口、伏笔状态与跳过标记同步、Windows 驱动器路径与 OpenCode `pre-commit.sh` | CI（三平台，`node --test`） |
 | `test-claude-hooks.mjs` | Claude Code 统一 Node hook CLI（`story_hook_cli.js` + `run-story-hook.sh`）原生 `node:test` 回归：全部 8 个事件、`analysis-input-guard`、缺 `node` fail-open 与真实 `zh_CN.GBK` 编码安全 | CI（三平台，`node --test`） |
 | `test-codex-hooks.mjs` | Codex Node hook（`story_codex_hook.js` + `run-story-hook.{sh,cmd}`）原生 `node:test` 回归：合成 stdin/stdout JSON 契约、大纲守卫、写后兜底与 `windowsHide: true` 断言 | CI（三平台，`node --test`） |
 | `test-codex-hook-merge.py` | Codex `hooks.json` 合并器的管理组替换、用户配置保留与幂等回归 | 被 `check-codex-adapter.sh` 调用 |
-| `test-zcode-hooks.sh` | ZCode 严格 JSON Hook、正文守卫与连续性回归 | CI（三平台） |
+| `test-zcode-hooks.mjs` | ZCode 严格 JSON Hook、正文守卫、版本提醒与连续性原生 `node:test` 回归 | CI（三平台，`node --test`） |
 | `test-zcode-agents.py` | ZCode 插件角色的工具白名单、禁止优先、模型继承、资料路径、无效输入零写入与生成漂移回归 | 被 `check-zcode-adapter.sh` 调用 |
 | `test-antigravity-hooks.mjs` | Antigravity 注册命令的 shell/字面 argv 兼容性、Hook I/O、正文守卫、artifact 桥接与 Stop 单次续跑 | CI（三平台，`node --test`） |
 | `test-antigravity-hook-merge.py` | `.agents/hooks.json` 顶层 `oh-story` 管理组替换、用户组保留与幂等回归 | 被 `check-antigravity-adapter.sh` 调用 |

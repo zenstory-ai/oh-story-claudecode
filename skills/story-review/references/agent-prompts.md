@@ -145,7 +145,7 @@
 2. 合并去重：按 `severity` 排序（S1 > S2 > S3 > S4），同级内按影响范围排序。
 3. **可选事实核查**：如果审查内容涉及需要验证的外部事实（历史年代、地理方位、职业细节等），只有在 `Effective Mode` 仍为 `full`/`lean`、当前不是子 Agent、当前运行时的 Agent 工具可用且按 Phase 0 的当前宿主来源确认 `story-researcher` 可用时（ZCode 查插件注册角色），才可额外 spawn；Antigravity 检查 `.agents/agents/story-researcher/agent.md`，用 `invoke_subagent` + `TypeName: "story-researcher"`。`solo`、missing/malformed/spawn failed 降级或子代理递归保护场景下不得 spawn，只能在报告中标记“需人工事实核查”。
 4. **分歧呈现**：如果 reviewer 间有冲突意见，明确呈现分歧让用户裁决；不要自动妥协。
-5. 按 SKILL.md「报告面向作者」输出综合审查报告：开头说明审查方式与范围，证据不足项写成作者能补的材料，执行路径只进技术备注行。
+5. 按 SKILL.md「报告面向作者」输出综合审查报告：开头说明审查方式与范围，证据不足项写成作者能补的材料，不另加技术备注行。
 
 ## 报告模板
 
@@ -179,5 +179,4 @@
 {仅分批审查：留到下一批回头看的问题 + 预计在哪几章兑现；否则删掉本节}
 
 下一步：{例如「说"改第12章"，我按必须改的几处动手」「AI 味集中的段落可以说"去 AI 味"」}
-技术备注：Mode {full | lean}→{full | lean} · Fallback none · Rubric {…} ({file | embedded})
 ```
