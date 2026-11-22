@@ -426,18 +426,19 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('作者已定：题材定位里没有或为空，未注入', self.build().stdout)
 
     def test_builder_matches_genre_cards_when_the_book_has_none(self):
-        # 新书第 1 章还没有题材正文提示卡：脚本按「题材类型」匹配卡，主会话不必整读 3K 的索引。
+        # 新书第 1 章还没有题材正文提示卡：脚本按「题材类型」匹配 references/genre-styles/ 流派包。
         (self.book / '设定/题材正文提示卡.md').unlink()
         self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：都市日常 · 豪门总裁\n')
         result = self.build()
         self.assertEqual(result.returncode, 0, result.stderr)
-        cards = SCRIPTS.parent / 'references' / 'genre-prose-cards'
-        self.assertIn(f"主题材 {cards / '都市日常.md'}（置信度 high）；辅题材 {cards / '豪门总裁.md'}", result.stdout)
+        cards = SCRIPTS.parent / 'references' / 'genre-styles'
+        self.assertIn(f"主题材 {cards / '都市日常神豪.md'}（置信度 high）；辅题材 {cards / '豪门虐恋追妻.md'}", result.stdout)
         self.assertIn('召回降档：不成立（题材正文提示卡缺有效内容）', result.stdout)
-        # 最长匹配优先：「玄幻言情」「仙侠言情」里的「玄幻」「仙侠」是别的卡的短别名，不能抢走主卡。
-        for line, main, loser in [('玄幻言情', '玄幻言情.md', '传统玄幻.md'),
-                                  ('仙侠言情', '玄幻言情.md', '东方仙侠.md'),
-                                  ('传统玄幻 · 玄幻言情', '传统玄幻.md', None)]:
+        self.assertIn('——— 语感锚点切片', result.stdout)
+        # 最长匹配优先：「玄幻言情」「仙侠言情」里的「玄幻」「仙侠」是别的包的短别名，不能抢走主包。
+        for line, main, loser in [('玄幻言情', '古言宅斗重生.md', '传统玄幻仙侠.md'),
+                                  ('仙侠言情', '古言宅斗重生.md', '传统玄幻仙侠.md'),
+                                  ('传统玄幻 · 玄幻言情', '传统玄幻仙侠.md', None)]:
             with self.subTest(genre=line):
                 self.put('设定/题材定位.md', f'# 题材定位\n- 题材类型：{line}\n')
                 out = self.build().stdout
@@ -445,15 +446,33 @@ class PipelineTests(unittest.TestCase):
                 if loser:
                     self.assertNotIn(str(cards / loser), out)
                 else:
-                    self.assertIn(f"辅题材 {cards / '玄幻言情.md'}", out)
-        # 匹配不到时给流派兜底卡，和命中走同一条路（同一行点名卡的路径）。
+                    self.assertIn(f"辅题材 {cards / '古言宅斗重生.md'}", out)
+        # 匹配不到时给通用长篇兜底包，和命中走同一条路（同一行点名包的路径）。
         self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：蒸汽朋克考古\n')
         out = self.build().stdout
         self.assertIn('题材卡无匹配', out)
-        self.assertIn(f"主题材 {cards / '流派兜底.md'}（置信度 low）", out)
-        # 兜底卡不参与按名匹配：它的名字写进题材类型也不会被当成真题材卡。
+        self.assertIn(f"主题材 {cards / '通用长篇.md'}（置信度 low）", out)
+        # 兜底包不参与按名匹配：命中真实题材时不会出现通用长篇。
         self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：都市日常\n')
-        self.assertNotIn('流派兜底.md', self.build().stdout)
+        self.assertNotIn('通用长篇.md', self.build().stdout)
+
+    def test_prose_anchor_injected_even_under_recall_downgrade(self):
+        # 召回降档成立时，仍必须注入语感锚点切片（优先主对标文风原文锚点，否则流派包内置切片）。
+        self.set_inputs_for_downgrade(self.volume.read_text(encoding='utf-8'))
+        self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：都市脑洞\n- 主对标书：无\n')
+        downgraded = self.build()
+        self.assertEqual(downgraded.returncode, 0, downgraded.stderr)
+        self.assertIn('召回降档：成立', downgraded.stdout)
+        self.assertIn('——— 语感锚点切片', downgraded.stdout)
+        self.assertIn('流派包「都市脑洞系统」内置原文切片', downgraded.stdout)
+        # 有主对标文风原文锚点时优先注入对标切片
+        self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：都市脑洞\n- 主对标书：测试热书\n')
+        self.put('对标/测试热书/文风.md', '# 文风\n## 原文锚点片段\n### 片段 1：开篇抓手\n```text\n“把合同撕了。”\n他把黑卡甩在桌上。\n```\n')
+        with_bench = self.build()
+        self.assertEqual(with_bench.returncode, 0, with_bench.stderr)
+        self.assertIn('召回降档：成立', with_bench.stdout)
+        self.assertIn('主对标「测试热书」文风原文锚点', with_bench.stdout)
+        self.assertIn('把合同撕了', with_bench.stdout)
 
     def test_bare_out_archives_into_book_work_dir(self):
         result = self.call('build_writer_prompt.py', '--project', self.book, '--chapter', 1, '--out')
@@ -641,37 +660,30 @@ class PipelineTests(unittest.TestCase):
 
 
     def test_architect_brief_carries_only_the_moment_files(self):
-        # 开书按作者确认点分时刻：卷纲任务包只带卷纲时刻的流程、模板与技法，细纲任务包只带细纲时刻的；
+        # 开书按作者确认点分时刻：卷纲任务包只带卷纲时刻的流程、模板与流派包，细纲任务包只带细纲时刻的；
         # 主会话不读包，story-architect 在新上下文里只读包和项目文件。
-        bundle = SCRIPTS.parents[1] / 'story-setup' / 'references' / 'agent-references'
         vol = self.call('build_architect_brief.py', '--project', self.book, '--task', 'volume', '--volume', 1)
         self.assertEqual(vol.returncode, 0, vol.stderr)
         info = json.loads(vol.stdout)
         text = Path(info['brief']).read_text(encoding='utf-8')
         self.assertEqual(Path(info['brief']).parent, self.book / '.story' / 'work' / '排纲')
-        self.assertEqual(info['includes'], ['workflow-volume.md（排纲方法）', 'artifact-protocols.md',
-                                            'outline-methods.md（卷纲排法）',
-                                            'reader-contract-and-progression.md', 'SKILL.md（新增物三级）',
-                                            '按条件可读（包外）'])
-        # 包外读不到 SKILL.md：新增物三级判据随包；流程点名的条件参考给出 agent 副本路径与小节，路径都要在副本里。
+        self.assertEqual(info['includes'], ['flow-opening-plan.md（排纲方法）', 'flow-opening-plan.md（大纲与卷纲模板）',
+                                            'SKILL.md（新增物三级）', '按条件可读（包外）'])
+        # 包外读不到 SKILL.md：新增物三级判据随包；条件参考指向包外 benchmark-recall.md。
         self.assertIn('**先问作者**：新主线事件或反转', text)
-        self.assertIn('agent-references/long-reversal.md` 「反转类型」一节', text)
-        self.assertNotIn('## 情感虐心三板斧', text)
-        # 卷纲排法每次随包；常见的八步结构、情绪模块公式、换地图按条件在包外读。
-        self.assertIn('### 剧情单元设计', text)
-        self.assertNotIn('## 常见的八步结构', text)
-        self.assertNotIn('## 情绪模块公式', text)
-        self.assertIn('agent-references/outline-methods.md` 「常见的八步结构」一节', text)
-        self.assertIn('agent-references/character-relations.md` 「感情线阶段」一节', text)
-        # 流程文件只截「排纲方法」：主会话的读取清单与作者汇报模板不进包。
-        self.assertIn('## 排纲方法', text)
-        self.assertIn('### 排纲刻度', text)
+        self.assertIn('references/benchmark-recall.md` 整份', text)
+        # 卷纲任务包带排纲方法与大纲/卷纲模板，主会话调度与细纲模板不进包。
+        self.assertIn('## 排纲方法（卷纲）', text)
+        self.assertIn('排纲刻度与松紧', text)
         self.assertIn('并补齐 `设定/题材定位.md`「题材框架」的「关键转折节点」', text)
-        self.assertIn('**设定/题材定位.md「题材框架」**', text)
         self.assertNotIn('<!-- author-report -->', text)
-        self.assertNotIn('## 主会话', text)
+        self.assertNotIn('## 主会话：立项与调度', text)
         self.assertNotIn('## 细纲（第 N 章）', text)
         self.assertLess(info['chars'], 30000)
+        # 设定/题材定位.md 写了题材类型时，自动附带命中的 1 份 genre-styles 流派包。
+        self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：都市脑洞\n')
+        vol_with_pack = json.loads(self.call('build_architect_brief.py', '--project', self.book, '--task', 'volume', '--volume', 1).stdout)
+        self.assertIn('genre-styles/都市脑洞系统.md', vol_with_pack['includes'])
         # story-architect 不能执行命令：覆盖本批章节的单元闭包由脚本取好放进包里。
         self.volume.write_text(self.volume_text() + '### 剧情单元 L1-02\n> 作用域：单元级 L1-02\n'
                                '- 章节范围：第4-12章\n- 单元情绪引擎：保管→被追查→反将一军\n', encoding='utf-8')
@@ -679,10 +691,10 @@ class PipelineTests(unittest.TestCase):
                                      '--chapters', '1-3').stdout)
         later = json.loads(self.call('build_architect_brief.py', '--project', self.book, '--task', 'outline',
                                      '--chapters', '4-10').stdout)
-        self.assertIn('opening-design.md（开篇规划）', first['includes'])
-        self.assertFalse(any(name.startswith('opening-design.md') for name in later['includes']))
-        self.assertIn('plot-core-methods.md', first['includes'])
-        self.assertIn('plot-core-methods.md（不含开篇噱头）', later['includes'])
+        self.assertIn('flow-outline.md（排纲方法·含黄金三章）', first['includes'])
+        self.assertIn('flow-outline.md（排纲方法）', later['includes'])
+        self.assertNotIn('flow-outline.md（排纲方法·含黄金三章）', later['includes'])
+        self.assertIn('genre-styles/都市脑洞系统.md', first['includes'])
         self.assertTrue(any('剧情段 L1-01' in name for name in first['includes']))
         self.assertTrue(any('剧情段 L1-02' in name for name in later['includes']))
         self.assertFalse(any('剧情段 L1-01' in name for name in later['includes']))
@@ -707,42 +719,23 @@ class PipelineTests(unittest.TestCase):
                                      '--chapters', '30-31', '--rules-only').stdout)
         self.assertFalse(any('卷纲取段' in name for name in rules['includes']))
         self.assertIn('## 细纲（第 N 章）', outline_text)
-        self.assertIn('## 开篇规划', outline_text)
-        self.assertNotIn('## 开篇落笔', outline_text)
-        self.assertIn('## 高潮构建公式', outline_text)
-        self.assertIn('## 噱头分类与开篇流程', outline_text)
+        self.assertIn('### 黄金三章规划', outline_text)
+        self.assertIn('### 高频章首 / 章尾硬钩子', outline_text)
+        self.assertNotIn('留白钩子', outline_text)
         self.assertNotIn('<!-- author-report -->', outline_text)
         later_text = Path(later['brief']).read_text(encoding='utf-8')
-        self.assertIn('## 高潮构建公式', later_text)
-        self.assertNotIn('## 噱头分类与开篇流程', later_text)
-        # 细纲模板要求从章首 7 式、章尾 13 式里选：两张表随包，实战模板不进包。
-        self.assertIn('## 章尾钩子 13 式', outline_text)
-        self.assertIn('## 章首钩子 7 式', outline_text)
-        self.assertNotIn('## 章尾实战模板', outline_text)
-        # 只带名称与公式两列，示例句不进包（细纲会照抄示例的句子形状）。
-        self.assertIn('| 13 | 留白钩子 | 只展示反应，不揭示发生了什么 |\n', outline_text)
-        self.assertNotIn('他看了信', outline_text)
-        self.assertIn('long-chapter-hooks.md（章尾钩子 13 式、章首钩子 7 式）', later['includes'])
-        # 角色卡按围栏标签只取模板本身：反派设计等方法不进细纲任务包。
+        self.assertIn('### 爽点倒推与高潮构建', later_text)
+        self.assertNotIn('### 黄金三章规划', later_text)
+        # 角色卡按围栏标签只取模板本身。
         self.assertIn('### 设定/角色/{名}.md（主角）', outline_text)
         self.assertIn('角色定位：', outline_text)
-        self.assertNotIn('第3节：反派设计', outline_text)
-        self.assertIn('outline-template.md', first['includes'])  # 细纲与排纲笔记模板整份进包
-        self.assertIn('## 排纲笔记（', outline_text)
+        self.assertIn('flow-outline.md（细纲与排纲笔记模板）', first['includes'])
+        self.assertIn('排纲笔记', outline_text)
         world = json.loads(self.call('build_architect_brief.py', '--project', self.book, '--task', 'world').stdout)
         world_text = Path(world['brief']).read_text(encoding='utf-8')
-        self.assertIn('## 作者已定', world_text)  # 设定模板随包，定方向落盘的作者决定有处可读
-        self.assertIn('核心梗三层递进设计', world_text)
-        self.assertIn('## 金手指', world_text)
-        self.assertIn('agent-references/character-relations.md` 「感情线阶段」一节', world_text)
-        self.assertNotIn('## 微创新与差异化设计', world_text)
-        self.assertNotIn('## 感情流人设核心法', world_text)
-        self.assertNotIn('全书体量与阶段总览', world_text)
-        self.assertNotIn('主会话自己定设定时读', world_text)  # 主会话的读取清单不进包
-        self.assertIn('agent-references/female-audience-writing.md` 整份', world_text)
-        for brief_text in (text, outline_text, world_text):
-            for name in re.findall(r'`agent-references/([\w-]+\.md)`', brief_text):
-                self.assertTrue((bundle / name).is_file(), name)
+        self.assertIn('## 作者已定', world_text)
+        self.assertIn('核心梗三层与金手指', world_text)
+        self.assertNotIn('## 主会话：立项与调度', world_text)
         self.assertIn('按下附「新增物三级」属问作者', world_text)
         # 定设定多一份全书梗概：任务包点名要写它，模板随包，结局一节写明可空。
         self.assertIn('`设定/全书梗概.md`', world_text)
@@ -750,16 +743,14 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('「题材框架」留到出卷纲补', world_text)
         self.assertIn('## 核心设定\n', world_text)
         self.assertIn('## 题材框架\n', world_text)
-        self.assertNotIn('（定设定时填）', world_text)
-        self.assertNotIn('（出卷纲时补）', world_text)
         # 细纲模板是新写法：「这章怎么走」、默认三列情节点表，「这章不能说破」挪进可选块，不再写字数口径。
         self.assertIn('#### 这章怎么走', outline_text)
         self.assertIn('| # | 情节点（谁做了什么） | 作用 |\n', outline_text)
-        self.assertIn('- 这章不能说破：{这章确有一件具体的事要压住时才写一行', outline_text)
+        self.assertIn('- 这章不能说破：', outline_text)
         self.assertNotIn('- 字数口径：', outline_text)
-        self.assertNotIn('<!-- {单元编号', outline_text)  # 「属于哪段剧情」不再写编号注释
-        # 前 3 章细纲要排一次正面冲突、按题材量级立起切身赌注。
-        self.assertIn('正面冲突', outline_text)
+        self.assertNotIn('<!-- {单元编号', outline_text)
+        # 前 3 章细纲要排正面交锋、立起切身赌注。
+        self.assertIn('正面交锋', outline_text)
         self.assertIn('切身赌注', outline_text)
         too_many = self.call('build_architect_brief.py', '--project', self.book, '--task', 'outline', '--chapters', '1-11')
         self.assertEqual(too_many.returncode, 2)
@@ -999,10 +990,10 @@ class ImportOutlineBriefTests(unittest.TestCase):
 
 
 class VolumeTemplateContractTests(unittest.TestCase):
-    """artifact-protocols.md 的卷纲模板原样落盘，必须过取段器的严格校验。"""
+    """flow-opening-plan.md 的卷纲模板原样落盘，必须过取段器的严格校验。"""
 
     def test_template_passes_strict_check(self):
-        doc = (ROOT / 'skills/story-long-write/references/artifact-protocols.md').read_text(encoding='utf-8')
+        doc = (ROOT / 'skills/story-long-write/references/flow-opening-plan.md').read_text(encoding='utf-8')
         template = template_block(doc, '卷纲')  # 与任务包同一取法：按围栏标签取
         with tempfile.TemporaryDirectory(prefix='volume-template-') as tmp:
             volume = Path(tmp) / '大纲' / '卷纲_第一卷.md'

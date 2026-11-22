@@ -43,8 +43,8 @@ const LONG_WRITE_WORKFLOWS = new Set([
   '长篇', '长篇写作', '写长篇', '长篇连载', '长篇网文', '长篇正文', 'story-long-write',
 ]);
 const WORKSPACE_MARKERS = ['.active-book', '长篇', '短篇', '拆文库'];
-const GENRE_CARD_DIR = path.resolve(__dirname, '..', 'references', 'genre-prose-cards');
-const FALLBACK_CARD = path.join(GENRE_CARD_DIR, '流派兜底.md');
+const GENRE_CARD_DIR = path.resolve(__dirname, '..', 'references', 'genre-styles');
+const FALLBACK_CARD = path.join(GENRE_CARD_DIR, '通用长篇.md');
 
 function isFile(p) {
   try {
@@ -412,6 +412,106 @@ function matchGenreCards(project) {
   return hits.length ? hits.slice(0, 2).map((h) => [h.card, h.level]) : fallback;
 }
 
+function findPrimaryBenchmarkName(project) {
+  const text = (readText(path.join(project, '设定', '题材定位.md')) || '').replace(/<!--[\s\S]*?-->/g, '');
+  const mine = ownNames(project);
+  const cleanName = (raw) =>
+    raw
+      .replace(/[（(][^）)]*[）)]/g, '')
+      .replace(/^《+|》+$/g, '')
+      .split(/[、,，/｜|]/)[0]
+      .trim();
+  const explicit = /^[ \t>]*(?:[-*+][ \t]*)?\**主对标书\**[ \t]*[：:][ \t]*(.*)$/m.exec(text);
+  if (explicit) {
+    const v = explicit[1].trim();
+    if (v && !v.startsWith('{') && !v.startsWith('｛') && !/^(无|不对标|都不用|没有)/.test(v)) {
+      const name = cleanName(v);
+      if (name && !mine.has(name)) return name;
+    }
+  }
+  const secMatch = /^##[ \t]*对标登记[^\n]*\n([\s\S]*?)(?=^##[ \t]|$(?![\r\n]))/m.exec(text);
+  if (secMatch) {
+    for (const line of secMatch[1].split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('|')) continue;
+      const cells = trimmed.replace(/^\|+|\|+$/g, '').split('|').map((c) => c.trim());
+      if (
+        cells.length &&
+        cells[0] &&
+        cells[0] !== '书名' &&
+        !/^[-:\s]+$/.test(cells[0]) &&
+        !cells[0].startsWith('{')
+      ) {
+        const name = cleanName(cells[0]);
+        if (name && !mine.has(name)) return name;
+      }
+    }
+  }
+  return null;
+}
+
+function findBenchmarkStyleFile(project) {
+  const name = findPrimaryBenchmarkName(project);
+  if (!name) return null;
+  const candidates = [
+    path.join(project, '对标', name, '文风.md'),
+    path.join(project, '拆文库', name, '文风.md'),
+    path.join(path.dirname(project), '拆文库', name, '文风.md'),
+  ];
+  for (const file of candidates) {
+    if (isFile(file)) return { file, name };
+  }
+  return null;
+}
+
+function extractProseSlices(text, chapter = 1, maxSlices = 2) {
+  if (!text) return null;
+  const lines = text.split('\n');
+  const slices = [];
+  let i = 0;
+  while (i < lines.length) {
+    const h = /^###\s+(.+)$/.exec(lines[i]);
+    if (h && /(?:切片|片段|原文|锚点)/.test(h[1])) {
+      const title = h[1].trim();
+      let j = i + 1;
+      const bodyLines = [];
+      let inFence = false;
+      let sawFence = false;
+      while (j < lines.length && !/^#{1,3}\s+/.test(lines[j])) {
+        const ln = lines[j];
+        if (/^\s*```/.test(ln)) {
+          inFence = !inFence;
+          sawFence = true;
+          j += 1;
+          continue;
+        }
+        if (inFence || !sawFence) {
+          bodyLines.push(ln);
+        }
+        j += 1;
+      }
+      const cleaned = bodyLines
+        .map((ln) => ln.replace(/^>\s?/, ''))
+        .join('\n')
+        .trim();
+      if (cleaned) {
+        slices.push({ title, body: cleaned });
+      }
+      i = j;
+      continue;
+    }
+    i += 1;
+  }
+  if (!slices.length) return null;
+  let picked;
+  if (slices.length > maxSlices && chapter > 3) {
+    picked = slices.slice(slices.length - maxSlices);
+  } else {
+    picked = slices.slice(0, maxSlices);
+  }
+  return picked.map((s) => `【${s.title}】\n${s.body}`).join('\n\n');
+}
+
 function authorDecided(project) {
   const text = readText(path.join(project, '设定', '题材定位.md')) || '';
   const match = /^##[ \t]*作者已定[^\n]*\n([\s\S]*?)(?=^#{1,2}[ \t]|$(?![\r\n]))/m.exec(text);
@@ -707,27 +807,64 @@ function build(project, chapter, report) {
     report.push(`召回降档：不成立（${why.join('、')}）—— 全量召回归主会话`);
   }
 
+  const matchedCards = matchGenreCards(project);
+  const genrePackLines = matchedCards.length
+    ? matchedCards
+        .map(([card, level], i) => `${i === 0 ? '主' : '辅'}流派包：${card}（置信度 ${level}）`)
+        .join('\n')
+    : `${SLOT_MARK} 未匹配到流派包，请检查 references/genre-styles/`;
+
+  let proseSliceText = null;
+  let proseSliceSource = null;
+  if (!noBenchmark) {
+    const bench = findBenchmarkStyleFile(project);
+    if (bench) {
+      const benchSlices = extractProseSlices(readText(bench.file), chapter, 2);
+      if (benchSlices) {
+        proseSliceText = benchSlices;
+        proseSliceSource = `主对标「${bench.name}」文风原文锚点（${bench.file}）`;
+      }
+    }
+  }
+  if (!proseSliceText && matchedCards.length) {
+    const primaryCard = matchedCards[0][0];
+    const packSlices = extractProseSlices(readText(primaryCard), chapter, 2);
+    if (packSlices) {
+      proseSliceText = packSlices;
+      proseSliceSource = `流派包「${path.basename(primaryCard, '.md')}」内置原文切片`;
+    }
+  }
+  if (proseSliceText) {
+    report.push(`语感锚点：已注入（来源：${proseSliceSource}，召回降档亦必传）`);
+  } else {
+    report.push('语感锚点：未抽到可用原文切片（请按 benchmark-recall.md 手动补 1-2 段 200-300 字原文锚点）');
+  }
+
   parts.push(
     `——— 本章意图（一句话）———\n${SLOT_MARK}`,
     `——— 作者本轮要求 ———\n${SLOT_MARK} 本轮字数范围、必发生、禁发生、停笔点与章尾要求；无写「无」。`,
     slotRecall,
-    `——— 本章技法 ———\n${SLOT_MARK} 填 SKILL.md「本章技法」类别之一（无写「无」）及用在何处；不摘技法。`,
+    `——— 本章流派包 ———\n${genrePackLines}`,
+    ...(proseSliceText
+      ? [
+          `——— 语感锚点切片（只学断行、句长、口语节奏与标点力度，严禁照抄人名/台词/桥段）———\n${proseSliceText}`,
+        ]
+      : []),
     `——— 本节速记 ———\n${SLOT_MARK} 筛自 \`追踪/上下文.md\`：在场角色状态、下章承诺、连贯性风险、活跃伏笔（只给禁令，不下放作者侧真相）、本章相关卷级禁忌、久别角色是否补读快照。`,
     `——— 涉及角色 ———\n${SLOT_MARK} 列出本章要读的角色卡（本节速记已给全状态者不列）。`
   );
 
   if (!substantive(cardText)) {
-    const cards = matchGenreCards(project);
-    if (cards.length) {
-      const named = cards
+    if (matchedCards.length) {
+      const named = matchedCards
         .map(([card, level], i) => `${i === 0 ? '主' : '辅'}题材 ${card}（置信度 ${level}）`)
         .join('；');
-      const howCard = cards[0][0] === FALLBACK_CARD ? '（题材卡无匹配，用流派兜底卡：只抽最接近的流派一节）' : '';
+      const howCard = matchedCards[0][0] === FALLBACK_CARD ? '（题材卡无匹配，用通用长篇兜底包）' : '';
       report.push(
-        `题材卡：本书还没有题材正文提示卡，按「题材类型」匹配到 ${named}${howCard}；按 genre-prose-cards.md「全书题材正文提示卡」一节生成后落盘，后续章直接读`
+        `题材卡：本书还没有题材正文提示卡，按「题材类型」匹配到 ${named}${howCard}；可提炼 3-5 条关键口径写入 设定/题材正文提示卡.md，后续章直接读`
       );
     } else {
-      report.push('题材卡：本书还没有题材正文提示卡，题材卡目录缺失——重跑 /story-setup 或重装本 skill');
+      report.push('题材卡：本书还没有题材正文提示卡，流派包目录缺失——重跑 /story-setup 或重装本 skill');
     }
   }
   parts.push(
