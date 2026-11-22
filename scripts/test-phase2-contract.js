@@ -66,6 +66,10 @@ function validSettings(overrides = {}) {
     ...values.moves.map((move) => `- ${move}`),
     '### 文风约定',
     '- 无',
+    ...(values.lead === null ? [] : [
+      '### 导语草稿',
+      values.lead || '结婚三周年纪念日，我收到一份签好字的离婚协议和一张陌生女人的产检单。',
+    ]),
     '## 构思要点',
     `- ${values.genre}`,
     `- ${values.villain}`,
@@ -413,6 +417,54 @@ try {
     validOutline()
   ), 'phase2.paywall-in-both')
   assert.match(mismatchedPaywall.normal.report.soft_warnings[0].evidence, /声明第 3 节末；大纲标在第 4 节/)
+
+  // SOFT: 缺少导语/冷开场声明 → phase2.lead-declared 软提醒；字段写法、导入书与旧版设定严格通过。
+  assertSoftOnly(writeCase('missing-lead', validSettings({ lead: null }), validOutline()), 'phase2.lead-declared')
+  const fieldLead = run(writeCase(
+    'field-lead',
+    `${validSettings({ lead: null })}- 冷开场：婚宴现场大屏突然放出他与伴娘的转账记录。\n`,
+    validOutline()
+  ), ['--strict'])
+  assert.strictEqual(fieldLead.status, 0, fieldLead.stdout + fieldLead.stderr)
+  const importedNoLead = run(writeCase(
+    'imported-no-lead',
+    `${validSettings({ lead: null })}\n## 已写部分的写法\n- 第一人称冷叙。\n`,
+    validOutline()
+  ), ['--strict'])
+  assert.strictEqual(importedNoLead.status, 0, importedNoLead.stdout + importedNoLead.stderr)
+
+  // SOFT: 付费点位置比例（≥5 节时建议落在 20%–55%）：过晚（7/8）或过早（1/8）给 advisory，<5 节跳过。
+  const lateOutline = validOutline({ includePaywall: false })
+    .replace('真正的主人敲响房门 |', '真正的主人敲响房门（付费点） |')
+  assertSoftOnly(writeCase(
+    'late-paywall-ratio',
+    validSettings({ paywall: '付费点：第 7 节末' }),
+    lateOutline
+  ), 'phase2.paywall-position-ratio')
+  const earlyOutline = validOutline({ includePaywall: false })
+    .replace('她决定去查监控 |', '她决定去查监控（付费点） |')
+  assertSoftOnly(writeCase(
+    'early-paywall-ratio',
+    validSettings({ paywall: '付费点：第 1 节末' }),
+    earlyOutline
+  ), 'phase2.paywall-position-ratio')
+  // 4 节短纲不受 >=5 节付费点位置比例约束
+  const fourSectionOutline = [
+    '# 小节大纲',
+    `| ${headers.join(' | ')} |`,
+    `| ${headers.map(() => '---').join(' | ')} |`,
+    `| ${outlineRow('开头', 1, '开场冲突').join(' | ')} |`,
+    `| ${outlineRow('升级', 2, '秘密曝光').join(' | ')} |`,
+    `| ${outlineRow('反转', 3, '证据砸脸（付费点）').join(' | ')} |`,
+    `| ${outlineRow('结尾', 4, '清算退场').join(' | ')} |`,
+    '',
+  ].join('\n')
+  const shortFourSections = run(writeCase(
+    'four-section-paywall-skip',
+    validSettings({ target: '4000', reversal: '反转在：第 3 节（共 4 节）', paywall: '付费点：第 3 节末' }),
+    fourSectionOutline
+  ), ['--strict'])
+  assert.strictEqual(shortFourSections.status, 0, shortFourSections.stdout + shortFourSections.stderr)
 
   const invalidInvocation = spawnSync(process.execPath, [verifier, '--unknown'], {
     cwd: repoRoot,

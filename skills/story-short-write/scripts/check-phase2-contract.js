@@ -19,7 +19,7 @@ const fs = require('fs')
 const path = require('path')
 
 // 小节大纲按列名找列，不按位置：新旧列名都认，老书的 小节大纲.md 不迁移也能继续写。
-// 第一个名字是现行列名（workflow-design 的小节大纲模板），其余是旧名。
+// 第一个名字是现行列名（SKILL.md 的小节大纲模板），其余是旧名。
 const OUTLINE_COLUMNS = [
   { role: 'stage', names: ['在全篇哪一段', '结构段/五段功能'] },
   { role: 'progress', names: ['这节发生的事', '情节推进', '子事件×3-5'] },
@@ -76,7 +76,7 @@ function verify(projectDir, options = {}) {
     '设定.md',
     settingsRead.ok ? '文件存在且非空' : (settingsRead.error || '文件为空'),
     '项目目录下存在非空的 设定.md',
-    ['references/workflow-design.md'],
+    ['SKILL.md'],
     '只补建或补全 设定.md，不改动已通过的 小节大纲.md。',
     'blocking'
   ))
@@ -86,7 +86,7 @@ function verify(projectDir, options = {}) {
     '小节大纲.md',
     outlineRead.ok ? '文件存在且非空' : (outlineRead.error || '文件为空'),
     '项目目录下存在非空的 小节大纲.md',
-    ['references/workflow-design.md'],
+    ['SKILL.md'],
     '只补建或补全 小节大纲.md，不改动已通过的 设定.md。',
     'blocking'
   ))
@@ -98,7 +98,7 @@ function verify(projectDir, options = {}) {
       '人物表.md',
       charactersRead.ok ? '文件存在且非空' : (charactersRead.error || '文件为空'),
       '项目目录下如创建了 人物表.md，文件应可读且非空',
-      ['references/workflow-design.md'],
+      ['SKILL.md'],
       '补全 人物表.md，或确认人物信息已统一落在 设定.md「人设速写」后删去空文件。',
       'blocking'
     ))
@@ -117,7 +117,7 @@ function verify(projectDir, options = {}) {
     '设定.md',
     platformMatch ? `目标平台：${platformMatch[1]}` : '未找到常见平台表内的目标平台字段',
     '建议写明“目标平台：知乎盐言 / 番茄 / 七猫 / 黑岩 / 小程序”之一；作者没定平台写“未定”',
-    ['references/submission-craft.md'],
+    ['SKILL.md'],
     '复核目标平台：若是自选其他平台，确认后可保留；否则补进 设定.md 基本信息。',
     'advisory'
   ))
@@ -136,10 +136,12 @@ function verify(projectDir, options = {}) {
   if (pathMatch) {
     const resolved = path.resolve(skillRoot, pathMatch[0])
     const insideSkill = resolved.startsWith(`${skillRoot}${path.sep}`)
-    genreOk = insideSkill && fs.existsSync(resolved) && fs.statSync(resolved).isFile()
+    const isLegacyFormula = pathMatch[0] === 'references/genre-writing-formulas.md'
+    genreOk = (insideSkill && fs.existsSync(resolved) && fs.statSync(resolved).isFile()) ||
+      (isLegacyFormula && fs.existsSync(path.join(skillRoot, 'SKILL.md')))
     genreEvidence = genreOk ? `题材：${pathMatch[0]}` : `题材对不到文件：${pathMatch[0]}`
   } else if (/^冷门/.test(genreValue)) {
-    genreOk = fs.existsSync(path.join(skillRoot, 'references', 'genre-writing-formulas.md'))
+    genreOk = fs.existsSync(path.join(skillRoot, 'SKILL.md'))
     genreEvidence = `题材：${genreValue}（冷门题材公式）`
   } else if (genreValue) {
     const named = genreNames.filter((name) => genreValue.startsWith(name)).sort((a, b) => b.length - a.length)[0]
@@ -152,7 +154,7 @@ function verify(projectDir, options = {}) {
     '设定.md',
     genreEvidence,
     `建议在「构思要点」写「题材：题材包名」（${genreNames.join(' / ')} 之一）；冷门题材写「题材：冷门：所用公式名」`,
-    ['references/workflow-design.md', 'references/short-craft.md'],
+    ['SKILL.md', 'references/genre-styles/*.md'],
     '复核题材名：若确属自定义或复合题材可保留；需要对齐题材包时修正「题材：」一行。',
     'advisory'
   ))
@@ -178,7 +180,7 @@ function verify(projectDir, options = {}) {
     '设定.md',
     moves.length ? `识别到 ${moves.length} 个套路` : '「这篇用的套路」下没有条目',
     '建议「这篇用的套路」下写 2-3 条，一条一行（旧书的「核心招式：招式一；招式二」照认）',
-    ['references/workflow-design.md'],
+    ['SKILL.md'],
     '复核套路数量：需要收敛或补足时调到 2-3 条；若篇幅或题材刻意增减，确认后可保留。',
     'advisory'
   ))
@@ -193,7 +195,7 @@ function verify(projectDir, options = {}) {
     '设定.md',
     villainSkipped ? '已明确反派不适用' : (villainOk ? '反派五字段齐全' : `缺字段：${missingVillainFields.join('、')}`),
     '无反派时建议写“反派：没有（原因）”；有反派时建议填写身份、动机、作恶方式、致命弱点、报应',
-    ['references/villain-and-reveal.md'],
+    ['SKILL.md'],
     '复核反派设定：若有具体反派，补齐缺失字段；若确无反派或已用白话说明，确认后可保留。',
     'advisory'
   ))
@@ -213,7 +215,7 @@ function verify(projectDir, options = {}) {
     '设定.md',
     placeholderLines.length ? `仍是模板占位符的行：${placeholderLines.map((entry) => entry.line).join('、')}` : '构思要点与套路没有未填写的 {} 占位符',
     '构思要点与「这篇用的套路」写实际设计内容，不保留 {} 模板占位符',
-    ['references/workflow-design.md'],
+    ['SKILL.md'],
     '只把报告行的占位符替换成本篇的实际设计，不重写其他字段。',
     'blocking'
   ))
@@ -261,7 +263,7 @@ function verify(projectDir, options = {}) {
     '小节大纲.md',
     headerEvidence,
     `表头含这五列：${OUTLINE_HEADERS.join(' | ')}；其余列可选`,
-    ['references/workflow-design.md'],
+    ['SKILL.md'],
     '只修表头缺失或重复的核心列，不改动各节已经成立的剧情内容。',
     'blocking'
   ))
@@ -271,7 +273,7 @@ function verify(projectDir, options = {}) {
     '小节大纲.md',
     unknownCells.length ? `自定义/未登记列：${unknownCells.join('、')}` : '表头无未登记的自定义列',
     `标准列为 ${OUTLINE_HEADERS.join(' | ')} 及已知可选列`,
-    ['references/workflow-design.md'],
+    ['SKILL.md'],
     '复核自定义列：若是有意加的辅助列且每行对齐，可保留；若是写错列名，改回标准列名。',
     'advisory'
   ))
@@ -296,7 +298,7 @@ function verify(projectDir, options = {}) {
     '小节大纲.md',
     rows.length === 0 ? '表头下没有数据行' : (rowShapeFailures.length ? `列数错误行：${rowShapeFailures.map((row) => row.line).join('、')}` : `识别到 ${rows.length} 节，列数与表头一致`),
     '表头下至少一行数据，每节的列数与表头一致',
-    ['references/workflow-design.md'],
+    ['SKILL.md'],
     '只补缺失节或修复报告行的列错位。',
     'blocking'
   ))
@@ -312,7 +314,7 @@ function verify(projectDir, options = {}) {
       ? `「这节发生的事」为空的行：${emptyProgress.join('、')}`
       : (shapedRows.length ? `所有 ${shapedRows.length} 节都写了这节发生的事` : '表头或列数有误，见前两项'),
     '每节写一句这节发生的事，不设数量',
-    ['references/workflow-design.md'],
+    ['SKILL.md'],
     '只补报告行的「这节发生的事」，不重写其他列或其他节；不要为数量补事件。',
     'blocking'
   ))
@@ -343,7 +345,7 @@ function verify(projectDir, options = {}) {
     '设定.md',
     statedTarget === null ? '目标字数未识别或不可解析' : `设定目标：${isRange ? `${targetLow}-${targetHigh}` : statedTarget}`,
     '设定.md 的目标字数为 1000-200000 的正整数或区间（低值 ≤ 高值）',
-    ['references/workflow-design.md', 'references/submission-craft.md'],
+    ['SKILL.md'],
     '只在 设定.md 基本信息补或修正可解析的目标字数。',
     'blocking'
   ))
@@ -358,7 +360,7 @@ function verify(projectDir, options = {}) {
     '设定.md、小节大纲.md',
     `设定目标：${statedTarget === null ? '未识别' : (isRange ? `${targetLow}-${targetHigh}` : statedTarget)}；大纲合计：${targetSum === null ? '有非数字目标字数' : targetSum}`,
     '建议大纲每行目标字数可解析，写区间时合计落在区间内，写单值时误差不超过 5%',
-    ['references/workflow-design.md', 'references/submission-craft.md'],
+    ['SKILL.md'],
     '复核各节目标字数合计：若偏差过大请微调分配，不要用增删剧情绕过数字偏差。',
     'advisory'
   ))
@@ -383,7 +385,7 @@ function verify(projectDir, options = {}) {
     '设定.md',
     reversalEvidence,
     '有反转时建议写“反转在：第 X 节（共 Y 节）”，X 在大纲节数之内；无反转时写“反转类型：无反转”和带原因的“反转在：不适用（…）”',
-    ['references/workflow-design.md', 'references/short-reversal.md'],
+    ['SKILL.md'],
     '复核反转节号是否超出大纲节数；无反转篇若已说明思路，确认后可保留。',
     'advisory'
   ))
@@ -407,8 +409,60 @@ function verify(projectDir, options = {}) {
     '设定.md、小节大纲.md',
     paywallEvidence,
     '有付费断点需求的平台建议在 设定.md 写“付费点：第 X 节末”，并在小节大纲.md 对应节「节尾停在哪」标出',
-    ['references/submission-craft.md', 'references/workflow-design.md'],
+    ['SKILL.md'],
     '复核付费点：若目标平台需单一付费断点则两边对齐；若是免费/非付费卡点形态，确认后可保留。',
+    'advisory'
+  ))
+
+  // 导语/冷开场声明（advisory）：导入书与 0.9.x 旧版设定跳过以保持严格向后兼容。
+  const isImportedOrLegacySettings =
+    /^#{1,6}[ \t]*(?:已写部分的写法|本书续写基线|Phase 2 设计校验)/m.test(settings)
+  let leadOk = false
+  let leadEvidence = '设定.md 未声明导语或冷开场'
+  if (isImportedOrLegacySettings) {
+    leadOk = true
+    leadEvidence = '导入或旧版设定，跳过导语声明检查'
+  } else {
+    const leadSection = settings.match(/^#{2,6}[ \t]*[^\n]*(?:导语|冷开场)[^\n]*\n([\s\S]*?)(?=^#{1,6}[ \t]|(?![\s\S]))/m)
+    const leadBody = leadSection
+      ? leadSection[1].split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !/^<!--.*-->$/.test(line) && !/^\{[^}]*\}$/.test(line) && line !== '[待补充]')
+      : []
+    const leadField = settings.match(/^[ \t]*[-*]?[ \t]*(?:导语|冷开场)[^：:\n]*[：:][ \t]*([^\n]+)$/m)
+    const leadFieldVal = leadField ? leadField[1].trim() : ''
+    const hasLeadField = Boolean(leadFieldVal) && !/^\{[^}]*\}$/.test(leadFieldVal) && leadFieldVal !== '[待补充]' && leadFieldVal !== '无'
+    if (leadBody.length > 0 || hasLeadField) {
+      leadOk = true
+      leadEvidence = leadBody.length > 0 ? '设定.md 已包含导语/冷开场小节' : '设定.md 已声明导语/冷开场字段'
+    }
+  }
+  checks.push(makeCheck(
+    'phase2.lead-declared',
+    leadOk,
+    '设定.md',
+    leadEvidence,
+    '建议在 设定.md 声明导语/冷开场（150-300 字开篇卖点与钩子），便于进入正文即冷开入冲突',
+    ['SKILL.md'],
+    '复核导语：若本篇走网文短篇冷开场，在 设定.md 补一段导语草稿或冷开场要点；若刻意省略导语可保留。',
+    'advisory'
+  ))
+
+  // 付费点位置比例（advisory）：大纲 ≥5 节且声明了付费点时，建议落在全文 20%-55% 区间。
+  let paywallRatioOk = true
+  let paywallRatioEvidence = '未声明付费点或总节数不足 5 节，跳过付费点位置比例检查'
+  if (paywallSection !== null && rows.length >= 5) {
+    const ratio = paywallSection / rows.length
+    const pct = Math.round(ratio * 100)
+    paywallRatioOk = ratio >= 0.20 && ratio <= 0.55
+    paywallRatioEvidence = `付费点在第 ${paywallSection} 节 / 共 ${rows.length} 节（${pct}%）`
+  }
+  checks.push(makeCheck(
+    'phase2.paywall-position-ratio',
+    paywallRatioOk,
+    '设定.md、小节大纲.md',
+    paywallRatioEvidence,
+    '总节数 ≥5 节时，建议付费点落在全文 20%-55% 区间（通常第 2-4 节末）',
+    ['SKILL.md'],
+    '复核付费点位置：偏后容易拖慢免费段转折，偏前容易铺垫不足；按平台试读比例微调或确认保留。',
     'advisory'
   ))
 

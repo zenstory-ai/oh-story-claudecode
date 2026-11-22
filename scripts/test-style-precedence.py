@@ -39,7 +39,8 @@ class StyleTests(unittest.TestCase):
         return self.node(SCRIPTS / 'check-ai-patterns.js', '--json', f'--fail-on={fail_on}', self.file)
 
     def test_default_check_still_blocks(self):
-        self.file.write_text('## 第1章 门\n“钥匙在——”\n钥匙在手——门开了。\n' + BLOCKING_NOT_IS, encoding='utf-8')
+        dashes = '\n'.join(f'钥匙在手第{i}次——门开了。' for i in range(1, 7))
+        self.file.write_text('## 第1章 门\n“钥匙在——”\n' + dashes + '\n' + BLOCKING_NOT_IS, encoding='utf-8')
         self.assertEqual(self.scan('blocking').returncode, 0)
         result = self.scan()
         self.assertEqual(result.returncode, 1, result.stderr)
