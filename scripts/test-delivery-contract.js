@@ -27,9 +27,9 @@ function writeCase(name, text) {
   return dir
 }
 
-function run(dir, values = ['6000', '8000', '6'], minSectionChars, checkContract = false) {
+function run(dir, values = ['6000', '8000', '6'], minSectionChars, checkContract = false, extraArgs = []) {
   const result = spawnSync(process.execPath, [
-    verifier, '--json', '--min-chars', values[0], '--max-chars', values[1],
+    verifier, '--json', ...extraArgs, '--min-chars', values[0], '--max-chars', values[1],
     '--sections', values[2], ...(minSectionChars === undefined ? [] : ['--min-section-chars', String(minSectionChars)]),
     ...(checkContract ? ['--check-contract'] : []), dir,
   ], { cwd: repoRoot, encoding: 'utf8' })
@@ -40,68 +40,118 @@ function run(dir, values = ['6000', '8000', '6'], minSectionChars, checkContract
 function failureIds(result) {
   return result.report.failures.map((failure) => failure.id)
 }
+function hardIds(result) {
+  return result.report.hard_failures.map((failure) => failure.id)
+}
+function softIds(result) {
+  return result.report.soft_warnings.map((warning) => warning.id)
+}
+
+function assertSoftOnly(dir, expectedId, values = ['6000', '8000', '6'], minSectionChars) {
+  const normal = run(dir, values, minSectionChars)
+  assert.strictEqual(normal.status, 0, `${expectedId} normal: ${normal.stdout}${normal.stderr}`)
+  assert.strictEqual(normal.report.ok, true)
+  assert.strictEqual(normal.report.status, 'warn')
+  assert.deepStrictEqual(hardIds(normal), [])
+  assert.deepStrictEqual(failureIds(normal), [])
+  assert(softIds(normal).includes(expectedId), `expected soft warning ${expectedId}, got ${JSON.stringify(softIds(normal))}`)
+  assert(normal.report.findings.some((f) => f.id === expectedId && f.severity === 'advisory'))
+  assert(normal.report.review_scope.some((f) => f.id === expectedId))
+
+  const strict = run(dir, values, minSectionChars, false, ['--strict'])
+  assert.strictEqual(strict.status, 1, `${expectedId} --strict should exit 1`)
+  assert.strictEqual(strict.report.ok, false)
+  assert.strictEqual(strict.report.strict, true)
+  assert.strictEqual(strict.report.status, 'fail')
+  assert.deepStrictEqual(hardIds(strict), [])
+  assert(softIds(strict).includes(expectedId))
+  assert(failureIds(strict).includes(expectedId))
+  assert(strict.report.repair_scope.some((f) => f.id === expectedId))
+  return { normal, strict }
+}
 
 try {
-  const good = run(writeCase('valid', body()))
+  const validDir = writeCase('valid', body())
+  const good = run(validDir)
   assert.strictEqual(good.status, 0, good.stdout + good.stderr)
   assert.strictEqual(good.report.ok, true)
+  assert.strictEqual(good.report.status, 'pass')
+  assert.deepStrictEqual(good.report.hard_failures, [])
+  assert.deepStrictEqual(good.report.soft_warnings, [])
+  assert.deepStrictEqual(good.report.findings, [])
   assert.strictEqual(good.report.contract.metric, 'non_whitespace_unicode_chars_v1')
+  assert.strictEqual(run(validDir, ['6000', '8000', '6'], undefined, false, ['--strict']).status, 0)
 
+  // SOFT: per-section floor (--min-section-chars) → soft_warnings (exit 0), --strict → exit 1.
   const lopsided = Array.from({ length: 6 }, (_, index) => `###${index + 1}.\n${'字'.repeat(index === 1 ? 5980 : 1)}`).join('\n')
-  const unbalanced = run(writeCase('unbalanced', lopsided), undefined, 800)
-  assert.strictEqual(unbalanced.status, 1, unbalanced.stdout + unbalanced.stderr)
-  assert.deepStrictEqual(unbalanced.report.failures.map((f) => f.section), [1, 3, 4, 5, 6])
-  assert(unbalanced.report.failures.every((f) => f.id === 'delivery.section-min-chars' && f.actual_chars === 1))
+  const unbalanced = assertSoftOnly(writeCase('unbalanced', lopsided), 'delivery.section-min-chars', ['6000', '8000', '6'], 800)
+  assert.deepStrictEqual(unbalanced.normal.report.soft_warnings.map((f) => f.section), [1, 3, 4, 5, 6])
+  assert(unbalanced.normal.report.soft_warnings.every((f) => f.id === 'delivery.section-min-chars' && f.actual_chars === 1))
+  assert.deepStrictEqual(unbalanced.strict.report.failures.map((f) => f.section), [1, 3, 4, 5, 6])
 
   for (const floor of [500, 800]) {
     for (const actual of [floor - 1, floor]) {
-      const result = run(writeCase(`floor-${floor}-${actual}`, body(actual, 1)), ['1', '2000', '1'], floor)
-      assert.strictEqual(result.status, actual < floor ? 1 : 0, result.stdout + result.stderr)
-      assert.strictEqual(result.report.contract.min_section_chars, floor)
-      if (actual < floor) assert.strictEqual(result.report.failures[0].actual_chars, actual)
+      const dir = writeCase(`floor-${floor}-${actual}`, body(actual, 1))
+      const normal = run(dir, ['1', '2000', '1'], floor)
+      assert.strictEqual(normal.status, 0, normal.stdout + normal.stderr)
+      assert.strictEqual(normal.report.contract.min_section_chars, floor)
+      const strict = run(dir, ['1', '2000', '1'], floor, false, ['--strict'])
+      assert.strictEqual(strict.status, actual < floor ? 1 : 0, strict.stdout + strict.stderr)
+      if (actual < floor) assert.strictEqual(normal.report.soft_warnings[0].actual_chars, actual)
     }
   }
   // Marker text and whitespace do not satisfy the body floor; Unicode code points do.
-  const unicode = run(writeCase('unicode-floor', '###1.\n😀 甲\n'), ['1', '100', '1'], 2)
+  const unicode = run(writeCase('unicode-floor', '###1.\n😀 甲\n'), ['1', '100', '1'], 2, false, ['--strict'])
   assert.strictEqual(unicode.status, 0, unicode.stdout + unicode.stderr)
   for (const value of ['0', '-1', '1.5', 'bad']) {
     const result = run(writeCase(`invalid-floor-${value}`, body()), undefined, value)
     assert.strictEqual(result.status, 2)
   }
 
-  const goodZhihu = run(writeCase('valid-zhihu', body(1000, 6, 'zhihu')))
+  const goodZhihu = run(writeCase('valid-zhihu', body(1000, 6, 'zhihu')), ['6000', '8000', '6'], undefined, false, ['--strict'])
   assert.strictEqual(goodZhihu.status, 0, goodZhihu.stdout + goodZhihu.stderr)
 
-  const tooLong = run(writeCase('too-long', body(1400)))
-  assert.strictEqual(tooLong.status, 1)
-  assert.deepStrictEqual(failureIds(tooLong), ['delivery.visible-chars'])
+  // SOFT: borderline wordcount (> max_chars and 50%-100% of min_chars) → exit 0 + soft_warnings, --strict → exit 1.
+  assertSoftOnly(writeCase('too-long', body(1400)), 'delivery.visible-chars')
+  assertSoftOnly(writeCase('borderline-short', body(600)), 'delivery.visible-chars')
 
-  const wrongSections = run(writeCase('wrong-sections', body(1200, 5)))
-  assert.strictEqual(wrongSections.status, 1)
-  assert(failureIds(wrongSections).includes('delivery.section-count'))
+  // HARD: catastrophic under-length (<50% of min_chars) → exit 1 + hard_failures.
+  const catastrophic = run(writeCase('catastrophic-short', body(400)))
+  assert.strictEqual(catastrophic.status, 1)
+  assert.strictEqual(catastrophic.report.status, 'fail')
+  assert.deepStrictEqual(hardIds(catastrophic), ['delivery.visible-chars'])
+  assert(catastrophic.report.findings.some((f) => f.id === 'delivery.visible-chars' && f.severity === 'blocking'))
 
+  // HARD: unfilled {} template placeholders in 正文.md → exit 1 + hard_failures.
+  const withPlaceholder = run(writeCase('unfilled-placeholder', body().replace('字\n###2.', '字{待补动作}\n###2.')))
+  assert.strictEqual(withPlaceholder.status, 1)
+  assert.deepStrictEqual(hardIds(withPlaceholder), ['delivery.no-template-placeholders'])
+
+  // SOFT: valid continuous sequence with different section count → soft_warnings (exit 0), --strict → exit 1.
+  assertSoftOnly(writeCase('wrong-sections', body(1200, 5)), 'delivery.section-count')
+
+  // SOFT: minor heading style mismatch → soft_warnings (exit 0), --strict → exit 1.
   const mixed = body().replace('###6.', '6.')
-  const mixedStyle = run(writeCase('mixed-style', mixed))
-  assert.strictEqual(mixedStyle.status, 1)
-  assert.deepStrictEqual(failureIds(mixedStyle), ['delivery.section-style'])
+  assertSoftOnly(writeCase('mixed-style', mixed), 'delivery.section-style')
 
+  // HARD: corrupted/duplicate section sequence → exit 1 + hard_failures.
   const duplicateMarker = run(writeCase('duplicate-marker', body().replace('###6.', '###5.')))
   assert.strictEqual(duplicateMarker.status, 1)
-  assert.deepStrictEqual(failureIds(duplicateMarker), ['delivery.section-sequence'])
+  assert.deepStrictEqual(hardIds(duplicateMarker), ['delivery.section-sequence'])
 
+  // SOFT: paragraph spacing blank lines → soft_warnings (exit 0), --strict → exit 1.
   const blank = body().replace('字\n###2.', '字\n\n另一段\n###2.')
-  const blankLines = run(writeCase('blank-lines', blank))
-  assert.strictEqual(blankLines.status, 1)
-  assert(failureIds(blankLines).includes('delivery.blank-lines'))
+  assertSoftOnly(writeCase('blank-lines', blank), 'delivery.blank-lines')
 
-  // 文件末尾的空行只是落盘习惯，不算段间空行。
-  const trailingBlank = run(writeCase('trailing-blank', `${body()}\n\n`))
+  // 文件末尾的空行只是落盘习惯，不算段间空行（连 --strict 也通过）。
+  const trailingBlank = run(writeCase('trailing-blank', `${body()}\n\n`), ['6000', '8000', '6'], undefined, false, ['--strict'])
   assert.strictEqual(trailingBlank.status, 0, trailingBlank.stdout + trailingBlank.stderr)
   assert.strictEqual(trailingBlank.report.ok, true)
 
+  // HARD: missing 正文.md → exit 1 + hard_failures.
   const missing = run(writeCase('missing', null))
   assert.strictEqual(missing.status, 1)
-  assert.deepStrictEqual(failureIds(missing), ['delivery.body-readable'])
+  assert.deepStrictEqual(hardIds(missing), ['delivery.body-readable'])
 
   const impossible = run(writeCase('impossible', body()), ['1', '3000', '6'], 800)
   assert.strictEqual(impossible.status, 2)

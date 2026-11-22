@@ -8,7 +8,7 @@
 
 已部署 story-architect 时，每批细纲在它的新上下文里出，调用见 [agent-calls.md](agent-calls.md)。没有子代理时主会话按下方「排纲方法」自己出：先给本批走向提案，作者确认后写入文件。
 
-**收回与验收**：每章细纲写入后跑 `node scripts/check-outline-contract.js --json --project {书目录} --chapter {N}`（查什么见 outline-template.md）。exit 1 只按 `repair_scope` 补报告点名的字段再复验，最多两轮；仍失败就报告检查 ID 停下，不改其他章。exit 2、脚本缺失或 node 不可用时如实报告验收未完成，不得声称细纲已合规。本检查只在新建、补建、回填时执行；既有项目的旧细纲不因此阻断写正文。
+**收回与验收**：每章细纲写入后跑 `node scripts/check-outline-contract.js --json --project {书目录} --chapter {N}`（查什么见 outline-template.md；需严格拦截软提醒加 `--strict`）。exit 1（`hard_failures`：文件可读、字数目标、`目标情绪`/`主角目标·关键选择`实质内容）必须按 `repair_scope` 补报告点名的字段再复验，最多两轮；仍失败就报告检查 ID 停下，不改其他章。exit 0 但带 `soft_warnings`（其余字段、四小节、五行、情节点表、设定引用）时重点复核：确认漏写或引用缺失则改，确属合理创作选择可保留。exit 2、脚本缺失或 node 不可用时如实报告验收未完成，不得声称细纲已合规。本检查只在新建、补建、回填时执行；既有项目的旧细纲不因此阻断写正文。
 
 **中途补纲/扩纲小流程**（项目已有大纲；只改细纲不进入正文大修）：
 1. 定位请求范围、已写进度和所属剧情段：读 `大纲/大纲.md`；卷纲先用 `outline_view.js --toc {卷纲路径}` 定位，再 `--unit {单元编号}` 取闭包，尚无剧情段用 `--contract` 取全卷段，不整读。另读 `设定/题材定位.md` 和已有 `追踪/上下文.md`；有正文却缺追踪时停止补纲，提示按 workflow-daily 修复/迁移，不猜进度；无正文也无追踪时以现有纲/设定规划，不为读取状态先初始化。

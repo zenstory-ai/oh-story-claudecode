@@ -738,7 +738,7 @@ def check_import_short(repo: Repo) -> list[str]:
     with tempfile.TemporaryDirectory(prefix="import-short-") as tmp:
         (Path(tmp) / "设定.md").write_text(settings, encoding="utf-8")
         (Path(tmp) / "小节大纲.md").write_text(outline, encoding="utf-8")
-        run = subprocess.run([node, str(ROOT / PHASE2_CHECK), "--json", tmp],
+        run = subprocess.run([node, str(ROOT / PHASE2_CHECK), "--json", "--strict", tmp],
                              capture_output=True, encoding="utf-8")
     try:
         failed = {item["id"] for item in json.loads(run.stdout)["failures"]}
