@@ -32,7 +32,7 @@ Agents read relevant character, dialogue and twist references as needed. Unread 
 | `pre-compact` | Before context compaction | Save progress snapshot path and line-count summary |
 | `post-compact` | After context compaction | Prompt to read progress snapshot for context recovery |
 | `pre-tool-commit-advisory` | git commit | Check hardcoded attributes and setting required fields (warning only, non-blocking) |
-| `pre-tool-prose-guard` | Before writing prose (Bash/Write/Edit) | Blocks prose writes when outline/tracking checkpoint fails or prior chapter has unresolved toxic phrasing (blocking) |
+| `pre-tool-prose-guard` | Before writing prose (Bash/Write/Edit) | Hard-blocks prose writes on unexpanded shell variables, missing/empty (<30-char) chapter outline, missing `小节大纲.md`, or missing/corrupt `_tracking-state.json`; prior-chapter toxic phrasing, uncommitted chapter gaps, and manual `上下文.md` status edits emit non-blocking pre-write advisories |
 | `post-tool-prose-check` | After writing prose (Write/Edit) | Lightly scan for truncation, leaked workflow terms, and deterministic AI phrasing (advisory; word count is measured by the writing workflow before delivery) |
 
 ## Project File Structure

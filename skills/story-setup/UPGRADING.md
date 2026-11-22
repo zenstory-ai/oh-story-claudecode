@@ -19,8 +19,9 @@
 
 ## 待发布版本（Unreleased，助手版本 45，更新后必须重跑 story-setup）
 
-- 五个支持 Hook 的宿主（Claude Code、Codex、OpenCode、Antigravity、ZCode）全部统一到单一 Node.js 18+ 共享核 `story_hook_core.js`：Claude Code 的 `.claude/hooks/` 收敛为 `run-story-hook.sh` + `story_hook_cli.js` + `story_hook_core.js`（重跑 story-setup 会自动清理旧版独立 `.sh` 脚本并刷新 `.claude/settings.local.json`），Codex 改用 `story_codex_hook.js` + `story_hook_core.js`，OpenCode `pre-commit` 改为调用同一共享核。
-- 需要本机 PATH 中有 Node.js 18+；缺 Node 时会在会话起点发出提示。书稿、设定、追踪不用迁移。
+- **零依赖 Node.js 18+ 运行时与五端共享 Hook**：全部核心技能运行时脚本与五个支持 Hook 的宿主（Claude Code、Codex、OpenCode、Antigravity、ZCode）全部收口到 Node.js 18+；五端 Hook 共用 `story_hook_core.js`（Claude Code `.claude/hooks/` 收敛为 `run-story-hook.sh` + `story_hook_cli.js` + `story_hook_core.js`，重跑自动清理旧版 `.sh` 并刷新 `.claude/settings.local.json`；Codex 改用 `story_codex_hook.js`；OpenCode `pre-commit` 复用共享核）。Python 3 改为可选（仅长篇拆文可选关系图 PNG 渲染 `render_relation_chart.py` 需要）；缺 Node.js 18+ 时会在会话起点发出提示。
+- **门禁分层重构（确定性硬底线 + 软门禁）**：写正文前仅在缺细纲/空壳细纲、缺小节大纲、`_tracking-state.json` 缺失或损坏等硬故障时拦截，上一章未提交、上章句式提醒等改为写前软提示；去 AI 味句式规则降为 `review_required`（可改写或附理由 `--ack` 放行），仅退化/截断/机械标点硬阻断；追踪状态卡（12 KiB）与逐章记录（3072B）改为软提醒、统一 64 KiB 硬上限，手改追踪文件默认报 `drift_warnings` 而不阻断（`--strict` 才拒），并支持 `--allow-gap` 跳章提交；细纲、短篇构思与交付校验改为 `hard_failures`/`soft_warnings` 双轨（加 `--strict` 才把软警告升为失败）。
+- **清理与稳定性修复**：退役断链的三层灵感库（`灵感库/`）；五端 Hook 新增 `agents_version` 过期提醒并跳过 `拆文库/` 与 `对标/` 书目误识别；本地 Dashboard 修复隐藏目录与工作区边界校验。书稿、设定、追踪不用迁移。
 
 ## v0.10.5 的改动（助手版本 44）
 
@@ -168,13 +169,13 @@ OpenClaw、Reasonix 和通用模式把 skill 放在项目 `skills/` 里，重跑
 |------|------|
 | `追踪/_tracking-state.json` 存在且 `check` 通过 | 正常，无需处理 |
 | 缺 `_tracking-state.json` 但已有正文 | 日更停止；Claude Code、Codex、OpenCode、ZCode、Antigravity 上写正文会被 hook 直接拦下，其他工具由写作流程自己停下 |
-| 存在但自动生成的追踪文件被手改 | `check` 报 `derived view differs from _tracking-state.json` |
+| 存在但自动生成的追踪文件被手改 | 默认 `check` 返回 exit 0 并输出 `drift_warnings`，提示把改动吸收回 JSON 或重建（仅 `--strict` 报错拒绝） |
 
 迁移**不需要重跑全书拆解**：正文、`设定/`、`大纲/`、`拆文库/` 都不受影响，只重建 `追踪/`。执行 `/story-import` 的「旧追踪项目迁移」：数出最后完整章号 `N`，从旧追踪文件与最近几章正文整理出当前状态，构造 `last_chapter=N` 的初始化事务跑 `tracking_commit.js init`。旧追踪文件会原样移入 `追踪/_旧追踪存档/` 留底，不删除、也不再读取。
 
 退役结构：`_tracking-meta.json`、`时间线/事件库.json` 及更早的追踪文件不再使用，`commit` 与 `check` 遇到会直接拒绝。
 
-之后写作时，追踪只通过写作流程提交；生成文件被手改后，用该章的修订提交整份重建。
+之后写作时，追踪仍建议通过写作流程提交；若曾手改派生文件，按 `check` 的 `drift_warnings` 提示吸收改动回 JSON，或用该章修订提交整份重建（需严格阻断漂移时加 `--strict`）。
 
 ## 作者记忆两级存储迁移（v0.7.11 之前的项目）
 

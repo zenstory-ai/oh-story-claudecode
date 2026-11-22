@@ -69,9 +69,9 @@ OpenCode agents 部署是 `replace`，会覆盖上次写入的 `model:`。所以
 
 ### 逐级交互选择
 
-按 低端 → 中端 → 高端 顺序，每级用 AskUserQuestion 让用户选择。问题只用作者能懂的角色名；括号里的内部 agent 名只写在技术备注里，不放进问题。
+按 低端 → 中端 → 高端 顺序，每级用 AskUserQuestion 让用户选择。问题只用作者能懂的角色名；括号里的内部 agent 名只写在部署明细里，不放进问题。
 
-| 等级 | 问作者的话 | 技术备注：对应 agent |
+| 等级 | 问作者的话 | 部署明细：对应 agent |
 |------|-----------|---------------------|
 | 低端 | 「拆书助手、资料检索员和校对员做的是翻找和核对，给它们选哪个模型？便宜的就够用。」 | chapter-extractor（拆书助手）、story-explorer（资料检索员）、consistency-checker（校对员） |
 | 中端 | 「人物设计师和资料研究员整理设定与资料，给它们选哪个模型？」 | character-designer（人物设计师）、story-researcher（资料研究员） |

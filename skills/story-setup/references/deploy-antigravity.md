@@ -17,7 +17,7 @@
 
 - 先确认 `node` 在 PATH（agent 生成与 hooks 均依赖 Node）；缺失则停止 Antigravity 部署，不留半成品，提示安装 Node 后重跑。
 - Agent 正文以 Claude Code Markdown 为真源。部署时调用 `scripts/generate-antigravity-agents.mjs`，把 Claude 工具名、模型档、reference 根和调用术语确定性转换为 Antigravity 2.0 契约；不得原样复制 Claude frontmatter。
-- 执行 `node "{story-setup skill目录}/scripts/generate-antigravity-agents.mjs" --source "{story-setup skill目录}/references/templates/agents" --dest "{项目}/.agents/agents"`。生成器先渲染全部 7 个 agent，再原子替换 `.agents/agents/agent-name/agent.md`（`agent-name` 为实际名称）并清理旧版同名扁平 `.md`；保留其他用户 agent，源 frontmatter 异常时不留半更新目录，也不沿 managed agent symlink 写出项目外。
+- 执行 `node "{story-setup skill目录}/scripts/generate-antigravity-agents.mjs" --source "{story-setup skill目录}/references/templates/agents" --dest "{项目}/.agents/agents"`。生成器先渲染全部 7 个 agent，再原子替换 `.agents/agents/agent-name/agent.md` 并清理旧版同名扁平 `.md`；保留其他用户 agent，源 frontmatter 异常时不留半更新目录，也不沿 managed agent symlink 写出项目外。
 - 校验 7 个 `.md`：`name` 与父目录一致；`mainAgent: false`、`subagent: true`；模型只用 `flash` / `pro`；工具只来自官方名称 `view_file`、`find_by_name`、`grep_search`、`write_to_file`、`replace_file_content`、`multi_replace_file_content`、`run_command`；不得残留 `Read/Glob/Grep/Write/Edit/Bash` 或 `.claude/skills/` 前缀（只用 `.agents/skills/`）。
 - 只读 agent（`consistency-checker`、`story-explorer`）无写文件或命令工具；`chapter-extractor` 只有读取与写文件、无命令工具；其余按 Claude 真源能力边界映射。
 - Antigravity 用 `invoke_subagent`（`TypeName`、`Role`、`Prompt`）异步调用子代理，完成后由 `send_message` 唤醒主会话；`agy` CLI 只读子代理未暴露 `find_by_name`/`grep_search` 时，主会话在 `Prompt` 传入具体文件路径供 `read_file`（`view_file`）读取。部署后新开会话并用 `story-review` 验证 full/lean；无法解析 custom agent 时走 solo/direct fallback。
@@ -32,10 +32,10 @@ Antigravity 2.0 使用项目 `.agents/` 根，部署时创建 `.agents/skills`�
 3. 复制 `references/antigravity/rules/oh-story.md` 到 `.agents/rules/oh-story.md`，验证 `trigger: always_on` 且小于 12,000 字符。该 rule 负责路由、硬约束与 compact 恢复；不用根 `AGENTS.md` 代替。
 4. 复制 `references/antigravity/hooks/story_antigravity_hook.js` 与 `story_hook_core.js` 到 `.agents/hooks/`，验证 `node --check`。hook 命令以 `.agents/` 为工作目录，须写 `hooks/story_antigravity_hook.js`（勿写 `.agents/hooks/...`）；共享 core 须与 Claude/Codex/OpenCode/ZCode 副本字节一致。
 5. 合并 `references/antigravity/hooks/hooks.json` 到 `.agents/hooks.json`：调用 `node "{skill目录}/scripts/merge-hooks.js" --host antigravity {项目}/.agents/hooks.json {skill目录}/references/antigravity/hooks/hooks.json`，只替换顶层 `oh-story` group、保留用户 groups，复跑比对字节确认幂等；禁止写入外层 `{ "hooks": ... }` schema。
-6. 校验事件边界：只注册 `PreToolUse`、`PostToolUse`、`PreInvocation`、`Stop`（`PreToolUse`/`PostToolUse` 的 `matcher` 覆盖 `write_file|edit_file`、`write_to_file|replace_file_content|multi_replace_file_content` 与 `run_command`）。PreToolUse 每次输出 `decision`；PostToolUse 只输出 `{}`，正文 findings 经 `artifactDirectoryPath` 暂存并由下次 PreInvocation 注入；模型直接结束（`NO_TOOL_CALL` 或 `model_stop`）时 Stop 最多强制继续一次。无 SessionStart/PreCompact/PostCompact，首次上下文仅在首轮（`invocationNum=0` 且 `initialNumSteps<=1`）PreInvocation 注入，compact 后由 Always-On Rule 读 `追踪/上下文.md`。
+6. 校验事件边界：只注册 `PreToolUse`、`PostToolUse`、`PreInvocation`、`Stop`（`PreToolUse`/`PostToolUse` 的 `matcher` 覆盖 `write_file|edit_file`、`write_to_file|replace_file_content|multi_replace_file_content` 与 `run_command`）。PreToolUse 输出 `decision`；PostToolUse 输出 `{}`，正文 findings 经 `artifactDirectoryPath` 暂存并由下次 PreInvocation 注入；仅存在硬伤 findings（<200B/截断/拒答/占位符/工程词/复读）且模型直接结束（`NO_TOOL_CALL`/`model_stop`）时 Stop 最多续跑一次，纯风格不触发。无 SessionStart/PreCompact/PostCompact，首次上下文仅首轮（`invocationNum=0` 且 `initialNumSteps<=1`）PreInvocation 注入，compact 后由 Always-On Rule 读 `追踪/上下文.md`。
 7. `.story-deployed` 的 `target_cli` 写 `antigravity` 或多端组合，`references_dir` 写 `.agents/skills/story-setup/references/agent-references`。安装报告提示新开会话重扫 Skills/Rules/Agents/Hooks，并注明 Node 为 hook 依赖。
 
-IDE 与交互式 `agy` 共用 `.agents/` 产物，仍需分别 smoke test。不依赖 `npx skills add -g` 写入的 `~/.gemini/*` 目录；仅支持项目内真实目录部署。
+IDE 与交互式 `agy` 共用 `.agents/` 产物，不依赖 `~/.gemini/*`，仅支持项目内真实目录。
 
 ## 验证
 
@@ -43,7 +43,7 @@ IDE 与交互式 `agy` 共用 `.agents/` 产物，仍需分别 smoke test。不�
 - 检查 `.agents/agents/` 下 7 个 Markdown agent 可解析，名称、模型档、官方工具白名单、只读边界与 `.agents/skills/` reference 前缀正确
 - 检查 `.agents/rules/oh-story.md` 为 `trigger: always_on` 且小于 12,000 字符
 - 检查 `.agents/hooks.json` 有效、顶层 `oh-story` group 恰有 PreToolUse/PostToolUse/PreInvocation/Stop，用户 hook groups 保留；检查 `.agents/hooks/story_antigravity_hook.js` 与 `story_hook_core.js` 语法有效
-- 用 fixture 验证：PreToolUse 缺纲/追踪时 deny、普通写入 allow、commit advisory；PostToolUse stdout 恒为 `{}` 且把正文 findings 写进 session artifact；下一次 PreInvocation 注入 findings；Stop 对未处理 findings 最多 continue 一次；干净正文清除 pending state
+- 用 fixture 验证：PreToolUse 缺纲/追踪时 deny、普通写入 allow、commit advisory；PostToolUse stdout 恒为 `{}` 且把正文 findings 写进 session artifact；下一次 PreInvocation 注入 findings；Stop 仅对未处理硬伤 findings 最多 continue 一次（纯风格不续跑）；干净正文清除 pending state
 
 ## 安装报告必须提示
 

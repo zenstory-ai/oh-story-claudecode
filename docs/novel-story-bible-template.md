@@ -64,7 +64,7 @@
 
 ## 用本仓库的 skill 怎么做
 
-上面是手工维护的做法。用 Oh Story 写长篇时，这些状态由 [story-long-write](../skills/story-long-write/SKILL.md) 维护：每写完一章，Agent 只提交这一章的变化，脚本据此更新追踪主数据文件，再自动生成书目录 `追踪/` 下的角色状态、伏笔、作者时间线和读者已知等文件。这些自动生成的文件不要手改，手改后会在核对时报错。四层文件怎么分工，见 [AI 写长篇小说怎么不崩人设](ai-long-novel-character-consistency.md)。
+上面是手工维护的做法。用 Oh Story 写长篇时，这些状态由 [story-long-write](../skills/story-long-write/SKILL.md) 维护：每写完一章，Agent 只提交这一章的变化，脚本据此更新追踪主数据文件，再自动生成书目录 `追踪/` 下的角色状态、伏笔、作者时间线和读者已知等文件。这些自动生成的文件一般不要手改；若确实手改过，默认核对会输出非阻断的 `drift_warnings` 提醒，提示把改动吸收回主数据或整份重建（仅加 `--strict` 时报错拒绝）。四层文件怎么分工，见 [AI 写长篇小说怎么不崩人设](ai-long-novel-character-consistency.md)。
 
 书稿不是在 Oh Story 里写的，先用 `/story-import` 导入，它会把已有章节整理成带设定、大纲和追踪的项目。已经在 Oh Story 项目里、想对着正文核一遍设定时，在 Claude Code 里可以这样说（Codex 里把 `/` 换成 `$`）：
 

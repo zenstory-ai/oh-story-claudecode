@@ -85,7 +85,7 @@ maxTurns: 30
 明确安排主会话或独立审查者负责语义去味/最终扫描时，写手只做编排、内容覆盖和格式自检；未分配时执行下列自检：
 1. **覆盖自检（长篇写作必做，审查与去味不做）**：细纲每个情节点至少落地一次，漏即补；逐点记下落在哪一场随交付返回。
 2. **对话与文风自检**：按 dialogue-mastery「绝对禁止」逐句过；按书级文风（`设定/文风.md` 或对标文风）核对句段，越写越碎、逗号结巴即合并重排再交付。
-3. **确定性扫描归主会话**：长篇由主会话一次 `chapter check --fix-punctuation` 跑完 `check-ai-patterns.js --check` 等检测，写手不重复跑。未安排主会话扫描时（短篇、独立改写）自跑 `check-ai-patterns.js --check --fail-on=blocking <正文>` 与 `check-outline-copy.js <正文>`：blocking 改到净，advisory 与细纲重合只列进摘要；node 不可用如实报告。
+3. **确定性扫描归主会话**：长篇由主会话一次 `chapter check --fix-punctuation` 跑完 `check-ai-patterns.js --check` 等检测，写手不重复跑。未安排主会话扫描时（短篇、独立改写）自跑 `check-ai-patterns.js --check --fail-on=review_required <正文>` 与 `check-outline-copy.js <正文>`：review_required 优先改写，确需保留须附理由，advisory 与细纲重合只列进摘要；node 不可用如实报告。
 
 ## 文风优先级
 

@@ -17,6 +17,7 @@ skills/
 ├── story-short-scan/        # 短篇扫榜
 ├── story-deslop/            # 去AI味
 ├── story-review/            # 多视角审查
+├── story-publish/           # 发布资料准备
 ├── story-cover/             # 封面生成
 └── browser-cdp/             # 浏览器操控
 scripts/                       # 开发守卫 / 测试 / 代码生成（完整索引见 scripts/README.md）
@@ -73,10 +74,10 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 PR 自动运行 `.github/workflows/cross-platform.yml`，拆为两个 job：`repo-lint-and-adapters`（Linux）与 `cross-platform-runtime`（Linux / Windows / macOS 矩阵，统一 Node 22）。代表性检查包括：
 
-- `python3 scripts/lint-repo.py` — 仓库统一静态守卫（支持 `--only static|contracts|shared|numbering`）：
+- `python3 scripts/lint-repo.py` — 仓库统一静态守卫（支持 `--only static|contracts|shared|numbering|agent-refs`）：
   - `static`：结构化解析 frontmatter、精确 Markdown 路径/锚点、Agent 引用与 references 可达性；除基础组件 `browser-cdp` 外禁止跨 Skill 文件引用
   - `contracts`：按 `scripts/current-contract.json` 校验版本锚点（`setup_skill_version` / `agents_version`）、`progress_schema_version`、`demo/` 主产物非空与 `quality-rubric.md` 维度一致性
-  - `shared`：共享 runtime 资产清单（`sync-shared-assets.py check`）+ 跨 skill reference 副本一致性（`shared-references.py check`）+ 部署 Agent 资料前缀、profile 与可达性
+  - `shared`：共享 runtime 资产清单（`sync-shared-assets.py check`）+ 跨 skill reference 副本一致性（`shared-references.py check`）+ 部署 Agent 资料前缀、profile 与可达性（可单独用 `--only agent-refs` 跑后者）
   - `numbering`：禁止 `skills/**/*.md` 中出现 `Step 1.5` / `Phase 2.1` / `Stage 0.5` 等小数工作流标签
 - `node scripts/check-doc-budget.mjs` — 热路径 SKILL/references/agent 模板的字数预算（按 `scripts/doc-budget.json`），防每次会话都要付的规则文本无声膨胀
 - `python3 scripts/test-static-check.py` / `python3 scripts/test-current-skill-contracts.py` / `python3 scripts/test-doc-budget.py` / `python3 scripts/test-shared-assets.py` / `python3 scripts/test-shared-references.py` — 仓库守卫行为回归
@@ -282,7 +283,7 @@ PR 中如果修改了 Claude Code 模板文件，CI 会自动检测 opencode 模
 - **agent 文件** 双份部署：`.opencode/agents/`（opencode 系统使用）+ `agents/`（Glob 可见副本）
 - **subagent 检测**：所有 spawn agent 的 skill（story、story-review、story-long-write、story-deslop、story-import、story-long-analyze、story-short-write）只检查当前运行时的 canonical 目录：Claude `.claude/agents/`、OpenCode `.opencode/agents/`、Codex `.codex/agents/`、Antigravity `.agents/agents/`；不得因其他端文件存在而误判。ZCode 从已启用插件的运行时注册检查同名角色，不要求 `.zcode/agents/`；仅角色或工具不可用才降级。OpenClaw Phase 1 不部署项目 agents，走 solo/direct fallback。
 
-**插件在后台服务里运行**：2.x 由一个后台服务进程服务多个项目，插件里的 `process.cwd()` 不是用户项目；项目根与相对路径起点一律取 `ctx.location.directory`（其 git toplevel）。会话首轮请求前用 `ctx.session.hook("context")` 往主会话 `system` 注入部署状态、当前书目上下文位置与 `continuityFindings`（连续性缺口提醒，子代理跳过）；压缩前注入用 `ctx.session.hook("compaction")` 往摘要请求的 `system` 追加写作上下文位置。
+**插件在后台服务里运行**：2.x 由一个后台服务进程服务多个项目，插件里的 `process.cwd()` 不是用户项目；项目根与相对路径起点一律取 `ctx.location.directory`（其 git toplevel）。通过共享 `story_hook_core.js` 完成五端一致的 `agents_version` 过期提醒与书目发现（自动跳过 `拆文库/` 与 `对标/`）：会话首轮请求前用 `ctx.session.hook("context")` 往主会话 `system` 注入部署状态、当前书目上下文位置、`continuityFindings`（连续性缺口提醒，子代理跳过）及写前暂存的非阻断软提醒（`pendingPreWriteWarnings`，如上一章未提交、上章毒句式或手改状态修订）；压缩前注入用 `ctx.session.hook("compaction")` 往摘要请求的 `system` 追加写作上下文位置。
 
 **其它 hook 差异**：`execute.after` 覆盖 `write`、`edit`、`patch` 与 `shell` 重定向写正文的落盘兜底检测，并在 `shell` 执行 `git commit` 时补齐暂存区 Markdown 角色属性硬编码提醒（与 git 原生 `pre-commit` hook 自动去重）；`session-end` 因 OpenCode 无等价事件暂不支持。
 
@@ -324,7 +325,7 @@ Antigravity 2.0 与 `agy` CLI 共用 `.agents/` workspace customization，但发
 - 14 个 Skills 物化到真实 `.agents/skills/{name}/`。`deploy-antigravity-skills.js` 只替换已知名称、保留用户 Skills；现有 symlink 默认 fail-closed，只有用户明确同意才迁移，且不得沿链接写到目标目录。
 - 7 个 custom subagents 由 Claude Markdown 真源在部署时生成到 `.agents/agents/agent-name/agent.md`（`agent-name` 替换为实际名称）。工具名必须来自官方清单，调用用 `invoke_subagent` + 同名 `TypeName`；生成器只替换 7 个已知定义并保留其他用户 agent。
 - Always-On Rule 固定为 `.agents/rules/oh-story.md`，文件必须小于 12,000 字符。它负责 skill 路由和 compact 后重新读取 `追踪/上下文.md`；不要假设 Antigravity 有 Claude 的 PreCompact/PostCompact。
-- `.agents/hooks.json` 是顶层 named-group mapping。合并器只替换 `oh-story` group，保留所有用户 groups。当前注册 `PreToolUse`、`PostToolUse`、`PreInvocation`、`Stop`：PreToolUse 必须输出 `decision`，PostToolUse 必须精确输出 `{}`；写后 findings 存到本会话 `artifactDirectoryPath`，下一次 PreInvocation 注入，Stop 最多强制 continue 一次。
+- `.agents/hooks.json` 是顶层 named-group mapping。合并器只替换 `oh-story` group，保留所有用户 groups。当前注册 `PreToolUse`、`PostToolUse`、`PreInvocation`、`Stop`：PreToolUse 必须输出 `decision`，PostToolUse 必须精确输出 `{}`；写后 findings 存到本会话 `artifactDirectoryPath`，下一次 PreInvocation 注入；Stop 仅在存在确定性硬伤 findings（`<200B`、截断、拒答、占位符、工程词泄露、相邻复读）时最多强制 continue 一次，纯风格/毒句式提示不触发续跑。
 - `.agents/hooks/` 只管理 `story_antigravity_hook.js` 与共享 `story_hook_core.js`；后者由 `scripts/shared-assets.json` 锁字节一致，不手改副本。Hook 依赖 PATH 中的 Node。
 
 检查步骤：

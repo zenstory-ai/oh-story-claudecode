@@ -1,4 +1,4 @@
-<!-- Last synced with README.md: 2026-11-19 -->
+<!-- Last synced with README.md: 2026-11-22 -->
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/zenstory-ai/zenstory/main/apps/web/public/brand/zenstory-ai-mark.svg" alt="" width="76" height="76">
@@ -41,7 +41,7 @@ https://github.com/user-attachments/assets/8f9cc11b-1fb8-4cc5-a084-e0deb05ec791
 Oh Story covers the full web-fiction workflow for both serials and short stories: **chart scanning → bestseller deconstruction → outlining and drafting → de-AI editing → cover art**. It installs as 14 skills inside the coding agent you already use and runs on that agent's model—no GPU and no separate model setup required.
 
 - **Files as memory** — settings, outlines, chapters, and continuity tracking live in separate directories, with `追踪/_tracking-state.json` as the single source of truth that generates the continuity card, foreshadowing ledger, character snapshots, and author-truth / reader-known timelines; after context compaction or a new session, writing picks right back up from disk.
-- **7 specialist roles and read/write gates** — dedicated subagents handle outlining, drafting, continuity checks, character design, research, manuscript search, and chapter extraction; long-form gates block drafting when a chapter outline is missing or previous state is uncommitted, and post-write checks catch cut-off endings, leaked outline jargon, and stock AI phrasing (references load on demand; see [Architecture & project layout](docs/architecture_EN.md) and [Knowledge base](docs/knowledge-base_EN.md)).
+- **7 specialist roles and read/write gates** — dedicated subagents handle outlining, drafting, continuity checks, character design, research, manuscript search, and chapter extraction; long-form gates hard-block drafting when a chapter outline or tracking state is missing/corrupt while flagging uncommitted prior chapters as soft pre-write advisories, and post-write checks catch cut-off endings, leaked outline jargon, and stock AI phrasing (references load on demand; see [Architecture & project layout](docs/architecture_EN.md) and [Knowledge base](docs/knowledge-base_EN.md)).
 - **Built for 7 coding agents** — Claude Code · Codex CLI · Google Antigravity · OpenCode · ZCode · OpenClaw · Reasonix; `/story-setup` deploys native subagents and hooks where supported, while any file-capable Web AI or agent environment can run the skills directly.
 - **Built for major Chinese fiction platforms** — Qidian (起点中文网), Fanqie (番茄小说), Jinjiang (晋江文学城), Qimao (七猫小说), and Ciweimao (刺猬猫) for serials; Zhihu Yanyan (知乎盐言故事), Fanqie Short-form, and Qimao Short-form for short stories.
 
@@ -169,17 +169,17 @@ When planning a new short story, `/story-short-write` draws directly from this r
 
 ### De-AI editing: lint known patterns, then rewrite in context
 
-`/story-deslop` runs a local prose linter that matches stock AI sentence patterns, reporting line numbers, spans, and rewrite directions. Scanning a hand-built AI-flavored passage catches 8 hits (3 blocking / 5 advisory):
+`/story-deslop` runs a local prose linter that matches stock AI sentence patterns, reporting line numbers, spans, and rewrite directions. Scanning a hand-built AI-flavored passage catches 8 hits (3 review_required / 5 advisory):
 
 ```text
-改前.md:7:20     [blocking] em-dash             (么叫做命运的安排——不是巧合，而是一)
-改前.md:23:6     [blocking] trailer-ending      (才刚刚开始)
-改前.md:25:1     [blocking] trailer-ending      (没人知道)
-改前.md:7:22     [advisory] not-is-comparison   (不是巧合，而是一种冥冥之中的注定)
-改前.md:11:1     [advisory] negation-parade     (没有犹豫，没有生涩，)
-改前.md:19:3     [advisory] voice-contrast      (声音不大，却)
-改前.md:21:2     [advisory] not-is-comparison   (不是一次简单的弹奏，而是一场蓄谋已久的惊艳亮相)
-改前.md:3:1      [advisory] cliche-density-tic  (仿佛 一丝 深吸一口气 缓缓 微微)
+改前.md:7:20     [review_required] em-dash             (么叫做命运的安排——不是巧合，而是一)
+改前.md:23:6     [review_required] trailer-ending      (才刚刚开始)
+改前.md:25:1     [review_required] trailer-ending      (没人知道)
+改前.md:7:22     [advisory]        not-is-comparison   (不是巧合，而是一种冥冥之中的注定)
+改前.md:11:1     [advisory]        negation-parade     (没有犹豫，没有生涩，)
+改前.md:19:3     [advisory]        voice-contrast      (声音不大，却)
+改前.md:21:2     [advisory]        not-is-comparison   (不是一次简单的弹奏，而是一场蓄谋已久的惊艳亮相)
+改前.md:3:1      [advisory]        cliche-density-tic  (仿佛 一丝 深吸一口气 缓缓 微微)
 ```
 
 Running the exact same scan on the corresponding scene in chapter 21 returns **zero hits, exit 0**. Both passages are nearly the same length: the before version tells the reader what to feel in abstract summary, while the rewrite puts character judgment, dialogue, and reactions directly on the page. Full comparison: **[demo/去AI味对照/](demo/去AI味对照/README_EN.md)**
@@ -288,7 +288,7 @@ flowchart LR
 | `story-cover` | `/story-cover` | Cover generation — builds cover prompts or generates images via GPT-Image-2 (Codex quota / API) |
 | `browser-cdp` | `/browser-cdp` | Browser automation — scrapes chart data over CDP while reusing your logged-in browser session |
 
-> Local linting in `story-deslop` blocks only deterministic phrasing and punctuation issues, leaving advisory notes to human judgment; external detectors like Zhuque are only a rough self-check.
+> Local checks separate hard defects from style: deterministic failures (degeneration/truncation, unclosed HTML comments, and mechanical punctuation issues) hard-block, while stylistic rules in `story-deslop` surface as `review_required` (rewrite or pass with an explicit `--ack` rationale in long-form) and `advisory` notes; external detectors like Zhuque are only a rough self-check.
 
 Plain-language requests work too:
 - `帮我开书` ("help me start a book") → `story-long-write`

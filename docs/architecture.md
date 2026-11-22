@@ -33,7 +33,7 @@ Agent 按任务读取 `references/` 中的角色设计、对话、反转等资�
 | `pre-compact` | 上下文压缩前 | 保存进度快照路径和行数摘要 |
 | `post-compact` | 上下文压缩后 | 提示读取进度快照恢复上下文 |
 | `pre-tool-commit-advisory` | git commit 时 | 检查硬编码属性、设定必填字段（仅警告，不阻断） |
-| `pre-tool-prose-guard` | 写正文前（Bash/Write/Edit） | 缺对应细纲/小节大纲、追踪检查点不成立或上一章有未清毒句式时阻止写入（阻断） |
+| `pre-tool-prose-guard` | 写正文前（Bash/Write/Edit） | 检测到未展开 shell 变量、缺对应细纲/空壳细纲（<30 字）、缺 `小节大纲.md` 或 `_tracking-state.json` 缺失损坏时硬阻断；上一章未清毒句式、跳章未提交或手改 `上下文.md` 状态修订改为非阻断写前提醒 |
 | `post-tool-prose-check` | 正文写入后（Write/Edit） | 轻量扫描截断、工程词和毒句式（提醒，不阻断；字数由写作流程交付前统一测量） |
 
 ## 项目文件结构

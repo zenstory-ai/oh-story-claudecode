@@ -17,7 +17,7 @@
 | [Long-Novel-GPT](https://github.com/MaoXiaoYuZ/Long-Novel-GPT) | 网页应用（Gradio，Docker） | 未检测到许可证 | 1,251 / 2025-11-05 | `.env` 配 Key，支持 OpenAI 格式的本地接口 | 大纲→章节→正文逐层展开，可导入旧作拆书再改写 |
 | [NovelKit](https://github.com/t59688/novel-kit) | 编程 Agent 斜杠命令（README 写明目前只支持 Cursor） | 未检测到许可证（README 徽章写 MIT） | 162 / 2025-12-22 | 用所在工具的模型 | “小说宪法”一致性检查，章节生命周期，伏笔追踪 |
 | [novel-writer-skills](https://github.com/wordflowlab/novel-writer-skills) / [novelws](https://github.com/binlee1990/novel-writer-skills) | Claude Code 斜杠命令 | MIT | 270 / 2025-10-20；分支版 novelws 6 / 2026-02-26 | 用 Claude Code 的模型 | `/track`、`/plot-check`、`/timeline` 等追踪命令；novelws 另有 JSON 追踪文件和本地看板 |
-| [Oh Story](https://github.com/zenstory-ai/oh-story-claudecode)（我们） | 编程 Agent skill 包，适配 Claude Code、Codex、OpenCode 等 7 款编程 Agent | MIT | 8,153 / 2026-10-30 | 直接用当前 Agent 的模型，不另配 | 设定、大纲、正文、追踪分文件存；写正文前检查本章细纲；追踪文件由工具重建，手改会被检查拒绝 |
+| [Oh Story](https://github.com/zenstory-ai/oh-story-claudecode)（我们） | 编程 Agent skill 包，适配 Claude Code、Codex、OpenCode 等 7 款编程 Agent | MIT | 8,153 / 2026-10-30 | 直接用当前 Agent 的模型，不另配 | 设定、大纲、正文、追踪分文件存；写正文前检查本章细纲；追踪文件由工具重建，手改会触发核对漂移提醒（`--strict` 模式拒绝） |
 
 另一个相关项目是 [denova](https://github.com/alfredxw/denova)（Apache-2.0，981 星，Beta）：写作加互动游戏的工作台，内置网文 skill，也能接入 Claude Code、Codex。
 
