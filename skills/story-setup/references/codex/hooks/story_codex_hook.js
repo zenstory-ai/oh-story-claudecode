@@ -159,8 +159,9 @@ function sessionStart() {
 }
 
 function preToolProseGuard() {
-  const { proseBlockReason } = loadCore()
+  const { proseBlockReason, prosePreWriteWarnings, formatPreWriteAdvisory } = loadCore()
   const root = projectRoot()
+  const warnings = []
   for (const target of targetPaths(hookInput)) {
     const reason = proseBlockReason(root, target)
     if (reason) {
@@ -173,7 +174,10 @@ function preToolProseGuard() {
       })
       return
     }
+    warnings.push(...prosePreWriteWarnings(root, target))
   }
+  const advisory = formatPreWriteAdvisory(warnings)
+  if (advisory) emit(hookContext("PreToolUse", advisory))
 }
 
 function preToolCommitAdvisory() {

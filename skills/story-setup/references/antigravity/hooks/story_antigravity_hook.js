@@ -94,14 +94,18 @@ function pendingPath() {
 
 function readPending() {
   const file = pendingPath()
-  if (!file) return { findings: {}, stopAttempts: 0 }
+  if (!file) return { findings: {}, hardFindings: {}, stopAttempts: 0 }
   try {
     const value = JSON.parse(fs.readFileSync(file, "utf8"))
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid pending state")
     const findings = value.findings && typeof value.findings === "object" && !Array.isArray(value.findings) ? value.findings : {}
-    return { findings, stopAttempts: Number.isInteger(value.stopAttempts) ? value.stopAttempts : 0 }
+    // 兼容旧版 pending JSON（未记录 hardFindings 时按保守硬信号处理）
+    const hardFindings = value.hardFindings && typeof value.hardFindings === "object" && !Array.isArray(value.hardFindings)
+      ? value.hardFindings
+      : Object.fromEntries(Object.keys(findings).map((key) => [key, true]))
+    return { findings, hardFindings, stopAttempts: Number.isInteger(value.stopAttempts) ? value.stopAttempts : 0 }
   } catch {
-    return { findings: {}, stopAttempts: 0 }
+    return { findings: {}, hardFindings: {}, stopAttempts: 0 }
   }
 }
 
@@ -116,7 +120,15 @@ function writePending(state) {
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true })
     const temporary = `${file}.${process.pid}.tmp`
-    fs.writeFileSync(temporary, JSON.stringify({ findings: state.findings, stopAttempts: state.stopAttempts || 0 }), "utf8")
+    fs.writeFileSync(
+      temporary,
+      JSON.stringify({
+        findings: state.findings,
+        hardFindings: state.hardFindings || {},
+        stopAttempts: state.stopAttempts || 0,
+      }),
+      "utf8"
+    )
     fs.renameSync(temporary, file)
   } catch {}
 }
@@ -128,21 +140,38 @@ function pendingMessage(state) {
     "\nResolve these findings in the affected prose files and write the fixes before moving to another chapter or ending the task."
 }
 
+function hardPendingMessage(state) {
+  const hardMap = state.hardFindings || {}
+  const notes = Object.entries(state.findings || {})
+    .filter(([key, value]) => Boolean(hardMap[key]) && typeof value === "string" && value)
+    .map(([, value]) => value)
+  if (!notes.length) return ""
+  return "[oh-story deterministic prose check]\n" + notes.join("\n\n") +
+    "\nResolve these deterministic prose defects (truncation/meta-leak/placeholder/repeat) before ending the task."
+}
+
 function preToolUse() {
   const call = toolCall()
   const root = projectRoot()
+  const warnings = []
   for (const target of targetPaths(call)) {
     const reason = core.proseBlockReason(root, target)
     if (reason) return emit({ decision: "deny", reason })
+    warnings.push(...core.prosePreWriteWarnings(root, target))
   }
+
+  const advisories = []
+  const preWriteAdvisory = core.formatPreWriteAdvisory(warnings)
+  if (preWriteAdvisory) advisories.push(preWriteAdvisory)
 
   if (call && call.name === "run_command") {
     const command = firstString(callArgs(call), ["CommandLine", "command", "cmd"])
     if (command && core.isGitCommitCommand(command)) {
-      const warnings = core.stagedMarkdownWarnings(root)
-      if (warnings) return emit({ decision: "allow", reason: warnings })
+      const commitWarnings = core.stagedMarkdownWarnings(root)
+      if (commitWarnings) advisories.push(commitWarnings)
     }
   }
+  if (advisories.length) return emit({ decision: "allow", reason: advisories.join("\n\n") })
   emit({ decision: "allow" })
 }
 
@@ -155,8 +184,13 @@ function postToolUse() {
   for (const target of targetPaths(call)) {
     const key = path.resolve(target)
     const finding = core.proseAfterWrite(root, key)
-    if (finding) state.findings[key] = finding
-    else delete state.findings[key]
+    if (finding) {
+      state.findings[key] = finding
+      state.hardFindings[key] = core.hasHardProseFindings(root, key)
+    } else {
+      delete state.findings[key]
+      delete state.hardFindings[key]
+    }
     changed = true
   }
   if (changed) {
@@ -197,7 +231,9 @@ function preInvocation() {
 
 function stop() {
   const state = readPending()
-  const message = pendingMessage(state)
+  // 只有 100% 确定性硬缺陷（落盘<200B/截断/AI拒绝语/占位符/工程词/紧邻复读）才在 Stop 强制拉回 1 次；
+  // 仅剩风格/毒句式/重名提醒时不再强制 continue，保留 PreInvocation 软提醒即可。
+  const message = hardPendingMessage(state)
   const termination = String(hookInput.terminationReason || "")
   const mayContinue = termination === "" || termination === "model_stop" || termination === "NO_TOOL_CALL"
   if (message && hookInput.fullyIdle !== false && mayContinue && state.stopAttempts < 1) {

@@ -184,25 +184,47 @@ function discoverAllBooks(root) {
   return [...books.values()]
 }
 
-function trackingCheckpointIssue(book, requireState = false, expectedLastCommitted = null) {
+function inspectTrackingCheckpoint(book, requireState = false, expectedLastCommitted = null) {
   const state = path.join(book, "追踪", "_tracking-state.json")
   if (!fs.existsSync(state)) {
-    return requireState
-      ? `追踪/_tracking-state.json 缺失；已有正文项目走 /story-import 的「旧追踪项目迁移」重建追踪（不必重跑全书拆解），新书先用 tracking_commit.js init 初始化`
-      : null
+    return {
+      hard: requireState
+        ? `追踪/_tracking-state.json 缺失；已有正文项目走 /story-import 的「旧追踪项目迁移」重建追踪（不必重跑全书拆解），新书先用 tracking_commit.js init 初始化`
+        : null,
+      warnings: [],
+    }
   }
   let document
   try {
     document = JSON.parse(fs.readFileSync(state, "utf8"))
   } catch {
-    return `追踪/_tracking-state.json 无法解析；停止写正文并重新 /story-import，不能猜测或手补状态`
+    return {
+      hard: `追踪/_tracking-state.json 无法解析；停止写正文并重新 /story-import，不能猜测或手补状态`,
+      warnings: [],
+    }
   }
   if (!document || typeof document !== "object" || Array.isArray(document) || document.schema_version !== 4) {
-    return `追踪/_tracking-state.json 不是当前 schema_version=4；停止写正文并重新 /story-import，不保留旧结构兼容路径`
+    return {
+      hard: `追踪/_tracking-state.json 不是当前 schema_version=4；停止写正文并重新 /story-import，不保留旧结构兼容路径`,
+      warnings: [],
+    }
   }
   if (!Number.isInteger(document.state_revision)) {
-    return `追踪/_tracking-state.json 缺少整数 state_revision；停止写正文并重新 /story-import`
+    return {
+      hard: `追踪/_tracking-state.json 缺少整数 state_revision；停止写正文并重新 /story-import`,
+      warnings: [],
+    }
   }
+  if (expectedLastCommitted !== null && !Number.isInteger(document.last_committed_chapter)) {
+    return {
+      hard: `追踪/_tracking-state.json 缺少整数 last_committed_chapter；停止写正文并重新 /story-import`,
+      warnings: [],
+    }
+  }
+
+  // 以下两项属协作/创作灵活性信号（作者可能手工改了追踪笔记或有意跳章起草），不作硬拦截，
+  // 改由软门禁提醒 Agent 重点核实后再决定是否重建派生视图或补提交前一章。
+  const warnings = []
   const context = path.join(book, "追踪", "上下文.md")
   let contextRevision = null
   try {
@@ -211,20 +233,23 @@ function trackingCheckpointIssue(book, requireState = false, expectedLastCommitt
   } catch {}
   if (contextRevision !== document.state_revision) {
     const shown = contextRevision === null ? "缺失" : contextRevision
-    return `追踪/上下文.md 状态修订 ${shown} 与 _tracking-state.json 的 ${document.state_revision} 不一致；重新提交该章的 mode=revision 事务重建派生视图（expected_state_revision 取 追踪/_tracking-state.json 的 state_revision 字段（check 失败时不输出 JSON））`
+    warnings.push(
+      `追踪/上下文.md 状态修订 ${shown} 与 _tracking-state.json 的 ${document.state_revision} 不一致——请核实作者是否手工编辑了追踪文件；如需按 JSON 重建派生视图，再提交 mode=revision 事务（expected_state_revision 取 追踪/_tracking-state.json 的 state_revision 字段）`
+    )
   }
   if (expectedLastCommitted !== null) {
-    if (!Number.isInteger(document.last_committed_chapter)) {
-      return `追踪/_tracking-state.json 缺少整数 last_committed_chapter；停止写正文并重新 /story-import`
-    }
-    // 章号已在追踪范围内 = 回炉/改名/留原稿备份，不是首建新章：文件名新但章节早已提交过，
-    // 顺序校验对它恒为假（workflow-revision 的「备份原稿」步骤必然命中），跳过。
-    if (expectedLastCommitted < document.last_committed_chapter) return null
-    if (document.last_committed_chapter !== expectedLastCommitted) {
-      return `追踪已提交到第${document.last_committed_chapter}章，首建第${expectedLastCommitted + 1}章前必须先提交第${expectedLastCommitted}章追踪事务`
+    // 章号已在追踪范围内 = 回炉/改名/留原稿备份，不是首建新章：跳过顺序提醒。
+    if (expectedLastCommitted >= document.last_committed_chapter && document.last_committed_chapter !== expectedLastCommitted) {
+      warnings.push(
+        `追踪已提交到第${document.last_committed_chapter}章，现在首建第${expectedLastCommitted + 1}章——请确认这是否为作者有意跳章起草；若漏提交第${expectedLastCommitted}章，建议先补提交第${expectedLastCommitted}章追踪事务再继续`
+      )
     }
   }
-  return null
+  return { hard: null, warnings }
+}
+
+function trackingCheckpointIssue(book, requireState = false, expectedLastCommitted = null) {
+  return inspectTrackingCheckpoint(book, requireState, expectedLastCommitted).hard
 }
 
 function continuityFindings(root) {
@@ -239,9 +264,12 @@ function continuityFindings(root) {
     } catch {}
 
     const context = path.join(book, "追踪", "上下文.md")
-    const checkpointIssue = trackingCheckpointIssue(book, chapters.length > 0)
-    if (checkpointIssue) {
-      messages.push(`[continuity] ${safeRelative(root, book)}：${checkpointIssue}。`)
+    const checkpoint = inspectTrackingCheckpoint(book, chapters.length > 0)
+    if (checkpoint.hard) {
+      messages.push(`[continuity] ${safeRelative(root, book)}：${checkpoint.hard}。`)
+    }
+    for (const warning of checkpoint.warnings) {
+      messages.push(`[continuity] ${safeRelative(root, book)}：${warning}。`)
     }
     if (chapters.length && fs.existsSync(context)) {
       try {
@@ -810,41 +838,71 @@ function proseBlockReason(root, absolute) {
   if (checkpointIssue) {
     return `⛔ 写正文被拦截：${safeRelative(root, book)} 的${checkpointIssue}。`
   }
-  if (exists) return null
-  // 欠账门（无状态）：写第 N 章（首建）前，上一章有未清毒句式且未标「去味:跳过」豁免时先清再写。
-  // 判据现算自上一章文件本身，不落任何状态文件；找不到上一章/读取失败一律放行（宁可漏拦不可误伤）。
-  // 五端共用本核，欠账门判定与豁免标记由 scripts/test-story-hook-core.mjs 覆盖。
-  const prevNum = Number(chapter) - 1
-  if (prevNum >= 1) {
-    let prevFile = null
-    try {
-      // readdir 顺序在 ext4/overlayfs 上是哈希序：不排序就可能挑中同章号的原稿备份
-      // （workflow-revision 的「备份原稿」产物），拿早已被改写掉的旧文本报欠账。
-      // 显式排除 _原稿_ 备份并排序，保证四端与各文件系统上取到同一个「上一章」。
-      const candidates = fs.readdirSync(path.dirname(absolute))
-        .filter((file) => {
-          const pm = file.match(/^第0*(\d+)章.*\.md$/)
-          return pm && Number(pm[1]) === prevNum && !file.includes("_原稿_")
-        })
-        .sort()
-      if (candidates.length) prevFile = path.join(path.dirname(absolute), candidates[0])
-    } catch {}
-    if (prevFile) {
-      let prevText = null
-      try { prevText = fs.readFileSync(prevFile, "utf8") } catch {}
-      if (prevText !== null && !hasDeslopSkipMarker(prevText)) {
-        const hits = toxicPhraseFindings(prevText, loadStyleWhitelist(prevFile)).filter((line) => line.startsWith("第"))
-        if (hits.length) {
-          const shown = hits.slice(0, 6)
-          const more = hits.length - shown.length
-          let reason = `⛔ 写正文被拦截：上一章（${path.basename(prevFile)}）有 ${hits.length} 处未清毒句式欠账，先清零再写第 ${chapter} 章；用户显式豁免时在上一章标题行下加 <!-- 去味:跳过 --> 后重试。\n${shown.join("\n")}`
-          if (more > 0) reason += `\n（另有 ${more} 处，${toxicRescanHint(prevFile)}）`
-          return reason
+  return null
+}
+
+// 写正文前软门禁提醒（非阻断）：只承载启发式/协作灵活性信号，永不拦截 Write/Edit/Bash。
+// 1. 追踪派生视图修订号不一致（作者可能手工编辑了 上下文.md）或跳章首建；
+// 2. 首建第 N 章时若上一章（非 _原稿_ 备份，且未标「去味:跳过」）检出疑似毒句式，提醒 Agent 重点复核。
+function prosePreWriteWarnings(root, absolute) {
+  const base = path.basename(absolute)
+  const parent = path.basename(path.dirname(absolute))
+  if (base === "正文.md") return []
+  if (parent !== "正文" || !/^第.*章.*\.md$/.test(base)) return []
+  const match = base.match(/^第0*(\d+)章/)
+  if (!match) return []
+  const chapter = match[1]
+  const book = path.dirname(path.dirname(absolute))
+  const state = path.join(book, "追踪", "_tracking-state.json")
+  if (fs.existsSync(path.join(root, "拆文库", path.basename(book))) && !fs.existsSync(state)) return []
+  const exists = fs.existsSync(absolute)
+  const warnings = []
+
+  const checkpoint = inspectTrackingCheckpoint(book, true, exists ? null : Number(chapter) - 1)
+  if (!checkpoint.hard) {
+    for (const item of checkpoint.warnings) {
+      warnings.push(`⚠ 写前复核提醒（${safeRelative(root, book)}）：${item}。`)
+    }
+  }
+
+  if (!exists) {
+    const prevNum = Number(chapter) - 1
+    if (prevNum >= 1) {
+      let prevFile = null
+      try {
+        // readdir 顺序在 ext4/overlayfs 上是哈希序：排除 _原稿_ 备份并排序，保证五端取到同一「上一章」。
+        const candidates = fs.readdirSync(path.dirname(absolute))
+          .filter((file) => {
+            const pm = file.match(/^第0*(\d+)章.*\.md$/)
+            return pm && Number(pm[1]) === prevNum && !file.includes("_原稿_")
+          })
+          .sort()
+        if (candidates.length) prevFile = path.join(path.dirname(absolute), candidates[0])
+      } catch {}
+      if (prevFile) {
+        let prevText = null
+        try { prevText = fs.readFileSync(prevFile, "utf8") } catch {}
+        if (prevText !== null && !hasDeslopSkipMarker(prevText)) {
+          const hits = toxicPhraseFindings(prevText, loadStyleWhitelist(prevFile)).filter((line) => line.startsWith("第"))
+          if (hits.length) {
+            const shown = hits.slice(0, 6)
+            const more = hits.length - shown.length
+            let note = `⚠ 写前复核提醒（非阻断）：上一章（${path.basename(prevFile)}）检出 ${hits.length} 处疑似 AI 毒句式，建议开写第 ${chapter} 章前重点复核（确认剧情需要可保留，或按单章检查收口）：\n${shown.join("\n")}`
+            if (more > 0) note += `\n（另有 ${more} 处，${toxicRescanHint(prevFile)}）`
+            warnings.push(note)
+          }
         }
       }
     }
   }
-  return null
+
+  return warnings
+}
+
+function formatPreWriteAdvisory(warnings) {
+  const unique = [...new Set((warnings || []).filter(Boolean))]
+  if (!unique.length) return ""
+  return `=== 写正文前软门禁提醒（非阻断，请重点复核）===\n${unique.join("\n\n")}\n=== 本次写入已放行；如属作者有意安排可继续，否则请顺手处理 ===`
 }
 
 // 收尾标点集与深扫 oracle check-degeneration.js 的 findTruncation 对齐（[。！？!?…”"』」）)】]）：
@@ -1131,7 +1189,7 @@ function toxicPhraseFindings(text, whitelist = [], rescan = toxicRescanHint(""))
   return findings
 }
 
-function proseNetFindings(text, whitelist = [], rescan = toxicRescanHint("")) {
+function proseDegenerationFindings(text) {
   const findings = []
   const content = []
   text.split("\n").forEach((raw, index) => {
@@ -1169,13 +1227,28 @@ function proseNetFindings(text, whitelist = [], rescan = toxicRescanHint("")) {
     const [lineNo, last] = content[content.length - 1]
     if (!TERMINAL.has(Array.from(last).pop())) findings.push(`第${lineNo}行 疑似截断：结尾「…${codePointSlice(last, -12)}」未以标点收束`)
   }
-  // 「去味:跳过」豁免与欠账门同判据（文件首 6 行）：标记在场时跳过毒句式推回，
-  // 其余网（元信息/占位/复读/截断）照常——否则按拦截提示加标记的那次 Edit 会把
-  // 已豁免的毒句式再次当硬信号推回。
+  return findings
+}
+
+function proseNetFindings(text, whitelist = [], rescan = toxicRescanHint("")) {
+  const findings = proseDegenerationFindings(text)
+  // 「去味:跳过」豁免（文件首 6 行）：标记在场时跳过毒句式提示，
+  // 其余网（元信息/占位/复读/截断）照常。
   if (!hasDeslopSkipMarker(text)) {
     findings.push(...toxicPhraseFindings(text, whitelist, rescan))
   }
   return findings
+}
+
+function hasHardProseFindings(root, absolute) {
+  if (!fs.existsSync(absolute) || !isProsePath(absolute)) return false
+  try {
+    if (fs.statSync(absolute).size < 200) return true
+    const text = fs.readFileSync(absolute, "utf8")
+    return proseDegenerationFindings(text).length > 0
+  } catch {
+    return false
+  }
 }
 
 function isProsePath(absolute) {
@@ -1555,14 +1628,18 @@ module.exports = {
   findFirst,
   discoverActiveBook,
   discoverAllBooks,
+  inspectTrackingCheckpoint,
   trackingCheckpointIssue,
   continuityFindings,
   extractProseTargets,
   extractPatchTargets,
   proseBlockReason,
+  prosePreWriteWarnings,
+  formatPreWriteAdvisory,
   isProsePath,
   duplicateTitleFindings,
   proseAfterWrite,
+  hasHardProseFindings,
   shellWords,
   isGitCommitCommand,
   isCharacterSheetPath,
@@ -1578,6 +1655,7 @@ module.exports = {
   SOFT_PATTERNS,
   HARD_PATTERNS,
   skippableLine,
+  proseDegenerationFindings,
   proseNetFindings,
   maskQuotedSpans,
   toxicPhraseFindings,

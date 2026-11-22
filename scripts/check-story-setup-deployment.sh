@@ -1038,10 +1038,27 @@ printf '> 状态修订：0。\n' > "$guard_root/book/追踪/上下文.md"
 [ "$(run_guard 'book/正文/第1章_开端.md')" = "0" ] || fail "guard wrongly blocked long prose when 细纲 present"
 mv "$guard_root/book/追踪/_tracking-state.json" "$guard_root/book/追踪/_state.bak"
 [ "$(run_guard 'book/正文/第1章_开端.md')" = "2" ] || fail "guard did not BLOCK long prose when tracking state missing"
+printf '{corrupt-json\n' > "$guard_root/book/追踪/_tracking-state.json"
+[ "$(run_guard 'book/正文/第1章_开端.md')" = "2" ] || fail "guard did not BLOCK long prose when tracking state is corrupt JSON"
 mv "$guard_root/book/追踪/_state.bak" "$guard_root/book/追踪/_tracking-state.json"
 [ "$(run_guard 'book/正文/第001章_开端.md')" = "0" ] || fail "guard did not tolerate chapter-number zero padding (第001章 vs 细纲_第1章)"
 write_outline "$guard_root/book/大纲/细纲_第7章_惊变.md"
 [ "$(run_guard 'book/正文/第7章_x.md')" = "0" ] || fail "guard did not tolerate title-suffixed 细纲 (细纲_第7章_惊变.md)"
+# 软门禁验证：跳章首建 / 手改上下文修订号 / 上一章疑似毒句式均放行（exit 0）并输出非阻断提醒 JSON
+printf '{"schema_version":4,"state_revision":1,"last_committed_chapter":1}\n' > "$guard_root/book/追踪/_tracking-state.json"
+printf '> 状态修订：0。\n' > "$guard_root/book/追踪/上下文.md"
+printf '# 第1章\n声音不大，却带着一股狠劲。他声音不高，却压住了整间屋子。\n' > "$guard_root/book/正文/第1章_旧.md"
+write_outline "$guard_root/book/大纲/细纲_第2章.md"
+soft_ec=0
+soft_out="$(printf '{"tool_name":"Write","tool_input":{"file_path":"book/正文/第2章_新.md","content":"x"}}' \
+  | CLAUDE_PROJECT_DIR="$guard_root" bash "$guard_root/.claude/hooks/run-story-hook.sh" pre-tool-prose-guard 2>/dev/null)" || soft_ec=$?
+[ "$soft_ec" = "0" ] || fail "softened pre-write warnings must allow write (exit 0), got $soft_ec"
+printf '%s' "$soft_out" | grep -q '写正文前软门禁提醒' || fail "softened pre-write warnings did not emit advisory JSON: $soft_out"
+printf '%s' "$soft_out" | grep -q '疑似 AI 毒句式' || fail "prior-chapter toxic prose advisory missing: $soft_out"
+printf '%s' "$soft_out" | grep -q '状态修订' || fail "manual context revision advisory missing: $soft_out"
+printf '{"schema_version":4,"state_revision":0,"last_committed_chapter":200}\n' > "$guard_root/book/追踪/_tracking-state.json"
+printf '> 状态修订：0。\n' > "$guard_root/book/追踪/上下文.md"
+rm -f "$guard_root/book/正文/第1章_旧.md" "$guard_root/book/大纲/细纲_第2章.md"
 # 短篇授权流：有 设定.md 信号 + 缺小节大纲 -> 拦截；补小节大纲 -> 放行
 : > "$guard_root/short/设定.md"
 [ "$(run_guard 'short/正文.md')" = "2" ] || fail "guard did not BLOCK short prose when 小节大纲.md missing"

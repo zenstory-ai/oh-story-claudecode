@@ -247,6 +247,62 @@ test("Claude pre-tool-prose-guard drive-letter paths (issue #184), analysis-inpu
     assert.equal(bad.status, 2)
     assert.match(bad.stderr, /chapter-extractor 写入被拦截/)
 
+    // Pre-write hard blocks vs soft advisory warnings (exit 0 + additionalContext JSON)
+    const softBook = path.join(root, "软门禁书")
+    writeOutline(path.join(softBook, "大纲/细纲_第2章.md"))
+    writeOutline(path.join(softBook, "大纲/细纲_第5章.md"))
+    write(path.join(softBook, "正文/第1章_旧.md"), "# 第1章\n声音不大，却带着一股狠劲。他声音不高，却压住了整间屋子。\n")
+
+    // Corrupt _tracking-state.json still hard-blocks (exit 2)
+    write(path.join(softBook, "追踪/_tracking-state.json"), "{corrupt-json\n")
+    const corruptRes = runLauncher(launcher, "pre-tool-prose-guard", {
+      root,
+      input: { tool_name: "Write", tool_input: { file_path: "软门禁书/正文/第2章_新.md" } },
+    })
+    assert.equal(corruptRes.status, 2)
+    assert.match(corruptRes.stderr, /无法解析/)
+
+    // Wrong schema_version still hard-blocks (exit 2)
+    write(path.join(softBook, "追踪/_tracking-state.json"), JSON.stringify({ schema_version: 3, state_revision: 0, last_committed_chapter: 1 }))
+    const schemaRes = runLauncher(launcher, "pre-tool-prose-guard", {
+      root,
+      input: { tool_name: "Write", tool_input: { file_path: "软门禁书/正文/第2章_新.md" } },
+    })
+    assert.equal(schemaRes.status, 2)
+    assert.match(schemaRes.stderr, /schema_version=4/)
+
+    // Prior-chapter toxic prose: exit 0 (ALLOWED) + non-blocking PreToolUse additionalContext JSON
+    writeCleanState(softBook, 1, 0)
+    const toxicRes = runLauncher(launcher, "pre-tool-prose-guard", {
+      root,
+      input: { tool_name: "Write", tool_input: { file_path: "软门禁书/正文/第2章_新.md" } },
+    })
+    assert.equal(toxicRes.status, 0, toxicRes.stderr)
+    const toxicJson = JSON.parse(toxicRes.stdout)
+    assert.equal(toxicJson.hookSpecificOutput?.hookEventName, "PreToolUse")
+    assert.match(toxicJson.hookSpecificOutput?.additionalContext, /写正文前软门禁提醒/)
+    assert.match(toxicJson.hookSpecificOutput?.additionalContext, /疑似 AI 毒句式/)
+
+    // Out-of-order chapter jump via Bash: exit 0 (ALLOWED) + non-blocking additionalContext JSON
+    const jumpRes = runLauncher(launcher, "pre-tool-prose-guard", {
+      root,
+      input: { tool_name: "Bash", tool_input: { command: "cat > 软门禁书/正文/第5章_跳章.md <<EOF\n正文\nEOF" } },
+    })
+    assert.equal(jumpRes.status, 0, jumpRes.stderr)
+    const jumpJson = JSON.parse(jumpRes.stdout)
+    assert.equal(jumpJson.hookSpecificOutput?.hookEventName, "PreToolUse")
+    assert.match(jumpJson.hookSpecificOutput?.additionalContext, /有意跳章起草/)
+
+    // Manual 上下文.md revision mismatch: exit 0 (ALLOWED) + non-blocking additionalContext JSON
+    write(path.join(softBook, "追踪/上下文.md"), "> 状态修订：99\n")
+    const revRes = runLauncher(launcher, "pre-tool-prose-guard", {
+      root,
+      input: { tool_name: "Write", tool_input: { file_path: "软门禁书/正文/第1章_旧.md" } },
+    })
+    assert.equal(revRes.status, 0, revRes.stderr)
+    const revJson = JSON.parse(revRes.stdout)
+    assert.match(revJson.hookSpecificOutput?.additionalContext, /状态修订/)
+
     // Verify story_hook_cli.js passes windowsHide: true on git rev-parse
     const origSpawn = childProcess.spawnSync
     const calls = []

@@ -159,20 +159,61 @@ test("ZCode pre-tool-prose-guard covers outlines, tracking, cwd resolution, cros
     writeCleanState(path.join(root, "cwd-book"), 7)
     assert.equal(invoke("pre-tool-prose-guard", relPayload), "", "relative prose target with cwd-local outline")
 
-    // Existing prose rewrite with mismatched derived state
+    // Existing prose rewrite: corrupt state still hard-denies; manual 上下文.md mismatch emits non-blocking advisory
     write(path.join(root, "book/正文/第009章_已存在.md"), "")
-    write(
-      path.join(root, "book/追踪/_tracking-state.json"),
-      JSON.stringify({ schema_version: 4, state_revision: 1, last_committed_chapter: 0 }) + "\n"
-    )
+    write(path.join(root, "book/追踪/_tracking-state.json"), "{corrupt-json\n")
     reason = assertDenied(
       invoke("pre-tool-prose-guard", {
         tool_name: "Write",
         tool_input: { file_path: "book/正文/第009章_已存在.md" },
       }),
-      "existing prose rewrite with mismatched derived state"
+      "existing prose rewrite with corrupt tracking state"
     )
-    assert.match(reason, /mode=revision 事务重建派生视图/)
+    assert.match(reason, /无法解析/)
+
+    write(
+      path.join(root, "book/追踪/_tracking-state.json"),
+      JSON.stringify({ schema_version: 4, state_revision: 1, last_committed_chapter: 0 }) + "\n"
+    )
+    let softSpec = assertContract(
+      invoke("pre-tool-prose-guard", {
+        tool_name: "Write",
+        tool_input: { file_path: "book/正文/第009章_已存在.md" },
+      }),
+      "PreToolUse",
+      "existing prose rewrite with mismatched derived state (soft advisory)"
+    )
+    assert.equal(softSpec.permissionDecision, undefined)
+    assert.match(softSpec.additionalContext, /写正文前软门禁提醒/)
+    assert.match(softSpec.additionalContext, /状态修订/)
+    writeCleanState(path.join(root, "book"), 1)
+
+    // Prior-chapter toxic prose & chapter jump emit strict-schema non-blocking PreToolUse additionalContext
+    write(path.join(root, "book/正文/第001章_旧.md"), "# 第1章\n声音不大，却带着一股狠劲。他声音不高，却压住了整间屋子。\n")
+    writeOutline(path.join(root, "book/大纲/细纲_第2章.md"))
+    softSpec = assertContract(
+      invoke("pre-tool-prose-guard", {
+        tool_name: "Write",
+        tool_input: { file_path: "book/正文/第002章_新局.md" },
+      }),
+      "PreToolUse",
+      "prior-chapter toxic prose soft advisory"
+    )
+    assert.equal(softSpec.permissionDecision, undefined)
+    assert.match(softSpec.additionalContext, /疑似 AI 毒句式/)
+    fs.unlinkSync(path.join(root, "book/大纲/细纲_第2章.md"))
+
+    writeOutline(path.join(root, "book/大纲/细纲_第5章.md"))
+    softSpec = assertContract(
+      invoke("pre-tool-prose-guard", {
+        tool_name: "Write",
+        tool_input: { file_path: "book/正文/第005章_跳章.md" },
+      }),
+      "PreToolUse",
+      "out-of-order chapter jump soft advisory"
+    )
+    assert.equal(softSpec.permissionDecision, undefined)
+    assert.match(softSpec.additionalContext, /有意跳章起草/)
     writeCleanState(path.join(root, "book"))
 
     // Windows cross-volume safety for isPathInside
@@ -236,18 +277,29 @@ test("ZCode pre-tool-prose-guard covers outlines, tracking, cwd resolution, cros
       "story-import long migration"
     )
     writeOutline(path.join(root, "impbook/大纲/细纲_第2章.md"))
-    write(
-      path.join(root, "impbook/追踪/_tracking-state.json"),
-      JSON.stringify({ schema_version: 4, state_revision: 1, last_committed_chapter: 1 }) + "\n"
-    )
+    write(path.join(root, "impbook/追踪/_tracking-state.json"), "{corrupt-json\n")
     write(path.join(root, "impbook/追踪/上下文.md"), "> 状态修订：0\n")
     assertDenied(
       invoke("pre-tool-prose-guard", {
         tool_name: "Write",
         tool_input: { file_path: "impbook/正文/第2章_导入后续.md" },
       }),
-      "imported project must not permanently bypass invalid tracking guard"
+      "imported project must not permanently bypass corrupt tracking guard"
     )
+    write(
+      path.join(root, "impbook/追踪/_tracking-state.json"),
+      JSON.stringify({ schema_version: 4, state_revision: 1, last_committed_chapter: 1 }) + "\n"
+    )
+    softSpec = assertContract(
+      invoke("pre-tool-prose-guard", {
+        tool_name: "Write",
+        tool_input: { file_path: "impbook/正文/第2章_导入后续.md" },
+      }),
+      "PreToolUse",
+      "imported project manual context mismatch emits soft advisory"
+    )
+    assert.equal(softSpec.permissionDecision, undefined)
+    assert.match(softSpec.additionalContext, /状态修订/)
   } finally {
     fs.rmSync(root, { recursive: true, force: true })
   }
