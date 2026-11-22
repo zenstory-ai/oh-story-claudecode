@@ -424,8 +424,25 @@ function verify(projectDir, options = {}) {
     leadEvidence = '导入或旧版设定，跳过导语声明检查'
   } else {
     const leadSection = settings.match(/^#{2,6}[ \t]*[^\n]*(?:导语|冷开场)[^\n]*\n([\s\S]*?)(?=^#{1,6}[ \t]|(?![\s\S]))/m)
+    const stripHtmlComments = (text) => {
+      const src = text || ''
+      let out = ''
+      let cursor = 0
+      while (cursor < src.length) {
+        const start = src.indexOf('<!--', cursor)
+        if (start === -1) {
+          out += src.slice(cursor)
+          break
+        }
+        out += src.slice(cursor, start)
+        const end = src.indexOf('-->', start + 4)
+        if (end === -1) break
+        cursor = end + 3
+      }
+      return out
+    }
     const leadBody = leadSection
-      ? leadSection[1].split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !/^<!--.*-->$/.test(line) && !/^\{[^}]*\}$/.test(line) && line !== '[待补充]')
+      ? stripHtmlComments(leadSection[1]).split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !/^\{[^}]*\}$/.test(line) && line !== '[待补充]')
       : []
     const leadField = settings.match(/^[ \t]*[-*]?[ \t]*(?:导语|冷开场)[^：:\n]*[：:][ \t]*([^\n]+)$/m)
     const leadFieldVal = leadField ? leadField[1].trim() : ''

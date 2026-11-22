@@ -107,8 +107,26 @@ function substantive(text) {
   return Boolean(body.replace(/[\s_#*\[\]【】{}。，；:：-]/g, ''));
 }
 
+function stripHtmlComments(text) {
+  const src = text || '';
+  let out = '';
+  let cursor = 0;
+  while (cursor < src.length) {
+    const start = src.indexOf('<!--', cursor);
+    if (start === -1) {
+      out += src.slice(cursor);
+      break;
+    }
+    out += src.slice(cursor, start);
+    const end = src.indexOf('-->', start + 4);
+    if (end === -1) break;
+    cursor = end + 3;
+  }
+  return out;
+}
+
 function hasCustomStyle(text) {
-  return substantive((text || '').replace(/<!--[\s\S]*?-->/g, ''));
+  return substantive(stripHtmlComments(text));
 }
 
 function escapeRegExp(str) {
@@ -183,7 +201,7 @@ function ownNames(project) {
 }
 
 function benchmarkRegistry(project) {
-  const text = (readText(path.join(project, '设定', '题材定位.md')) || '').replace(/<!--[\s\S]*?-->/g, '');
+  const text = stripHtmlComments(readText(path.join(project, '设定', '题材定位.md')));
   const values = [];
   for (const label of ['主对标书', '对标']) {
     const re = new RegExp(`^[ \\t>]*(?:[-*+][ \\t]*)?\\**${label}\\**[ \\t]*[：:][ \\t]*(.*)$`, 'gm');
@@ -413,7 +431,7 @@ function matchGenreCards(project) {
 }
 
 function findPrimaryBenchmarkName(project) {
-  const text = (readText(path.join(project, '设定', '题材定位.md')) || '').replace(/<!--[\s\S]*?-->/g, '');
+  const text = stripHtmlComments(readText(path.join(project, '设定', '题材定位.md')));
   const mine = ownNames(project);
   const cleanName = (raw) =>
     raw
