@@ -673,7 +673,17 @@ def test_parser_does_not_block_legit_modules() -> None:
 
         make_workspace(base)
         MODULE["register_atoms"](root, module_path, "测试书")
+        # Blank lines (internal and trailing) must be skipped just like Python csv.DictReader
+        csv_lines = (root / "灵感索引.csv").read_text(encoding="utf-8-sig").rstrip("\n").split("\n")
+        with_blanks = "\ufeff" + csv_lines[0] + "\n\n" + "\n\n".join(csv_lines[1:]) + "\n\n"
+        (root / "灵感索引.csv").write_bytes(with_blanks.encode("utf-8"))
+        blank_errors = MODULE["validate"](root)
+        require(not blank_errors, f"灵感索引.csv 含空行时 validate 不能报列数不匹配：{blank_errors}")
+        blank_cov = MODULE["coverage"](root)
+        require(blank_cov["books"]["测试书"]["atoms"] == 3, f"灵感索引.csv 含空行时 coverage 须正常：{blank_cov}")
+
         text = (root / "灵感索引.csv").read_text(encoding="utf-8-sig").rstrip("\n").split("\n")
+        text = [line for line in text if line]
         text.insert(2, "IA-099,原子灵感,短行")
         (root / "灵感索引.csv").write_bytes(("\ufeff" + "\n".join(text) + "\n").encode("utf-8"))
         errors = MODULE["validate"](root)

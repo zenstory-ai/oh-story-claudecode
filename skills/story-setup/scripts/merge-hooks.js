@@ -29,6 +29,7 @@ const CLAUDE_MANAGED_HOOK_SCRIPTS = Object.freeze([
 
 const CODEX_MANAGED_COMMAND_MARKERS = Object.freeze([
   ".codex/hooks/story_codex_hook.py",
+  ".codex/hooks/story_codex_hook.js",
   ".codex/hooks/run-story-hook.sh",
   ".codex/hooks/run-story-hook.cmd",
 ]);

@@ -103,12 +103,12 @@ The video at the top records this exact run—everything `/story-long-write 写�
 
 ```text
 Blueprint       细纲_第021章.md              tracking said "no blueprint for ch.21", so the skill wrote one first: unit L1-03, target emotion, stakes, loop state, a 10-row four-column plot table (plus the optional resolution column)
-Chapter check   storyctl.py chapter check   ready · 2068 chars / target 2300
+Chapter check   storyctl.js chapter check   ready · 2068 chars / target 2300
                   ├ check-ai-patterns.js     0 hits
                   ├ check-degeneration.js    0 hits
                   └ normalize-punctuation    0 hits
-Tracking commit storyctl.py chapter commit  tracking_committed=true · state_revision 0 → 1
-Derived views   tracking_commit.py check    上下文.md / 伏笔.md / 角色状态/ / 时间线/ / 逐章记录/ all re-rendered from state, byte-identical
+Tracking commit storyctl.js chapter commit  tracking_committed=true · state_revision 0 → 1
+Derived views   tracking_commit.js check    上下文.md / 伏笔.md / 角色状态/ / 时间线/ / 逐章记录/ all re-rendered from state, byte-identical
 ```
 
 Once the chapter outline passes validation, `narrative-writer` drafts the chapter in two parts, checks settings and foreshadowing, polishes AI phrasing if needed, and runs the closing checks. After commit, every tracking file is automatically re-rendered from `_tracking-state.json`; compared with the card above, here is what chapter 21 wrote back (excerpt):

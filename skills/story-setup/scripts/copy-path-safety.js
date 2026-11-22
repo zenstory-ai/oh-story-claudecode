@@ -190,6 +190,18 @@ function isSymlink(filePath) {
   }
 }
 
+function unlinkSymlink(targetPath) {
+  try {
+    fs.unlinkSync(targetPath);
+  } catch (err) {
+    if (err && (err.code === "EPERM" || err.code === "EISDIR")) {
+      fs.rmdirSync(targetPath);
+      return;
+    }
+    throw err;
+  }
+}
+
 function walkAndPrune(curDir, sourceRoot, targetRoot, pruned) {
   const entries = fs.readdirSync(curDir, { withFileTypes: true });
   for (const entry of entries) {
@@ -202,11 +214,11 @@ function walkAndPrune(curDir, sourceRoot, targetRoot, pruned) {
       const targetPointsToDir = isRealDirFollow(tEntry);
       if (targetPointsToDir) {
         if (!existsFollow(sEntry)) {
-          fs.unlinkSync(tEntry);
+          unlinkSymlink(tEntry);
           pruned.push(relPosix);
         }
       } else if (!existsFollow(sEntry) || (isRealDirFollow(sEntry) && !isSymlink(sEntry))) {
-        fs.unlinkSync(tEntry);
+        unlinkSymlink(tEntry);
         pruned.push(relPosix);
       }
     } else if (entry.isDirectory()) {
@@ -266,6 +278,15 @@ function sortObjectKeys(obj) {
   return sorted;
 }
 
+class CliUsageError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "CliUsageError";
+  }
+}
+
+const USAGE = "usage: copy-path-safety.js [--prune-orphans] <source> <target>\n";
+
 function parseArgs(argv) {
   let doPrune = false;
   const positional = [];
@@ -274,29 +295,37 @@ function parseArgs(argv) {
     if (arg === "--prune-orphans") {
       doPrune = true;
     } else if (arg === "-h" || arg === "--help") {
-      process.stdout.write(
-        "usage: copy-path-safety.js [--prune-orphans] <source> <target>\n"
-      );
-      process.exit(0);
+      return { help: true };
     } else if (arg === "--") {
       positional.push(...argv.slice(i + 1));
       break;
     } else if (arg.startsWith("-")) {
-      process.stderr.write(`copy-path-safety: unknown option: ${arg}\n`);
-      process.exit(2);
+      throw new CliUsageError(`copy-path-safety: unknown option: ${arg}\n`);
     } else {
       positional.push(arg);
     }
   }
   if (positional.length !== 2) {
-    process.stderr.write("usage: copy-path-safety.js [--prune-orphans] <source> <target>\n");
-    process.exit(2);
+    throw new CliUsageError(USAGE);
   }
-  return { pruneOrphans: doPrune, source: positional[0], target: positional[1] };
+  return { help: false, pruneOrphans: doPrune, source: positional[0], target: positional[1] };
 }
 
 function main(argv = process.argv.slice(2)) {
-  const args = parseArgs(argv);
+  let args;
+  try {
+    args = parseArgs(argv);
+  } catch (err) {
+    if (err instanceof CliUsageError) {
+      process.stderr.write(err.message);
+      return 2;
+    }
+    throw err;
+  }
+  if (args.help) {
+    process.stdout.write(USAGE);
+    return 0;
+  }
   const result = args.pruneOrphans
     ? pruneOrphans(args.source, args.target)
     : classifyCopy(args.source, args.target);

@@ -155,7 +155,7 @@ function preCompactOutput(directory: string): string {
     const ctxPath = path.join(bookDir, "追踪", "上下文.md")
     if (fs.existsSync(ctxPath)) {
       const lineCount = fs.readFileSync(ctxPath, "utf-8").split("\n").length
-      const relPath = path.relative(root, ctxPath)
+      const relPath = safeRelative(root, ctxPath)
       lines.push(`Writing context: ${relPath} (${lineCount} lines)`)
     } else {
       lines.push("Active state: not found")

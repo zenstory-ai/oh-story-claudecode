@@ -8,23 +8,21 @@
 const fs = require("node:fs")
 const path = require("node:path")
 const { spawnSync } = require("node:child_process")
-const core = require("./story_hook_core.js")
-const {
-  existingDir,
-  safeRelative,
-  resolveTarget,
-  discoverActiveBook,
-  continuityFindings,
-  extractProseTargets,
-  extractPatchTargets,
-  proseBlockReason,
-  isProsePath,
-  isGitCommitCommand,
-  stagedMarkdownWarnings,
-  proseNetFindings,
-  loadStyleWhitelist,
-  toxicRescanHint,
-} = core
+
+const VALID_EVENTS = new Set([
+  "session-start",
+  "pre-tool-prose-guard",
+  "pre-tool-commit-advisory",
+  "pre-compact",
+  "post-compact",
+  "stop",
+])
+
+let cachedCore = null
+function loadCore() {
+  if (!cachedCore) cachedCore = require("./story_hook_core.js")
+  return cachedCore
+}
 
 let hookInput = {}
 
@@ -58,13 +56,14 @@ function deployedWorkspaceRoot() {
     const hooksDir = path.resolve(__dirname)
     if (path.basename(hooksDir) === "hooks" && path.basename(path.dirname(hooksDir)) === ".codex") {
       const root = path.dirname(path.dirname(hooksDir))
-      if (fs.existsSync(root) && fs.statSync(root).isDirectory()) return root
+      if (fs.existsSync(root) && fs.statSync(root).isDirectory()) return fs.realpathSync(root)
     }
   } catch {}
   return null
 }
 
 function projectRoot() {
+  const { existingDir } = loadCore()
   for (const name of ["CODEX_PROJECT_DIR", "CLAUDE_PROJECT_DIR"]) {
     const candidate = existingDir(process.env[name])
     if (candidate) return candidate
@@ -80,9 +79,12 @@ function projectRoot() {
       stdio: ["ignore", "pipe", "ignore"],
       windowsHide: true,
     })
-    if (result.status === 0 && result.stdout.trim()) return path.resolve(result.stdout.trim())
+    if (result.status === 0 && result.stdout.trim()) {
+      const gitRoot = existingDir(result.stdout.trim())
+      if (gitRoot) return gitRoot
+    }
   } catch {}
-  return path.resolve(cwd)
+  return existingDir(cwd) || path.resolve(cwd)
 }
 
 function isPathInside(root, candidate, pathApi = path) {
@@ -108,6 +110,7 @@ function findCommand(value) {
 }
 
 function targetPaths(input) {
+  const { existingDir, extractProseTargets, extractPatchTargets, resolveTarget } = loadCore()
   const root = projectRoot()
   const inputCwd = existingDir(input.cwd)
   const base = inputCwd && isPathInside(root, inputCwd) ? inputCwd : root
@@ -128,6 +131,7 @@ function targetPaths(input) {
 }
 
 function sessionStart() {
+  const { discoverActiveBook, safeRelative, continuityFindings } = loadCore()
   const root = projectRoot()
   const messages = []
   const sentinel = path.join(root, ".story-deployed")
@@ -155,6 +159,7 @@ function sessionStart() {
 }
 
 function preToolProseGuard() {
+  const { proseBlockReason } = loadCore()
   const root = projectRoot()
   for (const target of targetPaths(hookInput)) {
     const reason = proseBlockReason(root, target)
@@ -172,6 +177,7 @@ function preToolProseGuard() {
 }
 
 function preToolCommitAdvisory() {
+  const { isGitCommitCommand, stagedMarkdownWarnings } = loadCore()
   const command = findCommand(hookInput)
   if (!command || !isGitCommitCommand(command)) return
   const warnings = stagedMarkdownWarnings(projectRoot())
@@ -193,6 +199,7 @@ function gitNullList(root, args) {
 }
 
 function compactSummary() {
+  const { discoverActiveBook, safeRelative } = loadCore()
   const root = projectRoot()
   const lines = ["=== Story Compact Summary ==="]
   const book = discoverActiveBook(root)
@@ -220,6 +227,7 @@ function compactSummary() {
 }
 
 function findChangedProseFiles(root) {
+  const { isProsePath } = loadCore()
   const out = []
   const seen = new Set()
   const commands = [
@@ -247,6 +255,7 @@ function stopEvent() {
   // Codex 无 PostToolUse，正文内容网在回合结束的 Stop 事件兜底：对本回合 git 改动过的正文
   // 复扫硬信号。非阻塞、无发现静默；解析失败一律 {continue:true}。
   try {
+    const { proseNetFindings, loadStyleWhitelist, toxicRescanHint, safeRelative } = loadCore()
     const root = projectRoot()
     const blocks = []
     for (const abs of findChangedProseFiles(root)) {
@@ -270,7 +279,19 @@ function stopEvent() {
 
 function main() {
   const event = process.argv[2] || ""
+  if (!VALID_EVENTS.has(event)) {
+    process.stderr.write(`unknown oh-story Codex hook event: ${event}\n`)
+    process.exitCode = 2
+    return
+  }
   hookInput = readHookInput()
+  try {
+    loadCore()
+  } catch (error) {
+    process.stderr.write(`[oh-story codex hook] failed to load story_hook_core.js: ${error instanceof Error ? error.message : String(error)}\n`)
+    if (event === "stop") emit({ continue: true })
+    return
+  }
   try {
     if (event === "session-start") sessionStart()
     else if (event === "pre-tool-prose-guard") preToolProseGuard()
@@ -278,10 +299,6 @@ function main() {
     else if (event === "pre-compact") compactSummary()
     else if (event === "post-compact") compactSummary()
     else if (event === "stop") stopEvent()
-    else {
-      process.stderr.write(`unknown oh-story Codex hook event: ${event}\n`)
-      process.exitCode = 2
-    }
   } catch (error) {
     process.stderr.write(`[oh-story codex hook] ${error instanceof Error ? error.message : String(error)}\n`)
     if (event === "stop") emit({ continue: true })

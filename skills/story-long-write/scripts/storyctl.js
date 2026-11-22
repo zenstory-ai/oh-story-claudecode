@@ -202,6 +202,18 @@ function chapterWorkDir(project, chapter) {
   return path.join(path.resolve(String(project)), ...WORK_ROOT, `第${padded}章`);
 }
 
+function unlinkSymlink(targetPath) {
+  try {
+    fs.unlinkSync(targetPath);
+  } catch (err) {
+    if (err && (err.code === 'EPERM' || err.code === 'EISDIR')) {
+      fs.rmdirSync(targetPath);
+      return;
+    }
+    throw err;
+  }
+}
+
 function removeChapterWorkDir(project, chapter) {
   const dirPath = chapterWorkDir(project, chapter);
   let lst;
@@ -211,7 +223,7 @@ function removeChapterWorkDir(project, chapter) {
     return null;
   }
   if (lst.isSymbolicLink()) {
-    fs.unlinkSync(dirPath);
+    unlinkSymlink(dirPath);
   } else if (lst.isDirectory()) {
     fs.rmSync(dirPath, { recursive: true, force: true });
   } else {
@@ -425,7 +437,7 @@ function fixPunctuation(project, chapter, authorRange = null) {
   const script = path.join(__dirname, 'normalize-punctuation.js');
   if (!isFile(script)) return false;
   const before = fs.readFileSync(bodyPath);
-  runNodeScript(script, [String(bodyPath)]);
+  _hooks.runNodeScript(script, [String(bodyPath)]);
   const after = fs.readFileSync(bodyPath);
   return !before.equals(after);
 }

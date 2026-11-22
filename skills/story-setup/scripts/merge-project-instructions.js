@@ -334,51 +334,72 @@ function toAsciiJson(value) {
   });
 }
 
+class CliUsageError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "CliUsageError";
+  }
+}
+
+const USAGE =
+  "usage: merge-project-instructions.js --host <host> --template <path> --existing <path> --output <path> --project-name <name>\n";
+
+const VALUE_FLAGS = new Set(["--host", "--template", "--existing", "--output", "--project-name"]);
+
 function parseArgs(argv) {
   const args = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (
-      arg === "--host" ||
-      arg === "--template" ||
-      arg === "--existing" ||
-      arg === "--output" ||
-      arg === "--project-name"
-    ) {
-      const value = argv[++i];
+    if (arg === "-h" || arg === "--help") {
+      return { help: true };
+    }
+    let flag = arg;
+    let inlineValue = null;
+    const eqIdx = arg.indexOf("=");
+    if (arg.startsWith("--") && eqIdx !== -1) {
+      flag = arg.slice(0, eqIdx);
+      inlineValue = arg.slice(eqIdx + 1);
+    }
+    if (VALUE_FLAGS.has(flag)) {
+      const value = inlineValue !== null ? inlineValue : argv[++i];
       if (value === undefined) {
-        process.stderr.write(`merge-project-instructions: ${arg} requires a value\n`);
-        process.exit(2);
+        throw new CliUsageError(`merge-project-instructions: ${flag} requires a value\n`);
       }
-      args[arg.slice(2)] = value;
-    } else if (arg === "-h" || arg === "--help") {
-      process.stdout.write(
-        "usage: merge-project-instructions.js --host <host> --template <path> --existing <path> --output <path> --project-name <name>\n"
-      );
-      process.exit(0);
+      args[flag.slice(2)] = value;
     } else {
-      process.stderr.write(`merge-project-instructions: unknown argument: ${arg}\n`);
-      process.exit(2);
+      throw new CliUsageError(`merge-project-instructions: unknown argument: ${arg}\n`);
     }
   }
   const required = ["host", "template", "existing", "output", "project-name"];
   for (const key of required) {
     if (args[key] === undefined) {
-      process.stderr.write(`merge-project-instructions: missing required option --${key}\n`);
-      process.exit(2);
+      throw new CliUsageError(`merge-project-instructions: missing required option --${key}\n`);
     }
   }
   if (!HOSTS.includes(args.host)) {
-    process.stderr.write(
+    throw new CliUsageError(
       `merge-project-instructions: invalid --host ${args.host} (choose from ${HOSTS.join(", ")})\n`
     );
-    process.exit(2);
   }
+  args.help = false;
   return args;
 }
 
 function main(argv = process.argv.slice(2)) {
-  const args = parseArgs(argv);
+  let args;
+  try {
+    args = parseArgs(argv);
+  } catch (err) {
+    if (err instanceof CliUsageError) {
+      process.stderr.write(err.message);
+      return 2;
+    }
+    throw err;
+  }
+  if (args.help) {
+    process.stdout.write(USAGE);
+    return 0;
+  }
   try {
     const template = fs.readFileSync(args.template, "utf8");
     const existing =

@@ -93,6 +93,52 @@ def main() -> None:
         assert proc_noop.returncode == 0, proc_noop.stderr
         assert proc_noop.stdout.strip() == "same-object no-op", proc_noop.stdout
 
+        # --flag=value CLI syntax must be accepted
+        eq_dest = root / "eq-project/.agents/skills"
+        proc_eq = subprocess.run(
+            ["node", str(SCRIPT_PATH), f"--source={source}", f"--dest={eq_dest}"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        assert proc_eq.returncode == 0, proc_eq.stderr
+        assert proc_eq.stdout.strip() == "materialized", proc_eq.stdout
+
+        # Stale backup preservation: throwing DeployError must NOT delete an existing stale backup
+        backup_probe = subprocess.run(
+            [
+                "node",
+                "-e",
+                (
+                    "const fs = require('node:fs');"
+                    "const path = require('node:path');"
+                    "const { deploy, DeployError } = require(process.argv[1]);"
+                    "const source = process.argv[2];"
+                    "const dest = process.argv[3];"
+                    "const backup = path.join(path.dirname(dest), path.basename(dest) + '.backup-' + process.pid);"
+                    "fs.mkdirSync(backup, { recursive: true });"
+                    "fs.writeFileSync(path.join(backup, 'sentinel.txt'), 'precious', 'utf8');"
+                    "let caught = null;"
+                    "try { deploy(source, dest); } catch (e) { caught = e; }"
+                    "if (!(caught instanceof DeployError) || !caught.message.includes('stale deployment backup exists')) {"
+                    "  console.error('unexpected error:', caught);"
+                    "  process.exit(1);"
+                    "}"
+                    "if (fs.readFileSync(path.join(backup, 'sentinel.txt'), 'utf8') !== 'precious') {"
+                    "  console.error('stale backup was modified or deleted');"
+                    "  process.exit(1);"
+                    "}"
+                ),
+                str(SCRIPT_PATH),
+                str(source),
+                str(destination),
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        assert backup_probe.returncode == 0, backup_probe.stderr
+
     print("Antigravity skill deployment tests passed.")
 
 

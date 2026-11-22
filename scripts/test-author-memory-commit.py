@@ -1150,6 +1150,10 @@ def main() -> None:
         assert len(after_legacy["items"]) == 1, "强化路径不得派生重复条目"
         assert after_legacy["items"]["AP001"]["confirmation_count"] == 2
         run("check", "--workspace", str(legacy_long_workspace))
+        # CRLF regression: derived views rewritten with \r\n (e.g. git autocrlf=true on Windows) must still pass check
+        profile_path = memory_dir(legacy_long_workspace) / "作者画像.md"
+        profile_path.write_bytes(profile_path.read_text(encoding="utf-8").replace("\n", "\r\n").encode("utf-8"))
+        run("check", "--workspace", str(legacy_long_workspace))
         new_long = record(legacy_long_workspace, input_path, remember("legacy-new-long", preference(legacy_assertion + "再补一句。", "新的长断言。")), expect=2)
         assert "超出 120 字节上限" in new_long.stderr, "新建条目仍受一句话上限约束"
 

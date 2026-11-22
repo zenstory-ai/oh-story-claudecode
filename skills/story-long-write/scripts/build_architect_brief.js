@@ -129,7 +129,7 @@ function escapeRegExp(str) {
 }
 
 function templateBlock(text, tag, source = '参考文件') {
-  const lines = text.replace(/^\ufeff/, '').split('\n');
+  const lines = text.replace(/^\ufeff/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
   const hits = [];
   let index = 0;
   while (index < lines.length) {
@@ -242,7 +242,7 @@ function unitClosures(project, first, last) {
   const undeclared = [];
   for (const volumePath of listVolumeFiles(project)) {
     const volumeName = path.basename(volumePath);
-    const { lines, sections } = parseVolume(fs.readFileSync(volumePath, 'utf8'));
+    const { lines, sections } = parseVolume(fs.readFileSync(volumePath, 'utf8').replace(/^\ufeff/, ''));
     for (const s of sections) {
       if (s.scope === null && s.unit && (s.title.includes('剧情单元') || s.title.includes('段剧情'))) {
         undeclared.push(`${volumeName}「${s.title.trim()}」`);

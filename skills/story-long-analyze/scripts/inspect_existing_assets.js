@@ -284,7 +284,7 @@ function compactRanges(chapters) {
 function relativePosix(root, targetPath) {
   try {
     const rel = path.relative(resolveReal(root), resolveReal(targetPath));
-    if (!rel.startsWith("..") && !path.isAbsolute(rel)) {
+    if (rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel)) {
       return toPosix(rel);
     }
   } catch {

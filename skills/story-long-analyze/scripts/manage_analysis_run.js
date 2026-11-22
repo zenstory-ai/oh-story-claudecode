@@ -1357,7 +1357,7 @@ function markStageCommand(args) {
     }
     const resolvedOut = resolveReal(outPath);
     const rel = path.relative(root, resolvedOut);
-    if (rel.startsWith("..") || path.isAbsolute(rel)) {
+    if (rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) {
       throw new RunError("stage_output_outside_root", String(outPath));
     }
     relativeOutput = toPosix(rel);
@@ -1453,7 +1453,7 @@ function digestCommand(args) {
       const model = parseCache(p).model_output;
       if (!model.includes(OBS_START) || !model.includes(OBS_END)) continue;
       let body = model.split(OBS_START)[1].split(OBS_END)[0].trim();
-      body = body.replace(/^##\s*跨章观察\s*\n/m, "").trim();
+      body = body.replace(/^##\s*跨章观察\s*\n/gm, "").trim();
       parts.push(`## ${batchId}（第${start}-${end}章）\n\n${body}`);
     }
   } else {
@@ -1501,7 +1501,10 @@ function printHelp() {
 }
 
 function parseArgs(argv) {
-  if (!argv.length || argv[0] === "-h" || argv[0] === "--help") {
+  if (!argv.length) {
+    throw new Error("command is required (choose from: plan, commit, split, repair-progress, mark-stage, digest)");
+  }
+  if (argv[0] === "-h" || argv[0] === "--help") {
     printHelp();
     return { help: true };
   }

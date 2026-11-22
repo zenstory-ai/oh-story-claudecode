@@ -98,12 +98,12 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 
 ```text
 细纲       细纲_第021章.md              追踪里写着「第21章尚无细纲」，skill 先补纲：单元 L1-03、目标情绪、本章标价、闭环状态、10 个情节点四列表格（外加可选的展开粒度列）
-章级检查   storyctl.py chapter check   ready · 字数 2068 / 目标 2300
+章级检查   storyctl.js chapter check   ready · 字数 2068 / 目标 2300
              ├ check-ai-patterns.js     0 命中
              ├ check-degeneration.js    0 命中
              └ normalize-punctuation    0 命中
-追踪提交   storyctl.py chapter commit  tracking_committed=true · state_revision 0 → 1
-追踪文件   tracking_commit.py check    上下文.md / 伏笔.md / 角色状态/ / 时间线/ / 逐章记录/ 全部由 state 重生成，逐字一致
+追踪提交   storyctl.js chapter commit  tracking_committed=true · state_revision 0 → 1
+追踪文件   tracking_commit.js check    上下文.md / 伏笔.md / 角色状态/ / 时间线/ / 逐章记录/ 全部由 state 重生成，逐字一致
 ```
 
 细纲通过校验后，`narrative-writer` 分两段写完正文，核对设定与伏笔、按需去味润色，再跑完收尾检查。提交后，所有追踪文件都从 `_tracking-state.json` 自动重生成，不用手动维护；对照写前状态卡，本章实际回写了这些变化（节选）：

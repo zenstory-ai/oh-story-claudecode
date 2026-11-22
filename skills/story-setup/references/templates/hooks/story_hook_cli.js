@@ -468,6 +468,22 @@ function handlePostToolProseCheck(core) {
   if (out) process.stdout.write(`${out}\n`)
 }
 
+function canonicalPath(value) {
+  let cur = path.resolve(value)
+  const tail = []
+  while (true) {
+    try {
+      const real = fs.realpathSync(cur)
+      return tail.length ? path.join(real, ...tail.reverse()) : real
+    } catch {
+      const parent = path.dirname(cur)
+      if (parent === cur) return path.resolve(value)
+      tail.push(path.basename(cur))
+      cur = parent
+    }
+  }
+}
+
 function handleAnalysisInputGuard() {
   // chapter-extractor 的 PreToolUse(Write) 内联守卫：它只许把批次结果写到
   // {拆文目录}/_analysis_cache/输入-{RAW|REUSE}-{起章}-{止章}.md。拆文目录以存在
@@ -482,8 +498,8 @@ function handleAnalysisInputGuard() {
   }
   const target = digTargetPath(obj)
   if (!target) process.exit(0)
-  const root = path.resolve(process.env.CLAUDE_PROJECT_DIR || digString(obj, ["cwd"]) || process.cwd())
-  const absolute = path.resolve(root, target)
+  const root = canonicalPath(process.env.CLAUDE_PROJECT_DIR || digString(obj, ["cwd"]) || process.cwd())
+  const absolute = canonicalPath(path.resolve(root, target))
   const reasons = []
   const match = /^输入-(RAW|REUSE)-(\d+)-(\d+)\.md$/.exec(path.basename(absolute))
   if (!match) reasons.push("文件名必须是 输入-{RAW|REUSE}-{起章}-{止章}.md")
@@ -494,8 +510,7 @@ function handleAnalysisInputGuard() {
   else if (!["chapter_index.csv", "_progress.md"].some((name) => fs.existsSync(path.join(bookDir, name)))) {
     reasons.push("上级目录不是拆文目录（缺 chapter_index.csv 与 _progress.md）")
   }
-  const relative = path.relative(root, absolute)
-  if (relative.startsWith("..") || path.isAbsolute(relative)) reasons.push("路径在项目目录之外")
+  if (!isPathInside(root, absolute)) reasons.push("路径在项目目录之外")
   if (reasons.length) {
     process.stderr.write(
       `⛔ chapter-extractor 写入被拦截：${target}\n${reasons.join("；")}。\n` +

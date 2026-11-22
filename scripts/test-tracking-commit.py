@@ -1302,6 +1302,29 @@ class TrackingCommitTests(unittest.TestCase):
             )
             self.assertEqual(checked.returncode, 0, f"{copy_rel}: {checked.stderr}")
 
+    def test_crlf_derived_views_and_idempotent_append_retry(self) -> None:
+        self.init()
+        tx = transaction(1, character=True)
+        self.run_tool("commit", tx)
+        # Simulate Windows CRLF line endings in derived views and delta file
+        ctx_path = self.project / "追踪/上下文.md"
+        ctx_crlf = ctx_path.read_text(encoding="utf-8").replace("\n", "\r\n")
+        ctx_path.write_bytes(ctx_crlf.encode("utf-8"))
+        self.run_tool("check")
+
+        # Also simulate CRLF on an already-written chapter delta during append retry
+        state_before_ch2 = (self.project / "追踪/_tracking-state.json").read_bytes()
+        delta_path = self.project / "追踪/逐章记录/第002章.md"
+        tx2 = transaction(2, character=True)
+        self.run_tool("commit", tx2)
+        delta_crlf = delta_path.read_text(encoding="utf-8").replace("\n", "\r\n")
+        # Restore state to before chapter 2 while leaving CRLF delta for chapter 2 on disk
+        (self.project / "追踪/_tracking-state.json").write_bytes(state_before_ch2)
+        delta_path.write_bytes(delta_crlf.encode("utf-8"))
+        tx2_retry = transaction(2, character=True)
+        self.run_tool("commit", tx2_retry)
+        self.run_tool("check")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

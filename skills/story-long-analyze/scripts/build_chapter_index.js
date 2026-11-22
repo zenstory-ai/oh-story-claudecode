@@ -495,6 +495,7 @@ function parseCsvRecords(text) {
   let row = [];
   let field = "";
   let inQuotes = false;
+  let hadQuotes = false;
   let lineNum = 1;
   let i = 0;
   const len = clean.length;
@@ -531,16 +532,21 @@ function parseCsvRecords(text) {
       }
     } else if (ch === '"' && field === "") {
       inQuotes = true;
+      hadQuotes = true;
       i += 1;
     } else if (ch === ",") {
       row.push(field);
       field = "";
+      hadQuotes = false;
       i += 1;
     } else if (ch === "\r" || ch === "\n") {
-      row.push(field);
-      field = "";
-      records.push({ fields: row, lineNum });
-      row = [];
+      if (row.length > 0 || field !== "" || hadQuotes) {
+        row.push(field);
+        records.push({ fields: row, lineNum });
+        row = [];
+        field = "";
+        hadQuotes = false;
+      }
       if (ch === "\r" && i + 1 < len && clean[i + 1] === "\n") {
         i += 2;
       } else {
@@ -555,7 +561,7 @@ function parseCsvRecords(text) {
   if (inQuotes) {
     throw new Error("csv_unterminated_quote");
   }
-  if (field !== "" || row.length > 0) {
+  if (field !== "" || row.length > 0 || hadQuotes) {
     row.push(field);
     records.push({ fields: row, lineNum });
   }

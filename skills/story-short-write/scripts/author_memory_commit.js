@@ -239,7 +239,7 @@ function atomicWriteText(filePath, payload) {
     const suffix = crypto.randomBytes(6).toString('hex');
     const candidate = path.join(dir, `.${base}.${suffix}.tmp`);
     try {
-      fd = fs.openSync(candidate, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY, mode);
+      fd = fs.openSync(candidate, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY, 0o600);
       tmpPath = candidate;
       break;
     } catch (err) {
@@ -1531,7 +1531,10 @@ function checkStore(store) {
   for (const [name, expected] of Object.entries(views)) {
     const viewPath = path.join(store.root, name);
     requireCondition(exists(viewPath), `missing derived view: ${viewPath}`);
-    requireCondition(fs.readFileSync(viewPath, 'utf8') === expected, `derived view is stale or edited: ${viewPath}`);
+    requireCondition(
+      fs.readFileSync(viewPath, 'utf8').replace(/\r\n/g, '\n') === expected,
+      `derived view is stale or edited: ${viewPath}`
+    );
   }
   const counts = {};
   for (const status of STATUSES) {

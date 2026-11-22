@@ -168,7 +168,7 @@ function resolveBookDir(project) {
   const realRoot = _realpathOrResolve(root);
   const realBook = _realpathOrResolve(book);
   const rel = path.relative(realRoot, realBook);
-  const inside = rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+  const inside = rel === '' || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
   requireCondition(
     Boolean(active) && inside && _isDir(book),
     `${marker} 没有指向工作区里的书目录（写的是「${active}」）；--project 直接传书目录`

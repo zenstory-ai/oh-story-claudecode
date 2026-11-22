@@ -139,7 +139,7 @@ class Section {
 }
 
 function parse(text) {
-  const normalized = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const normalized = String(text).replace(/^\ufeff/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const lines = normalized.split('\n');
   const sections = [];
   let fence = null;

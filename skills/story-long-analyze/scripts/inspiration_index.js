@@ -129,6 +129,7 @@ function parseCsvRecords(text) {
   let row = [];
   let field = "";
   let inQuotes = false;
+  let hadQuotes = false;
   let lineNum = 1;
   let i = 0;
   const len = clean.length;
@@ -163,16 +164,21 @@ function parseCsvRecords(text) {
       }
     } else if (ch === '"' && field === "") {
       inQuotes = true;
+      hadQuotes = true;
       i += 1;
     } else if (ch === ",") {
       row.push(field);
       field = "";
+      hadQuotes = false;
       i += 1;
     } else if (ch === "\r" || ch === "\n") {
-      row.push(field);
-      field = "";
-      records.push({ fields: row, lineNum });
-      row = [];
+      if (row.length > 0 || field !== "" || hadQuotes) {
+        row.push(field);
+        records.push({ fields: row, lineNum });
+        row = [];
+        field = "";
+        hadQuotes = false;
+      }
       if (ch === "\r" && i + 1 < len && clean[i + 1] === "\n") {
         i += 2;
       } else {
@@ -187,7 +193,7 @@ function parseCsvRecords(text) {
   if (inQuotes) {
     throw new Error("csv_unterminated_quote");
   }
-  if (field !== "" || row.length > 0) {
+  if (field !== "" || row.length > 0 || hadQuotes) {
     row.push(field);
     records.push({ fields: row, lineNum });
   }
@@ -449,7 +455,7 @@ function analyzeModule(root, modulePath, book, workspace = null) {
     errors.push(`book_dir_not_found:拆文库/${book}——工作区 ${ws} 下没有这本书，泄漏门无法取角色名单`);
   } else {
     const rel = path.relative(resolveReal(bookDir), resolveReal(modulePath));
-    if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) {
+    if (!rel || rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) {
       errors.push(`module_book_mismatch:${modulePath} 不在 拆文库/${book}/ 下——--book 与 --module 必须是同一本书`);
     }
   }
@@ -1091,7 +1097,10 @@ function printHelp() {
 }
 
 function parseArgs(argv) {
-  if (!argv.length || argv[0] === "-h" || argv[0] === "--help") {
+  if (!argv.length) {
+    throw new Error("command is required (choose from: register-atoms, check-atoms, validate, coverage, query, resolve)");
+  }
+  if (argv[0] === "-h" || argv[0] === "--help") {
     printHelp();
     return { help: true };
   }

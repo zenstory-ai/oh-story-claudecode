@@ -289,3 +289,78 @@ test("Codex non-git launcher root resolution, missing-deployment no-op, isPathIn
     fs.rmSync(tmp, { recursive: true, force: true })
   }
 })
+
+test("Codex hooks fail open when story_hook_core.js is missing or corrupt, and handle symlinked workspace roots", () => {
+  const tmp = mkTmp("codex-failopen-")
+  try {
+    // Missing story_hook_core.js (direct hook + launcher)
+    const missingProj = path.join(tmp, "missing-core")
+    const missingHook = deployCodexHooks(missingProj)
+    fs.rmSync(path.join(missingProj, ".codex/hooks/story_hook_core.js"))
+
+    const stopDirect = runHook(missingHook, "stop", { hook_event_name: "Stop" }, { cwd: missingProj, env: { CODEX_PROJECT_DIR: missingProj } })
+    assert.deepEqual(JSON.parse(stopDirect), { continue: true }, "stop must emit continue:true when story_hook_core.js is missing")
+    const ssDirect = runHook(missingHook, "session-start", { hook_event_name: "SessionStart" }, { cwd: missingProj, env: { CODEX_PROJECT_DIR: missingProj } })
+    assert.equal(ssDirect, "", "session-start must fail open cleanly when story_hook_core.js is missing")
+
+    if (process.platform === "win32") {
+      const launcher = path.join(missingProj, ".codex/hooks/run-story-hook.cmd")
+      const stopLauncher = spawnSync(launcher, ["stop"], { cwd: missingProj, input: "{}", encoding: "utf8", shell: true })
+      assert.equal(stopLauncher.status, 0, stopLauncher.stderr)
+      assert.deepEqual(JSON.parse(stopLauncher.stdout.trim()), { continue: true })
+      const ssLauncher = spawnSync(launcher, ["session-start"], { cwd: missingProj, input: "{}", encoding: "utf8", shell: true })
+      assert.equal(ssLauncher.status, 0, ssLauncher.stderr)
+    } else {
+      const launcher = path.join(missingProj, ".codex/hooks/run-story-hook.sh")
+      const stopLauncher = spawnSync("sh", [launcher, "stop"], { cwd: missingProj, input: "{}", encoding: "utf8" })
+      assert.equal(stopLauncher.status, 0, stopLauncher.stderr)
+      assert.deepEqual(JSON.parse(stopLauncher.stdout), { continue: true })
+      const ssLauncher = spawnSync("sh", [launcher, "session-start"], { cwd: missingProj, input: "{}", encoding: "utf8" })
+      assert.equal(ssLauncher.status, 0, ssLauncher.stderr)
+      assert.equal(ssLauncher.stdout, "")
+    }
+
+    // Corrupt story_hook_core.js (syntax error / runtime throw)
+    const corruptProj = path.join(tmp, "corrupt-core")
+    const corruptHook = deployCodexHooks(corruptProj)
+    fs.writeFileSync(path.join(corruptProj, ".codex/hooks/story_hook_core.js"), "throw new Error('corrupt core')\n", "utf8")
+
+    const stopCorrupt = runHook(corruptHook, "stop", { hook_event_name: "Stop" }, { cwd: corruptProj, env: { CODEX_PROJECT_DIR: corruptProj } })
+    assert.deepEqual(JSON.parse(stopCorrupt), { continue: true }, "stop must emit continue:true when story_hook_core.js is corrupt")
+    const guardCorrupt = runHook(
+      corruptHook,
+      "pre-tool-prose-guard",
+      { tool_name: "Write", tool_input: { file_path: "book/正文/第1章.md" } },
+      { cwd: corruptProj, env: { CODEX_PROJECT_DIR: corruptProj } }
+    )
+    assert.equal(guardCorrupt, "", "pre-tool-prose-guard must fail open cleanly when story_hook_core.js is corrupt")
+
+    // Symlinked workspace root with subdir input.cwd and unset CODEX_PROJECT_DIR
+    if (process.platform !== "win32") {
+      const realProj = path.join(tmp, "real-proj")
+      deployCodexHooks(realProj)
+      fs.mkdirSync(path.join(realProj, "sub-book/正文"), { recursive: true })
+      fs.mkdirSync(path.join(realProj, "sub-book/大纲"), { recursive: true })
+      const linkProj = path.join(tmp, "link-proj")
+      fs.symlinkSync(realProj, linkProj)
+      const linkHook = path.join(linkProj, ".codex/hooks/story_codex_hook.js")
+      const cleanEnv = { ...process.env }
+      delete cleanEnv.CODEX_PROJECT_DIR
+      delete cleanEnv.CLAUDE_PROJECT_DIR
+      const res = spawnSync(process.execPath, [linkHook, "pre-tool-prose-guard"], {
+        cwd: linkProj,
+        input: JSON.stringify({
+          cwd: path.join(linkProj, "sub-book"),
+          tool_name: "Write",
+          tool_input: { file_path: "正文/第3章_软链.md" },
+        }),
+        encoding: "utf8",
+        env: cleanEnv,
+      })
+      assert.equal(res.status, 0, res.stderr)
+      assert.match(assertDenied(res.stdout, "symlinked workspace subdir cwd"), /sub-book\/大纲\/细纲_第003章\.md/)
+    }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true })
+  }
+})

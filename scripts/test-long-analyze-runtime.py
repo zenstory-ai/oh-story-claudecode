@@ -639,6 +639,30 @@ def test_audit_stage_and_mapping_regressions() -> None:
                 "只有角色关系表时检查器仍要报 Stage 4 待补")
         (root / "角色" / "人物.md").write_text("有效人物档案", encoding="utf-8")
         (root / "拆文报告.md").write_text("有效拆文报告", encoding="utf-8")
+        hook_core = ROOT / "skills" / "story-setup" / "references" / "templates" / "hooks" / "story_hook_core.js"
+
+        def probe_analysis_incomplete(progress_path: Path) -> bool:
+            require(bool(NODE), "node binary required to probe story_hook_core.js")
+            probe = subprocess.run(
+                [
+                    NODE,
+                    "-e",
+                    "const { analysisIncomplete } = require(process.argv[1]);"
+                    "process.stdout.write(JSON.stringify(Boolean(analysisIncomplete(process.argv[2]))));",
+                    str(hook_core),
+                    str(progress_path),
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=False,
+            )
+            require(probe.returncode == 0, f"story_hook_core.js probe 失败：{probe.stderr}")
+            return json.loads(probe.stdout)
+
+        require(probe_analysis_incomplete(root / "_progress.md") is True,
+                "Stage 3-6 未标完前 hooks 必须判为未完成")
+
         for stage in ("stage3", "stage4", "stage5", "stage6"):
             marked = run(MANAGE, "mark-stage", "--root", root, "--stage", stage)
             require(marked.returncode == 0, marked.stdout or marked.stderr)
@@ -653,12 +677,19 @@ def test_audit_stage_and_mapping_regressions() -> None:
                 "受管 Stage 1-6 全部完成时必须识别为 current_complete/direct_use")
         require("- 最终状态：completed" in (root / "_progress.md").read_text(encoding="utf-8-sig"),
                 "六个阶段完成后必须写出 hooks 识别的最终状态")
-        hook_lib = ROOT / "skills" / "story-setup" / "references" / "templates" / "hooks" / "lib" / "common.sh"
-        if shutil.which("bash"):
-            probe = subprocess.run(["bash", "-c", 'source "$1" && analysis_incomplete "$2"', "_",
-                                    hook_lib.as_posix(), (root / "_progress.md").as_posix()],
-                                   capture_output=True, text=True, check=False)
-            require(probe.returncode == 1, "hooks 必须把拆完的书判为已完成：" + probe.stderr)
+        require(probe_analysis_incomplete(root / "_progress.md") is False,
+                "hooks 必须把拆完的书判为已完成")
+
+        # CSV 空行回归：chapter_index.csv 含中间空行与末尾空行时，inspect 与 plan 仍须正常解析
+        csv_path = root / "chapter_index.csv"
+        csv_lines = csv_path.read_text(encoding="utf-8-sig").splitlines()
+        with_blanks = "\ufeff" + csv_lines[0] + "\n\n" + "\n\n".join(csv_lines[1:]) + "\n\n"
+        csv_path.write_text(with_blanks, encoding="utf-8")
+        re_inspect = json.loads(run(INSPECT, "--root", root).stdout)
+        require(re_inspect["classification"] == "current_complete",
+                f"chapter_index.csv 含空行时 inspect 必须跳过空行：{re_inspect}")
+        re_plan = run(MANAGE, "plan", "--root", root)
+        require(re_plan.returncode == 0, f"chapter_index.csv 含空行时 plan 必须成功：{re_plan.stdout}{re_plan.stderr}")
 
         resumed = area / "旧项目续拆完成"
         shutil.copytree(root, resumed)
@@ -1294,6 +1325,28 @@ def test_extractor_write_guard() -> None:
             result = guard(str(path))
             require(result.returncode == 0, f"合法输入文件必须放行：{path} {result.stderr}")
         require(guard("拆文库/书/_analysis_cache/输入-RAW-7-9.md").returncode == 0, "相对路径按项目根解析后放行")
+        dotdot_book = project / "..draft"
+        (dotdot_book / "_analysis_cache").mkdir(parents=True)
+        (dotdot_book / "chapter_index.csv").write_text("chapter\n", encoding="utf-8")
+        require(guard(str(dotdot_book / "_analysis_cache" / "输入-RAW-1-3.md")).returncode == 0,
+                "..draft 子目录名不得被误判为项目目录外")
+        if os.name != "nt":
+            project_link = Path(temporary) / "项目软链"
+            project_link.symlink_to(project)
+            payload = json.dumps(
+                {"tool_name": "Write", "tool_input": {"file_path": str(book.resolve() / "_analysis_cache" / "输入-RAW-4-6.md"), "content": "x"}},
+                ensure_ascii=False,
+            )
+            sym_res = subprocess.run(
+                [node, str(HOOK_CLI), "analysis-input-guard"],
+                input=payload,
+                text=True,
+                encoding="utf-8",
+                capture_output=True,
+                check=False,
+                env={**os.environ, "CLAUDE_PROJECT_DIR": str(project_link)},
+            )
+            require(sym_res.returncode == 0, f"软链项目根与 realpath 目标路径必须放行：{sym_res.stderr}")
         blocked = {
             "文件名不对": book / "_analysis_cache" / "输入.md",
             "写缓存本体": book / "_analysis_cache" / "批次-RAW-4-6.md",

@@ -323,7 +323,7 @@ function atomicWriteText(filePath, payload) {
     const suffix = crypto.randomBytes(6).toString('hex');
     const candidate = path.join(dir, `.${base}.${suffix}.tmp`);
     try {
-      fd = fs.openSync(candidate, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY, mode);
+      fd = fs.openSync(candidate, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY, 0o600);
       tmpPath = candidate;
       break;
     } catch (err) {
@@ -1660,7 +1660,7 @@ function applyTransactionLocked(project, document) {
   const nextStatePayload = jsonPayload(nextState);
   if (transaction.mode === 'append' && exists(filePath)) {
     requireCondition(
-      fs.readFileSync(filePath, 'utf8') === deltaPayload,
+      fs.readFileSync(filePath, 'utf8').replace(/\r\n/g, '\n') === deltaPayload,
       `chapter delta ${transaction.chapter} already exists with different content`
     );
   }
@@ -1709,7 +1709,7 @@ function checkProject(project) {
     const filePath = path.join(tracking, relative);
     requireCondition(exists(filePath), `derived view is missing: ${relative}`);
     requireCondition(
-      fs.readFileSync(filePath, 'utf8') === expected,
+      fs.readFileSync(filePath, 'utf8').replace(/\r\n/g, '\n') === expected,
       `derived view differs from _tracking-state.json: ${relative}`
     );
   }

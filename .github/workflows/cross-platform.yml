@@ -100,7 +100,8 @@ jobs:
       - name: Hook & continuity regressions
         shell: bash
         run: |
-          node --test scripts/test-story-hook-core.mjs scripts/test-claude-hooks.mjs scripts/test-codex-hooks.mjs scripts/test-antigravity-hooks.mjs scripts/test-opencode-plugin.mjs
+          node --test scripts/test-story-hook-core.mjs scripts/test-claude-hooks.mjs scripts/test-codex-hooks.mjs scripts/test-antigravity-hooks.mjs
+          node --experimental-strip-types --test scripts/test-opencode-plugin.mjs
           bash scripts/test-zcode-hooks.sh
       - name: Portable char-count tests
         shell: bash

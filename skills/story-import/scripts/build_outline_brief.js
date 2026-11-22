@@ -117,7 +117,7 @@ function checkBatchSize(project, first, last, final) {
 
 function shownPath(filePath, base) {
   const rel = path.relative(path.resolve(base), path.resolve(filePath));
-  if (!rel.startsWith('..') && !path.isAbsolute(rel)) {
+  if (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel)) {
     return rel.split(path.sep).join('/');
   }
   return String(filePath);

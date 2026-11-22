@@ -118,11 +118,25 @@ function validateSource(source) {
   }
 }
 
+function unlinkSymlink(targetPath) {
+  try {
+    fs.unlinkSync(targetPath);
+  } catch (err) {
+    if (err && (err.code === "EPERM" || err.code === "EISDIR")) {
+      fs.rmdirSync(targetPath);
+      return;
+    }
+    throw err;
+  }
+}
+
 function removeEntry(targetPath) {
   const lst = lstatSafe(targetPath);
   if (!lst) return;
   if (lst.isDirectory() && !lst.isSymbolicLink()) {
     fs.rmSync(targetPath, { recursive: true, force: true });
+  } else if (lst.isSymbolicLink()) {
+    unlinkSymlink(targetPath);
   } else {
     fs.unlinkSync(targetPath);
   }
@@ -204,7 +218,7 @@ function deploy(sourceRaw, destinationRaw, { migrateSymlink = false } = {}) {
       throw new DeployError(`stale deployment backup exists: ${backup}`);
     }
     if (destIsSymlink) {
-      fs.unlinkSync(destination);
+      unlinkSymlink(destination);
     } else if (destStat !== null) {
       fs.renameSync(destination, backup);
       movedExisting = true;
@@ -231,11 +245,20 @@ function deploy(sourceRaw, destinationRaw, { migrateSymlink = false } = {}) {
     if (lstatSafe(staging) !== null) {
       fs.rmSync(staging, { recursive: true, force: true });
     }
-    if (lstatSafe(backup) !== null) {
+    if (movedExisting && lstatSafe(destination) !== null && lstatSafe(backup) !== null) {
       fs.rmSync(backup, { recursive: true, force: true });
     }
   }
 }
+
+class CliUsageError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "CliUsageError";
+  }
+}
+
+const USAGE = "usage: deploy-antigravity-skills.js --source <dir> --dest <dir> [--migrate-symlink]\n";
 
 function parseArgs(argv) {
   let source = null;
@@ -243,33 +266,47 @@ function parseArgs(argv) {
   let migrateSymlink = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === "--source") {
-      source = argv[++i];
-    } else if (arg === "--dest") {
-      dest = argv[++i];
+    if (arg === "--source" || arg.startsWith("--source=")) {
+      const value = arg.startsWith("--source=") ? arg.slice("--source=".length) : argv[++i];
+      if (value === undefined) {
+        throw new CliUsageError("deploy-antigravity-skills: --source requires a value\n");
+      }
+      source = value;
+    } else if (arg === "--dest" || arg.startsWith("--dest=")) {
+      const value = arg.startsWith("--dest=") ? arg.slice("--dest=".length) : argv[++i];
+      if (value === undefined) {
+        throw new CliUsageError("deploy-antigravity-skills: --dest requires a value\n");
+      }
+      dest = value;
     } else if (arg === "--migrate-symlink") {
       migrateSymlink = true;
     } else if (arg === "-h" || arg === "--help") {
-      process.stdout.write(
-        "usage: deploy-antigravity-skills.js --source <dir> --dest <dir> [--migrate-symlink]\n"
-      );
-      process.exit(0);
+      return { help: true };
     } else {
-      process.stderr.write(`deploy-antigravity-skills: unknown argument: ${arg}\n`);
-      process.exit(2);
+      throw new CliUsageError(`deploy-antigravity-skills: unknown argument: ${arg}\n`);
     }
   }
   if (!source || !dest) {
-    process.stderr.write(
-      "usage: deploy-antigravity-skills.js --source <dir> --dest <dir> [--migrate-symlink]\n"
-    );
-    process.exit(2);
+    throw new CliUsageError(USAGE);
   }
-  return { source, dest, migrateSymlink };
+  return { help: false, source, dest, migrateSymlink };
 }
 
 function main(argv = process.argv.slice(2)) {
-  const args = parseArgs(argv);
+  let args;
+  try {
+    args = parseArgs(argv);
+  } catch (err) {
+    if (err instanceof CliUsageError) {
+      process.stderr.write(err.message);
+      return 2;
+    }
+    throw err;
+  }
+  if (args.help) {
+    process.stdout.write(USAGE);
+    return 0;
+  }
   try {
     const status = deploy(args.source, args.dest, { migrateSymlink: args.migrateSymlink });
     process.stdout.write(status + "\n");

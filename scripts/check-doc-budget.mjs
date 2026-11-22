@@ -27,13 +27,13 @@ for (let i = 0; i < argv.length; i++) {
       console.log("FAIL: --root 缺少路径");
       process.exit(2);
     }
-    repoRoot = argv[++i];
+    repoRoot = path.resolve(argv[++i]);
   } else if (arg === "--manifest") {
     if (i + 1 >= argv.length) {
       console.log("FAIL: --manifest 缺少路径");
       process.exit(2);
     }
-    manifestPath = argv[++i];
+    manifestPath = path.resolve(argv[++i]);
   } else if (arg === "-h" || arg === "--help") {
     console.log("Usage: node scripts/check-doc-budget.mjs [--root DIR] [--manifest FILE]");
     process.exit(0);
@@ -106,7 +106,7 @@ const findPython = () => {
     ["python", []],
     ["py", ["-3"]],
   ]) {
-    const probe = spawnSync(cmd, [...pre, "--version"], { encoding: "utf8" });
+    const probe = spawnSync(cmd, [...pre, "--version"], { encoding: "utf8", windowsHide: true });
     if (probe.status === 0) {
       python = [cmd, pre];
       return python;
