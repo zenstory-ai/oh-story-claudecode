@@ -43,11 +43,8 @@ Long profile 禁止读取 `short-*` 文件，不得采用“6 章”“每节 50
 
 | 文件 | 读取条件 |
 |---|---|
-| [short-genre-formulas.md](short-genre-formulas.md) | 需要短篇题材结构骨架时 |
-| [short-chapter-hooks.md](short-chapter-hooks.md) | 设计节尾、节首、段落钩子、付费断点与全文悬念 |
-| [short-emotional-methods.md](short-emotional-methods.md) | 设计单篇内的羁绊、撕裂、拉扯与余韵，选整篇弧线与转折位置 |
-| [short-reversal.md](short-reversal.md) | 设计短篇线索、误导与揭示；两层反转按所选方案使用 |
-| [short-quality.md](short-quality.md) | 审查全文密度、付费点、反转证据链和结尾兑现 |
+| [short-quality.md](short-quality.md) | 设计或审查短篇导语冷开场、付费卡点、连环反击/反转节奏与明账清算收尾 |
+| [short-deslop.md](short-deslop.md) | 短篇写作、去味或审查时的卖点保护与长篇默认规则覆盖 |
 
 Short profile 禁止读取 `long-*`、`outline-*`、`opening-design.md`、`female-audience-writing.md` 或 `genre-prose-cards.md`；不得把卷级、日更或跨十几章指标当硬门槛。
 
