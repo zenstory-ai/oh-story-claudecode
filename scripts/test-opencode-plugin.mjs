@@ -326,7 +326,10 @@ try {
   await hooks.session.compaction(compact);
   assert(compact.system.some((part) => part.type === "text" && part.text.includes("Writing context: book/追踪/上下文.md")));
 
-  // session.context：主会话首轮请求注入部署状态、当前书目上下文与连续性提醒；同会话后续轮次与子代理跳过。
+  // session.context：主会话首轮请求注入部署状态、agents_version 过期提醒、当前书目上下文与连续性提醒；同会话后续轮次与子代理跳过。
+  const currentAgentsVer = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, "scripts/current-contract.json"), "utf8")
+  ).agents_version;
   fs.writeFileSync(".story-deployed", "target_cli: claude-code\n", "utf8");
   const subagentCtx = { sessionID: "ses_1", agent: "consistency-checker", system: [] };
   await hooks.session.context(subagentCtx);
@@ -335,12 +338,32 @@ try {
   const primaryCtx = { sessionID: "ses_1", agent: "code", system: [] };
   await hooks.session.context(primaryCtx);
   assert.equal(primaryCtx.system.length, 1);
+  assert.match(primaryCtx.system[0].text, /缺少数字 agents_version/);
   assert.match(primaryCtx.system[0].text, /当前部署标记未包含 opencode/);
   assert.match(primaryCtx.system[0].text, /\[story context\] 当前书目：book。继续长篇写作前先读取 book\/追踪\/上下文\.md。/);
 
   const secondTurnCtx = { sessionID: "ses_1", agent: "code", system: [] };
   await hooks.session.context(secondTurnCtx);
   assert.equal(secondTurnCtx.system.length, 0, "same session must not re-inject session context on every turn");
+
+  fs.writeFileSync(".story-deployed", `agents_version: ${currentAgentsVer - 1}\ntarget_cli: opencode\n`, "utf8");
+  const staleVerCtx = { sessionID: "ses_stale", agent: "code", system: [] };
+  await hooks.session.context(staleVerCtx);
+  assert.match(staleVerCtx.system[0].text, new RegExp(`低于 v${currentAgentsVer}`));
+  assert.match(staleVerCtx.system[0].text, /\/story-setup/);
+
+  fs.writeFileSync(".story-deployed", `agents_version: ${currentAgentsVer + 1}\ntarget_cli: opencode\n`, "utf8");
+  const futureVerCtx = { sessionID: "ses_future", agent: "code", system: [] };
+  await hooks.session.context(futureVerCtx);
+  assert.match(futureVerCtx.system[0].text, new RegExp(`高于本 hook 支持的 v${currentAgentsVer}`));
+  assert.match(futureVerCtx.system[0].text, /不要降级覆盖/);
+
+  fs.writeFileSync(".story-deployed", `agents_version: ${currentAgentsVer}\ntarget_cli: opencode\n`, "utf8");
+  const currentVerCtx = { sessionID: "ses_current", agent: "code", system: [] };
+  await hooks.session.context(currentVerCtx);
+  assert.ok(!currentVerCtx.system[0].text.includes(`低于 v${currentAgentsVer}`));
+  assert.ok(!currentVerCtx.system[0].text.includes("高于本 hook"));
+  assert.ok(!currentVerCtx.system[0].text.includes("缺少数字 agents_version"));
   fs.unlinkSync(".story-deployed");
 
   // 共享核 staged commit 检查也会拉 git。直接调用已部署布局中的真实模块，代理只记录并

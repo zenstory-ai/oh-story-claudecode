@@ -4,6 +4,50 @@ const fs = require("node:fs")
 const path = require("node:path")
 const { spawnSync } = require("node:child_process")
 
+const CURRENT_AGENTS_VERSION = 45
+
+function readSentinel(root) {
+  const file = path.join(root, ".story-deployed")
+  if (!fs.existsSync(file)) return null
+  let text = ""
+  try {
+    text = fs.readFileSync(file, "utf8")
+  } catch {
+    return {}
+  }
+  const fields = {}
+  for (const rawLine of text.split(/\r?\n/)) {
+    const idx = rawLine.indexOf(":")
+    if (idx <= 0) continue
+    const key = rawLine.slice(0, idx).trim()
+    if (!key || Object.prototype.hasOwnProperty.call(fields, key)) continue
+    let value = rawLine.slice(idx + 1).trim()
+    if (value.length >= 2 && ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))) {
+      value = value.slice(1, -1).trim()
+    }
+    fields[key] = value
+  }
+  return fields
+}
+
+function agentsVersionNotice(root, options = {}) {
+  const sentinel = options.sentinel !== undefined ? options.sentinel : readSentinel(root)
+  if (sentinel === null) return ""
+  const setupCmd = options.setupCommand || "/story-setup"
+  const versionRaw = sentinel.agents_version || ""
+  if (!/^[0-9]+$/.test(versionRaw)) {
+    return `[WARN] .story-deployed 缺少数字 agents_version。重新运行 ${setupCmd}。`
+  }
+  const version = Number.parseInt(versionRaw, 10)
+  if (version < CURRENT_AGENTS_VERSION) {
+    return `[WARN] story-setup agents_version=${version} 低于 v${CURRENT_AGENTS_VERSION}。重新运行 ${setupCmd} 刷新 hooks、agents 和 references（部署后需新开会话）。`
+  }
+  if (version > CURRENT_AGENTS_VERSION) {
+    return `[WARN] story-setup agents_version=${version} 高于本 hook 支持的 v${CURRENT_AGENTS_VERSION}。不要降级覆盖；请先更新 oh-story-claudecode。`
+  }
+  return ""
+}
+
 function realpathNative(value) {
   return typeof fs.realpathSync.native === "function"
     ? fs.realpathSync.native(value)
@@ -675,11 +719,11 @@ function extractPatchTargets(patchText) {
   return targets
 }
 
-// 未展开的 shell 变量：$VAR / ${VAR} / $(cmd)。与 codex UNEXPANDED_SHELL_VAR 同式。
+// 未展开的 shell 变量：$VAR / ${VAR} / $(cmd)。
 const UNEXPANDED_SHELL_VAR = /\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*|\()/
 
 // 「去味:跳过」豁免标记：文件首 6 行内的 `<!-- 去味:跳过 -->`，冒号全角半角都认，注释内可有
-// 空格/Tab；裸写不在注释里的不算。codex py _DESLOP_SKIP_MARKER、bash guard、storyctl DESLOP_SKIP 同一语法。
+// 空格/Tab；裸写不在注释里的不算。与 storyctl.js DESLOP_SKIP 同一语法（由 test-story-hook-core.mjs 校验）。
 const DESLOP_SKIP_MARKER = /<!--[ \t]*去味[ \t]*(：|:)[ \t]*跳过[ \t]*-->/
 function hasDeslopSkipMarker(text) {
   return DESLOP_SKIP_MARKER.test(text.split(/\r?\n/).slice(0, 6).join("\n"))
@@ -690,8 +734,7 @@ function hasDeslopSkipMarker(text) {
 // （`## 核心事件：…` 这种把内容写在标题行上的细纲是写了东西的）。只量写没写东西，
 // 不查 v0.8 细纲字段——旧书的细纲格式各异，照样放行。读不了（权限/是目录）或不是合法 UTF-8
 // （GBK 等旧编码，各端解码计数口径不同）都按非空放行（宁可漏拦）。
-// codex py _outline_is_empty 与 guard-outline-before-prose.sh outline_is_empty 同口径，
-// 由 test-prose-net-parity.sh C/D 段锁 parity。
+// 五端共用本核，边界行为由 scripts/test-story-hook-core.mjs 覆盖。
 const OUTLINE_MIN_CHARS = 30
 function outlineIsEmpty(file) {
   let text
@@ -764,7 +807,7 @@ function proseBlockReason(root, absolute) {
   if (exists) return null
   // 欠账门（无状态）：写第 N 章（首建）前，上一章有未清毒句式且未标「去味:跳过」豁免时先清再写。
   // 判据现算自上一章文件本身，不落任何状态文件；找不到上一章/读取失败一律放行（宁可漏拦不可误伤）。
-  // js↔py 文案由 check-hook-regex-sync.sh 锁同步，判定由 test-prose-net-parity.sh Part E 锁 parity。
+  // 五端共用本核，欠账门判定与豁免标记由 scripts/test-story-hook-core.mjs 覆盖。
   const prevNum = Number(chapter) - 1
   if (prevNum >= 1) {
     let prevFile = null
@@ -830,9 +873,8 @@ function skippableLine(line) {
 // 线性扫描、量词有界，无回溯灾难。台词/弹幕/系统播报不算：逐行把成对引号段等长
 // 问号占位（占位天然截断各规则的字符类，规则不会跨引号拼出假命中；见
 // maskQuotedSpans 为何用问号而不是句号），占位后仍残留引号字符（跨行对话/未闭合）
-// 的行整行跳过。js↔py 同构实现（codex
-// story_codex_hook.py）由 scripts/check-hook-regex-sync.sh（常量表逐字锁）与
-// scripts/test-prose-net-parity.sh（fixture 逐字 diff）锁 parity，文案以本核为准。
+// 的行整行跳过。五端共用本核，与 check-ai-patterns.js 的 6 条毒句式全量 parity 由
+// scripts/test-story-hook-core.mjs 守卫，文案以本核为准。
 // 单引号须成对；词内撇号（don't、O’Connor）不作为开闭引号。
 const TOXIC_QUOTE_SPANS = [/「[^」]*」/g, /『[^』]*』/g, /【[^】]*】/g, /“[^”]*”/g, /(?<![A-Za-z0-9_])‘(?:[^’]|(?<=[A-Za-z0-9_])’(?=[A-Za-z0-9_]))*(?!(?<=[A-Za-z0-9_])’[A-Za-z0-9_])’/g, /"[^"]*"/g, /(?<![A-Za-z0-9_])'(?:[^']|(?<=[A-Za-z0-9_])'(?=[A-Za-z0-9_]))*(?!(?<=[A-Za-z0-9_])'[A-Za-z0-9_])'/g]
 const TOXIC_QUOTE_CHARS = new Set(Array.from("「」『』【】“”‘’\"'"))
@@ -967,7 +1009,7 @@ function maskStyleText(text, whitelist) {
 
 // 毒句式末行的完整复扫指引：长篇分章正文（{书}/正文/第N章*.md）指 storyctl chapter check——长篇写作
 // 流程只认这一个检查入口；其余（短篇 正文.md、调用方没给路径）指 check-ai-patterns.js。
-// codex py toxic_rescan_hint 同文案，由 test-prose-net-parity.sh C 段锁 parity。
+// 五端共用本核，路径分流由 scripts/test-story-hook-core.mjs 覆盖。
 function toxicRescanHint(absolute) {
   const match = absolute ? path.basename(absolute).match(/^第0*(\d+)章.*\.md$/) : null
   if (match && path.basename(path.dirname(absolute)) === "正文") {
@@ -978,7 +1020,7 @@ function toxicRescanHint(absolute) {
 
 // HTML 注释（如 `<!-- 去味:跳过 -->`、作者备注）是元信息不是正文，与 check-ai-patterns.js scanDocument
 // 同规则：注释段（含 `<!--`、`-->`）换成等长（按码点）空格，可跨行；到文末都没闭合的 `<!--` 不算注释，
-// 只抹掉这四个字符、后面照常当正文（漏写 `-->` 不能把后面整章藏起来）。codex py _mask_html_comment_lines 同构。
+// 只抹掉这四个字符、后面照常当正文（漏写 `-->` 不能把后面整章藏起来）。
 function maskHtmlCommentLines(lines) {
   const unclosed = new Set()
   for (;;) {
@@ -1497,6 +1539,9 @@ function detectStoryGaps(root) {
 }
 
 module.exports = {
+  CURRENT_AGENTS_VERSION,
+  readSentinel,
+  agentsVersionNotice,
   existingDir,
   safeRelative,
   resolveTarget,

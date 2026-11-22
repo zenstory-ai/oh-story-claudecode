@@ -131,17 +131,17 @@ function targetPaths(input) {
 }
 
 function sessionStart() {
-  const { discoverActiveBook, safeRelative, continuityFindings } = loadCore()
+  const { readSentinel, agentsVersionNotice, discoverActiveBook, safeRelative, continuityFindings } = loadCore()
   const root = projectRoot()
   const messages = []
-  const sentinel = path.join(root, ".story-deployed")
-  if (fs.existsSync(sentinel)) {
-    let text = ""
-    try { text = fs.readFileSync(sentinel, "utf8") } catch {}
-    const match = text.match(/^target_cli:\s*(.+)$/m)
-    if (!match) {
+  const sentinel = readSentinel(root)
+  if (sentinel !== null) {
+    const versionNotice = agentsVersionNotice(root, { sentinel, setupCommand: "$story-setup" })
+    if (versionNotice) messages.push(versionNotice)
+    const targetCli = sentinel.target_cli || ""
+    if (!targetCli) {
       messages.push("[story-setup] .story-deployed 缺少 target_cli 字段；建议重新运行 $story-setup。")
-    } else if (!match[1].split(",").map((item) => item.trim()).includes("codex")) {
+    } else if (!targetCli.split(",").map((item) => item.trim()).includes("codex")) {
       messages.push("[story-setup] 当前部署标记未包含 codex；如需 Codex hooks/agents，请重新运行 $story-setup 并选择 Codex。")
     }
   }

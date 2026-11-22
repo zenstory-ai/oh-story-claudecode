@@ -5,14 +5,13 @@
 // 承接 .claude/settings.local.json 注册的全部 8 个 Claude Code hook 事件，以及
 // chapter-extractor.md 的 frontmatter 内联守卫 `analysis-input-guard`。
 // 共享写正文守卫/正文兜底网/缺口检测/连续性/commit 校验逻辑全部来自同目录的
-// story_hook_core.js（五端字节一致，由 check-shared-files.sh 守卫）。
+// story_hook_core.js（五端字节一致，由 lint-repo.py --only shared 守卫）。
 
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 const { spawnSync } = require("node:child_process")
 
-const CURRENT_AGENTS_VERSION = 45
 const REQUIRED_HOOK_FILES = ["run-story-hook.sh", "story_hook_cli.js", "story_hook_core.js"]
 const NESTED_INPUT_KEYS = ["tool_input", "input", "parameters", "args"]
 
@@ -104,30 +103,6 @@ function targetBase(root, obj) {
   const requested = existingDirFallback(digWorkingDirectory(obj))
   if (requested && isPathInside(root, requested)) return requested
   return root
-}
-
-function readSentinel(root) {
-  const file = path.join(root, ".story-deployed")
-  if (!fs.existsSync(file)) return null
-  let text = ""
-  try {
-    text = fs.readFileSync(file, "utf8")
-  } catch {
-    return {}
-  }
-  const fields = {}
-  for (const rawLine of text.split(/\r?\n/)) {
-    const idx = rawLine.indexOf(":")
-    if (idx <= 0) continue
-    const key = rawLine.slice(0, idx).trim()
-    if (!key || Object.prototype.hasOwnProperty.call(fields, key)) continue
-    let value = rawLine.slice(idx + 1).trim()
-    if (value.length >= 2 && ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))) {
-      value = value.slice(1, -1).trim()
-    }
-    fields[key] = value
-  }
-  return fields
 }
 
 function gitText(root, args) {
@@ -264,7 +239,7 @@ function handleSessionStart(core) {
     try { fs.unlinkSync(pendingRestart) } catch {}
   }
 
-  const sentinel = readSentinel(root)
+  const sentinel = core.readSentinel(root)
   if (sentinel !== null) {
     const missingHooks = REQUIRED_HOOK_FILES.filter((file) => !fs.existsSync(path.join(root, ".claude", "hooks", file)))
     if (missingHooks.length) {
@@ -272,16 +247,9 @@ function handleSessionStart(core) {
       output += "  修复：重新运行 /story-setup 恢复缺失的 hook。\n\n"
     }
 
-    const versionRaw = sentinel.agents_version || ""
-    if (!/^[0-9]+$/.test(versionRaw)) {
-      output += "[WARN] .story-deployed 缺少数字 agents_version。重新运行 /story-setup。\n\n"
-    } else {
-      const version = Number.parseInt(versionRaw, 10)
-      if (version < CURRENT_AGENTS_VERSION) {
-        output += `[WARN] story-setup agents_version=${version} 低于 v${CURRENT_AGENTS_VERSION}。重新运行 /story-setup 刷新 hooks、agents 和 references（部署后需新开会话）。\n\n`
-      } else if (version > CURRENT_AGENTS_VERSION) {
-        output += `[WARN] story-setup agents_version=${version} 高于本 hook 支持的 v${CURRENT_AGENTS_VERSION}。不要降级覆盖；请先更新 oh-story-claudecode。\n\n`
-      }
+    const versionNotice = core.agentsVersionNotice(root, { sentinel, setupCommand: "/story-setup" })
+    if (versionNotice) {
+      output += `${versionNotice}\n\n`
     }
 
     for (const field of ["setup_skill_version", "target_cli", "resolver_strategy", "references_dir"]) {
@@ -569,10 +537,24 @@ function main() {
 
 if (require.main === module) main()
 
+function loadCoreOrNull() {
+  try {
+    return require("./story_hook_core.js")
+  } catch {
+    return null
+  }
+}
+
 module.exports = {
-  CURRENT_AGENTS_VERSION,
+  get CURRENT_AGENTS_VERSION() {
+    const core = loadCoreOrNull()
+    return core ? core.CURRENT_AGENTS_VERSION : undefined
+  },
   REQUIRED_HOOK_FILES,
   projectRoot,
-  readSentinel,
+  readSentinel(root) {
+    const core = loadCoreOrNull()
+    return core ? core.readSentinel(root) : null
+  },
   isPathInside,
 }
