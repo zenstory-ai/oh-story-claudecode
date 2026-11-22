@@ -1818,10 +1818,10 @@ function draftTransaction(project, chapter, { state = null } = {}) {
   let title = '';
   const outlineDir = path.join(String(project), '大纲');
   if (isDir(outlineDir)) {
-    const prefix = `细纲_第${String(chapter).padStart(3, '0')}章`;
+    const outlineRe = new RegExp(`^细纲_第0*${chapter}章`);
     const candidates = fs
       .readdirSync(outlineDir)
-      .filter((n) => n.startsWith(prefix) && n.endsWith('.md'))
+      .filter((n) => outlineRe.test(n) && n.endsWith('.md'))
       .sort();
     const titleRe = new RegExp(`^#{1,4}\\s*第\\s*0*${chapter}\\s*章\\s*[：:]\\s*(.+?)\\s*$`, 'm');
     for (const name of candidates) {
@@ -2105,7 +2105,7 @@ function main(argv = process.argv.slice(2)) {
           );
         }
       }
-      fs.writeFileSync(out, `${JSON.stringify(document, null, 1)}\n`, 'utf8');
+      atomicWriteText(out, `${JSON.stringify(document, null, 1)}\n`);
       const rawActive = isPlainObject(document.context) ? document.context.active_character_names : [];
       const activeNames = Array.isArray(rawActive) ? rawActive.filter((n) => typeof n === 'string') : [];
       const { inline: snapshots, snapshotFiles, omitted: omittedSnapshots } = prepareDraftSnapshots(

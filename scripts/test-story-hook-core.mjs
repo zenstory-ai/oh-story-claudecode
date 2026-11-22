@@ -731,19 +731,41 @@ test("proseBlockReason, outlineIsEmpty, debt gate, trackingCheckpointIssue, and 
   }
 })
 
-test("bounded directory discovery (depth 4, pruned hidden/node_modules, no symlink escape)", () => {
+test("bounded directory discovery (depth 4, pruned hidden/node_modules/拆文库/对标, no symlink escape)", () => {
   const root = mkTmp("hook-core-disc-")
   const outside = mkTmp("hook-core-outside-")
   try {
     fs.mkdirSync(path.join(root, "shallow/追踪"), { recursive: true })
     fs.mkdirSync(path.join(root, "node_modules/fake/追踪"), { recursive: true })
     fs.mkdirSync(path.join(root, ".hidden/fake/追踪"), { recursive: true })
+    fs.mkdirSync(path.join(root, "拆文库/参考长篇/正文"), { recursive: true })
+    write(path.join(root, "拆文库/参考长篇/正文/第1章.md"), "拆文原文\n")
+    write(path.join(root, "拆文库/参考短篇/正文.md"), "拆文短篇\n")
+    fs.mkdirSync(path.join(root, "对标/竞品长篇/追踪"), { recursive: true })
+    fs.mkdirSync(path.join(root, "对标/竞品长篇/正文"), { recursive: true })
+    write(path.join(root, "对标/竞品长篇/正文/第1章.md"), "对标原文\n")
+    write(path.join(root, "shallow/对标/竞品短篇/正文.md"), "书内对标\n")
     fs.mkdirSync(path.join(root, "a/b/book/追踪"), { recursive: true })
     fs.mkdirSync(path.join(root, "a/b/c/book/追踪"), { recursive: true })
     fs.mkdirSync(path.join(outside, "追踪"), { recursive: true })
 
     const all = core.discoverAllBooks(root).map((p) => core.safeRelative(root, p)).sort()
     assert.deepEqual(all, ["a/b/book", "shallow"])
+
+    // A workspace containing only 拆文库/ and 对标/ must yield no active book or gap warnings
+    const refOnly = mkTmp("hook-core-ref-only-")
+    try {
+      fs.mkdirSync(path.join(refOnly, "拆文库/参考书/正文"), { recursive: true })
+      write(path.join(refOnly, "拆文库/参考书/正文/第1章.md"), "拆文原文\n")
+      write(path.join(refOnly, "拆文库/参考短篇/正文.md"), "拆文短篇\n")
+      fs.mkdirSync(path.join(refOnly, "对标/竞品/正文"), { recursive: true })
+      write(path.join(refOnly, "对标/竞品/正文/第1章.md"), "竞品原文\n")
+      assert.equal(core.discoverActiveBook(refOnly), null)
+      assert.deepEqual(core.discoverAllBooks(refOnly), [])
+      assert.equal(core.detectStoryGaps(refOnly), "")
+    } finally {
+      fs.rmSync(refOnly, { recursive: true, force: true })
+    }
 
     let linked = false
     try {

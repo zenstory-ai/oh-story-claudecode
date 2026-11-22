@@ -186,6 +186,12 @@ function applyEol(content, eol) {
   return !eol || eol === "\n" ? content : content.replaceAll("\n", eol);
 }
 
+function formatEolLabel(eol) {
+  if (eol === "\r\n") return "UTF-8 · CRLF";
+  if (eol === "\r") return "UTF-8 · CR";
+  return "UTF-8 · LF";
+}
+
 function activeEol() {
   return state.activeFile?.eol || "\n";
 }
@@ -748,7 +754,7 @@ function deduceViewForPath(filePath) {
 }
 
 async function openFile(path, { force = false } = {}) {
-  if (state.loadingFile || (!force && !confirmDiscard())) return;
+  if (state.loadingFile || state.deleting || (!force && !confirmDiscard())) return;
   state.loadingFile = true;
   syncActionAvailability();
   elements.fileTree.setAttribute("aria-busy", "true");
@@ -761,6 +767,9 @@ async function openFile(path, { force = false } = {}) {
     state.originalContent = normalized;
     elements.editorInput.value = normalized;
     elements.editorTitle.textContent = file.name;
+    if (elements.encodingLabel) {
+      elements.encodingLabel.textContent = formatEolLabel(file.eol);
+    }
     renderBreadcrumbs(file.path);
     setDirty(false);
     expandParentDirs(file.path);
@@ -794,11 +803,23 @@ function escapeHtml(value) {
 }
 
 function inlineMarkdown(value) {
-  return value
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
+  const codeSpans = [];
+  let placeholderPrefix = "\u0000CODE";
+  while (value.includes(placeholderPrefix)) {
+    placeholderPrefix += "X";
+  }
+  const masked = value.replace(/`([^`]+)`/g, (_, code) => {
+    const index = codeSpans.push(`<code>${code}</code>`) - 1;
+    return `${placeholderPrefix}${index}\u0000`;
+  });
+  const formatted = masked
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/__([^_]+)__/g, "<strong>$1</strong>")
     .replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, "<em>$1</em>");
+  return codeSpans.reduce(
+    (result, html, index) => result.replace(`${placeholderPrefix}${index}\u0000`, () => html),
+    formatted,
+  );
 }
 
 function markdownTableCells(line) {
@@ -989,14 +1010,16 @@ async function deleteFile() {
         expectedVersion: file.version,
       }),
     });
-    state.activeFile = null;
-    state.originalContent = "";
-    elements.editorInput.value = "";
-    elements.editorWorkspace.hidden = true;
-    elements.editorEmpty.hidden = false;
-    document.body.classList.remove("document-open");
-    setDirty(false);
-    syncViewState();
+    if (state.activeFile === file) {
+      state.activeFile = null;
+      state.originalContent = "";
+      elements.editorInput.value = "";
+      elements.editorWorkspace.hidden = true;
+      elements.editorEmpty.hidden = false;
+      document.body.classList.remove("document-open");
+      setDirty(false);
+      syncViewState();
+    }
     await loadWorkspace();
     showToast(`已删除《${file.name}》`);
   } catch (error) {

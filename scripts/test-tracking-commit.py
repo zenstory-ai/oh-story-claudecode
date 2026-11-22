@@ -1325,6 +1325,19 @@ class TrackingCommitTests(unittest.TestCase):
         self.run_tool("commit", tx2_retry)
         self.run_tool("check")
 
+    def test_draft_matches_unpadded_outline_and_writes_atomically(self) -> None:
+        self.init()
+        (self.project / "大纲").mkdir(exist_ok=True)
+        (self.project / "大纲/细纲_第1章.md").write_text(
+            "### 第 1 章：夜雨来客\n- 字数目标：2000 字\n",
+            encoding="utf-8",
+        )
+        _, draft_path = self.draft(1)
+        doc = json.loads(draft_path.read_text(encoding="utf-8"))
+        self.assertEqual(doc["chapter_title"], "夜雨来客")
+        leftovers = list(draft_path.parent.glob("*.tmp"))
+        self.assertEqual(leftovers, [], f"atomic draft write left temp files: {leftovers}")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

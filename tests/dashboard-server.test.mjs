@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { chmod, mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { afterEach, describe, test } from "node:test";
+import vm from "node:vm";
 import {
   DashboardError,
   browserLaunchCommand,
@@ -804,5 +806,284 @@ describe("HTTP API", () => {
     } finally {
       await chmod(root, 0o755);
     }
+  });
+
+  test("rejects hidden/infrastructure directory files on GET/PUT/DELETE while allowing ./book lookup and .story", async () => {
+    const root = await createWorkspace();
+    await mkdir(resolve(root, ".claude"), { recursive: true });
+    await mkdir(resolve(root, ".codex"), { recursive: true });
+    await mkdir(resolve(root, ".story"), { recursive: true });
+    await mkdir(resolve(root, "book", "正文"), { recursive: true });
+    const claudeContent = '{"hooks":{}}';
+    const codexContent = '{"hooks":{}}';
+    const claudeVersion = createHash("sha256").update(claudeContent, "utf8").digest("hex");
+    const codexVersion = createHash("sha256").update(codexContent, "utf8").digest("hex");
+    await writeFile(resolve(root, ".claude", "settings.local.json"), claudeContent, "utf8");
+    await writeFile(resolve(root, ".codex", "hooks.json"), codexContent, "utf8");
+    await writeFile(resolve(root, ".story", "notes.md"), "作者记忆", "utf8");
+    await writeFile(resolve(root, "book", "正文", "第1章.md"), "第一章", "utf8");
+
+    const baseUrl = await startServer(root);
+
+    for (const [hiddenPath, version, original] of [
+      [".claude/settings.local.json", claudeVersion, claudeContent],
+      [".codex/hooks.json", codexVersion, codexContent],
+      ["拆文库/盘龙/.omc/state/secrets.json", createHash("sha256").update("{}", "utf8").digest("hex"), "{}"],
+    ]) {
+      const getRes = await fetch(`${baseUrl}/api/file?path=${encodeURIComponent(hiddenPath)}`);
+      assert.equal(getRes.status, 403, `GET ${hiddenPath} must 403`);
+      assert.equal((await getRes.json()).error.code, "directory_hidden");
+
+      const putRes = await fetch(`${baseUrl}/api/file`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: hiddenPath, content: "pwned", expectedVersion: version }),
+      });
+      assert.equal(putRes.status, 403, `PUT ${hiddenPath} must 403`);
+      assert.equal((await putRes.json()).error.code, "directory_hidden");
+
+      const delRes = await fetch(`${baseUrl}/api/file`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: hiddenPath, expectedVersion: version }),
+      });
+      assert.equal(delRes.status, 403, `DELETE ${hiddenPath} must 403`);
+      assert.equal((await delRes.json()).error.code, "directory_hidden");
+      assert.equal(await readFile(resolve(root, hiddenPath), "utf8"), original);
+    }
+
+    // Leading ./ prefix on a visible directory must succeed (not be rejected as hidden ".")
+    const dotSlashTree = await fetch(`${baseUrl}/api/tree?path=${encodeURIComponent("./book")}`);
+    assert.equal(dotSlashTree.status, 200);
+    const dotSlashPayload = await dotSlashTree.json();
+    assert.equal(dotSlashPayload.path, "book");
+    assert.deepEqual(dotSlashPayload.entries.map((entry) => entry.name), ["正文"]);
+
+    const dotSlashFile = await fetch(`${baseUrl}/api/file?path=${encodeURIComponent("./book/正文/第1章.md")}`);
+    assert.equal(dotSlashFile.status, 200);
+    assert.equal((await dotSlashFile.json()).content, "第一章");
+
+    // .story is explicitly allowed by shouldIgnoreDirectory
+    const storyFile = await fetch(`${baseUrl}/api/file?path=${encodeURIComponent(".story/notes.md")}`);
+    assert.equal(storyFile.status, 200);
+    assert.equal((await storyFile.json()).content, "作者记忆");
+
+    // Symlinked directory pointing into a hidden dir must also be rejected on file access
+    let linked = false;
+    try {
+      await symlink(resolve(root, ".claude"), resolve(root, "visible-link"), "dir");
+      linked = true;
+    } catch {}
+    if (linked) {
+      const symlinkFileRes = await fetch(
+        `${baseUrl}/api/file?path=${encodeURIComponent("visible-link/settings.local.json")}`,
+      );
+      assert.equal(symlinkFileRes.status, 403);
+      assert.equal((await symlinkFileRes.json()).error.code, "directory_hidden");
+    }
+  });
+});
+
+describe("Frontend app.js helpers", () => {
+  async function loadAppHarness(fetchImpl) {
+    const appSource = await readFile(
+      new URL("../skills/story/assets/app.js", import.meta.url),
+      "utf8",
+    );
+    const makeElement = (extra = {}) => {
+      const classes = new Set();
+      const attrs = new Map();
+      return {
+        hidden: false,
+        disabled: false,
+        value: "",
+        textContent: "",
+        innerHTML: "",
+        title: "",
+        dataset: {},
+        style: {},
+        children: [],
+        selectionStart: 0,
+        scrollTop: 0,
+        clientWidth: 400,
+        classList: {
+          add: (...names) => names.forEach((name) => classes.add(name)),
+          remove: (...names) => names.forEach((name) => classes.delete(name)),
+          toggle: (name, force) => (force ? classes.add(name) : classes.delete(name)),
+          contains: (name) => classes.has(name),
+        },
+        setAttribute: (k, v) => attrs.set(k, String(v)),
+        removeAttribute: (k) => attrs.delete(k),
+        getAttribute: (k) => attrs.get(k) ?? null,
+        addEventListener: () => {},
+        append: () => {},
+        appendChild: () => {},
+        replaceChildren: () => {},
+        querySelector: () => makeElement(),
+        querySelectorAll: () => [],
+        focus: () => {},
+        select: () => {},
+        remove: () => {},
+        showModal: () => {},
+        getBoundingClientRect: () => ({ height: 20 }),
+        ...extra,
+      };
+    };
+
+    const bySelector = new Map();
+    const getEl = (selector) => {
+      if (!bySelector.has(selector)) bySelector.set(selector, makeElement());
+      return bySelector.get(selector);
+    };
+    const body = makeElement();
+    const documentElement = makeElement();
+    const document = {
+      body,
+      documentElement,
+      fonts: { ready: Promise.resolve() },
+      querySelector: (selector) => getEl(selector),
+      querySelectorAll: () => [],
+      createElement: () => makeElement(),
+      createDocumentFragment: () => makeElement(),
+      addEventListener: () => {},
+    };
+    const windowObj = {
+      location: { href: "http://127.0.0.1:43110/", search: "" },
+      history: { replaceState: () => {} },
+      matchMedia: () => ({ matches: false, addEventListener: () => {} }),
+      addEventListener: () => {},
+      requestAnimationFrame: () => 1,
+      setTimeout: () => 1,
+      clearTimeout: () => {},
+      confirm: () => true,
+      getComputedStyle: () => ({
+        fontFamily: "sans-serif",
+        fontSize: "16px",
+        fontWeight: "400",
+        fontStyle: "normal",
+        lineHeight: "24px",
+        letterSpacing: "normal",
+        wordSpacing: "normal",
+        textTransform: "none",
+        textIndent: "0px",
+        wordBreak: "normal",
+        tabSize: "4",
+        paddingLeft: "0px",
+        paddingRight: "0px",
+        paddingTop: "0px",
+        paddingBottom: "0px",
+      }),
+    };
+    const storage = new Map();
+    const context = vm.createContext({
+      window: windowObj,
+      document,
+      localStorage: {
+        getItem: (k) => storage.get(k) ?? null,
+        setItem: (k, v) => storage.set(k, String(v)),
+      },
+      ResizeObserver: class {
+        observe() {}
+      },
+      fetch: fetchImpl,
+      URL,
+      URLSearchParams,
+      TextEncoder,
+      Intl,
+      Promise,
+      Set,
+      Map,
+      console,
+    });
+    vm.runInContext(
+      `${appSource}\nglobalThis.__test = { state, elements, inlineMarkdown, openFile, deleteFile };`,
+      context,
+    );
+    return { ...context.__test, getEl, document };
+  }
+
+  test("inlineMarkdown preserves wildcards and underscores inside inline code spans", async () => {
+    const { inlineMarkdown } = await loadAppHarness(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ workspace: { name: "w", path: "/w" }, libraries: [], projects: [], scanErrors: [], limits: {} }),
+    }));
+
+    assert.equal(
+      inlineMarkdown("`大纲/细纲_第N章*.md` 和 `正文/*.md`"),
+      "<code>大纲/细纲_第N章*.md</code> 和 <code>正文/*.md</code>",
+    );
+    assert.equal(inlineMarkdown("`__pycache__`"), "<code>__pycache__</code>");
+    assert.equal(
+      inlineMarkdown("**加粗** 与 *斜体* 与 `$1` 与 `__init__`"),
+      "<strong>加粗</strong> 与 <em>斜体</em> 与 <code>$1</code> 与 <code>__init__</code>",
+    );
+  });
+
+  test("openFile updates encodingLabel for LF, CRLF, and CR files", async () => {
+    const files = {
+      "a-crlf.md": { path: "a-crlf.md", name: "a-crlf.md", content: "第一行\r\n第二行\r\n", version: "a".repeat(64), mtimeMs: 1, size: 10 },
+      "b-cr.md": { path: "b-cr.md", name: "b-cr.md", content: "第一行\r第二行\r", version: "b".repeat(64), mtimeMs: 1, size: 10 },
+      "c-lf.md": { path: "c-lf.md", name: "c-lf.md", content: "第一行\n第二行\n", version: "c".repeat(64), mtimeMs: 1, size: 10 },
+    };
+    const { elements, openFile } = await loadAppHarness(async (url) => {
+      if (url.startsWith("/api/workspace")) {
+        return { ok: true, status: 200, json: async () => ({ workspace: { name: "w", path: "/w" }, libraries: [], projects: [], scanErrors: [], limits: {} }) };
+      }
+      const requested = new URL(url, "http://127.0.0.1").searchParams.get("path");
+      return { ok: true, status: 200, json: async () => ({ ...files[requested] }) };
+    });
+
+    await openFile("a-crlf.md", { force: true });
+    assert.equal(elements.encodingLabel.textContent, "UTF-8 · CRLF");
+
+    await openFile("b-cr.md", { force: true });
+    assert.equal(elements.encodingLabel.textContent, "UTF-8 · CR");
+
+    await openFile("c-lf.md", { force: true });
+    assert.equal(elements.encodingLabel.textContent, "UTF-8 · LF");
+  });
+
+  test("openFile is blocked during in-flight delete and deleteFile guards activeFile cleanup", async () => {
+    let releaseDelete;
+    const deleteGate = new Promise((accept) => {
+      releaseDelete = accept;
+    });
+    const fileA = { path: "a.md", name: "a.md", content: "A", version: "a".repeat(64), mtimeMs: 1, size: 1 };
+    const fileB = { path: "b.md", name: "b.md", content: "B", version: "b".repeat(64), mtimeMs: 1, size: 1 };
+    let fetchedB = 0;
+
+    const { state, elements, openFile, deleteFile } = await loadAppHarness(async (url, options = {}) => {
+      if (url.startsWith("/api/workspace")) {
+        return { ok: true, status: 200, json: async () => ({ workspace: { name: "w", path: "/w" }, libraries: [], projects: [], scanErrors: [], limits: {} }) };
+      }
+      if (options.method === "DELETE") {
+        await deleteGate;
+        return { ok: true, status: 200, json: async () => ({ ok: true, path: "a.md" }) };
+      }
+      const requested = new URL(url, "http://127.0.0.1").searchParams.get("path");
+      if (requested === "b.md") fetchedB += 1;
+      return { ok: true, status: 200, json: async () => ({ ...(requested === "a.md" ? fileA : fileB) }) };
+    });
+
+    await openFile("a.md", { force: true });
+    const deletePromise = deleteFile();
+    assert.equal(state.deleting, true);
+
+    // Clicking another file while delete is in flight must be ignored
+    await openFile("b.md", { force: true });
+    assert.equal(fetchedB, 0);
+    assert.equal(state.activeFile.path, "a.md");
+
+    // Even if activeFile changed via another path before DELETE resolved, cleanup must not wipe it
+    state.activeFile = fileB;
+    elements.editorInput.value = "B";
+    elements.editorWorkspace.hidden = false;
+    releaseDelete();
+    await deletePromise;
+    assert.equal(state.deleting, false);
+    assert.equal(state.activeFile, fileB);
+    assert.equal(elements.editorInput.value, "B");
+    assert.equal(elements.editorWorkspace.hidden, false);
   });
 });

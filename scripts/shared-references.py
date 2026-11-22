@@ -37,6 +37,13 @@ class Group:
         return (self.source, *self.targets)
 
 
+@dataclass(frozen=True)
+class DerivedGroup:
+    name: str
+    reason: str
+    members: tuple[Path, ...]
+
+
 def parse_args() -> argparse.Namespace:
     script_dir = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(description=__doc__)
@@ -77,9 +84,9 @@ def string_list(raw: object, field: str) -> list[str]:
     return raw
 
 
-def load_groups(
+def load_manifest(
     root: Path, manifest_path: Path, *, runtime_manifest: bool = False
-) -> list[Group]:
+) -> tuple[list[Group], list[DerivedGroup]]:
     try:
         data: Any = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -159,6 +166,30 @@ def load_groups(
                 )
             )
 
+    raw_derived = data.get("derived_groups", [])
+    if not isinstance(raw_derived, list):
+        raise ManifestError("derived_groups must be an array")
+    derived_groups: list[DerivedGroup] = []
+    for index, raw in enumerate(raw_derived):
+        if not isinstance(raw, dict):
+            raise ManifestError(f"derived_groups[{index}] must be an object")
+        name = raw.get("name")
+        if not isinstance(name, str) or not name.strip() or name in names:
+            raise ManifestError(
+                f"derived_groups[{index}].name must be unique and non-empty"
+            )
+        names.add(name)
+        reason = raw.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ManifestError(f"{name}.reason must be a non-empty string")
+        raw_members = string_list(raw.get("members"), f"{name}.members")
+        if len(raw_members) < 2:
+            raise ManifestError(f"{name}.members must contain at least 2 paths")
+        members = tuple(
+            inside_root(root, item, f"{name}.members") for item in raw_members
+        )
+        derived_groups.append(DerivedGroup(name, reason.strip(), members))
+
     if not groups:
         raise ManifestError("manifest must declare at least one reference group")
 
@@ -174,6 +205,20 @@ def load_groups(
                 raise ManifestError(
                     f"{group.name}: reference manifest may manage only Markdown paths; "
                     f"got {managed_path.relative_to(root)}"
+                )
+
+    for derived in derived_groups:
+        for member in derived.members:
+            is_markdown = member.suffix.lower() in MARKDOWN_SUFFIXES
+            if runtime_manifest and is_markdown:
+                raise ManifestError(
+                    f"{derived.name}: runtime manifest cannot manage Markdown path "
+                    f"{member.relative_to(root)}"
+                )
+            if not runtime_manifest and not is_markdown:
+                raise ManifestError(
+                    f"{derived.name}: reference manifest may manage only Markdown paths; "
+                    f"got {member.relative_to(root)}"
                 )
 
     source_owners: dict[Path, str] = {}
@@ -200,7 +245,30 @@ def load_groups(
         raise ManifestError(
             f"managed path {path.relative_to(root)} is both source and target"
         )
-    return groups
+
+    managed_paths = source_owners.keys() | target_owners.keys()
+    derived_owners: dict[Path, str] = {}
+    for derived in derived_groups:
+        for member in derived.members:
+            if member in managed_paths:
+                owner = source_owners.get(member) or target_owners[member]
+                raise ManifestError(
+                    f"derived member {member.relative_to(root)} in {derived.name} "
+                    f"overlaps with managed group {owner}"
+                )
+            if member in derived_owners:
+                raise ManifestError(
+                    f"duplicate derived member {member.relative_to(root)} in "
+                    f"{derived_owners[member]} and {derived.name}"
+                )
+            derived_owners[member] = derived.name
+    return groups, derived_groups
+
+
+def load_groups(
+    root: Path, manifest_path: Path, *, runtime_manifest: bool = False
+) -> list[Group]:
+    return load_manifest(root, manifest_path, runtime_manifest=runtime_manifest)[0]
 
 
 def digest(path: Path) -> str:
@@ -298,7 +366,12 @@ def unmanaged_exact_pairs(root: Path, groups: list[Group]) -> list[tuple[Path, P
     return unmanaged
 
 
-def run(command: str, root: Path, groups: list[Group]) -> int:
+def run(
+    command: str,
+    root: Path,
+    groups: list[Group],
+    derived_groups: list[DerivedGroup] | tuple[DerivedGroup, ...] = (),
+) -> int:
     issues = 0
     changed = 0
     for group in groups:
@@ -321,7 +394,18 @@ def run(command: str, root: Path, groups: list[Group]) -> int:
                 print(f"DRIFT [{group.name}] {target.relative_to(root)}")
                 issues += 1
 
+    for derived in derived_groups:
+        for member in derived.members:
+            if not member.is_file():
+                print(
+                    f"MISSING DERIVED MEMBER [{derived.name}] {member.relative_to(root)}"
+                )
+                issues += 1
+
     if command == "sync":
+        if issues:
+            print(f"Shared reference sync failed: {issues} issue(s)", file=sys.stderr)
+            return 1
         print(f"Shared references synchronized: {changed} changed")
         return 0
 
@@ -344,11 +428,11 @@ def main() -> int:
     root = args.root.resolve()
     manifest = args.manifest.resolve()
     try:
-        groups = load_groups(root, manifest)
+        groups, derived_groups = load_manifest(root, manifest)
         if args.runtime_manifest is not None:
             # Disjoint file types keep the two manifests from owning the same path.
-            load_groups(root, args.runtime_manifest.resolve(), runtime_manifest=True)
-        return run(args.command, root, groups)
+            load_manifest(root, args.runtime_manifest.resolve(), runtime_manifest=True)
+        return run(args.command, root, groups, derived_groups)
     except ManifestError as exc:
         print(f"MANIFEST ERROR: {exc}", file=sys.stderr)
         return 2

@@ -164,7 +164,7 @@ workspace_hooks = flatten(config['events'])
 assert len(plugin_hooks) == len(workspace_hooks) == 4
 expected_routes = {(event, handler) for event, handlers in EVENT_HANDLERS.items() for handler in handlers}
 # 两份注册各自独立对表：只改 hooks.json 不改 config.json.patch（或反之）的漂移同样要红，
-# 二者是手工分开维护的，且 check-shared-files.sh 刻意把 hooks.json 排除在字节 parity 之外。
+# 二者是手工分开维护的，且 sync-shared-assets.py 刻意把 hooks.json 排除在字节 parity 之外。
 for source, pairs in (('hooks.json', plugin_hooks), ('config.json.patch', workspace_hooks)):
     for event, hook in pairs:
         assert set(hook) <= {'type', 'command', 'args', 'timeoutMs'}

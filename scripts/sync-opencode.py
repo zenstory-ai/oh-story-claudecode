@@ -409,6 +409,10 @@ def render_agents_md() -> str:
     new_content = replace_claude_paths(content)
     # auto memory 是 Claude Code 自带记忆的名字，OpenCode 版只保留泛称。
     new_content = new_content.replace("自带的记忆（如 auto memory）", "自带的记忆")
+    # OpenCode 不使用 rules/ 目录，由 plugins + agents + commands 构成。
+    new_content = new_content.replace(
+        "hooks/rules/agents 一键部署", "plugins/agents/commands 一键部署"
+    )
     return new_content.rstrip("\n") + "\n"  # 规范行尾为单个换行，避免 EOF 空行
 
 

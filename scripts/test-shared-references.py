@@ -603,12 +603,122 @@ def test_agent_reference_reachability() -> None:
         assert "orphan.md" in result.stdout
 
 
+def test_derived_groups_validation() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write(root / "skills/a/references/guide.md", "guide\n")
+        write(root / "skills/b/references/guide.md", "guide\n")
+        write(root / "skills/a/references/derived.md", "source variant\n")
+        write(root / "skills/b/references/derived.md", "consumer variant\n")
+
+        def write_manifest(derived_groups: object) -> Path:
+            path = root / "shared-references.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "groups": [
+                            {
+                                "name": "exact",
+                                "source": "skills/a/references/guide.md",
+                                "targets": ["skills/b/references/guide.md"],
+                            }
+                        ],
+                        "derived_groups": derived_groups,
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            return path
+
+        valid = write_manifest(
+            [
+                {
+                    "name": "derived-pair",
+                    "reason": "Intentional consumer edits.",
+                    "members": [
+                        "skills/a/references/derived.md",
+                        "skills/b/references/derived.md",
+                    ],
+                }
+            ]
+        )
+        ok = run(CHECKER, "check", "--root", str(root), "--manifest", str(valid))
+        assert ok.returncode == 0, ok.stdout + ok.stderr
+
+        # Empty reason rejected
+        empty_reason = write_manifest(
+            [
+                {
+                    "name": "derived-empty-reason",
+                    "reason": "   ",
+                    "members": [
+                        "skills/a/references/derived.md",
+                        "skills/b/references/derived.md",
+                    ],
+                }
+            ]
+        )
+        res = run(CHECKER, "check", "--root", str(root), "--manifest", str(empty_reason))
+        assert res.returncode == 2 and "reason must be a non-empty string" in res.stderr, res.stdout + res.stderr
+
+        # Escaping repo root rejected
+        escape = write_manifest(
+            [
+                {
+                    "name": "derived-escape",
+                    "reason": "Escape test",
+                    "members": [
+                        "skills/a/references/derived.md",
+                        "../outside.md",
+                    ],
+                }
+            ]
+        )
+        res = run(CHECKER, "check", "--root", str(root), "--manifest", str(escape))
+        assert res.returncode == 2 and "escapes repository root" in res.stderr, res.stdout + res.stderr
+
+        # Overlap with managed groups rejected
+        overlap = write_manifest(
+            [
+                {
+                    "name": "derived-overlap",
+                    "reason": "Overlap test",
+                    "members": [
+                        "skills/a/references/guide.md",
+                        "skills/b/references/derived.md",
+                    ],
+                }
+            ]
+        )
+        res = run(CHECKER, "check", "--root", str(root), "--manifest", str(overlap))
+        assert res.returncode == 2 and "overlaps with managed group" in res.stderr, res.stdout + res.stderr
+
+        # Missing member file on disk fails check
+        missing = write_manifest(
+            [
+                {
+                    "name": "derived-missing",
+                    "reason": "Missing file test",
+                    "members": [
+                        "skills/a/references/derived.md",
+                        "skills/b/references/missing.md",
+                    ],
+                }
+            ]
+        )
+        res = run(CHECKER, "check", "--root", str(root), "--manifest", str(missing))
+        assert res.returncode == 1 and "MISSING DERIVED MEMBER" in res.stdout, res.stdout + res.stderr
+
+
 def main() -> int:
     test_reference_manifest()
     test_cross_manifest_ownership()
     test_manifest_domains()
     test_tree_file_symlink_cannot_escape_root()
     test_undeclared_reference_symlink_cannot_escape_root()
+    test_derived_groups_validation()
     test_agent_reference_reachability()
     print("PASS: shared reference manifest and deployed consumer guards")
     return 0

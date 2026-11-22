@@ -203,7 +203,7 @@ try {
   await before("patch", { patchText: addPatch("book/正文/第004章_补丁.md") });
 
   // *** Move to: 是 patch 的搬家/改名形态，落盘路径是目的地。目标抽取的各形态（Delete+Move、
-  // 搬出 正文/、纯 Delete）归 test-prose-net-parity.sh B 段；这里只验插件把 patchText 交给核、
+  // 搬出 正文/、纯 Delete）归 test-story-hook-core.mjs；这里只验插件把 patchText 交给核、
   // 并按目的地章号拦下（源 draft.md 不是正文，本就不该被判）。
   const movePatch = (source, destination) =>
     `*** Begin Patch\n*** Update File: ${source}\n*** Move to: ${destination}\n+正文第一句。\n*** End Patch\n`;

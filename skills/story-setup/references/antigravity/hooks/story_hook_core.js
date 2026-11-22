@@ -109,6 +109,12 @@ function firstLine(file) {
   }
 }
 
+const SKIP_DISCOVERY_DIRS = new Set(["node_modules", "拆文库", "对标"])
+
+function isSkippedDiscoveryEntry(name) {
+  return name.startsWith(".") || SKIP_DISCOVERY_DIRS.has(name)
+}
+
 function findFirst(base, maxDepth, predicate) {
   // maxDepth 与 `find -maxdepth N` 一致：root 的直属条目深度为 1，深度 N 的条目可见，N+1 不可见。
   if (maxDepth <= 0) return null
@@ -119,13 +125,13 @@ function findFirst(base, maxDepth, predicate) {
     return null
   }
   for (const entry of entries) {
-    if (entry.name.startsWith(".") || entry.name === "node_modules") continue
+    if (isSkippedDiscoveryEntry(entry.name)) continue
     const full = path.join(base, entry.name)
     if (predicate(full, entry)) return full
   }
   if (maxDepth === 1) return null
   for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name.startsWith(".") || entry.name === "node_modules") continue
+    if (!entry.isDirectory() || isSkippedDiscoveryEntry(entry.name)) continue
     const found = findFirst(path.join(base, entry.name), maxDepth - 1, predicate)
     if (found) return found
   }
@@ -160,7 +166,7 @@ function discoverAllBooks(root) {
     let entries = []
     try { entries = fs.readdirSync(base, { withFileTypes: true }) } catch { return }
     for (const entry of entries) {
-      if (entry.name.startsWith(".") || entry.name === "node_modules") continue
+      if (isSkippedDiscoveryEntry(entry.name)) continue
       const full = path.join(base, entry.name)
       if (entry.isDirectory() && (entry.name === "追踪" || entry.name === "正文")) {
         books.set(path.dirname(full), path.dirname(full))
@@ -170,7 +176,7 @@ function discoverAllBooks(root) {
     }
     if (depth === 1) return
     for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name.startsWith(".") || entry.name === "node_modules") continue
+      if (!entry.isDirectory() || isSkippedDiscoveryEntry(entry.name)) continue
       walk(path.join(base, entry.name), depth - 1)
     }
   }

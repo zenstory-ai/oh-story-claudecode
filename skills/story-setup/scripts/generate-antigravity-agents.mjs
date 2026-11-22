@@ -109,6 +109,16 @@ function parseInlineList(value) {
   return match[1].split(",").map((item) => item.trim().replace(/^['"]|['"]$/g, "")).filter(Boolean)
 }
 
+function replaceRequired(text, pattern, replacement, label) {
+  const next = typeof pattern === "string"
+    ? text.replaceAll(pattern, replacement)
+    : text.replace(pattern, replacement)
+  if (next === text) {
+    fail(`story-researcher adaptation drift: expected ${label} to match`)
+  }
+  return next
+}
+
 function adaptBody(body, name, tools) {
   let adapted = body
     .replaceAll(".claude/skills/story-setup/references/agent-references/", ".agents/skills/story-setup/references/agent-references/")
@@ -120,20 +130,58 @@ function adaptBody(body, name, tools) {
     adapted = adapted.replace(new RegExp(`\\b${source}\\b`, "g"), targets.join("/"))
   }
 
-  if (name === "story-researcher") {
-    adapted = adapted
-      .replace("WebSearch/webReader 作为兜底。", "CDP 不可用时返回结构化缺口，由父会话完成联网检索。")
-      .replace("**核心原则：CDP 优先，WebSearch 兜底。**", "**核心原则：只在 CDP 可用时研究；否则交回父会话。**")
-      .replace("CDP 能打开真实页面拿到完整正文；WebSearch 只返回摘要节选，信息量远不如全文。", "Antigravity custom subagent 只通过 `run_command` 使用 CDP；不假定存在额外联网工具。")
-      .replace("3. WebSearch / webReader → 兜底（CDP 不可用或页面打不开时）", "3. CDP 不可用或页面打不开 → 返回结构化 research gap，由父会话继续")
-      .replaceAll("直接降级到 WebSearch/webReader", "返回结构化 research gap，由父会话继续")
-      .replaceAll("降级到 WebSearch/webReader 兜底", "返回结构化 research gap，由父会话继续")
-      .replaceAll("降级到 WebSearch", "返回结构化 research gap，由父会话继续")
-      .replace(
-        /### 第四步：WebSearch\/webReader（兜底）[\s\S]*?(?=\n### 第五步：整理输出)/,
-        "### 第四步：CDP 不可用时交回父会话\n\n返回 `status: \"failed\"`，在 `gaps` 中说明 CDP 不可用或页面提取失败，并给出建议检索词与候选来源类型。不要自行声称已调用联网兜底，也不要编造内容。\n",
-      )
-      .replace("{google | bing | websearch}", "{google | bing}")
+  if (name === "story-researcher" && /WebSearch|websearch|webReader|工具优先级/.test(adapted)) {
+    adapted = replaceRequired(
+      adapted,
+      "**核心原则：CDP 优先，WebSearch 兜底。**",
+      "**核心原则：只在 CDP 可用时研究；否则交回父会话。**",
+      "core principle line",
+    )
+    adapted = replaceRequired(
+      adapted,
+      "CDP 可打开实际页面提取正文，搜索摘要用于定位来源；",
+      "Antigravity custom subagent 只通过 `run_command` 使用 CDP；不假定存在额外联网工具。",
+      "CDP note line",
+    )
+    adapted = replaceRequired(
+      adapted,
+      "3. WebSearch / webReader → 兜底（CDP 不可用或页面打不开时）",
+      "3. CDP 不可用或页面打不开 → 返回结构化 research gap，由父会话继续",
+      "tool priority item 3",
+    )
+    adapted = replaceRequired(
+      adapted,
+      "直接降级到 WebSearch/webReader",
+      "返回结构化 research gap，由父会话继续",
+      "step 1 fallback phrase",
+    )
+    adapted = replaceRequired(
+      adapted,
+      "降级到 WebSearch/webReader 兜底",
+      "返回结构化 research gap，由父会话继续",
+      "step 2 fallback phrase",
+    )
+    adapted = replaceRequired(
+      adapted,
+      /### 第三步：WebSearch\/webReader（兜底）[\s\S]*?(?=\n### 第四步：整理输出)/,
+      "### 第三步：CDP 不可用时交回父会话\n\n返回 `status: \"failed\"`，在 `gaps` 中说明 CDP 不可用或页面提取失败，并给出建议检索词与候选来源类型。不要自行声称已调用联网兜底，也不要编造内容。\n",
+      "step 3 WebSearch fallback section",
+    )
+    adapted = replaceRequired(
+      adapted,
+      "{google | bing | websearch}",
+      "{google | bing}",
+      "markdown search_engine enum",
+    )
+    adapted = replaceRequired(
+      adapted,
+      '"search_engine": "google | bing | websearch"',
+      '"search_engine": "google | bing"',
+      "JSON search_engine enum",
+    )
+    if (/websearch|webreader/i.test(adapted)) {
+      fail("story-researcher adaptation drift: leftover WebSearch/webReader reference in adapted body")
+    }
   }
 
   const researchNote = name === "story-researcher"
@@ -167,9 +215,10 @@ function renderAgent(sourceFile) {
   const sourceModel = String(data.model || "").toLowerCase()
   const model = sourceModel === "haiku" ? "flash" : "pro"
   const sourceSkills = parseInlineList(data.skills)
-  const description = name === "story-researcher"
-    ? String(data.description).replace("WebSearch/webReader 作为兜底", "CDP 不可用时返回缺口，由父会话联网检索")
-    : String(data.description)
+  const rawDescription = String(data.description)
+  const description = name === "story-researcher" && /WebSearch|webReader/i.test(rawDescription)
+    ? replaceRequired(rawDescription, "WebSearch/webReader 作为兜底", "CDP 不可用时返回缺口，由父会话联网检索", "description WebSearch fallback")
+    : rawDescription
 
   const frontmatter = [
     "---",

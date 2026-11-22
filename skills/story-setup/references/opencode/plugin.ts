@@ -21,7 +21,7 @@ import {
 // 会记一行 "failed to load plugin" 后继续跑——守卫整场静默失效，所以 story-setup 部署前先查版本。
 //
 // 写正文守卫的检测逻辑（去 AI 味轻量确定性网、大纲/细纲守卫、字数/落盘/标题去重、
-// 正文写入目标抽取）与 ZCode hook 共享同一份 story_hook_core.js，随本插件一起部署到
+// 正文写入目标抽取）与 Claude/Codex/ZCode/Antigravity hook 共享同一份 story_hook_core.js，随本插件一起部署到
 // .opencode/plugins/lib/story_hook_core.js。放 lib/ 子目录而非平铺：plugins/ 下每个 .ts/.js 都会被
 // 当成插件加载；子目录只有含 server.* / index.* / tui.* / rpc.* 入口时才算插件包，lib/ 里不得放这些
 // 文件名。这里只保留 OpenCode 宿主相关的部分：项目根定位、事件模型（tool execute.before/after、

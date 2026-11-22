@@ -20,7 +20,7 @@
 | `skills/story-setup/references/opencode/AGENTS.md.tmpl` | `AGENTS.md` | user+managed | managed block merge | contains story skill routing sections |
 | `skills/story-setup/references/opencode/agents/` | `.opencode/agents/` | story-setup managed | replace | 7 agent files exist（replace 前按下方「保留已有模型配置」缓存现有 `model:`，避免覆盖用户已配模型） |
 | `skills/story-setup/references/opencode/plugin.ts` | `.opencode/plugins/story-hooks.ts` | story-setup managed | replace | TypeScript plugin file exists |
-| `skills/story-setup/references/opencode/story_hook_core.js` | `.opencode/plugins/lib/story_hook_core.js` | story-setup managed | replace | Node syntax valid；与 ZCode 副本字节一致；被 story-hooks.ts import |
+| `skills/story-setup/references/opencode/story_hook_core.js` | `.opencode/plugins/lib/story_hook_core.js` | story-setup managed | replace | Node syntax valid；与 Claude/Codex/ZCode/Antigravity 副本字节一致；被 story-hooks.ts import |
 | `skills/story-setup/references/opencode/commands/` | `.opencode/commands/` | story-setup managed | replace | 14 command files exist |
 | repository `skills/story-setup/references/agent-references/` | `skills/story-setup/references/agent-references/` | story-setup managed | replace | every reference resolves |
 | `skills/story-setup/references/opencode/pre-commit.sh` | `.git/hooks/pre-commit` | user+managed | append or create | file exists and is executable；含 marker 块则替换块内容，不含则检测 exit 0 位置智能插入 |
@@ -127,7 +127,7 @@ model: provider/model-id
 
 - 检查 `.opencode/agents/` 下的 7 个 agent 定义文件是否存在，且 frontmatter 包含 `mode: subagent` 和 `permissions` 规则列表
 - 检查 `.opencode/plugins/story-hooks.ts` 是否存在
-- 检查 `.opencode/plugins/lib/story_hook_core.js` 存在且 `node --check` 通过（story-hooks.ts import 之，与 `.zcode` 副本字节一致的共享写正文守卫核；置于 `lib/` 子目录以避开 OpenCode 对 `.opencode/plugins/*.js` 的插件自动发现，`lib/` 里不得放 `index.*` / `server.*`）
+- 检查 `.opencode/plugins/lib/story_hook_core.js` 存在且 `node --check` 通过（story-hooks.ts import 之，与 Claude/Codex/ZCode/Antigravity 副本字节一致的共享写正文守卫核；置于 `lib/` 子目录以避开 OpenCode 对 `.opencode/plugins/*.js` 的插件自动发现，`lib/` 里不得放 `index.*` / `server.*`）
 - 检查 `.opencode/commands/` 下的 14 个 command 文件是否存在
 - 按源目录相对路径核对 `skills/story-setup/references/agent-references/`，含子目录
 - 检查 `opencode.json` / `opencode.jsonc`（如有）的 `plugin`、`plugins` 数组不再含指向 story-hooks.ts 的项

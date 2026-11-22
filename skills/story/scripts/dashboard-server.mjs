@@ -117,6 +117,17 @@ function shouldIgnoreDirectory(name) {
   return IGNORED_DIRECTORIES.has(name) || (name.startsWith(".") && name !== ".story");
 }
 
+function hasIgnoredDirectorySegment(realRoot, targetDirectory) {
+  const relation = relative(realRoot, targetDirectory);
+  if (!relation || relation === ".") {
+    return false;
+  }
+  return relation
+    .split(sep)
+    .filter((segment) => segment && segment !== ".")
+    .some((segment) => shouldIgnoreDirectory(segment));
+}
+
 function compareTreeEntries(left, right) {
   if (left.type !== right.type) {
     return left.type === "directory" ? -1 : 1;
@@ -151,6 +162,9 @@ export async function resolveWorkspacePath(root, requestedPath, options = {}) {
   if (!isPathInside(candidate, realRoot)) {
     throw new DashboardError(403, "path_outside_workspace", "路径超出工作区");
   }
+  if (hasIgnoredDirectorySegment(realRoot, dirname(candidate))) {
+    throw new DashboardError(403, "directory_hidden", "该目录不会显示在 Dashboard 中");
+  }
 
   const info = await lstat(candidate).catch((error) => {
     if (error?.code === "ENOENT") {
@@ -169,11 +183,14 @@ export async function resolveWorkspacePath(root, requestedPath, options = {}) {
   if (!isPathInside(resolvedFile, realRoot)) {
     throw new DashboardError(403, "path_outside_workspace", "符号链接指向工作区外部");
   }
+  if (hasIgnoredDirectorySegment(realRoot, dirname(resolvedFile))) {
+    throw new DashboardError(403, "directory_hidden", "该目录不会显示在 Dashboard 中");
+  }
   if (editableOnly && !isEditableFile(candidate)) {
     throw new DashboardError(415, "unsupported_file_type", "该文件类型不支持在线编辑");
   }
 
-  return { absolutePath: candidate, realRoot, info };
+  return { absolutePath: candidate, resolvedFile, realRoot, info };
 }
 
 function directoryNode(absolutePath, relativePath) {
@@ -206,10 +223,7 @@ export async function resolveWorkspaceDirectory(root, requestedPath) {
   if (!isPathInside(candidate, realRoot)) {
     throw new DashboardError(403, "path_outside_workspace", "路径超出工作区");
   }
-  if (
-    requestedPath !== "." &&
-    requestedPath.split(/[\\/]+/).some((segment) => shouldIgnoreDirectory(segment))
-  ) {
+  if (hasIgnoredDirectorySegment(realRoot, candidate)) {
     throw new DashboardError(403, "directory_hidden", "该目录不会显示在 Dashboard 中");
   }
 
@@ -229,6 +243,9 @@ export async function resolveWorkspaceDirectory(root, requestedPath) {
   const resolvedDirectory = await realpath(candidate);
   if (!isPathInside(resolvedDirectory, realRoot)) {
     throw new DashboardError(403, "path_outside_workspace", "符号链接指向工作区外部");
+  }
+  if (hasIgnoredDirectorySegment(realRoot, resolvedDirectory)) {
+    throw new DashboardError(403, "directory_hidden", "该目录不会显示在 Dashboard 中");
   }
   return { absolutePath: candidate, realRoot };
 }
@@ -658,7 +675,7 @@ async function saveWorkspaceFile(root, payload) {
   const initial = await resolveWorkspacePath(root, payload.path, {
     editableOnly: true,
   });
-  return withSerializedFileMutation(initial.absolutePath, async () => {
+  return withSerializedFileMutation(initial.resolvedFile, async () => {
     let current;
     try {
       current = await resolveWorkspacePath(root, payload.path, { editableOnly: true });
@@ -700,7 +717,7 @@ async function deleteWorkspaceFile(root, payload) {
   const initial = await resolveWorkspacePath(root, payload.path, {
     editableOnly: true,
   });
-  return withSerializedFileMutation(initial.absolutePath, async () => {
+  return withSerializedFileMutation(initial.resolvedFile, async () => {
     let current;
     try {
       current = await resolveWorkspacePath(root, payload.path, { editableOnly: true });

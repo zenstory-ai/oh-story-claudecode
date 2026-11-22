@@ -928,7 +928,7 @@ echo "  OK TS8 multi-book gap detection"
 # 的文档完整性断言——那种改一个词就红、测的是措辞不是行为，已随 check-story-long-write-contract.sh
 # 一并去掉，发版是否补 UPGRADING 由发版清单和人把关，不靠 CI 钉死措辞。
 # session-start 的新旧版本分支由 TS5 真实执行覆盖；story-review 预检与 frontmatter version
-# 由 check-current-skill-contracts.py 守卫，这里不再重复 grep。
+# 由 lint-repo.py --only contracts 守卫，这里不再重复 grep。
 assert_grep "agents_version.*小于 \`$CURRENT_AGENTS_VERSION\`|版本 < $CURRENT_AGENTS_VERSION" "$SKILL_DIR/SKILL.md" "story-setup redeploy branch must treat agents_version $PREVIOUS_AGENTS_VERSION as stale"
 assert_grep "agents_version.*大于 \`$CURRENT_AGENTS_VERSION\`" "$SKILL_DIR/SKILL.md" "story-setup must stop before downgrading a newer deployment"
 
