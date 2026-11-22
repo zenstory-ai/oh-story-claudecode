@@ -6,11 +6,12 @@
 
 写正文时只查情节点写全和格式。**去味默认主会话自己做**：读 `references/short-deslop.md`（短篇卖点保护），先按检测结果和文末精修清单定点修复，再查前后一致；作者明确要交给写手时，才按 agent-calls.md「精修去味」派。作者要完整三层诊断或深查“为何过平”时，转 `/story-deslop`，不在本流程里做。主会话做最终扫描与交付验收，改后只复核改动处并重跑受影响的检查。
 
-问题分两级：
-- **blocking（必须修）**：检测脚本报 blocking 的命中，和清单里标「必须修」的项，修完才能交付。
-- **advisory（建议看）**：检测脚本的 advisory 命中和清单其余项。回到上下文判断，有功能的写法保留，没功能的改；词句信号拿不准时查 `banned-words.md` 对应一节，不是出现就删。拿不准的列进交付说明请作者定；子代理标的 `[需复核]` 只写在交回说明里，`正文.md` 里不做标记。
+问题分三级：
+- **blocking（硬底线）**：退化 blocking 与清单「必须修」项，修完才交付。
+- **review_required（重点复核）**：`check-ai-patterns.js` 高风险 AI 句式，优先改写复扫，确有功能入白名单或说明理由。
+- **advisory（建议看）**：脚本 advisory 与其余项。回上下文判功能，拿不准查 `banned-words.md` 对应节，不逢词必删；待定项列交付说明请作者定，`[需复核]` 不进 `正文.md`。
 
-文件模式依次运行 `node {skill 根}/scripts/check-ai-patterns.js --check --fail-on=blocking {短篇目录}/正文.md`、`node {skill 根}/scripts/check-outline-copy.js --outline {短篇目录}/小节大纲.md {短篇目录}/正文.md`、`node {skill 根}/scripts/normalize-punctuation.js {短篇目录}/正文.md`（默认 `--quote-mode keep`：保留引号与面板内的 `……` 及对话引号内的 `——`，规整非标省略号，旁白破折号、双连字符、独立分隔线按 short-format「标点」整理，白名单登记过的不动；保留盐言「」）、`node {skill 根}/scripts/check-degeneration.js --check {短篇目录}/正文.md`，blocking 先改正文再复扫。照搬检测报出的誓词、关键原话等功能性台词保留，登记进 `小节大纲.md` 表格下方「原样出现的原话：」（旧书叫「复沓锚句」）再复检，其余现场重写。
+文件模式依次运行 `node {skill 根}/scripts/check-ai-patterns.js --check --fail-on=review_required {短篇目录}/正文.md`、`node {skill 根}/scripts/check-outline-copy.js --outline {短篇目录}/小节大纲.md {短篇目录}/正文.md`、`node {skill 根}/scripts/normalize-punctuation.js {短篇目录}/正文.md`（默认 `--quote-mode keep`：保留引号与面板内的 `……` 及对话引号内的 `——`，规整非标省略号，旁白破折号、双连字符、独立分隔线按 short-format「标点」整理，白名单登记过的不动；保留盐言「」）、`node {skill 根}/scripts/check-degeneration.js --check {短篇目录}/正文.md`；退化 blocking 先改复扫，`review_required` 改写或说明/入白名单。照搬检测报出的誓词、关键原话等功能性台词保留，登记进 `小节大纲.md` 表格下方「原样出现的原话：」（旧书叫「复沓锚句」）再复检，其余现场重写。
 
 全部保存后运行 `node scripts/check-delivery-contract.js --json --min-chars {MIN} --max-chars {MAX} --sections {N} [--min-section-chars {用户逐节下限}] {短篇目录}`（严格拦软提醒加 `--strict`）。exit 1（`hard_failures`：缺稿、未填 `{}`、不足下限一半、节号错乱）须按 `repair_scope` 最小修复再复验，最多 2 轮，仍不过就停下告诉作者差在哪；exit 0 但带 `soft_warnings`（边缘字数、逐节篇幅、节数/标记样式、段间空行）时重点复核，需改则改，确属合理创作选择可保留。exit 2 或脚本不可执行时不得声称通过。
 

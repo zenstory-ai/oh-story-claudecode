@@ -15,7 +15,7 @@ Phase 4 完整读取本文件、[tracking-initialization.md](tracking-initializa
 
    ```text
    node {story-import skill 根}/scripts/tracking_commit.js init --project {书目录} --input {书目录}/.story/work/init.json
-   node {story-import skill 根}/scripts/tracking_commit.js check --project {书目录}
+   node {story-import skill 根}/scripts/tracking_commit.js check --project {书目录} [--strict]
    ```
 
 半成品最后一章为残稿时，`last_chapter`、角色快照和其他当前语义检查点一律截至最后完整章；残稿处理策略（导入记录里作者的决定）写入 `continuity_risks`，不把未完成动作登记成既成事实。
@@ -44,8 +44,8 @@ Phase 4 完整读取本文件、[tracking-initialization.md](tracking-initializa
 
 - 伏笔 `id` 形如 `F001`，`status` 取 已埋/已回收/已过期/放弃，`importance` 取 高/中/低；`planted_chapter` 不晚于 N。事件 `id` 形如 `E001`，`reveal_status` 取 未揭示/部分揭示/已揭示：`未揭示` 的 `reveal_chapter` 必须为 `null`，部分/完全揭示只能填已经发生的实际章节。
 - `context` 在 init 时收六项：`position`、`long_term_constraints`、`active_character_names`、`continuity_risks`、`recent_chapters`（最多 3 章，按章号升序）、`next_chapter_commitments`。
-- `character_snapshots` 里的角色就是核心角色；四个列表不限条数（单项 ≤600 字节），单角色文件目标 ≤16384 字节（仅提醒），硬上限 65536 字节，超过在任何写入前拒绝。`active_character_names` 是导入截止章之后下一章的活跃角色，不是核心角色总数：最多 20 人且必须已有快照；`long_term_constraints` 最多 6 条。
-- `上下文.md` ≤12288 字节，只含 7 个顶层区块：当前位置、长期约束、核心角色状态、活跃伏笔（最多 8 条）、近三章速记、下一章承诺、连贯性风险。
+- `character_snapshots` 里的角色就是核心角色；四个列表不限条数（单项建议 ≤600 字节）、单角色文件目标 ≤16384 字节，`active_character_names`（导入截止章之后下一章的活跃角色，不是核心角色总数，须已有快照）建议 ≤20 人、`long_term_constraints` 建议 ≤6 条——以上常规容量均为软提醒（`warnings`，不阻断写入）；仅单视图硬上限 65536 字节超过会在任何写入前拒绝。
+- `上下文.md` 建议 ≤12288 字节（超限仅出 `warnings`，单视图硬上限 65536 字节），只含 7 个顶层区块：当前位置、长期约束、核心角色状态、活跃伏笔（最多 8 条）、近三章速记、下一章承诺、连贯性风险。
 - 报错按提示改事务本身再跑，字段形状以 tracking-initialization.md 的骨架和本节为准。
 
 ## 伏笔提取
@@ -80,12 +80,12 @@ Phase 4 完整读取本文件、[tracking-initialization.md](tracking-initializa
 │   └── 读者已知.md
 ```
 
-- [ ] `tracking_commit.js check` 通过，`_tracking-state.json` 与全部自动生成的追踪文件一致
+- [ ] `tracking_commit.js check` 通过且无 `drift_warnings`（严格核查加 `--strict`），`_tracking-state.json` 与全部自动生成的追踪文件一致
 - [ ] `_tracking-state.json.imported_through_chapter` 等于最后完整导入章
 - [ ] `追踪/伏笔.md` 每个 ID 至多一行，未来尚未埋设的设计没有混入
 - [ ] `_tracking-state.json.timeline` 已登记关键事实与读者认知，`读者已知.md` 无真相泄露
 - [ ] `追踪/角色状态/{角色名}.md` 已覆盖全部核心角色并对齐 character-state-reverse.md
 - [ ] `追踪/逐章记录/` 空目录已创建，且没有为导入章伪造日更记录
-- [ ] `追踪/上下文.md` 顶层恰好固定 7 栏且 ≤12288 字节
+- [ ] `追踪/上下文.md` 顶层恰好固定 7 栏（建议 ≤12288 字节，未触及 65536 字节硬上限）
 
 通过后在导入记录勾「追踪初始化」，`init.json` 可删除；汇报末尾按 [SKILL.md 的换上下文规则](../SKILL.md#时刻表与交接) 建议新开对话。

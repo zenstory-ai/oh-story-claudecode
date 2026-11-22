@@ -140,11 +140,11 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 6. **确定性预检（只报告，不修改）**：当审查范围包含本地正文文件路径时，运行本 skill 自带脚本：
    ```bash
    node scripts/normalize-punctuation.js --check <正文文件...>
-   node scripts/check-ai-patterns.js --check --fail-on=blocking <正文文件...>
+   node scripts/check-ai-patterns.js --check --fail-on=review_required <正文文件...>
    node scripts/check-degeneration.js --check <正文文件...>
    ```
    - `ellipsis`、`double-hyphen`、`markdown-divider` 归入 `format` findings；旁白引号外的 `em-dash` 只采用 `check-ai-patterns.js` 的语义改写建议（去重丢弃 `normalize-punctuation.js` 同位置的 `em-dash`；对话引号内被打断或拖音的 `——` 不报错）；默认 `--quote-mode keep`。另人工检查标点节奏是否通篇句号化或随机堆砌。
-   - `check-ai-patterns.js` 的 blocking / advisory 作为 `prose` 候选，按 `style_resolution`、原文功能及 `expression.md` / `narrative-focus.md` / `story-logic.md` 复核，确认确实影响读感后按下方严重度定级；功能性纠错、叙述与停顿保留。
+   - `check-ai-patterns.js` 的 `review_required` / `advisory` 作为 `prose` 候选，按 `style_resolution`、原文功能及 `expression.md` / `narrative-focus.md` / `story-logic.md` 复核，确认确实影响读感后按下方严重度定级；功能性纠错、叙述与停顿保留。
    - `check-degeneration.js` 的 blocking（复读/截断/tier1 工程词）作为 S1/S2 `prose` findings（建议“重新生成该段，不是改写”），advisory（tier2 章节/歧义词）作为 S3。
    - `story-review` **不修改正文、设定或大纲文件**（需自动修复正文建议转 `/story-deslop`）；仅 full/lean 的「追踪文件维护」可修改 `追踪/`，分批审查可按 batch-review.md 写 **.story-review/state.md**。
 

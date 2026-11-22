@@ -21,4 +21,4 @@ node {story-import skill 根}/scripts/build_outline_brief.js --project {书目�
 
 ## Step 3：验收与交接
 
-每批写完由主会话运行 `node {story-import skill 根}/scripts/check-outline-contract.js --json <本批细纲路径...>`：exit 1 时只按报告补缺的字段或小节（有 story-architect 时把报错原样交回同一 agent 修一次）。通过后把导入记录的细纲进度改成「已验收到第 B 章」。还有下一批时，向作者一句话说到第几章了，末尾按 [SKILL.md 的换上下文规则](../SKILL.md#时刻表与交接) 建议新开对话说「继续导入」；没有子代理时每批都这样建议。全部章节细纲写完再进 Phase 4。
+每批写完由主会话运行 `node {story-import skill 根}/scripts/check-outline-contract.js --json <本批细纲路径...>`（需严格拦截软提醒加 `--strict`）：exit 1（`hard_failures`：文件可读、字数目标、两项意图字段实质内容）时按报告补齐再复验（有 story-architect 时把报错原样交回同一 agent 修一次）；exit 0 但带 `soft_warnings`（其余字段、四小节、五行、情节点表、设定引用）时重点复核，确认漏写则补、确属原文如此可保留。通过后把导入记录的细纲进度改成「已验收到第 B 章」。还有下一批时，向作者一句话说到第几章了，末尾按 [SKILL.md 的换上下文规则](../SKILL.md#时刻表与交接) 建议新开对话说「继续导入」；没有子代理时每批都这样建议。全部章节细纲写完再进 Phase 4。

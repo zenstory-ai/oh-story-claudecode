@@ -10,7 +10,7 @@
 
 ## 存放与路由
 
-分两级：`{工作区}/.story/作者记忆/` 存 global / genre / workflow 条目（编号 `AP`）；`{书}/.story/作者记忆/` 存本书 book 条目（编号 `BP`）。每级的 `作者画像.md` 和 `变更记录.md` 由 state 自动生成，禁止手改。
+分两级：`{工作区}/.story/作者记忆/` 存 global / genre / workflow 条目（编号 `AP`）；`{书}/.story/作者记忆/` 存本书 book 条目（编号 `BP`）。每级的 `作者画像.md` 和 `变更记录.md` 由 state 自动生成，默认不手改（手改会被 `check` 报 `drift_warnings`）。
 
 - `--workspace` 必传（承载多本书、`.active-book`、`长篇/`、`短篇/` 或 `拆文库/` 的目录，不得传书目录或用户主目录）；写某本书时必传 `--book-root`。
 - `forget` 按 `item_id` 路由，`remember` / `replace` 按 `scope.level` 路由。`replace` 不跨级：本书例外直接 `remember` 为 book 条目；全局改本书拆成 `forget` + `remember`。
@@ -38,12 +38,12 @@
 | 与已有习惯相反 | 问换掉旧的（`replace`）还是本次例外（只照做） |
 | 一次性要求、从成稿看出的模式、小说设定/剧情事实 | 不记入作者记忆 |
 
-`quote` 写原话，`assertion` 限一句话（≤120 字节），例外和限定合在同一条记录里，背景写进 `reason`。范围：`book` / `genre` / `workflow` / `global`；类型：`prose_style` / `story_design` / `workflow` / `delivery` / `interaction`；置信度与重要度：`low | medium | high`；`source`：`explicit_user | accepted_suggestion | manual`。
+`quote` 写原话，`assertion` 建议一句话（≤120 字节，超长仅出 `warnings`），例外和限定合在同一条记录里，背景写进 `reason`。范围：`book` / `genre` / `workflow` / `global`；类型：`prose_style` / `story_design` / `workflow` / `delivery` / `interaction`；置信度与重要度：`low | medium | high`；`source`：`explicit_user | accepted_suggestion | manual`。
 
 ## 改、忘与整理
 
 - 同范围规则改版用 `replace`，撤回用 `forget`。
-- **整理作者记忆**：作者要求整理、有习惯没带上、或 `作者画像.md` 超 12288 字节时，读项目级与本书 `作者画像.md`，向作者提议合并同义条（`replace`）、停用过时条（`forget`）、下调重要度或压短断言，同意后逐条 `record`；旧版项目级「本书：」条目跑 `migrate --book-root` 迁回书级。
+- **整理作者记忆**：作者要求整理、有习惯没带上、或 `作者画像.md` 超 12288 字节 / `变更记录.md` 超 24576 字节（均为软提醒 `warnings`；单视图硬上限 65536 字节、state JSON 硬上限 2MB）时，读项目级与本书 `作者画像.md`，向作者提议合并同义条（`replace`）、停用过时条（`forget`）、下调重要度或压短断言，同意后逐条 `record`；旧版项目级「本书：」条目跑 `migrate --book-root` 迁回书级。
 
 ## 回执怎么告诉作者
 
@@ -57,11 +57,11 @@
 node {当前 skill 根}/scripts/author_memory_commit.js record  --workspace {工作区} [--book-root {书目录}] --input {工作区}/.story/work/作者记忆-事件.json
 node {当前 skill 根}/scripts/author_memory_commit.js query   --workspace {工作区} --book-root {书目录} --kind {类型}（必传，可重复） [--genre {题材}] [--workflow {流程}]
 node {当前 skill 根}/scripts/author_memory_commit.js migrate --workspace {工作区} --book-root {书目录}
-node {当前 skill 根}/scripts/author_memory_commit.js check   --workspace {工作区} [--book-root {书目录}]
+node {当前 skill 根}/scripts/author_memory_commit.js check   --workspace {工作区} [--book-root {书目录}] [--strict]
 ```
 
 - 每次记、改、忘都是一份单事件 `record`：自动读当前修订、首次自动初始化。事件 JSON 写在 `{工作区}/.story/work/`，成功后删掉；同一 `event_id` 内容相同不重复写，内容不同则失败。写入不因加载上限失败，`warnings` 只是提醒，有回执就是记住了，不要换 `event_id` 重试。
-- `migrate` 把旧版写在项目级的本书条目搬进书级（可重复跑，失败直接重跑）；`check` 核对自动生成的视图，出错时才用。
+- `migrate` 把旧版写在项目级的本书条目搬进书级（可重复跑，失败直接重跑）；`check` 核对自动生成的视图，派生视图漂移默认 exit 0 并返回 `drift_warnings`（需严格拦截加 `--strict`）。
 
 ## 事件格式
 
