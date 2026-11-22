@@ -170,13 +170,13 @@ function sessionContext() {
   if (hookInput.invocationNum !== 0 || Number(hookInput.initialNumSteps || 0) > 1) return ""
   const root = projectRoot()
   const messages = []
-  const sentinel = path.join(root, ".story-deployed")
-  if (fs.existsSync(sentinel)) {
-    let text = ""
-    try { text = fs.readFileSync(sentinel, "utf8") } catch {}
-    const target = text.match(/^target_cli:\s*(.+)$/m)
-    if (!target) messages.push("[story-setup] .story-deployed is missing target_cli; rerun story-setup.")
-    else if (!target[1].split(",").map((value) => value.trim()).includes("antigravity")) {
+  const sentinel = core.readSentinel(root)
+  if (sentinel !== null) {
+    const versionNotice = core.agentsVersionNotice(root, { sentinel, setupCommand: "story-setup" })
+    if (versionNotice) messages.push(versionNotice)
+    const targetCli = sentinel.target_cli || ""
+    if (!targetCli) messages.push("[story-setup] .story-deployed is missing target_cli; rerun story-setup.")
+    else if (!targetCli.split(",").map((value) => value.trim()).includes("antigravity")) {
       messages.push("[story-setup] This deployment does not include antigravity; rerun story-setup and select Antigravity.")
     }
   }

@@ -339,6 +339,53 @@ test("Claude hooks end-to-end under real GBK locale (zh_CN.GBK when available)",
   }
 })
 
+test("Claude session-start checks agents_version via shared story_hook_core.js", () => {
+  const contract = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "scripts/current-contract.json"), "utf8"))
+  const ver = contract.agents_version
+  const root = mkTmp("claude-agents-ver-")
+  try {
+    const launcher = deployClaudeHooks(root)
+    write(path.join(root, ".claude/skills/story-setup/references/agent-references/dummy.md"), "# ref\n")
+
+    const writeSentinel = (agentsLine) =>
+      write(
+        path.join(root, ".story-deployed"),
+        [
+          agentsLine,
+          "setup_skill_version: 1.2.6",
+          "target_cli: claude-code",
+          "resolver_strategy: project-local-skill-reference",
+          "references_dir: .claude/skills/story-setup/references/agent-references",
+          "",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      )
+
+    writeSentinel(`agents_version: ${ver - 1}`)
+    let out = runLauncher(launcher, "session-start", { root }).stdout
+    assert.match(out, new RegExp(`低于 v${ver}`))
+    assert.match(out, /\/story-setup/)
+
+    writeSentinel(`agents_version: ${ver + 1}`)
+    out = runLauncher(launcher, "session-start", { root }).stdout
+    assert.match(out, new RegExp(`高于本 hook 支持的 v${ver}`))
+    assert.match(out, /不要降级覆盖/)
+
+    writeSentinel("agents_version: invalid")
+    out = runLauncher(launcher, "session-start", { root }).stdout
+    assert.match(out, /缺少数字 agents_version/)
+
+    writeSentinel(`agents_version: ${ver}`)
+    out = runLauncher(launcher, "session-start", { root }).stdout
+    assert.ok(!out.includes(`低于 v${ver}`))
+    assert.ok(!out.includes("高于本 hook"))
+    assert.ok(!out.includes("缺少数字 agents_version"))
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test("OpenCode pre-commit.sh delegates to shared story_hook_core.js and is valid POSIX sh", () => {
   const preCommitSrc = path.join(OPENCODE_SRC, "pre-commit.sh")
   const syntax = spawnSync("sh", ["-n", preCommitSrc], { encoding: "utf8" })

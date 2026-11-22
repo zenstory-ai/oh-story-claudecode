@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url"
 const require = createRequire(import.meta.url)
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const CORE_PATH = path.join(REPO_ROOT, "skills/story-setup/references/templates/hooks/story_hook_core.js")
+const CONTRACT_PATH = path.join(REPO_ROOT, "scripts/current-contract.json")
 const DETECTOR_PATH = path.join(REPO_ROOT, "skills/story-long-write/scripts/check-ai-patterns.js")
 const STORYCTL_PATH = path.join(REPO_ROOT, "skills/story-long-write/scripts/storyctl.js")
 const TRACKING_PATH = path.join(REPO_ROOT, "skills/story-long-write/scripts/tracking_commit.js")
@@ -210,6 +211,274 @@ test("proseNetFindings covers hard signals, quotes, apostrophes, toxic rules, co
     }
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true })
+  }
+})
+
+test("cross-file parity with check-ai-patterns.js across all 6 toxic prose rules, exclusions, and scale", () => {
+  const TOXIC_RULES = [
+    "voice-contrast",
+    "negation-parade",
+    "not-is-comparison",
+    "reverse-not-is",
+    "trailer-ending",
+    "trailer-summary",
+  ]
+  // ~9,000 CJK chars (scale = floor((9000 + 2250) / 4500) = 2)
+  const longPad = "江晨沿着河岸走过石桥，风吹得衣摆猎猎作响，他把账本折好塞进怀里继续赶路。\n".repeat(260)
+
+  const cases = {
+    // 1. voice-contrast (threshold 2 * scale)
+    vc_block: {
+      text: "他开口了。\n声音不高，第一句却稳稳压住了整个大厅。\n她声音不大，却让后排的人都听清了。\n",
+      expectedRules: ["voice-contrast"],
+    },
+    vc_below: {
+      text: "他开口了。\n声音不高，第一句却稳稳压住了整个大厅。\n台下静了三秒。\n",
+      expectedRules: [],
+    },
+    vc_quoted_ok: {
+      text: "他说：「声音不高，第一句却稳稳压住了整个大厅。」\n她回道：「声音不大，却让后排的人都听清了。」\n",
+      expectedRules: [],
+    },
+    vc_scale2_below: {
+      text: `${longPad}声音不高，第一句却稳稳压住了整个大厅。\n她声音不大，却让后排的人都听清了。\n`,
+      expectedRules: [],
+    },
+    vc_scale2_block: {
+      text:
+        `${longPad}` +
+        "声音不高，第一句却稳稳压住了整个大厅。\n" +
+        "她声音不大，却让后排的人都听清了。\n" +
+        "他声音并不响亮，偏偏字字清楚。\n" +
+        "老者声音不高，但整个院子都静了。\n",
+      expectedRules: ["voice-contrast"],
+    },
+
+    // 2. negation-parade (threshold 2 * scale)
+    np_block: {
+      text: "没有伴奏，没有和声，没有提词器。\n没有灯光，没有掌声，没有退路。\n台下静了三秒。\n",
+      expectedRules: ["negation-parade"],
+    },
+    np_below: {
+      text: "没有伴奏，没有和声，没有提词器。\n台下静了三秒。\n",
+      expectedRules: [],
+    },
+    np_scale2_below: {
+      text: `${longPad}没有伴奏，没有和声，没有提词器。\n没有灯光，没有掌声，没有退路。\n`,
+      expectedRules: [],
+    },
+    np_scale2_block: {
+      text:
+        `${longPad}` +
+        "没有伴奏，没有和声，没有提词器。\n" +
+        "没有灯光，没有掌声，没有退路。\n" +
+        "没有废话，没有铺垫，没有客套。\n" +
+        "没有退路，没有援军，没有侥幸。\n",
+      expectedRules: ["negation-parade"],
+    },
+
+    // 3. not-is-comparison (combined with reverse-not-is, threshold 3 * scale)
+    ni_block: {
+      text:
+        "不是没有想过退路，而是根本没有退路。\n" +
+        "不是不敢开口，而是懒得废话。\n" +
+        "不是输不起，而是没必要让。\n" +
+        "他把门关上了。\n",
+      expectedRules: ["not-is-comparison"],
+    },
+    ni_below: {
+      text: "不是没有想过退路，而是根本没有退路。\n不是不敢开口，而是懒得废话。\n他把门关上了。\n",
+      expectedRules: [],
+    },
+    ni_exclusions_ok: {
+      text:
+        "不是生就是死，他认了。\n" +
+        "他问自己是不是听错了，是不是灯光太晃。\n" +
+        "不是没有想过退路，是吗。\n" +
+        "不是不愿意去，是的，他太累了。\n" +
+        "他推门走了进去。\n",
+      expectedRules: [],
+    },
+    ni_scale2_below: {
+      text:
+        `${longPad}` +
+        "不是没有想过退路，而是根本没有退路。\n" +
+        "不是不敢开口，而是懒得废话。\n" +
+        "不是输不起，而是没必要让。\n",
+      expectedRules: [],
+    },
+    ni_scale2_block: {
+      text:
+        `${longPad}` +
+        "不是没有想过退路，而是根本没有退路。\n" +
+        "不是不敢开口，而是懒得废话。\n" +
+        "不是输不起，而是没必要让。\n" +
+        "不是听不懂，而是装糊涂。\n" +
+        "不是没机会，而是等时机。\n" +
+        "不是怕吃亏，而是算清楚了。\n",
+      expectedRules: ["not-is-comparison"],
+    },
+
+    // 4. reverse-not-is (combined with not-is-comparison, threshold 3 * scale)
+    rni_block: {
+      text:
+        "是真嗓子，不是修音修出来的。\n" +
+        "他稳稳吸了口气。\n" +
+        "是硬功夫，不是花架子撑出来的。\n" +
+        "台下有人吹了声口哨。\n" +
+        "是实打实的底气，不是装出来的。\n" +
+        "他清了清嗓子接着唱。\n",
+      expectedRules: ["reverse-not-is"],
+    },
+    rni_combined_block: {
+      text:
+        "不是没有想过退路，而是根本没有退路。\n" +
+        "不是不敢开口，而是懒得废话。\n" +
+        "是真嗓子，不是修音修出来的。\n" +
+        "他把门关上了。\n",
+      expectedRules: ["not-is-comparison", "reverse-not-is"],
+    },
+    rni_exclusions_ok: {
+      text:
+        "是啊，不是他的错。\n" +
+        "是不是他干的，不是我干的。\n" +
+        "是挺好的一件事，不是吗。\n" +
+        "还是太年轻，不是对手。\n" +
+        "他点了点头。\n",
+      expectedRules: [],
+    },
+
+    // 5. trailer-ending (tail 600-char window, threshold 2)
+    te_block: {
+      text: "他放下麦克风朝台下鞠了一躬。\n没人知道，这才刚刚开头。\n",
+      expectedRules: ["trailer-ending"],
+    },
+    te_below: {
+      text: "他放下麦克风朝台下鞠了一躬。\n没人知道他去了哪里。\n",
+      expectedRules: [],
+    },
+    te_curtain_ok: {
+      text: "钟声再度响起，比赛正式拉开序幕。\n第二场比赛也正式拉开帷幕。\n他站上了台。\n",
+      expectedRules: [],
+    },
+    te_outside_window_ok: {
+      text:
+        "没人知道他练了多少年。也没人知道他去了哪里。\n" +
+        "江晨把这段视频剪了又剪从凌晨剪到天亮每一帧都抠得死死的。".repeat(22) +
+        "\n他把琴盖合上，起了身。\n",
+      expectedRules: [],
+    },
+
+    // 6. trailer-summary (tail 600-char window, threshold 1)
+    ts_block: {
+      text: "他放下麦克风朝台下鞠了一躬。\n这一切都结束了。\n",
+      expectedRules: ["trailer-summary"],
+    },
+    ts_fate_block: {
+      text: "她把账单折好塞回包里。\n这一夜注定无人入眠。\n",
+      expectedRules: ["trailer-summary"],
+    },
+    ts_gear_block: {
+      text: "他握紧了那枚铜钱。\n命运的齿轮开始转动。\n",
+      expectedRules: ["trailer-summary"],
+    },
+    ts_exclusions_ok: {
+      text:
+        "等这一切结束了，我们就能过上平静幸福的生活了。\n" +
+        "世间的这一刻，所有人都接受了命中注定的结局！\n" +
+        "他转身走了。\n",
+      expectedRules: [],
+    },
+  }
+
+  const tmp = mkTmp("hook-core-6rule-parity-")
+  try {
+    const files = []
+    const fileToKey = new Map()
+    for (const [key, spec] of Object.entries(cases)) {
+      const f = path.join(tmp, `${key}.md`)
+      fs.writeFileSync(f, spec.text, "utf8")
+      files.push(f)
+      fileToKey.set(f, key)
+    }
+
+    const det = spawnSync(process.execPath, [DETECTOR_PATH, "--json", ...files], {
+      encoding: "utf8",
+      maxBuffer: 10 * 1024 * 1024,
+    })
+    assert.ok(det.status === 0 || det.status === 1, `check-ai-patterns.js failed (${det.status}): ${det.stderr}`)
+    const parsed = JSON.parse(det.stdout)
+    const detByKey = Object.fromEntries(Object.keys(cases).map((k) => [k, new Set()]))
+    for (const finding of parsed.findings) {
+      if (finding.severity !== "blocking") continue
+      if (!TOXIC_RULES.includes(finding.type)) continue
+      const key = fileToKey.get(finding.file)
+      if (key) detByKey[key].add(finding.type)
+    }
+
+    for (const [key, spec] of Object.entries(cases)) {
+      const hookFindings = core.proseNetFindings(spec.text)
+      const hookRules = new Set()
+      for (const line of hookFindings) {
+        const m = line.match(/毒句式\[([a-z-]+)\]/)
+        if (m) hookRules.add(m[1])
+      }
+      const detRules = detByKey[key]
+      assert.deepEqual(
+        [...hookRules].sort(),
+        [...detRules].sort(),
+        `${key}: story_hook_core vs check-ai-patterns.js blocking rule mismatch`
+      )
+      assert.deepEqual(
+        [...hookRules].sort(),
+        [...spec.expectedRules].sort(),
+        `${key}: unexpected blocking rule set`
+      )
+    }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true })
+  }
+})
+
+test("CURRENT_AGENTS_VERSION, readSentinel, and agentsVersionNotice match current-contract.json and handle all states", () => {
+  const contract = JSON.parse(fs.readFileSync(CONTRACT_PATH, "utf8"))
+  assert.equal(core.CURRENT_AGENTS_VERSION, contract.agents_version)
+
+  const root = mkTmp("hook-core-sentinel-")
+  try {
+    // Missing .story-deployed -> null sentinel, silent notice
+    assert.equal(core.readSentinel(root), null)
+    assert.equal(core.agentsVersionNotice(root), "")
+
+    // Current version (even quoted and with lagging setup_skill_version) -> silent
+    write(
+      path.join(root, ".story-deployed"),
+      `agents_version: "${contract.agents_version}"\nsetup_skill_version: 1.2.6\ntarget_cli: codex\n`
+    )
+    const parsed = core.readSentinel(root)
+    assert.equal(parsed.agents_version, String(contract.agents_version))
+    assert.equal(parsed.target_cli, "codex")
+    assert.equal(core.agentsVersionNotice(root), "")
+
+    // Stale version -> warns with custom setupCommand
+    write(path.join(root, ".story-deployed"), `agents_version: ${contract.agents_version - 1}\ntarget_cli: codex\n`)
+    const staleNotice = core.agentsVersionNotice(root, { setupCommand: "$story-setup" })
+    assert.match(staleNotice, new RegExp(`agents_version=${contract.agents_version - 1} 低于 v${contract.agents_version}`))
+    assert.match(staleNotice, /重新运行 \$story-setup/)
+
+    // Future version -> downgrade warning
+    write(path.join(root, ".story-deployed"), `agents_version: ${contract.agents_version + 1}\ntarget_cli: codex\n`)
+    const futureNotice = core.agentsVersionNotice(root, { setupCommand: "$story-setup" })
+    assert.match(futureNotice, new RegExp(`高于本 hook 支持的 v${contract.agents_version}`))
+    assert.match(futureNotice, /不要降级覆盖/)
+
+    // Missing or non-numeric agents_version -> warns
+    write(path.join(root, ".story-deployed"), "agents_version: abc\ntarget_cli: zcode\n")
+    const badNotice = core.agentsVersionNotice(root, { setupCommand: "$story-setup" })
+    assert.match(badNotice, /缺少数字 agents_version/)
+    assert.match(badNotice, /\$story-setup/)
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
   }
 })
 

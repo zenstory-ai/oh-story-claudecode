@@ -171,13 +171,33 @@ try {
   assert.ok(!fs.existsSync(pending), "clean edit_file rewrite must clear pending findings")
   assert.deepEqual(invoke("pre-invocation", { invocationNum: 1 }).value, {})
 
+  const currentAgentsVer = JSON.parse(
+    fs.readFileSync(path.join(repo, "scripts/current-contract.json"), "utf8")
+  ).agents_version
   write(".story-deployed", "agents_version: 26\ntarget_cli: antigravity\n")
   write(".active-book", "长书\n")
   write("长书/设定/世界观.md", "# 世界观\n")
   write("长书/追踪/上下文.md", "# 上下文\n")
   response = invoke("pre-invocation", { invocationNum: 0, initialNumSteps: 1 }).value
   assert.ok(Array.isArray(response.injectSteps))
-  assert.match(response.injectSteps.map((item) => item.ephemeralMessage).join("\n"), /Active book: 长书/)
+  const staleMsg = response.injectSteps.map((item) => item.ephemeralMessage).join("\n")
+  assert.match(staleMsg, /Active book: 长书/)
+  assert.match(staleMsg, new RegExp(`agents_version=26 低于 v${currentAgentsVer}`))
+
+  write(".story-deployed", `agents_version: ${currentAgentsVer + 1}\ntarget_cli: antigravity\n`)
+  const futureMsg = invoke("pre-invocation", { invocationNum: 0, initialNumSteps: 1 }).value.injectSteps
+    .map((item) => item.ephemeralMessage)
+    .join("\n")
+  assert.match(futureMsg, new RegExp(`高于本 hook 支持的 v${currentAgentsVer}`))
+  assert.match(futureMsg, /不要降级覆盖/)
+
+  write(".story-deployed", `agents_version: ${currentAgentsVer}\ntarget_cli: antigravity\n`)
+  const currentMsg = invoke("pre-invocation", { invocationNum: 0, initialNumSteps: 1 }).value.injectSteps
+    .map((item) => item.ephemeralMessage)
+    .join("\n")
+  assert.match(currentMsg, /Active book: 长书/)
+  assert.ok(!currentMsg.includes(`低于 v${currentAgentsVer}`))
+  assert.ok(!currentMsg.includes("高于本 hook"))
   assert.deepEqual(
     invoke("pre-invocation", { invocationNum: 0, initialNumSteps: 6 }).value,
     {},

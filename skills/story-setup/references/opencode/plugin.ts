@@ -3,6 +3,8 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import { execSync } from "node:child_process"
 import {
+  readSentinel,
+  agentsVersionNotice,
   discoverActiveBook,
   safeRelative,
   resolveTarget,
@@ -24,7 +26,7 @@ import {
 // 当成插件加载；子目录只有含 server.* / index.* / tui.* / rpc.* 入口时才算插件包，lib/ 里不得放这些
 // 文件名。这里只保留 OpenCode 宿主相关的部分：项目根定位、事件模型（tool execute.before/after、
 // session compaction）、以及把发现追加进写工具返回内容的输出信封。
-// 共享核以 bash hook 为 oracle，parity 由 test-prose-net-parity.sh 守卫。
+// 共享核行为与 check-ai-patterns.js 毒句式 parity 由 test-story-hook-core.mjs 守卫。
 
 type ToolInput = Record<string, unknown>
 type TextPart = { type: "text"; text: string }
@@ -129,16 +131,14 @@ function proseTargets(tool: string, input: ToolInput): string[] {
 function sessionContextOutput(directory: string): string {
   const root = projectRoot(directory)
   const messages: string[] = []
-  const sentinel = path.join(root, ".story-deployed")
-  if (fs.existsSync(sentinel)) {
-    let content = ""
-    try {
-      content = fs.readFileSync(sentinel, "utf-8")
-    } catch {}
-    const match = content.match(/^target_cli:\s*(.+)$/m)
-    if (!match) {
+  const sentinel = readSentinel(root)
+  if (sentinel !== null) {
+    const versionNotice = agentsVersionNotice(root, { sentinel, setupCommand: "/story-setup" })
+    if (versionNotice) messages.push(versionNotice)
+    const targetCli = sentinel.target_cli || ""
+    if (!targetCli) {
       messages.push("[story-setup] .story-deployed 缺少 target_cli；建议重新运行 /story-setup。")
-    } else if (!match[1].split(",").map((item) => item.trim()).includes("opencode")) {
+    } else if (!targetCli.split(",").map((item) => item.trim()).includes("opencode")) {
       messages.push(
         "[story-setup] 当前部署标记未包含 opencode；如需 OpenCode 项目适配，请重新运行 /story-setup 并选择 OpenCode。"
       )
