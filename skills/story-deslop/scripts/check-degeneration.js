@@ -34,7 +34,7 @@ const PLACEHOLDER_PATTERNS = [
   // 复合名词；并对对话行豁免（系统流/AI 伴侣题材里 AI 角色台词「作为AI，我会保护你」是合法对话）。
   // 型号后缀（AI语言模型/AI助手/人工智能语言模型/AI模型/AI大模型）必须可选吃掉：否则前视断言紧跟
   // 在「AI」后面看到的是「语」/「助」/「模」，最典型的退化开场整类漏检（与写后网 story_hook_core.js
-  // SOFT_PATTERNS / story_codex_hook.py _NET_SOFT_PATTERNS 同语义）。
+  // SOFT_PATTERNS 同语义）。
   { re: /作为(一个)?(AI|人工智能|大?语言模型|智能助手|聊天助手)(?:语言模型|大?模型|助手|机器人)?(?=[，,。、；;：:！!？?\s）)」』"】]|我|无法|不能|没法|$)/, label: '元信息泄漏（AI 自指）', hard: false },
   { re: /�/, label: '乱码（替换字符 �）', hard: true },
   { re: /^(Sure|Certainly|Here'?s|As an AI|I (?:cannot|can't|am unable|apologize))/, label: '元信息泄漏（英文 AI 腔）', hard: true },

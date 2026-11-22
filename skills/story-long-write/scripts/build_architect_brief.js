@@ -231,7 +231,7 @@ function listVolumeFiles(project) {
     return [];
   }
   return entries
-    .filter((name) => /^卷纲_第.*卷\.md$/.test(name))
+    .filter((name) => /^卷纲_.*\.md$/.test(name))
     .sort()
     .map((name) => path.join(dir, name));
 }

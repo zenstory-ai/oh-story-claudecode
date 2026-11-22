@@ -429,6 +429,73 @@ def assert_book_dir_is_not_single_root(temporary: Path, input_path: Path) -> Non
     assert not memory_dir(nested).exists()
 
 
+def assert_write_lock_blocks_busy_and_serializes_writes(temporary: Path, input_path: Path) -> None:
+    """写锁在锁文件被占用时超时报错，并在并发 record 下串行化写入不丢更新。"""
+    lock_ws = temporary / "写锁工作区"
+    lock_ws.mkdir()
+    run("init", "--workspace", str(lock_ws))
+    lock_file = memory_dir(lock_ws) / ".author-memory.lock"
+    lock_file.write_text("pid=99999\n", encoding="utf-8")
+    try:
+        probe = subprocess.run(
+            [
+                NODE,
+                "-e",
+                (
+                    "const mod = require(process.argv[1]);"
+                    "const store = mod.projectStore(process.argv[2]);"
+                    "try {"
+                    "  mod.withStoreWriteLock(store, () => {}, { timeoutSeconds: 0.15 });"
+                    "  process.exit(1);"
+                    "} catch (err) {"
+                    "  if (!(err instanceof mod.AuthorMemoryError) || !/lock is busy or stale/.test(err.message)) process.exit(3);"
+                    "  process.stdout.write(err.message);"
+                    "}"
+                ),
+                str(TOOL),
+                str(lock_ws),
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+        assert probe.returncode == 0, f"busy lock must throw AuthorMemoryError: {probe.returncode} {probe.stdout} {probe.stderr}"
+    finally:
+        lock_file.unlink(missing_ok=True)
+
+    # 并发 4 个 record 子进程写同一工作区，全部成功且修订号连续推进到 4，无锁文件残留。
+    race_ws = temporary / "并发写锁工作区"
+    race_ws.mkdir()
+    procs = []
+    for idx in range(4):
+        ev_file = temporary / f"race-ev-{idx}.json"
+        ev_file.write_text(
+            json.dumps(
+                remember(f"race-{idx}", preference(f"并发偏好{idx}：保持短句节奏", f"作者说第{idx}条。")),
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        procs.append(
+            subprocess.Popen(
+                [NODE, str(TOOL), "record", "--workspace", str(race_ws), "--input", str(ev_file)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+            )
+        )
+    for proc in procs:
+        out, err = proc.communicate(timeout=30)
+        assert proc.returncode == 0, f"concurrent record failed: {out} {err}"
+    race_state = state(race_ws)
+    assert race_state["state_revision"] == 4, f"expected revision 4, got {race_state['state_revision']}"
+    assert len(race_state["items"]) == 4, f"expected 4 items, got {len(race_state['items'])}"
+    assert not (memory_dir(race_ws) / ".author-memory.lock").exists(), "lockfile must be cleaned up"
+    run("check", "--workspace", str(race_ws))
+
+
 def assert_single_root_case_insensitive_path(temporary: Path, input_path: Path) -> None:
     """大小写不敏感的文件系统（macOS APFS 默认）上，只差大小写的书根仍是同一目录。"""
     probe = temporary / "CaseProbe"
@@ -1160,6 +1227,7 @@ def main() -> None:
         assert_single_root_layout(Path(temporary), input_path)
         assert_book_dir_is_not_single_root(Path(temporary), input_path)
         assert_single_root_case_insensitive_path(Path(temporary), input_path)
+        assert_write_lock_blocks_busy_and_serializes_writes(Path(temporary), input_path)
         assert_other_store_failure_is_nonfatal(Path(temporary), input_path)
         assert_no_false_negatives()
         assert_omitted_follow_priority_and_lines_fit()

@@ -18,7 +18,7 @@ Stage 完成前逐项检查。**`[BLOCK]` 只检查应有内容是否写出，�
 - [ ] 结局类型已标注 `[WARN]`
 - [ ] 叙事视角已识别 `[WARN]`
 - [ ] 叙事时间线已标注 `[WARN]`
-- [ ] 情节节点覆盖全文真实变化，没有为凑数量重复记录同一事件（见 [stage2-3-structure-emotion.md](stage2-3-structure-emotion.md)「情节节点提取规则」） `[BLOCK]`
+- [ ] 情节节点覆盖全文真实变化，没有为凑数量重复记录同一事件（见 [stage2-3-structure-emotion.md](stage2-3-structure-emotion.md)「情节节点提取」） `[BLOCK]`
 - [ ] 每个节点有位置（节号 + 约第几字）和情绪标记（类型 + 强度值） `[BLOCK]`
 
 **Stage 3（情感线+爆点）**：

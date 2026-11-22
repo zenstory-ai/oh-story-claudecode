@@ -335,6 +335,21 @@ def test_sample(scan: Path) -> None:
     by_tag = run(LONG, str(scan), "--sample", "追妻火葬场")
     check("离婚后前夫跪求复合" in by_tag.stdout, "sample matches tags")
 
+    # --sample 按分组标题（section）筛选：书的题材字段与 ## 分组名不同时仍可命中
+    section_file = scan.parent / "section-sample.md"
+    section_file.write_text("\n".join([
+        "# 番茄 · 男频阅读榜", "",
+        "## 玄幻脑洞 — 1 本", "",
+        "### #1 都市里的仙界外卖",
+        "*甲作者 · 都市 · 连载中 · 50万 在读 · 100万字*",
+        "",
+    ]), encoding="utf-8")
+    for script in (LONG, SHORT):
+        by_section = run(script, str(section_file), "--sample", "玄幻脑洞")
+        check(by_section.returncode == 0, f"{script.name} sample by section failed: {by_section.stderr}")
+        check("命中 1 条" in by_section.stdout and "都市里的仙界外卖" in by_section.stdout,
+              f"{script.name} sample must match entry.section: {by_section.stdout}")
+
 
 def test_errors(tmp: Path) -> None:
     empty = tmp / "empty"

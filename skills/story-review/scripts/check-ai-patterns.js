@@ -297,7 +297,7 @@ const TRAILER_ENDING_BLOCKING_MIN_HITS = 2;
 // review 分类：下游按它分流。mechanical = 命中的表面形态本身就是问题，写作端就地改写即可；
 // semantic = 同一形态可能承担叙事功能，要读上下文判断保留还是改（交语义审查）。blocking 只能是
 // mechanical（blocking 的含义就是不需判断、必须清零）。新增 finding type 必须在此登记，否则运行期
-// 直接报错退出（scripts/test-ai-patterns.sh 另从源码抽 type 与本表双向核对）。
+// 直接报错退出（scripts/test-ai-patterns.mjs 另从源码抽 type 与本表双向核对）。
 //   type                         review      理由
 //   not-is-comparison            mechanical  固定句式模板「不是A，而是B」，blocking
 //   voice-contrast               mechanical  固定反差模板「声音不大…却」，blocking

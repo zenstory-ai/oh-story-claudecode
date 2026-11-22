@@ -176,7 +176,8 @@ function normalizeDocument(input, quoteMode, whitelist) {
       commentStart = null;
     }
 
-    const quoteResult = normalizeQuotes(line, quoteMode, quoteOpen, lineNo);
+    const protectedSpans = htmlCommentSpans(line, commentOpenBefore).spans.concat(styleSpans(line, whitelist));
+    const quoteResult = normalizeQuotes(line, quoteMode, quoteOpen, lineNo, protectedSpans);
     findings.push(...quoteResult.findings);
     line = quoteResult.line;
     quoteOpen = quoteResult.quoteOpen;
@@ -464,7 +465,7 @@ function isOpeningDelimiter(ch) {
   return /[「『（(“‘]/.test(ch || '');
 }
 
-function normalizeQuotes(line, quoteMode, quoteOpen, lineNo) {
+function normalizeQuotes(line, quoteMode, quoteOpen, lineNo, protectedSpans = []) {
   if (quoteMode === 'keep') {
     return { line, findings: [], quoteOpen };
   }
@@ -473,11 +474,16 @@ function normalizeQuotes(line, quoteMode, quoteOpen, lineNo) {
   let output = '';
 
   if (quoteMode === 'curly') {
-    // 行内配对转换为中文弯引号 `“…”`（内嵌引号转为 `‘…’`）；保护英文撇号（don't / O'Connor）。
-    const stack = [];
+    // 跨行承接未闭合引号栈，配对转换为中文弯引号 `“…”`（内嵌引号转为 `‘…’`）；
+    // 保护 HTML 注释、白名单字面量与英文撇号（don't / O'Connor）。
+    const stack = Array.isArray(quoteOpen) ? [...quoteOpen] : quoteOpen ? ['outer'] : [];
     const isAsciiWord = (ch) => /[A-Za-z0-9_]/.test(ch || '');
     for (let i = 0; i < line.length; i += 1) {
       const ch = line[i];
+      if (insideSpans(i, i + 1, protectedSpans)) {
+        output += ch;
+        continue;
+      }
       let replacement = ch;
       if (ch === '“' || ch === '「' || ch === '『') {
         const level = stack.length === 0 ? 'outer' : 'inner';
@@ -516,11 +522,15 @@ function normalizeQuotes(line, quoteMode, quoteOpen, lineNo) {
         findings.push({ line: lineNo, column: i + 1, type: 'quote-style', message: '按显式 quote-mode 转为中文弯引号。' });
       }
     }
-    return { line: output, findings, quoteOpen: stack.length > 0 };
+    return { line: output, findings, quoteOpen: stack.length > 0 ? stack : false };
   }
 
   for (let i = 0; i < line.length; i += 1) {
     const ch = line[i];
+    if (insideSpans(i, i + 1, protectedSpans)) {
+      output += ch;
+      continue;
+    }
     if (quoteMode === 'ascii' && /[「」『』“”]/.test(ch)) {
       output += '"';
       findings.push({ line: lineNo, column: i + 1, type: 'quote-style', message: '按显式 quote-mode 转为半角双引号。' });

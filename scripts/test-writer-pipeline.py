@@ -785,6 +785,25 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('子标题跟着这一段', text)
         self.assertIn('信不拆', text)
 
+    def test_unpadded_own_chapter_does_not_clash_and_general_volume_filename_is_read(self):
+        # 已有未补零的本章正文（第1章_一封信.md）不应触发与自己重名的假告警；其他章同名仍要报。
+        self.put('正文/第1章_一封信.md', '# 第1章 一封信\n旧稿。\n')
+        res = self.build()
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertIn('标题预检：《一封信》无重名', res.stdout)
+        self.put('正文/第2章_一封信.md', '# 第2章 一封信\n别章。\n')
+        res2 = self.build()
+        self.assertEqual(res2.returncode, 0, res2.stderr)
+        self.assertIn('标题预检：《一封信》与既有章重名 → 第2章_一封信.md', res2.stdout)
+
+        # build_architect_brief.js 与 build_writer_prompt.js 统一匹配 /^卷纲_.*\.md$/（如 卷纲_序章.md）。
+        self.volume.unlink()
+        self.put('大纲/卷纲_序章.md', self.volume_text())
+        brief = self.call('build_architect_brief.py', '--project', self.book, '--task', 'outline', '--chapters', '1-3')
+        self.assertEqual(brief.returncode, 0, brief.stderr)
+        info = json.loads(brief.stdout)
+        self.assertTrue(any('剧情段 L1-01' in name for name in info['includes']), info['includes'])
+
 
 class ImportOutlineBriefTests(unittest.TestCase):
     """导入逐批反推细纲：任务包只带本批规则、抽好的摘要要点、测好的长度与重叠的剧情单元卡。"""

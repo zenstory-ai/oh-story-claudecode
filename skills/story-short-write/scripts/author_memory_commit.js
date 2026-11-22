@@ -16,6 +16,13 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { performance } = require('node:perf_hooks');
+
+const _SLEEP_ARR = new Int32Array(new SharedArrayBuffer(4));
+
+function sleepMs(ms) {
+  Atomics.wait(_SLEEP_ARR, 0, 0, ms);
+}
 
 const INPUT_SCHEMA_VERSION = 1;
 const STATE_SCHEMA_VERSION = 1;
@@ -290,6 +297,47 @@ function writeIfChanged(filePath, payload) {
     if (!err || err.code !== 'ENOENT') throw err;
   }
   atomicWriteText(filePath, payload);
+}
+
+function withStoreWriteLock(store, fn, { timeoutSeconds = 10.0 } = {}) {
+  fs.mkdirSync(store.root, { recursive: true });
+  const lockPath = path.join(store.root, '.author-memory.lock');
+  const deadline = performance.now() + timeoutSeconds * 1000;
+  let fd = null;
+  while (fd === null) {
+    try {
+      fd = fs.openSync(lockPath, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY, 0o644);
+    } catch (err) {
+      if (err && err.code === 'EEXIST') {
+        if (performance.now() >= deadline) {
+          throw new AuthorMemoryError(
+            `author memory lock is busy or stale; retry, or remove ${lockPath} after confirming no write is running`
+          );
+        }
+        sleepMs(50);
+        continue;
+      }
+      throw err;
+    }
+  }
+  try {
+    fs.writeSync(fd, Buffer.from(`pid=${process.pid}\n`, 'ascii'));
+    fs.fsyncSync(fd);
+    return fn();
+  } finally {
+    try {
+      fs.closeSync(fd);
+    } catch {
+      // ignore
+    }
+    try {
+      fs.unlinkSync(lockPath);
+    } catch (err) {
+      if (!err || err.code !== 'ENOENT') {
+        // ignore
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1422,12 +1470,14 @@ function storeFields(store) {
 function commandInit(workspace, bookRoot, book) {
   prepareWorkspace(workspace, bookRoot);
   const store = bookRoot ? bookStore(workspace, bookRoot, book) : projectStore(workspace);
-  let state = loadState(store);
-  if (state === null) {
-    state = emptyState(store.book);
-  }
-  writeSnapshot(store, state);
-  return { ok: true, command: 'init', revision: state.state_revision, ...storeFields(store) };
+  return withStoreWriteLock(store, () => {
+    let state = loadState(store);
+    if (state === null) {
+      state = emptyState(store.book);
+    }
+    writeSnapshot(store, state);
+    return { ok: true, command: 'init', revision: state.state_revision, ...storeFields(store) };
+  });
 }
 
 function commandCommit(workspace, bookRoot, book, inputPath) {
@@ -1435,61 +1485,66 @@ function commandCommit(workspace, bookRoot, book, inputPath) {
   const transaction = normalizeTransaction(readJson(inputPath));
   const store = resolveTargetStore(transactionStoreKind(transaction), workspace, bookRoot, book);
   requireCondition(exists(store.statePath), `${store.label} author memory is not initialized; run init first`);
-  const state = loadState(store);
-  const digest = transactionDigest(transaction);
-  const { updated, summaries, replayed } = applyTransaction(state, transaction, digest, { store });
-  writeSnapshot(store, updated);
-  const { projectState, bookState, loadWarnings } = visibleStates(store, updated, workspace, bookRoot, book);
-  return {
-    ok: true,
-    command: 'commit',
-    revision: updated.state_revision,
-    transaction_id: transaction.transaction_id,
-    replayed,
-    item_ids: updated.applied_transactions[transaction.transaction_id].item_ids,
-    summaries,
-    warnings: [...loadWarnings, ...queryBudgetWarnings(projectState, bookState)],
-    ...storeFields(store),
-  };
+  return withStoreWriteLock(store, () => {
+    requireCondition(exists(store.statePath), `${store.label} author memory is not initialized; run init first`);
+    const state = loadState(store);
+    const digest = transactionDigest(transaction);
+    const { updated, summaries, replayed } = applyTransaction(state, transaction, digest, { store });
+    writeSnapshot(store, updated);
+    const { projectState, bookState, loadWarnings } = visibleStates(store, updated, workspace, bookRoot, book);
+    return {
+      ok: true,
+      command: 'commit',
+      revision: updated.state_revision,
+      transaction_id: transaction.transaction_id,
+      replayed,
+      item_ids: updated.applied_transactions[transaction.transaction_id].item_ids,
+      summaries,
+      warnings: [...loadWarnings, ...queryBudgetWarnings(projectState, bookState)],
+      ...storeFields(store),
+    };
+  });
 }
 
 function commandRecord(workspace, bookRoot, book, inputPath) {
   prepareWorkspace(workspace, bookRoot);
   const event = normalizeRecordEvent(readJson(inputPath));
   const store = resolveTargetStore(operationStoreKind(event.operation, 'event.operation'), workspace, bookRoot, book);
-  let state = loadState(store);
-  if (state === null) {
-    state = emptyState(store.book);
-  }
-  const transactionId = `record:${event.event_id}`;
-  const applied = state.applied_transactions[transactionId];
-  const expectedRevision = applied !== undefined ? applied.revision - 1 : state.state_revision;
-  const transaction = {
-    schema_version: INPUT_SCHEMA_VERSION,
-    transaction_id: transactionId,
-    expected_state_revision: expectedRevision,
-    operations: [event.operation],
-  };
-  const digest = transactionDigest(transaction);
-  const { updated, summaries, replayed } = applyTransaction(state, transaction, digest, { store });
-  writeSnapshot(store, updated);
-  const record = updated.applied_transactions[transactionId];
-  const itemIds = record.item_ids;
-  const receipt = `Author Memory Receipt: r${record.revision} · ${itemIds.join(', ')}`;
-  const { projectState, bookState, loadWarnings } = visibleStates(store, updated, workspace, bookRoot, book);
-  return {
-    ok: true,
-    command: 'record',
-    revision: updated.state_revision,
-    applied_revision: record.revision,
-    event_id: event.event_id,
-    replayed,
-    item_ids: itemIds,
-    receipt,
-    summaries,
-    warnings: [...loadWarnings, ...queryBudgetWarnings(projectState, bookState)],
-    ...storeFields(store),
-  };
+  return withStoreWriteLock(store, () => {
+    let state = loadState(store);
+    if (state === null) {
+      state = emptyState(store.book);
+    }
+    const transactionId = `record:${event.event_id}`;
+    const applied = state.applied_transactions[transactionId];
+    const expectedRevision = applied !== undefined ? applied.revision - 1 : state.state_revision;
+    const transaction = {
+      schema_version: INPUT_SCHEMA_VERSION,
+      transaction_id: transactionId,
+      expected_state_revision: expectedRevision,
+      operations: [event.operation],
+    };
+    const digest = transactionDigest(transaction);
+    const { updated, summaries, replayed } = applyTransaction(state, transaction, digest, { store });
+    writeSnapshot(store, updated);
+    const record = updated.applied_transactions[transactionId];
+    const itemIds = record.item_ids;
+    const receipt = `Author Memory Receipt: r${record.revision} · ${itemIds.join(', ')}`;
+    const { projectState, bookState, loadWarnings } = visibleStates(store, updated, workspace, bookRoot, book);
+    return {
+      ok: true,
+      command: 'record',
+      revision: updated.state_revision,
+      applied_revision: record.revision,
+      event_id: event.event_id,
+      replayed,
+      item_ids: itemIds,
+      receipt,
+      summaries,
+      warnings: [...loadWarnings, ...queryBudgetWarnings(projectState, bookState)],
+      ...storeFields(store),
+    };
+  });
 }
 
 function commandQuery(workspace, bookRoot, kinds, book, genre, workflow) {
@@ -1611,77 +1666,95 @@ function commandMigrate(workspace, bookRoot, book) {
   );
   const project = projectStore(workspace);
   const store = bookStore(workspace, bookRoot, book);
-  let projectState = loadState(project);
-  let bookState = loadState(store);
+  if (!exists(project.statePath)) {
+    const bookState = loadState(store);
+    return {
+      ok: true,
+      command: 'migrate',
+      migrated: [],
+      project_revision: 0,
+      revision: bookState !== null ? bookState.state_revision : 0,
+      warnings: queryBudgetWarnings(null, bookState),
+      ...storeFields(store),
+    };
+  }
+  return withStoreWriteLock(project, () => {
+    let projectState = loadState(project);
+    const buildResult = (migrated, bookState) => ({
+      ok: true,
+      command: 'migrate',
+      migrated,
+      project_revision: projectState !== null ? projectState.state_revision : 0,
+      revision: bookState !== null ? bookState.state_revision : 0,
+      warnings: queryBudgetWarnings(projectState, bookState),
+      ...storeFields(store),
+    });
 
-  const buildResult = (migrated) => ({
-    ok: true,
-    command: 'migrate',
-    migrated,
-    project_revision: projectState !== null ? projectState.state_revision : 0,
-    revision: bookState !== null ? bookState.state_revision : 0,
-    warnings: queryBudgetWarnings(projectState, bookState),
-    ...storeFields(store),
+    if (projectState === null) return buildResult([], loadState(store));
+    const legacy = legacyBookItems(projectState)
+      .filter((item) => sameScopeValue(item.scope.value, store.book))
+      .sort((a, b) => idNumber(a.id) - idNumber(b.id));
+    if (!exists(store.statePath) && !legacy.length) {
+      return buildResult([], null);
+    }
+    return withStoreWriteLock(store, () => {
+      let bookState = loadState(store);
+      if (bookState === null) {
+        if (!legacy.length) return buildResult([], null);
+        bookState = emptyState(store.book);
+      }
+      const idMap = migrationRecords(bookState);
+
+      for (const item of legacy) {
+        if (Object.prototype.hasOwnProperty.call(idMap, item.id)) continue;
+        const transactionId = `${MIGRATE_PREFIX}${item.id}`;
+        const newId = `${STORE_PREFIX.book}${String(bookState.next_item_number).padStart(3, '0')}`;
+        const preview = migratedItem(item, newId, 1, idMap);
+        bookState = applySingle(
+          bookState,
+          transactionId,
+          migrationDigest(item),
+          (updated, revision) => {
+            updated.next_item_number += 1;
+            updated.items[newId] = migratedItem(item, newId, revision, idMap);
+          },
+          [`迁移 ${item.id} → ${newId}（${preview.status}）：${item.assertion}`],
+          { store }
+        );
+        idMap[item.id] = newId;
+      }
+      writeSnapshot(store, bookState);
+
+      const migrated = legacy.map((item) => ({ from: item.id, to: idMap[item.id] }));
+      if (legacy.length) {
+        const transactionId = `${MIGRATE_PREFIX}${store.book.toLowerCase()}:r${projectState.state_revision + 1}`;
+        const digest = transactionDigest({ transaction_id: transactionId, migrated });
+        const summaries = migrated.map(
+          (pair) => `迁出 ${pair.from} → ${pair.to}：${projectState.items[pair.from].assertion}`
+        );
+        projectState = applySingle(
+          projectState,
+          transactionId,
+          digest,
+          (updated, revision) => {
+            for (const item of legacy) {
+              const target = updated.items[item.id];
+              target.status = 'superseded';
+              target.superseded_by = null;
+              target.conflicts_with = [];
+              target.reason = `已迁移到书级 store「${store.book}」：${idMap[item.id]}`;
+              target.updated_revision = revision;
+            }
+            releaseConflicts(updated, new Set(Object.keys(idMap)), revision);
+          },
+          summaries,
+          { store: project }
+        );
+        writeSnapshot(project, projectState);
+      }
+      return buildResult(migrated, bookState);
+    });
   });
-
-  if (projectState === null) return buildResult([]);
-  const legacy = legacyBookItems(projectState)
-    .filter((item) => sameScopeValue(item.scope.value, store.book))
-    .sort((a, b) => idNumber(a.id) - idNumber(b.id));
-  if (bookState === null) {
-    if (!legacy.length) return buildResult([]);
-    bookState = emptyState(store.book);
-  }
-  const idMap = migrationRecords(bookState);
-
-  for (const item of legacy) {
-    if (Object.prototype.hasOwnProperty.call(idMap, item.id)) continue;
-    const transactionId = `${MIGRATE_PREFIX}${item.id}`;
-    const newId = `${STORE_PREFIX.book}${String(bookState.next_item_number).padStart(3, '0')}`;
-    const preview = migratedItem(item, newId, 1, idMap);
-    bookState = applySingle(
-      bookState,
-      transactionId,
-      migrationDigest(item),
-      (updated, revision) => {
-        updated.next_item_number += 1;
-        updated.items[newId] = migratedItem(item, newId, revision, idMap);
-      },
-      [`迁移 ${item.id} → ${newId}（${preview.status}）：${item.assertion}`],
-      { store }
-    );
-    idMap[item.id] = newId;
-  }
-  writeSnapshot(store, bookState);
-
-  const migrated = legacy.map((item) => ({ from: item.id, to: idMap[item.id] }));
-  if (legacy.length) {
-    const transactionId = `${MIGRATE_PREFIX}${store.book.toLowerCase()}:r${projectState.state_revision + 1}`;
-    const digest = transactionDigest({ transaction_id: transactionId, migrated });
-    const summaries = migrated.map(
-      (pair) => `迁出 ${pair.from} → ${pair.to}：${projectState.items[pair.from].assertion}`
-    );
-    projectState = applySingle(
-      projectState,
-      transactionId,
-      digest,
-      (updated, revision) => {
-        for (const item of legacy) {
-          const target = updated.items[item.id];
-          target.status = 'superseded';
-          target.superseded_by = null;
-          target.conflicts_with = [];
-          target.reason = `已迁移到书级 store「${store.book}」：${idMap[item.id]}`;
-          target.updated_revision = revision;
-        }
-        releaseConflicts(updated, new Set(Object.keys(idMap)), revision);
-      },
-      summaries,
-      { store: project }
-    );
-    writeSnapshot(project, projectState);
-  }
-  return buildResult(migrated);
 }
 
 // ---------------------------------------------------------------------------
@@ -1814,5 +1887,8 @@ module.exports = {
   commandQuery,
   commandMigrate,
   commandCheck,
+  withStoreWriteLock,
+  projectStore,
+  bookStore,
   main,
 };

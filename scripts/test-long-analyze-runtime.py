@@ -1106,6 +1106,34 @@ def test_digest_reads_observations_and_fields_without_whole_caches() -> None:
         require(empty.returncode == 2 and json.loads(empty.stdout)["error"] == "digest_empty_request", "空请求必须拒绝")
 
 
+def test_digest_reads_zero_padded_chapter_summaries() -> None:
+    with tempfile.TemporaryDirectory(prefix="long-digest-padded-") as temporary:
+        root = Path(temporary) / "零填充摘要书"
+        chapter_dir = root / "章节"
+        chapter_dir.mkdir(parents=True)
+        (chapter_dir / "第001章_摘要.md").write_text(
+            "## 第1章\n\n**关键事件**：\n1. 林远推开旧城石门\n",
+            encoding="utf-8",
+        )
+        (chapter_dir / "第002章_摘要.md").write_text(
+            "## 第2章\n\n**关键事件**：\n1. 苏晴交出半块玉牌\n",
+            encoding="utf-8",
+        )
+        res = run(MANAGE, "digest", "--root", root, "--part", "chapters", "--fields", "关键事件", "--points", "none")
+        require(res.returncode == 0, "零填充摘要文件 digest 不得报 ENOENT：" + res.stdout + res.stderr)
+        require("### 第1章" in res.stdout and "林远推开旧城石门" in res.stdout, "第001章摘要内容缺失：" + res.stdout)
+        require("### 第2章" in res.stdout and "苏晴交出半块玉牌" in res.stdout, "第002章摘要内容缺失：" + res.stdout)
+        # 同章同时存在零填充与非零填充文件名时按章去重，且优先规范名 第1章_摘要.md。
+        (chapter_dir / "第1章_摘要.md").write_text(
+            "## 第1章\n\n**关键事件**：\n1. 规范摘要覆盖旧零填充\n",
+            encoding="utf-8",
+        )
+        deduped = run(MANAGE, "digest", "--root", root, "--part", "chapters", "--fields", "关键事件", "--points", "none")
+        require(deduped.returncode == 0, deduped.stdout + deduped.stderr)
+        require(deduped.stdout.count("### 第1章") == 1 and "规范摘要覆盖旧零填充" in deduped.stdout,
+                "同章多份摘要应按章去重并优先规范文件名：" + deduped.stdout)
+
+
 HOOK_CLI = ROOT / "skills" / "story-setup" / "references" / "templates" / "hooks" / "story_hook_cli.js"
 
 
@@ -1395,6 +1423,7 @@ def main() -> int:
     test_relation_chart_font_choice()
     test_relation_chart_mermaid_edge_cases()
     test_digest_reads_observations_and_fields_without_whole_caches()
+    test_digest_reads_zero_padded_chapter_summaries()
     test_extractor_write_guard()
     test_extractor_self_check_patterns_match_commit_format()
     test_plan_next_prints_only_upcoming_batches()
