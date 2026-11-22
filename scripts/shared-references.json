@@ -2,32 +2,11 @@
   "version": 1,
   "groups": [
     {
-      "name": "cross-book-recall",
-      "source": "skills/story-long-write/references/cross-book-recall.md",
-      "targets": ["skills/story-setup/references/agent-references/cross-book-recall.md"]
-    },
-    {
-      "name": "deslop-expression",
-      "source": "skills/story-deslop/references/expression.md",
+      "name": "deslop-guide",
+      "source": "skills/story-deslop/references/deslop-guide.md",
       "targets": [
-        "skills/story-review/references/expression.md",
-        "skills/story-setup/references/agent-references/expression.md"
-      ]
-    },
-    {
-      "name": "deslop-narrative-focus",
-      "source": "skills/story-deslop/references/narrative-focus.md",
-      "targets": [
-        "skills/story-review/references/narrative-focus.md",
-        "skills/story-setup/references/agent-references/narrative-focus.md"
-      ]
-    },
-    {
-      "name": "deslop-story-logic",
-      "source": "skills/story-deslop/references/story-logic.md",
-      "targets": [
-        "skills/story-review/references/story-logic.md",
-        "skills/story-setup/references/agent-references/story-logic.md"
+        "skills/story-review/references/deslop-guide.md",
+        "skills/story-setup/references/agent-references/deslop-guide.md"
       ]
     },
     {
@@ -39,126 +18,38 @@
     },
     {
       "name": "prose-banned-words",
-      "source": "skills/story-long-write/references/banned-words.md",
+      "source": "skills/story-deslop/references/banned-words.md",
       "targets": [
-        "skills/story-short-write/references/banned-words.md",
-        "skills/story-deslop/references/banned-words.md",
         "skills/story-review/references/banned-words.md",
         "skills/story-setup/references/agent-references/banned-words.md"
       ]
     },
     {
-      "name": "character-basics",
-      "source": "skills/story-long-write/references/character-basics.md",
-      "targets": ["skills/story-setup/references/agent-references/character-basics.md"]
-    },
-    {
-      "name": "character-relations",
-      "source": "skills/story-long-write/references/character-relations.md",
+      "name": "long-flow-opening-plan",
+      "source": "skills/story-long-write/references/flow-opening-plan.md",
       "targets": [
-        "skills/story-setup/references/agent-references/character-relations.md"
+        "skills/story-setup/references/agent-references/flow-opening-plan.md"
       ]
     },
     {
-      "name": "dialogue-mastery",
-      "source": "skills/story-long-write/references/dialogue-mastery.md",
+      "name": "long-flow-outline",
+      "source": "skills/story-long-write/references/flow-outline.md",
       "targets": [
-        "skills/story-short-write/references/dialogue-mastery.md",
-        "skills/story-setup/references/agent-references/dialogue-mastery.md"
+        "skills/story-setup/references/agent-references/flow-outline.md"
       ]
     },
     {
-      "name": "long-emotional-methods",
-      "source": "skills/story-long-write/references/emotional-methods.md",
-      "targets": ["skills/story-setup/references/agent-references/long-emotional-methods.md"]
-    },
-    {
-      "name": "short-emotional-methods",
-      "source": "skills/story-short-write/references/emotional-methods.md",
-      "targets": ["skills/story-setup/references/agent-references/short-emotional-methods.md"]
-    },
-    {
-      "name": "genre-prose-card-index",
-      "source": "skills/story-long-write/references/genre-prose-cards.md",
-      "targets": ["skills/story-setup/references/agent-references/genre-prose-cards.md"]
-    },
-    {
-      "name": "short-genre-formulas",
-      "source": "skills/story-short-write/references/genre-writing-formulas.md",
-      "targets": ["skills/story-setup/references/agent-references/short-genre-formulas.md"]
-    },
-    {
-      "name": "long-chapter-hooks",
-      "source": "skills/story-long-write/references/long-chapter-hooks.md",
-      "targets": ["skills/story-setup/references/agent-references/long-chapter-hooks.md"]
-    },
-    {
-      "name": "short-chapter-hooks",
-      "source": "skills/story-short-write/references/hooks-chapter.md",
-      "targets": ["skills/story-setup/references/agent-references/short-chapter-hooks.md"]
-    },
-    {
-      "name": "long-suspense",
-      "source": "skills/story-long-write/references/long-suspense.md",
-      "targets": ["skills/story-setup/references/agent-references/long-suspense.md"]
-    },
-    {
-      "name": "opening-design",
-      "source": "skills/story-long-write/references/opening-design.md",
-      "targets": ["skills/story-setup/references/agent-references/opening-design.md"]
-    },
-    {
-      "name": "outline-methods",
-      "source": "skills/story-long-write/references/outline-methods.md",
-      "targets": ["skills/story-setup/references/agent-references/outline-methods.md"]
-    },
-    {
-      "name": "plot-core-methods",
-      "source": "skills/story-long-write/references/plot-core-methods.md",
+      "name": "long-flow-drafting",
+      "source": "skills/story-long-write/references/flow-drafting.md",
       "targets": [
-        "skills/story-setup/references/agent-references/plot-core-methods.md"
+        "skills/story-setup/references/agent-references/flow-drafting.md"
       ]
     },
     {
-      "name": "long-reversal",
-      "source": "skills/story-long-write/references/long-reversal.md",
-      "targets": ["skills/story-setup/references/agent-references/long-reversal.md"]
-    },
-    {
-      "name": "short-reversal",
-      "source": "skills/story-short-write/references/short-reversal.md",
-      "targets": ["skills/story-setup/references/agent-references/short-reversal.md"]
-    },
-    {
-      "name": "long-genre-catalog",
-      "source": "skills/story-long-write/references/long-genre-catalog.md",
-      "targets": ["skills/story-setup/references/agent-references/long-genre-catalog.md"]
-    },
-    {
-      "name": "female-audience-writing",
-      "source": "skills/story-long-write/references/female-audience-writing.md",
-      "targets": ["skills/story-setup/references/agent-references/female-audience-writing.md"]
-    },
-    {
-      "name": "writing-craft",
-      "source": "skills/story-long-write/references/writing-craft.md",
-      "targets": ["skills/story-setup/references/agent-references/writing-craft.md"]
-    },
-    {
-      "name": "long-genre-mechanics",
-      "source": "skills/story-long-write/references/long-genre-mechanics.md",
-      "targets": ["skills/story-setup/references/agent-references/long-genre-mechanics.md"]
-    },
-    {
-      "name": "style-combat-face",
-      "source": "skills/story-long-write/references/style-combat-face.md",
-      "targets": ["skills/story-setup/references/agent-references/style-combat-face.md"]
-    },
-    {
-      "name": "tracking-transaction-reference",
-      "source": "skills/story-long-write/references/tracking-transaction.md",
+      "name": "long-benchmark-recall",
+      "source": "skills/story-long-write/references/benchmark-recall.md",
       "targets": [
-        "skills/story-review/references/tracking-transaction.md"
+        "skills/story-setup/references/agent-references/benchmark-recall.md"
       ]
     },
     {
@@ -170,79 +61,39 @@
       ]
     },
     {
-      "name": "deslop-gate-rules",
-      "source": "skills/story-deslop/references/deslop-gates.md",
-      "targets": [
-        "skills/story-setup/references/agent-references/deslop-gates.md"
-      ]
-    },
-    {
       "name": "short-selling-point-protection",
       "source": "skills/story-deslop/references/short-deslop.md",
       "targets": [
-        "skills/story-short-write/references/short-deslop.md"
-      ]
-    },
-    {
-      "name": "tracking-initialization",
-      "source": "skills/story-long-write/references/tracking-initialization.md",
-      "targets": [
-        "skills/story-import/references/tracking-initialization.md",
-        "skills/story-review/references/tracking-initialization.md"
+        "skills/story-review/references/short-deslop.md",
+        "skills/story-setup/references/agent-references/short-deslop.md"
       ]
     }
   ],
-  "derived_groups": [
-    {
-      "name": "genre-readers-deployment",
-      "reason": "Setup deploys the writing reader taxonomy as an agent reference with consumer-specific edits.",
-      "members": [
-        "skills/story-long-write/references/genre-readers.md",
-        "skills/story-setup/references/agent-references/genre-readers.md"
-      ]
-    }
-  ],
+  "derived_groups": [],
   "tree_groups": [
     {
-      "name": "long-genre-prose-cards",
-      "source": "skills/story-long-write/references/genre-prose-cards",
+      "name": "long-genre-styles",
+      "source": "skills/story-long-write/references/genre-styles",
       "targets": [
-        "skills/story-setup/references/agent-references/genre-prose-cards"
+        "skills/story-setup/references/agent-references/genre-styles"
       ],
       "files": [
-        "东方仙侠.md",
-        "传统玄幻.md",
-        "历史古代.md",
-        "历史脑洞.md",
+        "传统玄幻仙侠.md",
         "双男主.md",
-        "古言脑洞.md",
-        "古风世情.md",
-        "女频悬疑.md",
-        "女频种田.md",
-        "宫斗宅斗.md",
-        "年代.md",
-        "快穿.md",
+        "古言宅斗重生.md",
+        "历史架空权谋.md",
+        "年代种田经商.md",
         "悬疑灵异.md",
-        "悬疑脑洞.md",
-        "战神赘婿.md",
-        "抗战谍战.md",
-        "星光璀璨.md",
-        "民国言情.md",
-        "流派兜底.md",
-        "游戏体育.md",
-        "玄幻脑洞.md",
-        "玄幻言情.md",
-        "现言脑洞.md",
-        "科幻末世.md",
-        "职场婚恋.md",
-        "西方奇幻.md",
-        "豪门总裁.md",
-        "都市修真.md",
-        "都市日常.md",
-        "都市种田.md",
-        "都市脑洞.md",
-        "都市高武.md",
-        "青春甜宠.md"
+        "末世规则科幻.md",
+        "玄幻脑洞反套路.md",
+        "现言脑洞快穿.md",
+        "西幻游戏同人.md",
+        "豪门虐恋追妻.md",
+        "通用长篇.md",
+        "都市日常神豪.md",
+        "都市脑洞系统.md",
+        "都市高武异能.md",
+        "青春甜宠文娱.md"
       ]
     }
   ]

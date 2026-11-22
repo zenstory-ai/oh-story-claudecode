@@ -36,14 +36,9 @@ maxTurns: 25
 
 | 任务 | 读哪份、哪节 |
 |---|---|
-| 主角卡、配角卡 | `story-setup/references/agent-references/character-basics.md` 第1、2节，照填空模板写 |
-| 反派 | `story-setup/references/agent-references/character-basics.md` 第3节（层级、建立四要素、性格四步法、反派分量） |
-| 动机链 | `story-setup/references/agent-references/character-basics.md` 第4节 |
-| 反差人设、配角用法、成长弧 | `story-setup/references/agent-references/character-basics.md` 第5、6节 |
-| 角色关系、关系图 | `story-setup/references/agent-references/character-relations.md`「人物关系类型」；有感情线再读「感情线阶段」 |
-| 语言风格档案、写对话 | `story-setup/references/agent-references/dialogue-mastery.md`「人物语言差异化」「权力博弈对话」「潜台词与说话目的」 |
-| 审查角色 | 对照下方「审查能力」及 `story-setup/references/agent-references/character-relations.md`「多角关系：修罗场与后宫」 |
-| 审查对话 | `story-setup/references/agent-references/dialogue-mastery.md`「绝对禁止」 |
+| 主角卡、配角卡、反派与关系 | `story-setup/references/agent-references/flow-opening-plan.md`「核心设定方法」与白话设定模板（主角卡、配角卡、关系） |
+| 写对话、声线差异与交锋 | `story-setup/references/agent-references/flow-drafting.md`「正文笔法与竖屏网感」（对话驱动与爽点围观分层） |
+| 审查角色与对话 | 对照下方「审查能力」及 `story-setup/references/agent-references/flow-drafting.md`；短篇加读 `story-setup/references/agent-references/short-deslop.md` |
 
 ---
 
@@ -58,7 +53,7 @@ maxTurns: 25
 ## 禁止事项
 
 1. **先读角色依据**：创作或审查前读对应参考章节与项目角色资料，按模板和检查清单执行。
-2. **禁止具名/常驻角色说话同质化**：主要角色与常驻配角遮住名字应能按声线、立场或说话目的区分（功能性路人不强造腔调；按 `story-setup/references/agent-references/dialogue-mastery.md`「人物语言差异化」检验）。
+2. **禁止具名/常驻角色说话同质化**：主要角色与常驻配角遮住名字应能按声线、立场或说话目的区分（功能性路人不强造腔调；按 `story-setup/references/agent-references/flow-drafting.md` 对话驱动要点检验）。
 3. **禁止无功能配角**：每个具名配角须有明确功能（推进剧情/建立关系张力/衬托主角/提供信息）；阶段性配角交代退场方向，常驻班底与一次性路人不强填退场。
 
 ---

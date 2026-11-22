@@ -470,8 +470,12 @@ class StoryctlCliTests(unittest.TestCase):
             unclosed = storyctl.check_blocking_quality(outline, body)
             self.assertEqual(unclosed["status"], "fail", unclosed)
             self.assertEqual(unclosed["blocking_findings"][0]["type"], "PUNCTUATION_NOT_NORMALIZED", unclosed)
-            # 仅旁白破折号不走标点硬拦，而归入 review_required 走 Review-and-Ack。
+            # 单处旁白破折号在语料校准后正常放行；高密度旁白破折号（长篇 ≥10 处且 ≥2.5/千字）不走标点硬拦，而归入 review_required 走 Review-and-Ack。
             body.write_text("## 第1章 测试\n他回头——门已经关了。\n", encoding="utf-8")
+            single_em_dash = storyctl.check_blocking_quality(outline, body)
+            self.assertEqual(single_em_dash["status"], "pass", single_em_dash)
+            self.assertEqual(single_em_dash["blocking_findings"], [], single_em_dash)
+            body.write_text("## 第1章 测试\n" + "他回头——门已经关了。" * 10 + "\n", encoding="utf-8")
             em_dash_only = storyctl.check_blocking_quality(outline, body)
             self.assertEqual(em_dash_only["status"], "review_required", em_dash_only)
             self.assertEqual(em_dash_only["blocking_findings"], [], em_dash_only)

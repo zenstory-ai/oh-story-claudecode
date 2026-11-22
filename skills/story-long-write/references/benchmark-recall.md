@@ -23,12 +23,12 @@
 
 ### 全量召回（降档不成立时执行）
 
-1. **情绪模块**：读主对标 `剧情/情绪模块.md`，选 1 张最贴合本章目标情绪的 `EM-*` 卡（读者想看什么/情绪链/戏剧单元/可替换项/不可照搬）；缺失则停止并提示用 `/story-long-analyze` 补拆 Stage 3。
-2. **节奏**：读主对标 `剧情/节奏.md`，选 1 条匹配 `rhythm_reference`；缺失同上。
-3. **流派包与文风**：流派包由 `build_writer_prompt.js` 自动匹配 `references/genre-styles/{流派}.md`；文风优先本书 `设定/文风.md`，否则读主对标 `文风.md`（缺则提示 `/story-long-analyze` 补拆 Stage 6，不当场现编）。
+1. **情绪模块**：读主对标 `剧情/情绪模块.md`，选 1 张最贴合本章目标情绪的 `selected_emotion_module`（读者想看什么、情绪链、戏剧单元、可替换项、不可照搬）；缺失则停止并提示用 `/story-long-analyze` 补拆 Stage 3。
+2. **节奏**：读主对标 `剧情/节奏.md`，选 1 条匹配 `rhythm_reference`（关键信息 → 扩写方式 → 推进功能 → 节奏效果）；缺失同上。
+3. **流派包与文风**：流派包由 `build_writer_prompt.js` 自动匹配 `genre-styles/{流派}.md`；文风优先本书 `设定/文风.md`，否则读主对标 `文风.md`（缺则提示 `/story-long-analyze` 补拆 Stage 6，不当场现编）。
 4. **匹配章节与原文切片**：从主对标 `章节/*_摘要.md` 按 `基调：` 挑最贴合的 1 章摘要，连同 `文风.md` 中 1–2 段 200–300 字「原文锚点片段」一并送入正文阶段（**只学断行、句长、口语节奏与对话推进，严禁复用专名、独特物件、台词或桥段**）。
 
 ## 三、多本对标预算（≥2 本时）
 
 - **主对标**独占文风、原文锚点与主节奏；**副对标**（按「引用强度」辅 ＞ 参考 排序）不读其 `文风.md` 与原文，每本仅取 1–2 条结构/情绪功能位或单章钩子灵感，汇总压缩 ≤400 字写入「副对标召回摘要」。
-- 已部署 `story-explorer` 时可按 `agent-calls.md` 一次召回 `benchmark_style_load`；遇 `missing_primary_contract` 停下补拆，遇 `benchmark_book_missing` 核对书名不私自换书。
+- 已部署 `story-explorer` 时可按子代理派发手册一次召回 `benchmark_style_load`；遇 `missing_primary_contract` 停下补拆，遇 `benchmark_book_missing` 核对书名不私自换书。

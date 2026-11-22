@@ -1,6 +1,6 @@
 # 正文写作、日更调度与竖屏网感（flow-drafting）
 
-> 谁读：主会话写一章、日更时整份读；`narrative-writer` 写正文时读「正文笔法与竖屏网感」一节；同时读本书 `references/genre-styles/{流派}.md`。
+> 谁读：主会话写一章、日更时整份读；`narrative-writer` 写正文时读「正文笔法与竖屏网感」一节；同时读本书 `genre-styles/{流派}.md`。
 
 ---
 
@@ -9,7 +9,7 @@
 ### 缺文件先修（修好再写，本轮不硬写）
 
 - `tracking_commit.js check` 报错（exit 2）：按提示修；仅返 `drift_warnings`（视图被手改）先问作者吸回改动还是按 JSON 重建。
-- 已有正文却缺 `_tracking-state.json`：请作者走 `/story-import` 迁移；新书第 1 章前先读 `tracking-protocol.md` 初始化第 0 章。
+- 已有正文却缺 `_tracking-state.json`：请作者走 `/story-import` 迁移；新书第 1 章前先读主会话追踪协议初始化第 0 章。
 - 缺细纲：写指定章时按 `flow-outline.md` 补建点名章细纲并跑 `check-outline-contract.js`；日更批内停在该章前问作者。细纲缺「目标情绪」「主角目标/关键选择」两行时按卷纲补齐写回再写。
 - 临时文件只放 `{书目录}/.story/work/第NNN章/`，不写 `/tmp` 或书根。
 
@@ -21,12 +21,12 @@
 ### 单章执行流程
 
 1. **取纲与上下文**：读 `大纲/细纲_第{N}章.md` + 跑 `outline_view.js --chapter {N} {卷纲路径}`（同段复用，不整读卷纲）+ `tracking_commit.js check` + 读 `追踪/上下文.md` 全 7 栏与细纲点名设定。
-2. **组装与切片锚定**：跑 `node {skill 根}/scripts/build_writer_prompt.js --project {书目录} --chapter {N} --out`（`====` 上为 prompt、下为核对报告；exit 2 修完重跑）。核对报告报「召回降档不成立」时读 `benchmark-recall.md`；**无论是否降档，动笔前必须读入 1–2 段 150–250 字真网感原文切片**（有主对标优先取对标 `文风.md` 原文锚点，无对标取本书流派包内置切片）校准语感。
-3. **写正文**：整章一次写完，批准内容写完即停。已部署 `narrative-writer` 时按 `agent-calls.md` 派发；主会话自写时同步列新增物申报表（无写 `0`）。
-4. **检测收口**：跑 `node {skill 根}/scripts/storyctl.js chapter check --project {书目录} --chapter {N} --fix-punctuation --plain`。
+2. **组装与切片锚定**：在 `{skill 根}` 的脚本目录跑 `build_writer_prompt.js --project {书目录} --chapter {N} --out`（`====` 上为 prompt、下为核对报告；exit 2 修完重跑）。核对报告报「召回降档不成立」时读 `benchmark-recall.md`；**无论是否降档，动笔前必须读入 1–2 段 150–250 字真网感原文切片**（有主对标优先取对标 `文风.md` 原文锚点，无对标取本书流派包内置切片）校准语感。
+3. **写正文**：整章一次写完，批准内容写完即停。已部署 `narrative-writer` 时按子代理派发手册派发；主会话自写时同步列新增物申报表（无写 `0`）。
+4. **检测收口**：跑 `storyctl.js chapter check --project {书目录} --chapter {N} --fix-punctuation --plain`（内置 `check-ai-patterns.js` 与 `check-degeneration.js`）。
    - 硬阻断项（退化/复读/截断/工程词）与 S1/S2 冲突必须清零；`review_required` 逐条看原文，真属 AI 腔则改，确属网文卖点/剧情需要保留则提交时附 `--ack <rule-id>:<理由>`。
    - **字数带外**：欠字不硬凑，按下方模板请作者选；超字净删一次（只删废话不加剧情），仍超请作者选（不到目标一半需作者坚持才加 `--force`）。
-5. **一致性与提交**：申报表非 `0` 时按 `agent-calls.md` 调 `consistency-checker`（或主会话自核），按 SKILL.md「新增物三级」分流登记/修复/先问作者。确认无阻塞后跑 `tracking_commit.js draft --project {书目录} --chapter {N}` 填 `delta` 与变化角色快照，再跑 `storyctl.js chapter commit --project {书目录} --chapter {N} --input {工作目录}/tracking.json`（报错读 `tracking-protocol.md`），返回 `tracking_committed: true` 即完成。
+5. **一致性与提交**：申报表非 `0` 时按子代理派发手册调 `consistency-checker`（或主会话自核），按 SKILL.md「新增物三级」分流登记/修复/先问作者。确认无阻塞后跑 `tracking_commit.js draft --project {书目录} --chapter {N}` 填 `delta` 与变化角色快照，再跑 `storyctl.js chapter commit --project {书目录} --chapter {N} --input {工作目录}/tracking.json`（报错读主会话追踪协议），返回 `tracking_committed: true` 即完成。
 
 ### 向作者汇报（白话，不带代码块围栏）
 

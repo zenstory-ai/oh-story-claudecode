@@ -974,26 +974,28 @@ assert_grep '不用.*——|不使用.*——|不保留.*——|不残留.*—�
 assert_grep '语气标点谱系' "$AGENT_REFS_DIR/format-and-structure.md" "agent references must include v13 tone punctuation format rules"
 assert_grep '不用.*……|不使用.*……|不保留.*……|不残留.*……' "$AGENT_REFS_DIR/format-and-structure.md" "agent references must forbid ellipsis pause punctuation"
 assert_grep '不用.*——|不使用.*——|不保留.*——|不残留.*——|正文和对话都禁止.*——' "$AGENT_REFS_DIR/format-and-structure.md" "agent references must forbid dialogue dash exception"
-# 去味方法按三层同源发布；行为判据由方法与真实改稿测评检查，部署守卫只验可读取的接口。
-for deslop_method in expression narrative-focus story-logic; do
+# 去味方法合并为 deslop-guide.md（表达/用笔/故事三层）+ short-deslop.md（短篇覆盖矩阵）同源发布；
+# 行为判据由方法与真实改稿测评检查，部署守卫只验可读取的接口与同源一致。
+for deslop_method in deslop-guide short-deslop; do
   assert_grep "agent-references/$deslop_method\\.md" "$SKILL_DIR/references/templates/agents/narrative-writer.md" "narrative-writer must load the $deslop_method method"
-  assert_grep "$deslop_method\\.md" "$AGENT_REFS_DIR/deslop-gates.md" "deslop scope interface must route to $deslop_method"
   cmp -s "$AGENT_REFS_DIR/$deslop_method.md" "$REPO_ROOT/skills/story-deslop/references/$deslop_method.md" || fail "deployed deslop method is stale: $deslop_method"
 done
+assert_grep '表达层' "$AGENT_REFS_DIR/deslop-guide.md" "deslop-guide must cover expression layer"
+assert_grep '用笔层' "$AGENT_REFS_DIR/deslop-guide.md" "deslop-guide must cover narrative-focus layer"
+assert_grep '故事层' "$AGENT_REFS_DIR/deslop-guide.md" "deslop-guide must cover story-logic layer"
 assert_no_grep 'anti-ai-writing\.md' "$SKILL_DIR/references/templates/agents/narrative-writer.md" "narrative-writer must not load the removed deslop guide"
 assert_grep 'check-ai-patterns\.js --check' "$SKILL_DIR/references/templates/agents/narrative-writer.md" "narrative-writer must require detector rescan handoff"
 assert_grep '裸调用.*不得自动进入正文写作|不得自动进入正文写作.*裸调用' "$REPO_ROOT/skills/story-long-write/SKILL.md" "story-long-write bare invocation must not auto-write prose"
 assert_grep '不得把已有项目默认为日更 3 章|默认为日更 3 章' "$REPO_ROOT/skills/story-long-write/SKILL.md" "story-long-write must not default existing projects to daily 3 chapters on bare invocation"
 assert_grep '默认停在细纲交付|最远停在细纲交付|默认停靠.*Phase 1→3' "$REPO_ROOT/skills/story-long-write/SKILL.md" "story-long-write opening flow must stop after outline by default"
-assert_grep '本轮 K（最多 3 章）后必须进入 Step 3/4 收尾并停止|最多 3 章.*收尾并停止' "$REPO_ROOT/skills/story-long-write/references/workflow-daily.md" "daily workflow must stop after bounded batch"
+assert_grep '单轮最多 3 章' "$REPO_ROOT/skills/story-long-write/references/flow-drafting.md" "daily workflow must bound batch size to 3 chapters"
+assert_grep '写满即停' "$REPO_ROOT/skills/story-long-write/references/flow-drafting.md" "daily workflow must stop after bounded batch"
 assert_grep '细纲边界|不得自造剧情' "$SKILL_DIR/references/templates/agents/narrative-writer.md" "narrative-writer must enforce the outline boundary"
 # 锚在源模板；OpenCode/Codex 生成副本由 sync-opencode.py --check 与 Codex 生成器确定性检查保持一致。
 assert_grep '`under` 不补.*`over`.*`compress-once`' "$SKILL_DIR/references/templates/agents/narrative-writer.md" "narrative-writer must keep asymmetric wordcount handling"
 assert_grep 'over 单次压缩.*净删.*不增语义' "$SKILL_DIR/references/templates/agents/narrative-writer.md" "narrative-writer must keep one-pass semantic-preserving compression"
-assert_grep '导入续写入口顺序|推荐顺序.*story-setup' "$REPO_ROOT/skills/story-import/SKILL.md" "story-import must answer setup-vs-import order before asking for source"
-# 导入按作者时刻分文件：流程答疑细节与旧追踪重建挪进 import-special-cases.md，作者决定落盘到导入记录。
-assert_grep '推荐顺序.*story-setup' "$REPO_ROOT/skills/story-import/references/import-special-cases.md" "story-import special cases must keep the setup-vs-import answer"
-assert_grep '只需重建 `追踪/`' "$REPO_ROOT/skills/story-import/references/import-special-cases.md" "story-import must rebuild legacy tracking without re-analyzing the book"
+assert_grep '推荐先 `/story-setup`|导入续写入口顺序|推荐顺序.*story-setup' "$REPO_ROOT/skills/story-import/SKILL.md" "story-import must answer setup-vs-import order before asking for source"
+assert_grep '不重跑全书拆解.*直接重建追踪|只需重建 `追踪/`' "$REPO_ROOT/skills/story-import/SKILL.md" "story-import must rebuild legacy tracking without re-analyzing the book"
 assert_grep '\.story/work/导入记录\.md' "$REPO_ROOT/skills/story-import/SKILL.md" "story-import must persist author decisions to the import record"
 assert_grep '超过约 25K 字时脚本自动少排几章' "$REPO_ROOT/skills/story-import/references/outline-reverse.md" "story-import must reverse outlines in bounded batches"
 echo "  OK TS10 version + behavior anchors"

@@ -20,7 +20,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | 宿主 | 角色来源与合法判定 | 派发工具 |
 |---|---|---|
 | Claude Code | `.claude/agents/{agent}.md`，frontmatter `name:` 匹配目标 | `subagent_type` |
-| OpenCode | `.opencode/agents/{agent}.md`，frontmatter 含 `mode: subagent` 与复数 `permissions:`（单数 `permission:` 视为待重部署） | `subagent`（`agent`） |
+| OpenCode | `.opencode/agents/{agent}.md`，frontmatter 含 `mode: subagent` 与复数 `permissions:` 规则列表（单数 `permission:` 视为待重部署） | `subagent`（`agent`） |
 | Codex | `.codex/agents/{agent}.toml`，可解析 TOML 且含 `name`、`description`、`developer_instructions` | `agent_type` |
 | Antigravity | `.agents/agents/agent-name/agent.md`，frontmatter 含匹配 `name`、`mainAgent: false`、`subagent: true`、非空 `tools` | `invoke_subagent`（`TypeName`） |
 | ZCode | 已启用插件注册的同名角色（不要求 `.zcode/agents/`）；定义不可直读时以运行时注册为准 | `Agent`（按当前 schema） |
@@ -96,7 +96,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | 篇幅 | 目标平台 | 叠加的平台表 |
 |---|---|---|
 | 长篇 | 起点 | `story-review/references/rubrics/qidian.md` |
-| 长篇 | 番茄 | `story-review/references/rubrics/fanqie.md` |
+| 长篇 | 番茄、七猫 | `story-review/references/rubrics/fanqie.md` |
 | 长篇 | 晋江、其他、未定、没写 | 不叠加 |
 | 短篇 | 知乎盐言（也写作盐选） | `story-review/references/rubrics/zhihu.md` |
 | 短篇 | 番茄、七猫、黑岩、小程序、点众、未定、没写 | `story-review/references/rubrics/short-shuang.md` |

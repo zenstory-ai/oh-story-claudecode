@@ -60,8 +60,8 @@ SHORT_STAGE46 = "skills/story-short-analyze/references/stage4-6-reversal-summary
 SHORT_CONTRACT = "skills/story-short-analyze/references/output-contract.md"
 IMPORT_DEEP = "skills/story-import/references/deep-analysis.md"
 SHORT_RECALL = "skills/story-short-write/references/benchmark-recall.md"
-SHORT_DESIGN = "skills/story-short-write/references/workflow-design.md"
-SHORT_DRAFT = "skills/story-short-write/references/workflow-draft.md"
+SHORT_DESIGN = "skills/story-short-write/SKILL.md"
+SHORT_DRAFT = "skills/story-short-write/SKILL.md"
 PHASE2_CHECK = "skills/story-short-write/scripts/check-phase2-contract.js"
 SHORT_SCAN_SKILL = "skills/story-short-scan/SKILL.md"
 TOPIC_MATCH = "skills/story-short-scan/references/topic-match.md"
@@ -625,7 +625,7 @@ def check_short_scan_handoff(repo: Repo) -> list[str]:
 LONG_SCAN_SKILL = "skills/story-long-scan/SKILL.md"
 TOPIC_DECISION = "skills/story-long-scan/references/topic-decision.md"
 LONG_ANALYZE_SKILL = f"{LONG_ANALYZE}/SKILL.md"
-LONG_WRITE_SETUP = "skills/story-long-write/references/workflow-setup.md"
+LONG_WRITE_SETUP = "skills/story-long-write/references/flow-opening-plan.md"
 
 # 读取方点名的选题决策小节或字段：(读取方, 原文里的写法, 模板里的名字)。
 # 写法找不到说明读取方改了读法，提醒更新本表；名字找不到说明模板改名，下游会静默断开。
@@ -754,8 +754,8 @@ def check_import_short(repo: Repo) -> list[str]:
         failures.append(f"{IMPORT_SHORT}: 设定模板没有「## 已写部分的写法」，确认写法后更新本测试")
     elif "只补缺项" in repo.text(IMPORT_SHORT) and not (f"有「{baseline.group(1)}」" in design_text and "[待补充]" in design_text):
         failures.append(f"{SHORT_DESIGN}: 导入说续写构思只补缺项，构思步骤没写有「{baseline.group(1)}」时只补 [待补充]")
-    draft_line = next((line for line in repo.text(SHORT_DRAFT).splitlines() if "**导入的书**" in line), "")
-    if "第 N+1 节" not in draft_line:
+    draft_lines = [line for line in repo.text(SHORT_DRAFT).splitlines() if "**导入的书**" in line]
+    if not any("第 N+1 节" in line for line in draft_lines):
         failures.append(f"{SHORT_DRAFT}: 导入的半成品要从下一节接着写，「导入的书」一段没写第 N+1 节")
     return failures
 
@@ -881,7 +881,7 @@ def check_import_long(repo: Repo) -> list[str]:
 # ---------- 写作端目标平台 → 审稿平台表；审稿 → consistency-checker ----------
 
 REVIEW_SKILL = "skills/story-review/SKILL.md"
-LONG_SETUP = "skills/story-long-write/references/workflow-setup.md"
+LONG_SETUP = "skills/story-long-write/references/flow-opening-plan.md"
 IMPORT_SKILL = "skills/story-import/SKILL.md"
 
 
@@ -963,12 +963,12 @@ def check_review_checker_fields(repo: Repo) -> list[str]:
 # ---------- 去味 → 写手 ----------
 
 DESLOP_DETECTOR = "skills/story-deslop/scripts/check-ai-patterns.js"
-DESLOP_EXPRESSION = "skills/story-deslop/references/expression.md"
-DESLOP_GATES = "skills/story-deslop/references/deslop-gates.md"
+DESLOP_EXPRESSION = "skills/story-deslop/references/deslop-guide.md"
+DESLOP_GATES = "skills/story-deslop/references/deslop-guide.md"
 WRITER_TEMPLATE = f"{AGENT_TEMPLATES}/narrative-writer.md"
 # 派 narrative-writer 去味的调用方；任务标签必须是写手「被调用协议」认得的那个。
 DESLOP_WRITER_CALLERS = (
-    "skills/story-deslop/references/agent-calls.md",
+    "skills/story-deslop/SKILL.md",
     "skills/story-long-write/references/agent-calls.md",
     "skills/story-short-write/references/agent-calls.md",
 )
@@ -1009,9 +1009,9 @@ def check_deslop_handoff(repo: Repo) -> list[str]:
         for label in re.findall(r"任务描述：([^\n`{]*去AI味[^\n`{]*)", text):
             if label.strip() not in known_labels:
                 failures.append(f"{rel}：任务标签「{label.strip()}」写手不认得（认得：{sorted(known_labels)}）")
-        for cited in re.findall(r"deslop-gates(?:\.md)?「([^」]+)」", text):
+        for cited in re.findall(r"deslop-(?:gates|guide)(?:\.md)?「([^」]+)」", text):
             if cited not in gate_headings:
-                failures.append(f"{rel}：点名的 deslop-gates.md「{cited}」不存在")
+                failures.append(f"{rel}：点名的 deslop-guide.md「{cited}」不存在")
     return failures
 
 
@@ -1083,7 +1083,7 @@ NEGATIVE_CASES = (
     ("去味索引漏了一类 blocking", DESLOP_EXPRESSION, "**`em-dash`**", "**`em_dash`**", "em-dash"),
     ("短篇派写手用了写手不认的去味标签", "skills/story-short-write/references/agent-calls.md",
      "任务描述：审查+去AI味", "任务描述：去AI味+格式检查", "写手不认得"),
-    ("调用方点名的 deslop-gates 小节改了名", DESLOP_GATES,
+    ("调用方点名的 deslop-guide 小节改了名", DESLOP_GATES,
      "## 按检测类别或问题限定范围", "## 定点 Gate 映射", "按检测类别或问题限定范围"),
 )
 

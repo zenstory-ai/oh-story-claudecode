@@ -1,14 +1,14 @@
 # 细纲规划与钩子节奏（flow-outline）
 
-> 谁读：主会话出细纲、补纲或写指定章前缺细纲时整份读；同时读本书 `references/genre-styles/{流派}.md`。`story-architect` 出细纲任务包带入「排纲方法」及以下全部内容。
+> 谁读：主会话出细纲、补纲或写指定章前缺细纲时整份读；同时读本书 `genre-styles/{流派}.md`。`story-architect` 出细纲任务包带入「排纲方法」及以下全部内容。
 
 ---
 
 ## 主会话：出细纲步骤与汇报
 
-1. **只取本段卷纲**：跑 `node {skill 根}/scripts/outline_view.js --unit {单元编号} {卷纲路径}`（先 `--toc` 找编号），绝不整读卷纲；按需定点读 `设定/` 与 `追踪/上下文.md`。
-2. **派发或自排**：已部署 `story-architect` 时跑 `build_architect_brief.js --project {书目录} --task outline --chapters {A-B}`（单批最多 10 章，见 `agent-calls.md`）；无子代理时主会话先给本批走向提案，作者确认后落盘。
-3. **收回验收**：每章写入后跑 `node {skill 根}/scripts/check-outline-contract.js --json --project {书目录} --chapter {N}`。exit 1（`hard_failures`：可读、字数目标、`目标情绪`/`主角目标·关键选择`实质内容）按点名字段补齐重验（最多两轮）；`soft_warnings` 复核后按需修补。
+1. **只取本段卷纲**：在 `{skill 根}` 的脚本目录跑 `outline_view.js --unit {单元编号} {卷纲路径}`（先 `--toc` 找编号），绝不整读卷纲；按需定点读 `设定/` 与 `追踪/上下文.md`。
+2. **派发或自排**：已部署 `story-architect` 时跑 `build_architect_brief.js --project {书目录} --task outline --chapters {A-B}`（单批最多 10 章，见子代理派发手册）；无子代理时主会话先给本批走向提案，作者确认后落盘。
+3. **收回验收**：每章写入后跑 `check-outline-contract.js --json --project {书目录} --chapter {N}`。exit 1（`hard_failures`：可读、字数目标、`目标情绪`/`主角目标·关键选择`实质内容）按点名字段补齐重验（最多两轮）；`soft_warnings` 复核后按需修补。
 4. **中途补纲/扩纲**：只补点名范围，**已写正文的章细纲锁定不改**。确需新剧情段时按 `flow-opening-plan.md` 往卷尾追加新卡（不改锁定部分），规划事件不写进 `追踪/`。
 5. **向作者汇报**（开书、大纲、卷纲、细纲、补纲通用；只用故事话）：
 

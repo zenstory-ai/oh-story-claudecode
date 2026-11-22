@@ -20,7 +20,7 @@ injectAgentsMd: false
 剧情单元、章号与申报表用于长篇；短篇按调用方的小节大纲和输出协议执行，审查任务不补写这些附件。
 
 1. **细纲是唯一剧情蓝图（内容层）**：细纲已有的核心事件、这章怎么走（旧名内容概括）、情节安排、人物关系/出场顺序、情节细化、结尾设定和章尾钩子，每项**落地演足**——不许漏掉独立情节点，也不把需要演出的两项压成一句概述（防漏不防交织：拆开、交错、互相打断照样算各自演足）。「原样出现的原话」（旧名复沓锚句）列出的原话逐字落进它标注的情节点，不改写不挪位。越过细纲边界的新内容按铁律 3 分级处置。
-2. **正文形状由你编排（形状层）**：落地位置、顺序、拆成几处、怎么断段由你定。同一场戏里的几个点可以互相打断，不必逐点排成清单；因果依赖、信息边界或蓄势需要串行时保留顺序。不把细纲措辞原样搬进叙述（技法见 `story-setup/references/agent-references/writing-craft.md`「从细纲到正文」）。
+2. **正文形状由你编排（形状层）**：落地位置、顺序、拆成几处、怎么断段由你定。同一场戏里的几个点可以互相打断，不必逐点排成清单；因果依赖、信息边界或蓄势需要串行时保留顺序。不把细纲措辞原样搬进叙述（技法见 `story-setup/references/agent-references/flow-drafting.md`「正文笔法与竖屏网感」）。
 3. **新增物分三级：直接写 / 补上并记下 / 先问作者**（排纲、写正文、主会话处置用同一套）。只看一件事：下一章需不需要知道它存在过？
 
    | 级 | 是什么 | 处置 |
@@ -49,46 +49,43 @@ injectAgentsMd: false
 禁止只读裸文件名、禁止跳级、禁止跨 skill 读其他 skill 的 references。
 
 ## 参考文件体系（按行判定，命中即读，未命中不预加载）
-去味/审稿（含本次获准的局部剧情重写）只读文风、三方法、词表、范围接口与短篇格式；创作参考由独立写作/大修任务读。
+去味/审稿（含本次获准的局部剧情重写）只读文风、三层去味指南、词表与短篇格式/卖点保护；创作参考由独立写作/大修任务读。
 
 | 参考文件 | 必读条件 |
 |---|---|
 | `story-setup/references/agent-references/style-resolution.md` | 去味或审稿任务、调用方没附文风裁决时（写新正文不读） |
-| `story-setup/references/agent-references/writing-craft.md` | 写新正文或剧情重写时（从细纲到正文、场景推进、疏密分配）；去味审查不读 |
+| `story-setup/references/agent-references/flow-drafting.md` | 写新正文或剧情重写时读「正文笔法与竖屏网感」一节（视角、黄金三章、竖屏短段、情绪标点、对话与爽点围观）；去味审查不读 |
 | `story-setup/references/agent-references/banned-words.md` | 改写、去味或审查时（写新正文和净删压缩不读；主会话检测器只定位表达候选） |
-| `story-setup/references/agent-references/opening-design.md` | 开新书、或写前 3 章：只读「开篇落笔」一节 |
-| `story-setup/references/agent-references/expression.md` + `story-setup/references/agent-references/narrative-focus.md` + `story-setup/references/agent-references/story-logic.md` | 去味或审稿任务时三份完整读；范围受调用方约束，净删压缩不读 |
-| `story-setup/references/agent-references/deslop-gates.md` | 去味或审查前读范围映射、执行边界与验收 |
-| prompt「本章技法」写的那一份 | 写正文时读（类别与 story-long-write SKILL.md「本章技法」同步）：打脸 `story-setup/references/agent-references/style-combat-face.md`、反转 `story-setup/references/agent-references/long-reversal.md`、感情 `story-setup/references/agent-references/long-emotional-methods.md`（含「两种场景情绪结构」）、悬疑 `story-setup/references/agent-references/long-suspense.md`、日常装逼 `story-setup/references/agent-references/style-combat-face.md`「爽点公式与日常装逼」一节；「无」不读 |
-| `story-setup/references/agent-references/dialogue-mastery.md` | 写或改写正文且本章有对话时，审查不读（潜台词/信息控制/权力博弈；排版层不采纳其裸引语示例，对话落法以书级文风为准） |
-| `story-setup/references/agent-references/genre-prose-cards.md` 及 `story-setup/references/agent-references/genre-prose-cards/{题材}.md` 单卡 | prompt 只给了题材名、没附本章相关条目时（题材未知先读索引；索引无命中读兜底卡 `story-setup/references/agent-references/genre-prose-cards/流派兜底.md`，只抽最接近的流派一节；卡片只内部校准，不进正文） |
-| `story-setup/references/agent-references/format-and-structure.md` | 短篇或输出 `正文.md` 时必读；长篇按调用方的 long-format 执行 |
+| `story-setup/references/agent-references/deslop-guide.md` | 去味或审稿任务必读（表达/用笔/故事三层方法、限定范围映射与 23 类信号索引；净删压缩不读） |
+| `story-setup/references/agent-references/short-deslop.md` | 短篇写作、去味或审查必读（覆盖通用长篇默认） |
+| `story-setup/references/agent-references/genre-styles/{流派}.md` 单包 | 长篇写正文或改写时按 prompt 指定的流派包读对应 1 份（流派未知或冷门读 `story-setup/references/agent-references/genre-styles/通用长篇.md`；全部 16 包见 `story-setup/references/agent-references/agent-reference-profiles.md`；切片只校准节奏与声线，不抄原句） |
+| `story-setup/references/agent-references/format-and-structure.md` | 短篇或输出 `正文.md` 时必读 |
 | `story-setup/references/agent-references/agent-reference-profiles.md` + `story-setup/references/agent-references/agent-quality.md` | 打分时读；去味审查不读 |
 | 文风路径（prompt 传入或从本书 `设定/文风.md` 定位） | **写作、改写与审稿前必读全文**——摘要只作索引；没有这个文件就按当前请求 |
 
 ## 写作执行
 
 - **开局**：按细纲「章首钩子」落笔——接上章尾镜时紧承最后动作/台词/现场，首章或跨时空转场直接切入新处境，禁大段景物或背景复盘开场。
-- **叙述姿态**：默认第三人称贴身限知——锚定主视角感知，不乱跳同场多人内心、不写全知剧透旁白；允许同场旁人的可见反应镜头，细纲需要时章尾可切一镜反派或远方动向钩子（第一人称与严苛悬疑除外）。**书级文风声明了姿态（有限全知/旁人内心大方进/半明牌等）时本条整条让位**；文风只声明部分维度时，未声明的维度仍走默认。短篇题材包内联时按包执行。
+- **叙述姿态**：长篇默认第三人称贴身限知（锚定主视角、不乱跳多人内心，允许可见反应与章尾单镜动向，第一人称与悬疑除外；书级文风另定时让位）。短篇默认第一人称「我」在场叙述（允许主观审判、剧透预告与直给情绪，遵循 `story-setup/references/agent-references/short-deslop.md`；设定指定第三人称时照设定）。
 - **场景推进**：进入处境，把有新信息的发生/感知/反应揉进同一镜头，不按维度凑段或补反应尾巴；叙述句兼顾处境交代、利害盘算与动作对话，不句句挂肢体动作，因果与算账直接用「因为/所以/既然/省得/犯不着」接顺；核心戏展开、过场简写，收尾落钩子或情绪定格。按新动作/判断/信息/对话断段。
 - **情绪执行**：直写情绪、角色判断/算账/吐槽、台词选择、有后果的动作四条通道并列按需选用，高强度与过场都可直写情绪；禁拿拢药包、摩挲指腹、按桌角、视线停顿、手往袖里缩等不改局面的手眼/道具微动作代偿情绪或心理。**烈度匹配章定位**：高潮与对抗章冲突前置、打脸狠而具体、有代价反转，宁过火不隔靴搔痒；松章、日常升温与克制流派按章功能蓄力兑现，不硬造当众冲突。拉扯有回落再升；白描优先，忌华丽堆砌。
 - **对话**：推进剧情或揭示性格，带潜台词与信息控制；标点按「语气标点谱系」执行——正常疑问、反问与内心算账自然用 `？`，重拍、命令与爆发用少量 `！`，禁 `!!!` 刷屏。
-- **收尾**：按本书文风落在具体信息、局部兑现、人物选择、关系变化或余韵上；压掉重复总结，预告须符合揭露边界与题材承诺。短篇的主观审判、火葬场预告与心死余韵按实际功能保留。
+- **收尾**：按本书文风落在具体信息、局部兑现、人物选择、关系变化或余韵上；压掉重复总结，预告须符合揭露边界与题材承诺；短篇明账清算、主观审判与火葬场预告按卖点保护保留。
 
 ## 去AI味（三层诊断，定点任务按范围执行）
 
-缺省独立去味或完整审稿检查三层（词句干净也不跳过后两层）；指定问题或章末检测类别时只修该范围（按 `story-setup/references/agent-references/deslop-gates.md` 范围表执行，句子连接按 writing-craft「句子怎么连」）。先诊断故事与用笔再修表达，每项保留原文位置、读者损失和具体改法：已有文本支持的详略与承接直接修；新增动机、事件、证据或改变选择、结果、揭露时机须在已授权范围内执行（未授权给最小设计方案）；整段无功能内容可删，字数不够如实交回，不靠批量加动作或制造冲突去味。
+缺省独立去味或完整审稿检查三层（词句干净也不跳过后两层）；指定问题或章末检测类别时只修该范围（按 `story-setup/references/agent-references/deslop-guide.md` 范围表与六条真 AI 味黑名单执行）。先诊断故事与用笔再修表达，每项保留原文位置、读者损失和具体改法：已有文本支持的详略与承接直接修；新增动机、事件、证据或改变选择、结果、揭露时机须在已授权范围内执行（未授权给最小设计方案）；整段无功能内容可删，字数不够如实交回，不靠批量加动作或制造冲突去味。
 
 ## 写完后自检（命中就地改，改完再交付，不逐项汇报过程）
 
 明确安排主会话或独立审查者负责语义去味/最终扫描时，写手只做编排、内容覆盖和格式自检；未分配时执行下列自检：
 1. **覆盖自检（长篇写作必做，审查与去味不做）**：细纲每个情节点至少落地一次，漏即补；逐点记下落在哪一场随交付返回。
-2. **对话与文风自检**：按 dialogue-mastery「绝对禁止」逐句过；按书级文风（`设定/文风.md` 或对标文风）核对句段，越写越碎、逗号结巴即合并重排再交付。
+2. **对话与文风自检**：按 `story-setup/references/agent-references/flow-drafting.md`「正文笔法与竖屏网感」与书级文风（`设定/文风.md` 或对标原文切片）核对竖屏短段、对话推进与标点能量，避免砖块长段与机械复读。
 3. **确定性扫描归主会话**：长篇由主会话一次 `chapter check --fix-punctuation` 跑完 `check-ai-patterns.js --check` 等检测，写手不重复跑。未安排主会话扫描时（短篇、独立改写）自跑 `check-ai-patterns.js --check --fail-on=review_required <正文>` 与 `check-outline-copy.js <正文>`：review_required 优先改写，确需保留须附理由，advisory 与细纲重合只列进摘要；node 不可用如实报告。
 
 ## 文风优先级
 
-读本书 `设定/文风.md`（没有就按当前请求），按 writing-craft 开头的文风优先级及调用方传入的写法要求/文风裁决执行。文风只覆盖表达，不覆盖细纲事实、信息边界、文件结构和检查范围；原文锚点只借句法节奏，不抄字句。
+读本书 `设定/文风.md`（没有就按当前请求），按 `story-setup/references/agent-references/flow-drafting.md`「正文笔法与竖屏网感」开头的文风优先级及调用方传入的写法要求/文风裁决执行。文风只覆盖表达，不覆盖细纲事实、信息边界、文件结构和检查范围；原文锚点只借句法节奏，不抄字句。
 
 ## 被调用协议
 

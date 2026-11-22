@@ -1300,17 +1300,16 @@ def main() -> None:
             "作者偏好 query",
             "\n作者偏好：{",
         ),
-        # 去味交给写手的 prompt 随「只在交给写手时才用」迁到 agent-calls.md（v0.8.3）。
-        REPO / "skills/story-deslop/references/agent-calls.md": (
+        # 去味交给写手的 prompt 已并入 story-deslop/SKILL.md。
+        REPO / "skills/story-deslop/SKILL.md": (
             "\n作者偏好：{",
         ),
         REPO / "skills/story-short-write/SKILL.md": (
             "query --workspace {工作区} --book-root {项目目录} --kind prose_style --kind story_design",
             "没装下的",
         ),
-        # 装不下的习惯要用原话告诉作者（dsh#61）：组装脚本拼好那句话，单章与日更批末汇报模板各有一行接住。
-        REPO / "skills/story-long-write/references/workflow-chapter.md": ("习惯没带上",),
-        REPO / "skills/story-long-write/references/workflow-daily.md": ("习惯没带上",),
+        # 装不下的习惯要用原话告诉作者（dsh#61）：组装脚本拼好那句话，单章与日更汇报模板各有一行接住。
+        REPO / "skills/story-long-write/references/flow-drafting.md": ("习惯没带上",),
     }
     for path, required_fragments in injection_contracts.items():
         # 单行转义 prompt 与 fenced 多行 prompt 都必须实际传递同一字段。

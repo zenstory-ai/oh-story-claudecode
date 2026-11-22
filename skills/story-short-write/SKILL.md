@@ -12,11 +12,11 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 写短篇默认只读两份：本文件 + 1 份 `references/genre-styles/{流派}.md`（Phase 1–4 同会话连续完成，不再强制换对话）；未命中选 `通用短篇.md`。
 
-12 流派：`追妻火葬场`、`总裁豪门`、`世情打脸`、`宅斗宫斗`、`年代重生打脸`、`脑洞设定流`、`复仇打脸`、`甜宠`、`男频都市反杀`、`双男主`、`悬疑`（含民俗怪谈）、`通用短篇`。
+12 流派（位于 `references/genre-styles/`）：`references/genre-styles/追妻火葬场.md`、`references/genre-styles/总裁豪门.md`、`references/genre-styles/世情打脸.md`、`references/genre-styles/宅斗宫斗.md`、`references/genre-styles/年代重生打脸.md`、`references/genre-styles/脑洞设定流.md`、`references/genre-styles/复仇打脸.md`、`references/genre-styles/甜宠.md`、`references/genre-styles/男频都市反杀.md`、`references/genre-styles/双男主.md`、`references/genre-styles/悬疑.md`（含民俗怪谈）、`references/genre-styles/通用短篇.md`。
 
 3 份冷路径文件**仅命中时按需读**：有 `对标/`/`拆文库/`/参考书 → `references/benchmark-recall.md`；管理习惯 → `references/author-memory.md`（完成即停）；作者要求派助手 → `references/agent-calls.md`。
 
-> 派发查当前宿主：Claude `.claude/agents`（`subagent_type`）、OpenCode `.opencode/agents`（`subagent`）、Codex `.codex/agents` TOML（`agent_type`）、Antigravity `.agents/agents`（`invoke_subagent`）、ZCode 插件同名角色（`Agent`）。直接写与去味是常态，派发缺失直接接手只说「这次我自己写」。`.story-deployed` 的 `agents_version` 不等于 `agents_version: 45` 时照常派发，仅提醒升级 `/story-setup`（高于 45 先更仓库）。有作者记忆时动笔前跑 `node {skill 根}/scripts/author_memory_commit.js query --workspace {工作区} --book-root {项目目录} --kind prose_style --kind story_design [--genre {题材}] [--workflow 短篇]`（去味只带 `--kind prose_style`），`lines` 作自然倾向。
+> 派发查当前宿主：Claude `.claude/agents`（`subagent_type`）、OpenCode `.opencode/agents`（`subagent`）、Codex `.codex/agents` TOML（`agent_type`）、Antigravity `.agents/agents`（`invoke_subagent`）、ZCode 已启用插件注册的同名角色（`Agent`）。直接写与去味是常态，派发缺失直接接手只说「这次我自己写」。`.story-deployed` 的 `agents_version` 不等于 `agents_version: 45` 时照常派发，仅提醒升级 `/story-setup`（高于 45 先更仓库）。有作者记忆时动笔前跑 `node {skill 根}/scripts/author_memory_commit.js query --workspace {工作区} --book-root {项目目录} --kind prose_style --kind story_design [--genre {题材}] [--workflow 短篇]`（去味只带 `--kind prose_style`），`lines` 作自然倾向，没装下的交稿时用原话告诉作者。
 
 优先级：作者这次说的 ＞ `设定.md`「文风约定」「作者已定」 ＞ 作者记忆 ＞ 流派包 ＞ 本文件默认。
 
@@ -50,7 +50,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ### Phase 1：定核心钩子、平台与流派
 
-项目根及上一级往下 3 层有 `短篇扫榜结论.md`（取最新）时，先读其「选题匹配」，把排第一的方向带目标情绪推荐给作者；过「复扫日期」提醒可能过期。
+项目根及上一级往下 3 层有 `短篇扫榜结论.md`（取最新）时，先读其「选题匹配」，把排第一的方向带目标情绪推荐给作者；过复扫日期提醒可能过期。
 
 一句话问清：「核心矛盾或脑洞是什么？投哪个平台（盐言/七猫/番茄/黑岩/小程序/未定）？想让读者最爽、最虐还是笑出声？」方向明确直接选流派进 Phase 2；模糊时用下表定情绪：
 
@@ -82,8 +82,8 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 ### 一句话梗概
 {开局爆点 + 核心拉扯 + 付费钩子 + 最终清算}
 
-### 导语草稿（开篇150-300字）
-{冷开场初稿：前3句直接进事件/对白/赌注，零纯景物}
+### 导语草稿
+{冷开场初稿 150-300 字：前3句直接进事件/对白/赌注，零纯景物}
 
 ### 这篇靠什么撑住
 - 整体走向：{先压后扬 / 一路上扬 / 几起几落 / 先甜后崩 / 最后急转}
@@ -138,7 +138,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ## 4. Phase 3：锚定切片，连续落稿
 
-**导入的书**：读「已写部分的写法」，从第 N+1 节接着写，不改已写节。
+**导入的书**：读「已写部分的写法」，正文从第 N+1 节接着写，不改已写节。
 
 1. **锁参数**：作者字数范围优先（单数取 95%–105%，未给取 `设定.md` 与大纲节数）。写前跑 `node {skill 根}/scripts/check-delivery-contract.js --json --check-contract --min-chars {MIN} --max-chars {MAX} --sections {N} {短篇目录}`（exit 2 请作者调参数）。
 2. **锚定切片**：每批前重读流派包（或 `设定.md` 对标）的 **2–3 段 150–250 字示范切片**，锁定「单句 ~20 字 + 35% 对白 + 口语吐槽」频道。

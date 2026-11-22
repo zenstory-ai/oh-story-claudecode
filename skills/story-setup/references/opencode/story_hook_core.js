@@ -964,7 +964,9 @@ const TOXIC_SENTENCE_PATTERNS = [
   [/不是[^。！？!?\n]{1,16}[，,]\s*(?:而)?是/g, "not-is-comparison", "删否定铺垫，直接写后项（直白情绪、判断、对话或具体细节皆可）。"],
 ]
 // 「正式拉开序幕/帷幕」是场内事件的报幕式陈述，不是叙述者预告，lookbehind 排除（同 check-ai-patterns.js）。
-const TOXIC_TRAILER_PATTERN = /没人知道|谁也不知道|谁也没想到|殊不知|(?:这)?才刚刚开(?:始|头)|正(?:朝着|向着)[^。！？!?\n]{0,24}(?:压|涌|袭|逼)(?:了?过去|了?过来|来)|(?<!正式)拉开(?:序幕|帷幕)|即将(?:开始|来临|降临)/
+const TOXIC_TRAILER_CLICHE_PATTERN = /(?:这)?才刚刚开(?:始|头)|正(?:朝着|向着)[^。！？!?\n]{0,24}(?:压|涌|袭|逼)(?:了?过去|了?过来|来)|(?<!正式)拉开(?:序幕|帷幕)|即将(?:开始|来临|降临)/
+const TOXIC_TRAILER_PATTERN = new RegExp(`没人知道|谁也不知道|谁也没想到|殊不知|${TOXIC_TRAILER_CLICHE_PATTERN.source}`)
+const TOXIC_SHORT_TRAILER_MIN_CHARS = 6000
 // 章尾状态总结体：与 trailer-ending 共用文末窗口，盖章过去而非预告将来（同 check-ai-patterns.js）。
 // 收的都是 banned-words 已按名禁掉的形态；不收「(这|那)一刻…终于明白」——真人叙述里那是正常认知
 // 节拍，短篇第一人称审判句还是卖点。各分支要求落在句末断言位，避免吃进条件从句/动补/成语/及物用法/否定认知。
@@ -1122,7 +1124,8 @@ function maskHtmlCommentLines(lines) {
   }
 }
 
-function toxicPhraseFindings(text, whitelist = [], rescan = toxicRescanHint("")) {
+function toxicPhraseFindings(text, whitelist = [], rescan = toxicRescanHint(""), options = {}) {
+  const mode = options && options.mode === "short" ? "short" : "long"
   const findings = []
   const content = []
   let docChars = 0
@@ -1137,6 +1140,9 @@ function toxicPhraseFindings(text, whitelist = [], rescan = toxicRescanHint(""))
     content.push([index + 1, masked])
   })
   const scale = Math.max(1, Math.floor((docChars + Math.floor(TOXIC_SCALE_UNIT_CHARS / 2)) / TOXIC_SCALE_UNIT_CHARS))
+  const notIsThreshold = mode === "short"
+    ? Math.max(6, Math.round(5 * scale))
+    : TOXIC_NOT_IS_MIN_HITS * scale
   const sentenceHits = []
   const counts = new Map()
   for (const [lineNo, masked] of content) {
@@ -1147,19 +1153,21 @@ function toxicPhraseFindings(text, whitelist = [], rescan = toxicRescanHint(""))
   }
   const notIsCombined = (counts.get("not-is-comparison") || 0) + (counts.get("reverse-not-is") || 0)
   for (const [lineNo, label, fix, matched] of sentenceHits) {
-    if ((label === "not-is-comparison" || label === "reverse-not-is") && notIsCombined < TOXIC_NOT_IS_MIN_HITS * scale) continue
+    if ((label === "not-is-comparison" || label === "reverse-not-is") && notIsCombined < notIsThreshold) continue
     if (label === "voice-contrast" && (counts.get("voice-contrast") || 0) < TOXIC_VOICE_MIN_HITS * scale) continue
     if (label === "negation-parade" && (counts.get("negation-parade") || 0) < TOXIC_PARADE_MIN_HITS * scale) continue
     findings.push(`第${lineNo}行 毒句式[${label}]：『${codePointSlice(matched, 0, 20)}』——${fix}`)
   }
   // trailer-ending 只扫文末 600 字窗口（引号占位后按行累计，边界行整行计入）。
+  // 短篇模式分批写作时文末常是中段小节/付费卡点，字数不足 6000 时跳过 trailer-ending；达到后也只拦 AI 预告腔，不拦信息差剧透钩。
   let acc = 0
   let cut = content.length
   while (cut > 0 && acc < TOXIC_TRAILER_WINDOW) {
     cut -= 1
     acc += Array.from(content[cut][1]).length
   }
-  const trailerRe = new RegExp(TOXIC_TRAILER_PATTERN.source, "g")
+  const checkTrailerEnding = mode !== "short" || docChars >= TOXIC_SHORT_TRAILER_MIN_CHARS
+  const trailerRe = new RegExp((mode === "short" ? TOXIC_TRAILER_CLICHE_PATTERN : TOXIC_TRAILER_PATTERN).source, "g")
   const summaryRe = new RegExp(TOXIC_TRAILER_SUMMARY_PATTERN.source, "g")
   const windowRows = []
   let totalTrailers = 0
@@ -1168,8 +1176,10 @@ function toxicPhraseFindings(text, whitelist = [], rescan = toxicRescanHint(""))
     const trailers = []
     const summaries = []
     let match
-    trailerRe.lastIndex = 0
-    while ((match = trailerRe.exec(masked)) !== null) trailers.push(match[0])
+    if (checkTrailerEnding) {
+      trailerRe.lastIndex = 0
+      while ((match = trailerRe.exec(masked)) !== null) trailers.push(match[0])
+    }
     summaryRe.lastIndex = 0
     while ((match = summaryRe.exec(masked)) !== null) summaries.push(match[0])
     totalTrailers += trailers.length
@@ -1185,7 +1195,13 @@ function toxicPhraseFindings(text, whitelist = [], rescan = toxicRescanHint(""))
       findings.push(`第${lineNo}行 毒句式[trailer-summary]：『${codePointSlice(hit, 0, 20)}』——删章尾状态总结句，细纲的结尾设定要落成最后的具体动作、画面或台词。`)
     }
   }
-  if (findings.length) findings.push(`毒句式是确定性 AI 指纹：本章须清零后再继续。${rescan}`)
+  if (findings.length) {
+    if (mode === "short") {
+      findings.push(`短篇风格复核提醒（非阻断；确属情绪或节奏需要可保留）。${rescan}`)
+    } else {
+      findings.push(`毒句式是确定性 AI 指纹：本章须清零后再继续。${rescan}`)
+    }
+  }
   return findings
 }
 
@@ -1230,12 +1246,12 @@ function proseDegenerationFindings(text) {
   return findings
 }
 
-function proseNetFindings(text, whitelist = [], rescan = toxicRescanHint("")) {
+function proseNetFindings(text, whitelist = [], rescan = toxicRescanHint(""), options = {}) {
   const findings = proseDegenerationFindings(text)
   // 「去味:跳过」豁免（文件首 6 行）：标记在场时跳过毒句式提示，
   // 其余网（元信息/占位/复读/截断）照常。
   if (!hasDeslopSkipMarker(text)) {
-    findings.push(...toxicPhraseFindings(text, whitelist, rescan))
+    findings.push(...toxicPhraseFindings(text, whitelist, rescan, options))
   }
   return findings
 }
@@ -1283,14 +1299,27 @@ function duplicateTitleFindings(absolute) {
 
 function proseAfterWrite(root, absolute) {
   if (!fs.existsSync(absolute) || !isProsePath(absolute)) return ""
+  const isShort = path.basename(absolute) === "正文.md"
   const findings = []
+  let hasHard = false
   try {
     const bytes = fs.statSync(absolute).size
-    if (bytes < 200) findings.push(`【落盘】正文仅 ${bytes} 字节，疑似未写完/落盘失败（quota/超时中断？），请核对并补写。`)
+    if (bytes < 200) {
+      hasHard = true
+      findings.push(`【落盘】正文仅 ${bytes} 字节，疑似未写完/落盘失败（quota/超时中断？），请核对并补写。`)
+    }
     const text = fs.readFileSync(absolute, "utf8")
-    const net = proseNetFindings(text, loadStyleWhitelist(absolute), toxicRescanHint(absolute))
+    const hard = proseDegenerationFindings(text)
+    if (hard.length) hasHard = true
+    const net = proseNetFindings(text, loadStyleWhitelist(absolute), toxicRescanHint(absolute), {
+      mode: isShort ? "short" : "long",
+    })
     if (net.length) {
-      findings.push("【退化/工程词/毒句式】（硬信号：截断/拒绝语/工程词→重写该段；毒句式→就地改写；命中即处理，别留给下一章）")
+      if (isShort && !hasHard) {
+        findings.push("【短篇风格复核提醒（非阻断）】（确属情绪、反转或节奏需要可保留，其余精修时一并处理）")
+      } else {
+        findings.push("【退化/工程词/毒句式】（硬信号：截断/拒绝语/工程词→重写该段；毒句式→就地改写；命中即处理，别留给下一章）")
+      }
       findings.push(...net)
     }
   } catch {
@@ -1298,7 +1327,10 @@ function proseAfterWrite(root, absolute) {
   }
   findings.push(...duplicateTitleFindings(absolute))
   if (!findings.length) return ""
-  return `=== 正文兜底检测（${safeRelative(root, absolute)}）===\n轻量确定性网自动复扫（模型无关，防主会话漏跑收尾）。按类型处理后复扫到净：\n${findings.join("\n")}`
+  const lead = isShort && !hasHard
+    ? "轻量确定性网自动复扫（短篇软提醒，非阻断）："
+    : "轻量确定性网自动复扫（模型无关，防主会话漏跑收尾）。按类型处理后复扫到净："
+  return `=== 正文兜底检测（${safeRelative(root, absolute)}）===\n${lead}\n${findings.join("\n")}`
 }
 
 // 线性手写分词，不用带歧义交替的正则：旧式 /"(?:\\.|[^"])*"|'[^']*'|[^\s]+/ 里 \\. 与 [^"] 都能吃

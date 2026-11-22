@@ -144,7 +144,7 @@ class FinalChapterFlowTests(unittest.TestCase):
     def test_fix_punctuation_normalizes_body_before_the_single_check(self) -> None:
         self.write_contract(1, 1000)
         body = self.project / "正文" / "第001章_测试.md"
-        body.write_text(body.read_text(encoding="utf-8").replace("字字字字字字", "字...字——字", 1), encoding="utf-8")
+        body.write_text(body.read_text(encoding="utf-8").replace("字字字字字字", "字...字--字", 1), encoding="utf-8")
         plain = self.run_chapter("check", 1, expect=1)
         self.assertEqual(plain["status"], "blocked")
         self.assertEqual(plain["quality"]["status"], "fail")
@@ -154,8 +154,11 @@ class FinalChapterFlowTests(unittest.TestCase):
         fixed = self.run_process(args)
         self.assertTrue(fixed["punctuation_fixed"])
         self.assertEqual(fixed["quality"]["status"], "pass")
-        self.assertIn("……", body.read_text(encoding="utf-8"))
-        self.assertNotIn("——", body.read_text(encoding="utf-8"))
+        fixed_text = body.read_text(encoding="utf-8")
+        self.assertIn("……", fixed_text)
+        self.assertNotIn("...", fixed_text)
+        self.assertIn("——", fixed_text)
+        self.assertNotIn("--", fixed_text)
         self.assertFalse(self.run_process(args)["punctuation_fixed"])
 
     def test_complete_user_flow_without_persisted_approval_state(self) -> None:
@@ -449,8 +452,8 @@ class FinalChapterFlowTests(unittest.TestCase):
         self.assertIsNone(second["work_dir_removed"])
 
     def test_review_and_ack_soft_gate_for_style_and_borderline_length(self) -> None:
-        # 1. Stylistic review_required items (em-dash + voice-contrast): check exits 0 with status=review_required.
-        style_prefix = "他回头——门已经关了。声音不大，却压住了全场。她声音不高，却把账念清了。"
+        # 1. Stylistic review_required items (em-dash cluster + voice-contrast): check exits 0 with status=review_required.
+        style_prefix = "他回头——门关了。" * 10 + "声音不大，却压住了全场。她声音不高，却把账念清了。"
         self.write_contract(1, 1000, review_prefix=style_prefix)
         checked = self.run_chapter("check", 1, expect=0)
         self.assertEqual(checked["status"], "review_required")
