@@ -7,7 +7,7 @@
 效率（按提交章数平均）：墙钟、主会话回合、工具调用、子 agent 次数、累计输入/输出 token、
 主会话单次上下文峰值、自动压缩次数、每章提交时刻。
 正文：每章可见字数与目标、第一次 chapter check 的长度结论、是否接受当前长度、
-check-ai-patterns 的 blocking/advisory 计数；给了 --tell 时加人类区间越界项数。
+check-ai-patterns 的 blocking/review_required/advisory 计数；给了 --tell 时加人类区间越界项数。
 """
 import argparse
 import json
@@ -277,15 +277,16 @@ def main():
         print(json.dumps(rows, ensure_ascii=False, indent=1))
         return
     keys = ['wall_min', 'input_tokens_total_M', 'input_uncached_K', 'output_tokens_K', 'main_calls', 'tool_calls', 'spawns']
-    print('| run | 章 | ' + ' | '.join(keys) + ' | ctx峰值K | 压缩 | 首检带内 | blocking/advisory |')
+    print('| run | 章 | ' + ' | '.join(keys) + ' | ctx峰值K | 压缩 | 首检带内 | blocking/review/advisory |')
     print('|' + '---|' * (len(keys) + 6))
     for r in rows:
         inband = sum(1 for s in r['first_check_status'].values() if s in ('internal_pass', 'borderline'))
         blk = sum(p.get('detector', {}).get('blocking', 0) for p in r['prose'])
+        rev = sum(p.get('detector', {}).get('review_required', 0) for p in r['prose'])
         adv = sum(p.get('detector', {}).get('advisory', 0) for p in r['prose'])
         print(f"| {r['run']} | {r['chapters_committed']}/{r['chapters_goal']} | "
               + ' | '.join(str(r['per_chapter'][k]) for k in keys)
-              + f" | {r['max_main_context_K']} | {r['compactions']} | {inband}/{len(r['first_check_status'])} | {blk}/{adv} |")
+              + f" | {r['max_main_context_K']} | {r['compactions']} | {inband}/{len(r['first_check_status'])} | {blk}/{rev}/{adv} |")
 
 
 if __name__ == '__main__':

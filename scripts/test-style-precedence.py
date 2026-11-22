@@ -109,19 +109,27 @@ class StyleTests(unittest.TestCase):
         (self.book / '追踪/_tracking-state.json').write_text(json.dumps({'schema_version': 4, 'state_revision': 0, 'last_committed_chapter': 1}), encoding='utf-8')
         (self.book / '追踪/上下文.md').write_text('> 状态修订：0', encoding='utf-8')
         next_file = self.book / '正文/第002章_再见.md'
-        for body, approved, should_block in [
+        for body, approved, should_warn in [
             (BLOCKING_NOT_IS, '', True),
             (BLOCKING_NOT_IS, APPROVED, False),
             (BLOCKING_NOT_IS + BLOCKING_VOICE, APPROVED, True),
         ]:
             self.file.write_text(body, encoding='utf-8')
             self.allow.write_text(approved, encoding='utf-8')
-            result = self.node('-e', "console.log(JSON.stringify(require(process.argv[1]).proseBlockReason(process.argv[2],process.argv[3])));", HOOK, self.root, next_file)
+            result = self.node(
+                '-e',
+                "const h=require(process.argv[1]); console.log(JSON.stringify({block: h.proseBlockReason(process.argv[2],process.argv[3]), warnings: h.prosePreWriteWarnings(process.argv[2],process.argv[3])}));",
+                HOOK,
+                self.root,
+                next_file,
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
-            reason = json.loads(result.stdout)
-            self.assertEqual(reason is not None, should_block)
-            if should_block:
-                self.assertIn('毒句式', reason)
+            payload = json.loads(result.stdout)
+            self.assertIsNone(payload['block'])
+            warnings = payload['warnings']
+            self.assertEqual(len(warnings) > 0, should_warn)
+            if should_warn:
+                self.assertIn('毒句式', '\n'.join(warnings))
         (self.book / '大纲/细纲_第002章.md').unlink()
         result = self.node('-e', "console.log(JSON.stringify(require(process.argv[1]).proseBlockReason(process.argv[2],process.argv[3])));", HOOK, self.root, next_file)
         self.assertEqual(result.returncode, 0, result.stderr)
