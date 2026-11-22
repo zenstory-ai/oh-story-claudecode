@@ -412,6 +412,58 @@ function verify(projectDir, options = {}) {
     'advisory'
   ))
 
+  // 导语/冷开场声明（advisory）：导入书与 0.9.x 旧版设定跳过以保持严格向后兼容。
+  const isImportedOrLegacySettings =
+    /^#{1,6}[ \t]*(?:已写部分的写法|本书续写基线|Phase 2 设计校验)/m.test(settings)
+  let leadOk = false
+  let leadEvidence = '设定.md 未声明导语或冷开场'
+  if (isImportedOrLegacySettings) {
+    leadOk = true
+    leadEvidence = '导入或旧版设定，跳过导语声明检查'
+  } else {
+    const leadSection = settings.match(/^#{2,6}[ \t]*[^\n]*(?:导语|冷开场)[^\n]*\n([\s\S]*?)(?=^#{1,6}[ \t]|(?![\s\S]))/m)
+    const leadBody = leadSection
+      ? leadSection[1].split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !/^<!--.*-->$/.test(line) && !/^\{[^}]*\}$/.test(line) && line !== '[待补充]')
+      : []
+    const leadField = settings.match(/^[ \t]*[-*]?[ \t]*(?:导语|冷开场)[^：:\n]*[：:][ \t]*([^\n]+)$/m)
+    const leadFieldVal = leadField ? leadField[1].trim() : ''
+    const hasLeadField = Boolean(leadFieldVal) && !/^\{[^}]*\}$/.test(leadFieldVal) && leadFieldVal !== '[待补充]' && leadFieldVal !== '无'
+    if (leadBody.length > 0 || hasLeadField) {
+      leadOk = true
+      leadEvidence = leadBody.length > 0 ? '设定.md 已包含导语/冷开场小节' : '设定.md 已声明导语/冷开场字段'
+    }
+  }
+  checks.push(makeCheck(
+    'phase2.lead-declared',
+    leadOk,
+    '设定.md',
+    leadEvidence,
+    '建议在 设定.md 声明导语/冷开场（150-300 字开篇卖点与钩子），便于进入正文即冷开入冲突',
+    ['references/workflow-design.md', 'references/submission-craft.md'],
+    '复核导语：若本篇走网文短篇冷开场，在 设定.md 补一段导语草稿或冷开场要点；若刻意省略导语可保留。',
+    'advisory'
+  ))
+
+  // 付费点位置比例（advisory）：大纲 ≥5 节且声明了付费点时，建议落在全文 20%-55% 区间。
+  let paywallRatioOk = true
+  let paywallRatioEvidence = '未声明付费点或总节数不足 5 节，跳过付费点位置比例检查'
+  if (paywallSection !== null && rows.length >= 5) {
+    const ratio = paywallSection / rows.length
+    const pct = Math.round(ratio * 100)
+    paywallRatioOk = ratio >= 0.20 && ratio <= 0.55
+    paywallRatioEvidence = `付费点在第 ${paywallSection} 节 / 共 ${rows.length} 节（${pct}%）`
+  }
+  checks.push(makeCheck(
+    'phase2.paywall-position-ratio',
+    paywallRatioOk,
+    '设定.md、小节大纲.md',
+    paywallRatioEvidence,
+    '总节数 ≥5 节时，建议付费点落在全文 20%-55% 区间（通常第 2-4 节末）',
+    ['references/submission-craft.md', 'references/workflow-design.md'],
+    '复核付费点位置：偏后容易拖慢免费段转折，偏前容易铺垫不足；按平台试读比例微调或确认保留。',
+    'advisory'
+  ))
+
   return report(project, checks, { strict })
 }
 

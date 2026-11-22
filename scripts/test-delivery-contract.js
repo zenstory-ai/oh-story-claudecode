@@ -11,11 +11,31 @@ const repoRoot = path.resolve(__dirname, '..')
 const verifier = path.join(repoRoot, 'skills/story-short-write/scripts/check-delivery-contract.js')
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'delivery-contract-'))
 
-function body(charsPerSection = 1000, sections = 6, style = 'numeric') {
+const DEFAULT_LEAD = [
+  '结婚三周年纪念日，我收到一份离婚协议。',
+  '“签字吧，别拖着了。”',
+  '我把转账记录拍在桌上，他瞬间白了脸。',
+].join('\n')
+
+// 生成精确可见字数的短篇测试正文块：每行 ≤15 字、对话占比 ≥35%、末尾落「字」。
+function sectionChunk(totalChars) {
+  const lines = []
+  let rem = totalChars
+  while (rem >= 27) {
+    lines.push('“这事没完，你别想躲。”') // 12 visible chars (10 quoted)
+    lines.push('她把协议拍在桌上没再看他一眼字') // 15 visible chars
+    rem -= 27
+  }
+  if (rem > 0) lines.push('字'.repeat(rem))
+  return lines.join('\n')
+}
+
+function body(charsPerSection = 1000, sections = 6, style = 'numeric', { includeLead = sections >= 2 } = {}) {
   const rows = []
+  if (includeLead) rows.push(DEFAULT_LEAD)
   for (let index = 1; index <= sections; index++) {
     const marker = style === 'zhihu' ? `${index}.` : `###${index}.`
-    rows.push(marker, '字'.repeat(charsPerSection))
+    rows.push(marker, sectionChunk(charsPerSection))
   }
   return `${rows.join('\n')}\n`
 }
@@ -83,7 +103,10 @@ try {
   assert.strictEqual(run(validDir, ['6000', '8000', '6'], undefined, false, ['--strict']).status, 0)
 
   // SOFT: per-section floor (--min-section-chars) → soft_warnings (exit 0), --strict → exit 1.
-  const lopsided = Array.from({ length: 6 }, (_, index) => `###${index + 1}.\n${'字'.repeat(index === 1 ? 5980 : 1)}`).join('\n')
+  const lopsided = [
+    DEFAULT_LEAD,
+    ...Array.from({ length: 6 }, (_, index) => `###${index + 1}.\n${index === 1 ? sectionChunk(5950) : '字'}`),
+  ].join('\n')
   const unbalanced = assertSoftOnly(writeCase('unbalanced', lopsided), 'delivery.section-min-chars', ['6000', '8000', '6'], 800)
   assert.deepStrictEqual(unbalanced.normal.report.soft_warnings.map((f) => f.section), [1, 3, 4, 5, 6])
   assert(unbalanced.normal.report.soft_warnings.every((f) => f.id === 'delivery.section-min-chars' && f.actual_chars === 1))
@@ -147,6 +170,39 @@ try {
   const trailingBlank = run(writeCase('trailing-blank', `${body()}\n\n`), ['6000', '8000', '6'], undefined, false, ['--strict'])
   assert.strictEqual(trailingBlank.status, 0, trailingBlank.stdout + trailingBlank.stderr)
   assert.strictEqual(trailingBlank.report.ok, true)
+
+  // SOFT: 短篇结构健康度（全部仅 advisory，不设标点/情绪词计数门禁）。
+  // 1) delivery.short-para-rhythm：段长中位 >45 字或 >80 字段落占比 >10%
+  const longParaChunk = Array.from({ length: 10 }, () => `“${'对白内容测试长句'.repeat(5)}”${'叙述补足长度凑够百字'.repeat(6)}`).join('\n')
+  const longParaBody = [
+    DEFAULT_LEAD,
+    ...Array.from({ length: 6 }, (_, index) => `###${index + 1}.\n${longParaChunk}`),
+  ].join('\n') + '\n'
+  const paraWarn = assertSoftOnly(writeCase('short-long-paras', longParaBody), 'delivery.short-para-rhythm', ['5500', '8000', '6'])
+  assert.deepStrictEqual(softIds(paraWarn.normal), ['delivery.short-para-rhythm'])
+
+  // 2) delivery.short-dialogue-share：对话占比 <15%
+  const noDialogueChunk = Array.from({ length: 50 }, () => '她走进屋里把门反锁又把灯关掉了。字').join('\n')
+  const noDialogueBody = [
+    '结婚三周年纪念日，我收到一份离婚协议。',
+    ...Array.from({ length: 6 }, (_, index) => `###${index + 1}.\n${noDialogueChunk}`),
+  ].join('\n') + '\n'
+  const dialWarn = assertSoftOnly(writeCase('short-low-dialogue', noDialogueBody), 'delivery.short-dialogue-share', ['5000', '8000', '6'])
+  assert.deepStrictEqual(softIds(dialWarn.normal), ['delivery.short-dialogue-share'])
+
+  // 3) delivery.short-lead-present：缺少导语或导语 >500 字
+  const noLeadWarn = assertSoftOnly(
+    writeCase('short-no-lead', body(1000, 6, 'numeric', { includeLead: false })),
+    'delivery.short-lead-present'
+  )
+  assert.deepStrictEqual(softIds(noLeadWarn.normal), ['delivery.short-lead-present'])
+
+  const hugeLead = `${sectionChunk(540)}\n${body(1000, 6, 'numeric', { includeLead: false })}`
+  const longLeadWarn = assertSoftOnly(
+    writeCase('short-huge-lead', hugeLead),
+    'delivery.short-lead-present'
+  )
+  assert.deepStrictEqual(softIds(longLeadWarn.normal), ['delivery.short-lead-present'])
 
   // HARD: missing 正文.md → exit 1 + hard_failures.
   const missing = run(writeCase('missing', null))

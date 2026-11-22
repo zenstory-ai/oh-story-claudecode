@@ -767,6 +767,72 @@ test("proseBlockReason, outlineIsEmpty, debt gate, trackingCheckpointIssue, and 
     for (const sample of ["/p/书/正文.md", "/p/书/草稿/第3章.md", ""]) {
       assert.equal(core.toxicRescanHint(sample), "完整扫描：node <skill>/scripts/check-ai-patterns.js --check <正文文件>")
     }
+
+    // Short-story 正文.md mode: relaxed not-is threshold, trailer-ending skipped <6000 chars,
+    // narrator spoilers skipped, soft advisory phrasing (no 本章须清零后再继续), long chapters unchanged.
+    const shortBook = path.join(root, "short-mode-book")
+    write(path.join(shortBook, "设定.md"), "# 设定\n")
+    const shortFile = path.join(shortBook, "正文.md")
+
+    // Mid-draft (<6000 chars) with 5 not-is hits + narrator spoilers + trailer clichés -> 0 style findings
+    const fiveNotIs = [
+      "他不是心软，而是怕曝光。",
+      "那不是巧合，而是设局。",
+      "她不是不懂，而是装傻。",
+      "这不是意外，而是预谋。",
+      "是真账本，不是假流水。",
+    ].join("\n")
+    const midDraft = `# 试写\n\n${pad}\n${fiveNotIs}\n没人知道真相，一切才刚刚开始。\n复仇大戏拉开序幕。\n她关上了门。\n`
+    write(shortFile, midDraft)
+    assert.equal(
+      core.proseAfterWrite(root, shortFile),
+      "",
+      "short mid-draft (<6000c, 5 not-is, spoilers/trailers) must stay silent"
+    )
+    assert.equal(core.hasHardProseFindings(root, shortFile), false)
+
+    // 6 not-is hits in short 正文.md -> soft advisory reminder (NOT 本章须清零后再继续)
+    const sixNotIs = `${fiveNotIs}\n我不是求和，而是来清算。`
+    write(shortFile, `# 试写\n\n${pad}\n${sixNotIs}\n她关上了门。\n`)
+    const shortStyleWarn = core.proseAfterWrite(root, shortFile)
+    assert.match(shortStyleWarn, /短篇风格复核提醒（非阻断）/)
+    assert.match(shortStyleWarn, /短篇软提醒，非阻断/)
+    assert.ok(!shortStyleWarn.includes("本章须清零后再继续"), "short mode must not use blocking phrasing")
+    assert.match(shortStyleWarn, /check-ai-patterns\.js --check <正文文件>/)
+    assert.equal(core.hasHardProseFindings(root, shortFile), false)
+
+    // >=6000 chars short 正文.md: narrator spoilers still silent, 2+ clichés warn softly
+    const bigPad = "雨夜里的便利店还亮着灯，她核对完银行流水把手机放回包里，推门走入冷风中。".repeat(200)
+    write(
+      shortFile,
+      `# 成稿\n\n${bigPad}\n没人知道她的底牌。\n可他不知道的是，公证早已完成。\n殊不知大局已定。\n她关上了门。\n`
+    )
+    assert.equal(
+      core.proseAfterWrite(root, shortFile),
+      "",
+      "short >=6000c narrator spoilers alone must stay silent"
+    )
+    write(
+      shortFile,
+      `# 成稿\n\n${bigPad}\n一切才刚刚开始。\n复仇大戏就此拉开序幕。\n她关上了门。\n`
+    )
+    const shortClicheWarn = core.proseAfterWrite(root, shortFile)
+    assert.match(shortClicheWarn, /trailer-ending/)
+    assert.ok(!shortClicheWarn.includes("本章须清零后再继续"))
+
+    // Hard degeneration in short 正文.md still triggers hard warning & hasHardProseFindings === true
+    write(shortFile, `# 成稿\n\n${pad}\n她冲过去一把扯住`)
+    assert.equal(core.hasHardProseFindings(root, shortFile), true)
+    assert.match(core.proseAfterWrite(root, shortFile), /【退化\/工程词\/毒句式】[\s\S]*疑似截断/)
+
+    // Long-form chapter still uses original blocking phrasing for 3 not-is hits & trailer-ending
+    const longChapter = path.join(shortBook, "正文/第001章_长篇对照.md")
+    write(
+      longChapter,
+      `# 第1章\n\n${pad}\n他不是心软，而是怕曝光。\n那不是巧合，而是设局。\n她不是不懂，而是装傻。\n她关上了门。\n`
+    )
+    const longWarn = core.proseAfterWrite(root, longChapter)
+    assert.match(longWarn, /本章须清零后再继续/)
   } finally {
     fs.rmSync(root, { recursive: true, force: true })
   }

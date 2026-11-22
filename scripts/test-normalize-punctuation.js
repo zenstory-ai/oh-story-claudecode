@@ -269,7 +269,64 @@ try {
   assert.strictEqual(missing.status, 2);
   assert.match(missing.stderr, /unable to read/);
 
-  console.log("OK: punctuation normalizer check/write, quoted ellipsis, robust fences, CRLF, quote modes, and errors");
+  // 短篇模式（--mode=short 与 --mode=auto 自动识别）：保留旁白标准 ——，统一非标 —/———/-- 为 ——，数字范围仍转「到」。
+  const shortBook = path.join(tmpDir, "short-book");
+  fs.mkdirSync(shortBook, { recursive: true });
+  fs.writeFileSync(path.join(shortBook, "设定.md"), "# 设定\n", "utf8");
+  const shortClean = path.join(shortBook, "正文.md");
+  const shortCleanText = "他推开门——屋里空无一人。\n“等等——”她喊住他。\n10到20米外有人影。\n";
+  fs.writeFileSync(shortClean, shortCleanText, "utf8");
+  const shortAutoCheck = run(["--check", shortClean]);
+  assert.strictEqual(shortAutoCheck.status, 0, "auto short mode must keep standard narration ——: " + shortAutoCheck.stdout);
+  const shortAutoWrite = run([shortClean]);
+  assert.strictEqual(shortAutoWrite.status, 0, shortAutoWrite.stderr);
+  assert.match(shortAutoWrite.stdout, /Changed files: 0/);
+  assert.strictEqual(fs.readFileSync(shortClean, "utf8"), shortCleanText);
+
+  // 显式 --mode=long 覆盖自动短篇判定，恢复长篇规则（旁白 —— 替换为中文标点）。
+  const forceLongCheck = run(["--mode=long", "--check", shortClean]);
+  assert.strictEqual(forceLongCheck.status, 1, "--mode=long must still flag narration ——");
+  assert.match(forceLongCheck.stdout, /em-dash/);
+
+  // 短篇模式下非标破折号与双连字符统一为 ——，数字范围 10--20 仍转为 10到20，--- 分隔线和 ... 省略号照常处理。
+  const shortDirty = path.join(tmpDir, "short-dirty.md");
+  fs.writeFileSync(
+    shortDirty,
+    [
+      "他说...真相就在这里——没人反驳。",
+      "门开了—他站在门外———她退了一步--灯灭了。",
+      "10--20分钟后。",
+      "---",
+      "“别走—”他拉住她。",
+      "",
+    ].join("\n"),
+    "utf8"
+  );
+  const shortDirtyCheck = run(["--mode=short", "--check", shortDirty]);
+  assert.strictEqual(shortDirtyCheck.status, 1, shortDirtyCheck.stderr);
+  assert.match(shortDirtyCheck.stdout, /ellipsis/);
+  assert.match(shortDirtyCheck.stdout, /em-dash/);
+  assert.match(shortDirtyCheck.stdout, /double-hyphen/);
+  assert.match(shortDirtyCheck.stdout, /markdown-divider/);
+  assert.strictEqual(run(["--mode=short", shortDirty]).status, 0);
+  assert.strictEqual(
+    fs.readFileSync(shortDirty, "utf8"),
+    [
+      "他说……真相就在这里——没人反驳。",
+      "门开了——他站在门外——她退了一步——灯灭了。",
+      "10到20分钟后。",
+      "“别走——”他拉住她。",
+      "",
+    ].join("\n"),
+    "short mode must preserve standard —— and unify non-standard dashes to ——"
+  );
+  assert.strictEqual(run(["--mode=short", "--check", shortDirty]).status, 0, "short mode normalization must be idempotent");
+  assert.match(run(["--mode=short", shortDirty]).stdout, /Changed files: 0/);
+
+  // 非法 --mode 返回退出码 2。
+  assert.strictEqual(run(["--mode=invalid", shortDirty]).status, 2);
+
+  console.log("OK: punctuation normalizer check/write, quoted ellipsis, robust fences, CRLF, quote modes, short mode, and errors");
 } finally {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 }

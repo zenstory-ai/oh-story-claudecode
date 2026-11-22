@@ -184,6 +184,76 @@ function verify(projectDir, contract, options = {}) {
     'advisory'
   ))
 
+  // 短篇竖屏结构健康度（全部仅 advisory，不设标点/情绪词计数门禁）。
+  const bodyLines = lines
+    .map((line, index) => ({ line: line.trim(), index }))
+    .filter(({ line, index }) => line !== '' && !markerLines.has(index) && !/^#{1,6}\s/.test(line))
+  const paraLengths = bodyLines.map(({ line }) => visibleChars(line)).filter((len) => len > 0)
+  const bodyChars = paraLengths.reduce((sum, len) => sum + len, 0)
+
+  let paraRhythmOk = true
+  let paraRhythmEvidence = '正文无内容段落'
+  if (paraLengths.length > 0) {
+    const sorted = [...paraLengths].sort((a, b) => a - b)
+    const mid = Math.floor(sorted.length / 2)
+    const median = sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+    const over80Count = paraLengths.filter((len) => len > 80).length
+    const over80Ratio = over80Count / paraLengths.length
+    paraRhythmOk = median <= 45 && over80Ratio <= 0.10
+    paraRhythmEvidence = `共 ${paraLengths.length} 段，段长中位 ${median} 字，>80 字段落 ${over80Count} 段（${(over80Ratio * 100).toFixed(1)}%）`
+  }
+  checks.push(makeCheck(
+    'delivery.short-para-rhythm',
+    paraRhythmOk,
+    paraRhythmEvidence,
+    '建议短篇段落中位 ≤45 字且 >80 字长段占比 ≤10%，贴合手机竖屏阅读节奏',
+    '复核超长段落：把多动作/多信息混杂的长段按镜头或一句一段拆开；刻意长推理/古言抒情段可保留。',
+    'advisory'
+  ))
+
+  let dialogueOk = true
+  let dialogueEvidence = '正文不足 200 字，跳过对话占比检查'
+  if (bodyChars >= 200) {
+    let quotedChars = 0
+    const quoteRe = /“[^”\n]*”|「[^」\n]*」|『[^』\n]*』|"[^"\n]*"/g
+    for (const { line } of bodyLines) {
+      let m
+      quoteRe.lastIndex = 0
+      while ((m = quoteRe.exec(line)) !== null) {
+        quotedChars += visibleChars(m[0].slice(1, -1))
+      }
+    }
+    const dialogueRatio = quotedChars / bodyChars
+    dialogueOk = dialogueRatio >= 0.15
+    dialogueEvidence = `引号内对话 ${quotedChars} / ${bodyChars} 字（${(dialogueRatio * 100).toFixed(1)}%）`
+  }
+  checks.push(makeCheck(
+    'delivery.short-dialogue-share',
+    dialogueOk,
+    dialogueEvidence,
+    '建议短篇对话占比 ≥15%，用直接交锋推动节奏（纯独白/书信/强悬疑独角戏可按题材豁免）',
+    '复核对话占比：若中段大段旁白转述冲突，改成当面对质或短促台词交锋；独白体题材可保留。',
+    'advisory'
+  ))
+
+  let leadOk = true
+  let leadEvidence = '节数不足 2 节或无正文内容，跳过导语检查'
+  if (markers.length >= 2 && bodyChars > 0) {
+    const leadChars = visibleChars(lines.slice(0, markers[0].line - 1).join('\n'))
+    leadOk = leadChars > 0 && leadChars <= 500
+    leadEvidence = leadChars === 0
+      ? '首个小节标记前缺少导语（0 字）'
+      : `首个小节标记前导语 ${leadChars} 字`
+  }
+  checks.push(makeCheck(
+    'delivery.short-lead-present',
+    leadOk,
+    leadEvidence,
+    '建议多节短篇在首个小节标记前设置 1-500 字冷开场导语',
+    '复核导语：若投稿平台需要冷开场导语，在首个小节标记前补 150-300 字导语或压短过长导语；刻意直入第 1 节可保留。',
+    'advisory'
+  ))
+
   return report(project, contract, checks, { strict })
 }
 

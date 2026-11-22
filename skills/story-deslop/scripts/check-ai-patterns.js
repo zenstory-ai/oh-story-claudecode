@@ -5,7 +5,7 @@ const fs = require('fs');
 const { loadStyleWhitelist, maskStyleText } = require('./style-whitelist.js');
 const path = require('path');
 
-const USAGE = `Usage: node check-ai-patterns.js [--check] [--json] [--fail-on=blocking|review_required|all] <file...>
+const USAGE = `Usage: node check-ai-patterns.js [--check] [--json] [--mode=auto|long|short] [--fail-on=blocking|review_required|all] <file...>
        node check-ai-patterns.js --list-review-classes
 
 Detect high-risk AI-flavor prose patterns that need human rewrite:
@@ -53,9 +53,17 @@ const MAX_POSITIVE_SPAN = 80;
 // 碎句号：连续 STUTTER_MIN_RUN 个「叙述」短句（每句可见字数 ≤ STUTTER_MAX_SENTENCE）无呼吸。
 // 只数叙述句，跳过对话/弹幕/系统播报（成片短句是这些体裁的正常形态，不算碎句号）。
 const STUTTER_MIN_RUN = 6;
+const SHORT_STUTTER_MIN_RUN = 9;
 const STUTTER_MAX_SENTENCE = 5;
-// 长段落：单段原始字符数超过阈值即提示按镜头断段（手机阅读保守阈值，正常单段远低于此）。
+// 长段落：单段原始字符数超过阈值即提示按镜头断段（长篇保守阈值 200；短篇竖屏阅读收紧到 100）。
 const LONG_PARAGRAPH_CHARS = 200;
+const SHORT_LONG_PARAGRAPH_CHARS = 100;
+// 短篇旁白破折号密度门槛：短篇旁白允许用 —— 做转折/揭底拍，仅高密度聚集时 advisory。
+const SHORT_EM_DASH_MIN_HITS = 6;
+const SHORT_EM_DASH_PER_KILO = 1.5;
+// 短篇套式反应细节门槛：实测真人网文短篇 74% 含常规情绪/生理速记，短篇抬高到 8 处且 3.0/千字。
+const SHORT_STOCK_REACTION_MIN_HITS = 8;
+const SHORT_STOCK_REACTION_PER_KILO = 3.0;
 
 // 微动作复读：「V了下 / V了一下 / 拍了两下 / 松了半圈」式轻量补语在叙述里高密度复现，
 // 容易形成删减过头的电报体指纹。只扫引号外叙述；密度与次数双门槛同时达标才报，
@@ -249,8 +257,11 @@ const REVERSE_NOT_IS_PREV_EXCLUDE = new Set([...COMPACT_EITHER_OR_PREV, '还', '
 // 「他/她/它(们)不知道的是」是全知旁白跳出视角预告后事（banned-words 抽象收束、预告行）；
 // 必须带「的是」，「她不知道该说什么」这类普通叙述不计。
 // 校准：《万疆》20 章排除「正式拉开序幕」2 处报幕句后 0 命中，demo 前 20 章 0 命中。
-const TRAILER_ENDING_PATTERN = /没人知道|谁也不知道|谁也没想到|[他她它]们?不知道的是|殊不知|(?:这)?才刚刚开(?:始|头)|正(?:朝着|向着)[^。！？!?\n]{0,24}(?:压|涌|袭|逼)(?:了?过去|了?过来|来)|(?<!正式)拉开(?:序幕|帷幕)|即将(?:开始|来临|降临)/g;
+const TRAILER_SPOILER_PATTERN = /没人知道|谁也不知道|谁也没想到|[他她它]们?不知道的是|殊不知/g;
+const TRAILER_CLICHE_PATTERN = /(?:这)?才刚刚开(?:始|头)|正(?:朝着|向着)[^。！？!?\n]{0,24}(?:压|涌|袭|逼)(?:了?过去|了?过来|来)|(?<!正式)拉开(?:序幕|帷幕)|即将(?:开始|来临|降临)/g;
+const TRAILER_ENDING_PATTERN = new RegExp(`${TRAILER_SPOILER_PATTERN.source}|${TRAILER_CLICHE_PATTERN.source}`, 'g');
 const TRAILER_ENDING_WINDOW_CHARS = 600;
+const shortSpoilerFindings = new WeakSet();
 
 // 章尾状态总结体：把细纲「结尾设定」原样写成总结句收章（「这一夜注定无人入眠」
 // 「这一切都结束了」「新的人生才刚刚开始」「命运的齿轮」）。与 trailer-ending 共用文末窗口，
@@ -351,6 +362,7 @@ const options = {
   json: false,
   files: [],
   failOn: 'all',
+  mode: 'auto',
 };
 
 for (let i = 2; i < process.argv.length; i += 1) {
@@ -362,6 +374,19 @@ for (let i = 2; i < process.argv.length; i += 1) {
     process.exit(0);
   } else if (arg === '--json') {
     options.json = true;
+  } else if (arg === '--mode') {
+    const v = process.argv[i + 1];
+    if (v !== 'auto' && v !== 'long' && v !== 'short') {
+      die("--mode must be 'auto', 'long', or 'short'");
+    }
+    options.mode = v;
+    i += 1;
+  } else if (arg.startsWith('--mode=')) {
+    const v = arg.slice('--mode='.length);
+    if (v !== 'auto' && v !== 'long' && v !== 'short') {
+      die("--mode must be 'auto', 'long', or 'short'");
+    }
+    options.mode = v;
   } else if (arg.startsWith('--fail-on=')) {
     const v = arg.slice('--fail-on='.length);
     if (v !== 'blocking' && v !== 'review_required' && v !== 'all') {
@@ -376,6 +401,17 @@ for (let i = 2; i < process.argv.length; i += 1) {
   } else {
     options.files.push(arg);
   }
+}
+
+function resolveMode(fullPath, requestedMode) {
+  if (requestedMode === 'short' || requestedMode === 'long') return requestedMode;
+  if (path.basename(fullPath) === '正文.md') {
+    const dir = path.dirname(fullPath);
+    if (fs.existsSync(path.join(dir, '设定.md')) || fs.existsSync(path.join(dir, '小节大纲.md'))) {
+      return 'short';
+    }
+  }
+  return 'long';
 }
 
 if (options.files.length === 0) {
@@ -399,7 +435,8 @@ for (const file of options.files) {
   let whitelist;
   try { whitelist = loadStyleWhitelist(fullPath); }
   catch (error) { die(`${file}: unable to read .deslop-whitelist (${error.message})`); }
-  const findings = scanDocument(maskStyleText(input, whitelist)).map((finding) => {
+  const effectiveMode = resolveMode(fullPath, options.mode);
+  const findings = scanDocument(maskStyleText(input, whitelist), new Set(), effectiveMode).map((finding) => {
     const baseReview = reviewClass(finding.type);
     return { file, ...finding, review: finding.review || baseReview };
   });
@@ -459,7 +496,7 @@ function die(message) {
 
 // unclosedOpenings：到文末都没闭合的 `<!--` 位置（"行号:列号"）。未闭合的注释不是注释，
 // 否则一个漏写的 `-->` 会把后面整章藏起来；这些位置按正文扫描，只把 `<!--` 本身抹掉。
-function scanDocument(input, unclosedOpenings = new Set()) {
+function scanDocument(input, unclosedOpenings = new Set(), mode = 'long') {
   const lines = input.split(/\r?\n/);
   const findings = [];
   let fence = null;
@@ -510,39 +547,55 @@ function scanDocument(input, unclosedOpenings = new Set()) {
   }
 
   if (commentOpen && commentStart !== null) {
-    return scanDocument(input, new Set([...unclosedOpenings, commentStart]));
+    return scanDocument(input, new Set([...unclosedOpenings, commentStart]), mode);
   }
 
   flushBlock();
-  findings.push(...scanProsePatterns(proseLines));
   let proseChars = 0;
   for (const { text } of proseLines) {
     const trimmed = text.trim();
     if (!trimmed || isDivider(trimmed) || isStructural(trimmed)) continue;
     proseChars += Array.from(trimmed.replace(/\s+/g, '')).length;
   }
-  applyDensitySeverityGates(findings, proseChars);
+  const scale = computeDensityScale(proseChars);
+  findings.push(...scanProsePatterns(proseLines, mode, scale));
+  applyDensitySeverityGates(findings, proseChars, mode);
   findings.sort((a, b) => a.line - b.line || a.column - b.column);
   return findings;
 }
 
-function applyDensitySeverityGates(findings, proseChars = 0) {
-  const scale = Math.max(1, Math.floor((proseChars + Math.floor(DENSITY_SCALE_UNIT_CHARS / 2)) / DENSITY_SCALE_UNIT_CHARS));
+function computeDensityScale(proseChars = 0) {
+  return Math.max(1, Math.floor((proseChars + Math.floor(DENSITY_SCALE_UNIT_CHARS / 2)) / DENSITY_SCALE_UNIT_CHARS));
+}
+
+function applyDensitySeverityGates(findings, proseChars = 0, mode = 'long') {
+  const scale = computeDensityScale(proseChars);
   const counts = new Map();
+  let trailerClicheCount = 0;
   for (const f of findings) {
     counts.set(f.type, (counts.get(f.type) || 0) + 1);
+    if (f.type === 'trailer-ending' && !shortSpoilerFindings.has(f)) {
+      trailerClicheCount += 1;
+    }
   }
   const notIsCombined = (counts.get('not-is-comparison') || 0) + (counts.get('reverse-not-is') || 0);
+  const notIsThreshold = mode === 'short'
+    ? Math.max(6, Math.round(5 * scale))
+    : NOT_IS_BLOCKING_MIN_HITS * scale;
   for (const f of findings) {
     let block = null;
     if (f.type === 'not-is-comparison' || f.type === 'reverse-not-is') {
-      block = notIsCombined >= NOT_IS_BLOCKING_MIN_HITS * scale;
+      block = notIsCombined >= notIsThreshold;
     } else if (f.type === 'voice-contrast') {
       block = (counts.get('voice-contrast') || 0) >= VOICE_CONTRAST_BLOCKING_MIN_HITS * scale;
     } else if (f.type === 'negation-parade') {
       block = (counts.get('negation-parade') || 0) >= NEGATION_PARADE_BLOCKING_MIN_HITS * scale;
     } else if (f.type === 'trailer-ending') {
-      block = (counts.get('trailer-ending') || 0) >= TRAILER_ENDING_BLOCKING_MIN_HITS;
+      if (mode === 'short') {
+        block = !shortSpoilerFindings.has(f) && trailerClicheCount >= TRAILER_ENDING_BLOCKING_MIN_HITS;
+      } else {
+        block = (counts.get('trailer-ending') || 0) >= TRAILER_ENDING_BLOCKING_MIN_HITS;
+      }
     }
     if (block === true) {
       f.severity = 'review_required';
@@ -555,8 +608,14 @@ function applyDensitySeverityGates(findings, proseChars = 0) {
 }
 
 // 段落级检测：碎句号（连续短叙述句）、长段落、旁白破折号（按功能改写，对白引号与面板内豁免）。
-function scanProsePatterns(proseLines) {
+function scanProsePatterns(proseLines, mode = 'long', scale = 1) {
   const findings = [];
+  const longParaLimit = mode === 'short' ? SHORT_LONG_PARAGRAPH_CHARS : LONG_PARAGRAPH_CHARS;
+  let shortDashHits = 0;
+  let shortDashNarrativeChars = 0;
+  let shortDashFirstLine = null;
+  let shortDashFirstCol = 1;
+  const shortDashSamples = [];
 
   for (const { text, lineNo } of proseLines) {
     const trimmed = text.trim();
@@ -564,19 +623,33 @@ function scanProsePatterns(proseLines) {
 
     const dashScanText = maskQuotedWithUnclosed(text);
     const dashPattern = /——|—|--+/g;
-    let dash;
-    while ((dash = dashPattern.exec(dashScanText)) !== null) {
-      findings.push({
-        line: lineNo,
-        column: dash.index + 1,
-        type: 'em-dash',
-        severity: 'review_required',
-        message: '叙述旁白不用破折号，按功能改写：打断→动作或抢白，停顿→逗号或省略，插入说明→逗号/冒号；勿一律改句号。',
-        excerpt: compact(text.slice(Math.max(0, dash.index - 8), dash.index + dash[0].length + 8)),
-      });
+    if (mode === 'short') {
+      shortDashNarrativeChars += visibleLength(stripQuoted(trimmed));
+      let dash;
+      while ((dash = dashPattern.exec(dashScanText)) !== null) {
+        shortDashHits += 1;
+        if (shortDashFirstLine === null) {
+          shortDashFirstLine = lineNo;
+          shortDashFirstCol = dash.index + 1;
+        }
+        const ex = compact(text.slice(Math.max(0, dash.index - 8), dash.index + dash[0].length + 8));
+        if (shortDashSamples.length < 5 && ex && !shortDashSamples.includes(ex)) shortDashSamples.push(ex);
+      }
+    } else {
+      let dash;
+      while ((dash = dashPattern.exec(dashScanText)) !== null) {
+        findings.push({
+          line: lineNo,
+          column: dash.index + 1,
+          type: 'em-dash',
+          severity: 'review_required',
+          message: '叙述旁白不用破折号，按功能改写：打断→动作或抢白，停顿→逗号或省略，插入说明→逗号/冒号；勿一律改句号。',
+          excerpt: compact(text.slice(Math.max(0, dash.index - 8), dash.index + dash[0].length + 8)),
+        });
+      }
     }
 
-    if (trimmed.length > LONG_PARAGRAPH_CHARS) {
+    if (trimmed.length > longParaLimit) {
       findings.push({
         line: lineNo,
         column: 1,
@@ -588,24 +661,41 @@ function scanProsePatterns(proseLines) {
     }
   }
 
+  if (mode === 'short' && shortDashHits >= SHORT_EM_DASH_MIN_HITS && shortDashNarrativeChars > 0) {
+    const perKilo = (shortDashHits / shortDashNarrativeChars) * 1000;
+    if (perKilo >= SHORT_EM_DASH_PER_KILO) {
+      findings.push({
+        line: shortDashFirstLine,
+        column: shortDashFirstCol,
+        type: 'em-dash',
+        severity: 'advisory',
+        review: 'semantic',
+        message: `短篇旁白破折号偏密：${shortDashHits} 处（${perKilo.toFixed(1)}/千字）；保留关键反转或情绪揭底拍，其余按功能改逗号或冒号。`,
+        excerpt: compact(shortDashSamples.join(' | ')),
+      });
+    }
+  }
+
   findings.push(...findVoiceContrast(proseLines));
   findings.push(...findNegationParade(proseLines));
   findings.push(...findFormulaicParallelism(proseLines));
   findings.push(...findReverseNotIs(proseLines));
-  findings.push(...findTrailerEnding(proseLines));
-  findings.push(...findQuoteEmphasisTic(proseLines));
-  findings.push(...findPeriodStutter(proseLines));
+  findings.push(...findTrailerEnding(proseLines, mode));
+  findings.push(...findQuoteEmphasisTic(proseLines, mode, scale));
+  findings.push(...findPeriodStutter(proseLines, mode));
   findings.push(...findMicroActionTic(proseLines));
-  findings.push(...findNegationPairTic(proseLines));
-  findings.push(...findStockReactionTic(proseLines));
+  findings.push(...findNegationPairTic(proseLines, mode, scale));
+  findings.push(...findStockReactionTic(proseLines, mode));
   findings.push(...findActionListTic(proseLines));
   findings.push(...findAbstractSummaryTic(proseLines));
   findings.push(...findClicheDensityTic(proseLines));
   findings.push(...findMetaphorDensityTic(proseLines));
   findings.push(...findReasoningChainTic(proseLines));
   findings.push(...findNoticeFormalityTic(proseLines));
-  findings.push(...findOvercompressedProseTic(proseLines));
-  findings.push(...findLowConnectiveDensityTic(proseLines));
+  if (mode !== 'short') {
+    findings.push(...findOvercompressedProseTic(proseLines));
+    findings.push(...findLowConnectiveDensityTic(proseLines));
+  }
   findings.push(...findEllipsisDensityTic(proseLines));
   return findings;
 }
@@ -768,7 +858,7 @@ function findReverseNotIs(proseLines) {
 
 // 预告式总结收尾（实战漏网 D）：只扫文末窗口。从文末往回收集叙述行，
 // 直到剥引号后的可见字数达到窗口大小（按行取整，边界行整行计入）。
-function findTrailerEnding(proseLines) {
+function findTrailerEnding(proseLines, mode = 'long') {
   const windowLines = [];
   let accumulated = 0;
 
@@ -783,17 +873,47 @@ function findTrailerEnding(proseLines) {
   const findings = [];
   for (const { text, lineNo } of windowLines) {
     const masked = maskQuoted(text);
-    TRAILER_ENDING_PATTERN.lastIndex = 0;
-    let match;
-    while ((match = TRAILER_ENDING_PATTERN.exec(masked)) !== null) {
-      findings.push({
-        line: lineNo,
-        column: match.index + 1,
-        type: 'trailer-ending',
-        severity: 'review_required',
-        message: '预告式总结收尾：「没人知道/才刚刚开始/正朝着…压了过去」是 AI 章尾预告腔；结尾停在具体决定、动作、画面或一句台词上，悬念让事件自己挂住，别替读者预告下一章。',
-        excerpt: compact(text.slice(match.index, match.index + match[0].length)),
-      });
+    if (mode === 'short') {
+      TRAILER_SPOILER_PATTERN.lastIndex = 0;
+      let spoilerMatch;
+      while ((spoilerMatch = TRAILER_SPOILER_PATTERN.exec(masked)) !== null) {
+        const finding = {
+          line: lineNo,
+          column: spoilerMatch.index + 1,
+          type: 'trailer-ending',
+          severity: 'advisory',
+          review: 'semantic',
+          message: '短篇文末信息差/剧透钩子提示：确属后文兑现或火葬场预告可保留，无具体事件支撑则删改。',
+          excerpt: compact(text.slice(spoilerMatch.index, spoilerMatch.index + spoilerMatch[0].length)),
+        };
+        shortSpoilerFindings.add(finding);
+        findings.push(finding);
+      }
+      TRAILER_CLICHE_PATTERN.lastIndex = 0;
+      let clicheMatch;
+      while ((clicheMatch = TRAILER_CLICHE_PATTERN.exec(masked)) !== null) {
+        findings.push({
+          line: lineNo,
+          column: clicheMatch.index + 1,
+          type: 'trailer-ending',
+          severity: 'review_required',
+          message: '预告式总结收尾：「才刚刚开始/拉开序幕/正朝着…压了过去」是 AI 章尾预告腔；结尾停在具体决定、动作、画面或一句台词上，悬念让事件自己挂住，别替读者预告下一章。',
+          excerpt: compact(text.slice(clicheMatch.index, clicheMatch.index + clicheMatch[0].length)),
+        });
+      }
+    } else {
+      TRAILER_ENDING_PATTERN.lastIndex = 0;
+      let match;
+      while ((match = TRAILER_ENDING_PATTERN.exec(masked)) !== null) {
+        findings.push({
+          line: lineNo,
+          column: match.index + 1,
+          type: 'trailer-ending',
+          severity: 'review_required',
+          message: '预告式总结收尾：「没人知道/才刚刚开始/正朝着…压了过去」是 AI 章尾预告腔；结尾停在具体决定、动作、画面或一句台词上，悬念让事件自己挂住，别替读者预告下一章。',
+          excerpt: compact(text.slice(match.index, match.index + match[0].length)),
+        });
+      }
     }
     TRAILER_SUMMARY_PATTERN.lastIndex = 0;
     let summaryMatch;
@@ -814,7 +934,7 @@ function findTrailerEnding(proseLines) {
 
 // 引号强调滥用（实战漏网 E）：统计叙述层 1-4 字成对引号强调片段，全文只报一条
 // （密度型分布指纹）。台词类排除见 QUOTE_EMPHASIS_* 常量注释。
-function findQuoteEmphasisTic(proseLines) {
+function findQuoteEmphasisTic(proseLines, mode = 'long', scale = 1) {
   let hits = 0;
   let firstLine = null;
   const samples = [];
@@ -845,7 +965,8 @@ function findQuoteEmphasisTic(proseLines) {
     }
   }
 
-  if (hits < QUOTE_EMPHASIS_MIN_HITS) return [];
+  const minHits = mode === 'short' ? Math.max(6, Math.round(3 * scale)) : QUOTE_EMPHASIS_MIN_HITS;
+  if (hits < minHits) return [];
 
   return [{
     line: firstLine,
@@ -858,7 +979,7 @@ function findQuoteEmphasisTic(proseLines) {
 }
 
 // 否定对偶：统计引号外叙述里「没A，也没B」式句子，全文只报一条。
-function findNegationPairTic(proseLines) {
+function findNegationPairTic(proseLines, mode = 'long', scale = 1) {
   let hits = 0;
   let firstLine = null;
   const samples = [];
@@ -874,7 +995,8 @@ function findNegationPairTic(proseLines) {
       if (samples.length < 4) samples.push(match[0]);
     }
   }
-  if (hits < NEGATION_PAIR_MIN_HITS) return [];
+  const minHits = mode === 'short' ? Math.max(6, Math.round(3 * scale)) : NEGATION_PAIR_MIN_HITS;
+  if (hits < minHits) return [];
   return [{
     line: firstLine,
     column: 1,
@@ -959,7 +1081,7 @@ function findMicroActionTic(proseLines) {
 // 套式反应细节：统计引号外叙述中通用的部位/声线反应与固定语气比喻。
 // 这是删除测试的候选集，不是身体描写黑名单；全篇只报一条，保留有动作后果、
 // 伤势、人物习惯或情节功能的细节。
-function findStockReactionTic(proseLines) {
+function findStockReactionTic(proseLines, mode = 'long') {
   let hits = 0;
   let narrativeChars = 0;
   let firstLine = null;
@@ -983,9 +1105,11 @@ function findStockReactionTic(proseLines) {
     }
   }
 
-  if (narrativeChars === 0 || hits < STOCK_REACTION_MIN_HITS) return [];
+  const minHits = mode === 'short' ? SHORT_STOCK_REACTION_MIN_HITS : STOCK_REACTION_MIN_HITS;
+  const perKiloLimit = mode === 'short' ? SHORT_STOCK_REACTION_PER_KILO : STOCK_REACTION_PER_KILO;
+  if (narrativeChars === 0 || hits < minHits) return [];
   const perKilo = (hits / narrativeChars) * 1000;
-  if (perKilo < STOCK_REACTION_PER_KILO) return [];
+  if (perKilo < perKiloLimit) return [];
 
   return [{
     line: firstLine,
@@ -1351,14 +1475,15 @@ function findAbstractSummaryTic(proseLines) {
   }];
 }
 
-function findPeriodStutter(proseLines) {
+function findPeriodStutter(proseLines, mode = 'long') {
   const findings = [];
+  const stutterMinRun = mode === 'short' ? SHORT_STUTTER_MIN_RUN : STUTTER_MIN_RUN;
   let runLen = 0;
   let runStartLine = null;
   let runSample = [];
 
   const flush = () => {
-    if (runLen >= STUTTER_MIN_RUN) {
+    if (runLen >= stutterMinRun) {
       findings.push({
         line: runStartLine,
         column: 1,

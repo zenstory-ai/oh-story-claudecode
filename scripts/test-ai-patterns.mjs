@@ -1094,4 +1094,213 @@ describe("check-ai-patterns.js", () => {
     assert.equal(rDense.status, 1);
     assert.equal(runDetector(["--json", "--fail-on=blocking", fShortDense]).status, 0);
   });
+
+  test("short mode (--mode=short / --mode=auto): relaxed short-fiction rules while long mode stays unchanged", () => {
+    // 1) Auto-detection: 正文.md with sibling 设定.md or 小节大纲.md -> short; without -> long
+    const shortDirA = path.join(tmpDir, "auto-short-a");
+    fs.mkdirSync(shortDirA, { recursive: true });
+    fs.writeFileSync(path.join(shortDirA, "设定.md"), "# 设定\n", "utf8");
+    const shortBodyA = path.join(shortDirA, "正文.md");
+    fs.writeFileSync(
+      shortBodyA,
+      "他回头看了一眼——门已经关了。\n她冷笑一声——协议早签好了。\n",
+      "utf8"
+    );
+    const rAutoA = runDetector(["--json", "--fail-on=review_required", shortBodyA]);
+    assert.equal(rAutoA.status, 0, "auto short mode must not fail on 2 narration em-dashes");
+    assert.equal(rAutoA.json().findings.filter((f) => f.type === "em-dash").length, 0);
+
+    const shortDirB = path.join(tmpDir, "auto-short-b");
+    fs.mkdirSync(shortDirB, { recursive: true });
+    fs.writeFileSync(path.join(shortDirB, "小节大纲.md"), "# 小节大纲\n", "utf8");
+    const shortBodyB = path.join(shortDirB, "正文.md");
+    fs.writeFileSync(shortBodyB, "他回头看了一眼——门已经关了。\n", "utf8");
+    assert.equal(runDetector(["--json", "--fail-on=review_required", shortBodyB]).status, 0);
+
+    // Explicit --mode=long overrides auto-short detection
+    const rForceLong = runDetector(["--mode=long", "--json", "--fail-on=review_required", shortBodyA]);
+    assert.equal(rForceLong.status, 1, "--mode=long must still flag narration em-dash as review_required");
+    assert.equal(rForceLong.json().findings.filter((f) => f.type === "em-dash").length, 2);
+
+    // Without sibling 设定.md / 小节大纲.md, 正文.md stays in long mode
+    const plainDir = path.join(tmpDir, "auto-long-plain");
+    fs.mkdirSync(plainDir, { recursive: true });
+    const plainBody = path.join(plainDir, "正文.md");
+    fs.writeFileSync(plainBody, "他回头看了一眼——门已经关了。\n", "utf8");
+    assert.equal(runDetector(["--json", "--fail-on=review_required", plainBody]).status, 1);
+
+    // 2) em-dash in short mode: advisory density gate (>=6 hits AND >=1.5/k)
+    const fDashDense = writeFixture(
+      "short-emdash-dense.md",
+      Array.from({ length: 6 }, (_, i) => `第${i + 1}次转身——真相浮出水面。`).join("\n")
+    );
+    const rDashDense = runDetector(["--mode=short", "--json", "--fail-on=review_required", fDashDense]);
+    assert.equal(rDashDense.status, 0, "dense em-dash in short mode is advisory, not review_required");
+    const dashF = rDashDense.json().findings.filter((f) => f.type === "em-dash");
+    assert.equal(dashF.length, 1);
+    assert.equal(dashF[0].severity, "advisory");
+    assert.equal(dashF[0].review, "semantic");
+
+    // Dense count (6 hits) but low density (<1.5/k over >4500 chars) stays silent in short mode
+    const longPad = Array.from(
+      { length: 160 },
+      (_, i) => `第${i + 1}段：她推开会议室玻璃门，把复印好的转账清单和录音笔一起推到桌案正中。`
+    ).join("\n");
+    const fDashSparse = writeFixture(
+      "short-emdash-sparse.md",
+      `${longPad}\n` + Array.from({ length: 6 }, (_, i) => `第${i + 1}次停顿——他没说话。`).join("\n")
+    );
+    assert.equal(
+      runDetector(["--mode=short", "--json", fDashSparse]).json().findings.filter((f) => f.type === "em-dash").length,
+      0
+    );
+
+    // 3) trailer-ending split: narrator spoilers -> advisory; clichés -> review_required
+    const fSpoilers = writeFixture("short-spoilers.md", [
+      "她签完字走出律师所。",
+      "可他不知道的是，那份股权早已冻结。",
+      "没人知道，她早就把备份交给了审计。",
+      "谁也没想到，第二天热搜直接爆了。",
+      "殊不知，他手里的印章根本是假的。",
+    ]);
+    const rSpoilers = runDetector(["--mode=short", "--json", "--fail-on=review_required", fSpoilers]);
+    assert.equal(rSpoilers.status, 0, "narrator spoilers in short mode must stay advisory");
+    const spoilerF = rSpoilers.json().findings.filter((f) => f.type === "trailer-ending");
+    assert.equal(spoilerF.length, 4);
+    assert.ok(spoilerF.every((f) => f.severity === "advisory" && f.review === "semantic"));
+
+    const fCliche = writeFixture("short-trailer-cliche.md", [
+      "她站在酒店门口冷笑。",
+      "一切才刚刚开始。",
+      "复仇的大戏，就此拉开序幕。",
+    ]);
+    const rCliche = runDetector(["--mode=short", "--json", "--fail-on=review_required", fCliche]);
+    assert.equal(rCliche.status, 1, "2+ trailer clichés in short mode remain review_required");
+    assert.ok(
+      rCliche
+        .json()
+        .findings.filter((f) => f.type === "trailer-ending")
+        .every((f) => f.severity === "review_required")
+    );
+
+    // 4) not-is + reverse-not-is threshold: 5 hits -> advisory, 6 hits -> review_required
+    const fiveNotIs = [
+      "他不是心软，而是怕曝光。",
+      "那不是巧合，而是设局。",
+      "她不是不懂，而是装傻。",
+      "这不是意外，而是预谋。",
+      "是真账本，不是假流水。",
+    ];
+    const fNotIs5 = writeFixture("short-notis-5.md", fiveNotIs);
+    const rNotIs5 = runDetector(["--mode=short", "--json", "--fail-on=review_required", fNotIs5]);
+    assert.equal(rNotIs5.status, 0, "5 not-is/reverse-not-is hits in short mode stay advisory");
+    const fNotIs6 = writeFixture("short-notis-6.md", [...fiveNotIs, "我不是求和，而是来清算。"]);
+    assert.equal(runDetector(["--mode=short", "--json", "--fail-on=review_required", fNotIs6]).status, 1);
+
+    // 5) overcompressed-prose-tic & low-connective-density-tic skipped in short mode
+    const fCompressed = writeFixture(
+      "short-compressed.md",
+      Array.from(
+        { length: 25 },
+        (_, i) => `门开。灯灭。人静。茶凉。字落。风停。第${i + 1}页翻过。`
+      ).join("\n")
+    );
+    const rCompressedShort = runDetector(["--mode=short", "--json", fCompressed]).json().findings;
+    assert.equal(rCompressedShort.filter((f) => f.type === "overcompressed-prose-tic").length, 0);
+    assert.equal(rCompressedShort.filter((f) => f.type === "low-connective-density-tic").length, 0);
+
+    // 6) period-stutter: 8 short sentences silent in short mode, 9 triggers advisory
+    const fStutter8 = writeFixture("short-stutter-8.md", "门开了。灯灭了。风停了。人走了。茶凉了。雨落了。夜深了。天黑了。");
+    assert.equal(
+      runDetector(["--mode=short", "--json", fStutter8]).json().findings.filter((f) => f.type === "period-stutter").length,
+      0
+    );
+    const fStutter9 = writeFixture(
+      "short-stutter-9.md",
+      "门开了。灯灭了。风停了。人走了。茶凉了。雨落了。夜深了。天黑了。钟响了。"
+    );
+    assert.equal(
+      runDetector(["--mode=short", "--json", fStutter9]).json().findings.filter((f) => f.type === "period-stutter").length,
+      1
+    );
+
+    // 7) quote-emphasis-tic & negation-pair-tic: 5 silent in short mode, 6 triggers
+    const qeLines = [
+      "他是被请来“把关”的，早有准备。",
+      "这段“神反转”迅速传遍全网。",
+      "那张“婚书”被压在最底下。",
+      "他的“体面”瞬间碎了一地。",
+      "这个“局”他布了整整三年。",
+      "那笔“彩礼”其实全是借的。",
+    ];
+    const fQe5 = writeFixture("short-qe-5.md", qeLines.slice(0, 5));
+    const fQe6 = writeFixture("short-qe-6.md", qeLines);
+    assert.equal(
+      runDetector(["--mode=short", "--json", fQe5]).json().findings.filter((f) => f.type === "quote-emphasis-tic").length,
+      0
+    );
+    assert.equal(
+      runDetector(["--mode=short", "--json", fQe6]).json().findings.filter((f) => f.type === "quote-emphasis-tic").length,
+      1
+    );
+
+    const negLines = [
+      "他没说话，也没抬头。",
+      "她没看他，也没签字。",
+      "秘书没拦，也没出声。",
+      "婆婆没笑，也没接话。",
+      "保安没动，也没开门。",
+      "律师没催，也没收件。",
+    ];
+    const fNeg5 = writeFixture("short-neg-5.md", negLines.slice(0, 5));
+    const fNeg6 = writeFixture("short-neg-6.md", negLines);
+    assert.equal(
+      runDetector(["--mode=short", "--json", fNeg5]).json().findings.filter((f) => f.type === "negation-pair-tic").length,
+      0
+    );
+    assert.equal(
+      runDetector(["--mode=short", "--json", fNeg6]).json().findings.filter((f) => f.type === "negation-pair-tic").length,
+      1
+    );
+
+    // 8) stock-reaction-tic: 5 hits silent in short mode, 8 hits & >=3.0/k triggers
+    const stockLines = [
+      "她指尖微微一颤。",
+      "他指节泛白，攥紧了拳头。",
+      "她眼眶发红。",
+      "他喉结滚了滚。",
+      "她抿了下唇。",
+      "她手往袖口里一缩。",
+      "他声音放轻，低头看她。",
+      "她胸口像被撞了一下。",
+    ];
+    assert.equal(
+      runDetector(["--mode=short", "--json", writeFixture("short-stock-5.md", stockLines.slice(0, 5))])
+        .json()
+        .findings.filter((f) => f.type === "stock-reaction-tic").length,
+      0
+    );
+    assert.equal(
+      runDetector(["--mode=short", "--json", writeFixture("short-stock-8.md", stockLines)])
+        .json()
+        .findings.filter((f) => f.type === "stock-reaction-tic").length,
+      1
+    );
+
+    // 9) long-paragraph: 120-char paragraph triggers in short mode, silent in long mode
+    const para120 = "她把那份公证过的遗嘱摊在长桌正中，指腹按着落款日期一字一句念给满屋子亲戚听，客厅里的吊灯照得纸面发白，二婶手里的茶杯停在半空半晌没敢落下去，墙上的挂钟嘀嗒走过半分钟，谁也没先开口打破僵局，连最爱挑刺的堂哥都默默缩回了椅子里。";
+    const fPara120 = writeFixture("short-para-120.md", [para120]);
+    assert.equal(
+      runDetector(["--mode=long", "--json", fPara120]).json().findings.filter((f) => f.type === "long-paragraph").length,
+      0
+    );
+    const lpShort = runDetector(["--mode=short", "--json", fPara120])
+      .json()
+      .findings.filter((f) => f.type === "long-paragraph");
+    assert.equal(lpShort.length, 1);
+    assert.equal(lpShort[0].severity, "advisory");
+
+    // 10) invalid --mode exits 2
+    assert.equal(runDetector(["--mode=bogus", fPara120]).status, 2);
+  });
 });
