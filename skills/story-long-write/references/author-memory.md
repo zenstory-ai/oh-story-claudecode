@@ -51,13 +51,13 @@
 
 ## 运行工具
 
-依次尝试 `python3`、`python`、`py -3` 找到 Python 3，从当前写作 skill 根运行本地副本：
+从当前写作 skill 根用 `node` 运行本地副本：
 
 ```text
-{PYTHON} {当前 skill 根}/scripts/author_memory_commit.py record  --workspace {工作区} [--book-root {书目录}] --input {工作区}/.story/work/作者记忆-事件.json
-{PYTHON} {当前 skill 根}/scripts/author_memory_commit.py query   --workspace {工作区} --book-root {书目录} --kind {类型}（必传，可重复） [--genre {题材}] [--workflow {流程}]
-{PYTHON} {当前 skill 根}/scripts/author_memory_commit.py migrate --workspace {工作区} --book-root {书目录}
-{PYTHON} {当前 skill 根}/scripts/author_memory_commit.py check   --workspace {工作区} [--book-root {书目录}]
+node {当前 skill 根}/scripts/author_memory_commit.js record  --workspace {工作区} [--book-root {书目录}] --input {工作区}/.story/work/作者记忆-事件.json
+node {当前 skill 根}/scripts/author_memory_commit.js query   --workspace {工作区} --book-root {书目录} --kind {类型}（必传，可重复） [--genre {题材}] [--workflow {流程}]
+node {当前 skill 根}/scripts/author_memory_commit.js migrate --workspace {工作区} --book-root {书目录}
+node {当前 skill 根}/scripts/author_memory_commit.js check   --workspace {工作区} [--book-root {书目录}]
 ```
 
 - 每次记、改、忘都是一份单事件 `record`：自动读当前修订、首次自动初始化。事件 JSON 写在 `{工作区}/.story/work/`，成功后删掉；同一 `event_id` 内容相同不重复写，内容不同则失败。写入不因加载上限失败，`warnings` 只是提醒，有回执就是记住了，不要换 `event_id` 重试。

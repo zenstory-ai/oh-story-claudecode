@@ -41,7 +41,7 @@ Read the selected skill's `SKILL.md` first, then load references as it directs.
   can read them directly via `read_file`/`view_file` when `find_by_name` or
   `grep_search` is unavailable). Because `invoke_subagent` runs asynchronously
   in the background, end the turn to wait for the subagent's `send_message`
-  wakeup before running dependent steps such as `manage_analysis_run.py commit`
+  wakeup before running dependent steps such as `manage_analysis_run.js commit`
   or review synthesis; if the runtime cannot start custom subagents, use the
   skill's documented solo/direct fallback instead of failing the workflow.
 

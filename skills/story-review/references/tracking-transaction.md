@@ -16,15 +16,15 @@
 
 ## 运行工具
 
-先探测 Python 3 解释器（依次试 `python3`、`python`、`py -3`）：
+使用 Node.js 18+ 运行：
 
 ```text
-{PYTHON} {当前 skill 根}/scripts/tracking_commit.py init   --project {书项目根} --input {书项目根}/.story/work/init.json
-{PYTHON} {当前 skill 根}/scripts/tracking_commit.py check  --project {书项目根}
-{PYTHON} {当前 skill 根}/scripts/tracking_commit.py draft  --project {书项目根} --chapter {N}
-{PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter check   --project {书项目根} --chapter {N} [--min-chars {下限} --max-chars {上限}]
-{PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter commit  --project {书项目根} --chapter {N} --input {书项目根}/.story/work/第{NNN}章/tracking.json
-{PYTHON} {story-long-write skill 根}/scripts/storyctl.py chapter accept-current-length --project {书项目根} --chapter {N} --input {书项目根}/.story/work/第{NNN}章/tracking.json
+node {当前 skill 根}/scripts/tracking_commit.js init   --project {书项目根} --input {书项目根}/.story/work/init.json
+node {当前 skill 根}/scripts/tracking_commit.js check  --project {书项目根}
+node {当前 skill 根}/scripts/tracking_commit.js draft  --project {书项目根} --chapter {N}
+node {story-long-write skill 根}/scripts/storyctl.js chapter check   --project {书项目根} --chapter {N} [--min-chars {下限} --max-chars {上限}]
+node {story-long-write skill 根}/scripts/storyctl.js chapter commit  --project {书项目根} --chapter {N} --input {书项目根}/.story/work/第{NNN}章/tracking.json
+node {story-long-write skill 根}/scripts/storyctl.js chapter accept-current-length --project {书项目根} --chapter {N} --input {书项目根}/.story/work/第{NNN}章/tracking.json
 ```
 
 - `init`：仅在 `_tracking-state.json` 不存在时执行（旧追踪文件自动移入 `追踪/_旧追踪存档/`）；执行前读 [tracking-initialization.md](tracking-initialization.md)。
@@ -32,7 +32,7 @@
 - **作者字数范围**：细纲可写 `字数范围：2000-2600`，本轮临时覆盖传 `--min-chars` / `--max-chars`（同时替代默认 ±12% 内部带与 ±15% 用户带）。
 - `chapter check`：读取正文与细纲目标，返回 `ready`（可提交，exit 0）/ `needs_decision`（长度带外，交作者定夺，exit 0；`over` 额外返回 `compress-once` 删除字数）/ `blocked`（正文硬伤，exit 1）/ `invalid`（exit 1）/ `tool_unavailable`（exit 3）。加 `--plain` 输出白话结论（含短段占比与叙述句长中位数参考）。
 - `chapter commit`：重跑计数与硬伤检查，将生效区间内的字数记录与逐章事务原子提交（成功后自动删除 `.story/work/第NNN章/`）。
-- `chapter accept-current-length`：接受带外但质检通过的章节并原子提交；低于目标一半（`BELOW_ACCEPT_FLOOR`）或超长未压缩（`COMPRESSION_REQUIRED`）时拒绝，作者明确拍板加 `--force`。
+- `chapter accept-current-length`：接受带外但质检通过的章节并原子提交；低于目标一半（`BELOW_ACCEPT_FLOOR`）时拒绝，作者明确拍板加 `--force`。
 - `check`：校验 state schema、逐章记录与自动生成视图的一致性。若报 `derived view differs from _tracking-state.json`，取当前 `state_revision` 重新提交该章 `mode=revision` 事务重建，禁止手改视图或删 `_tracking-state.json`；手写逐章记录导致 `chapter delta N already exists with different content` 时，删掉手写文件后重跑原事务。
 
 ## 逐章事务

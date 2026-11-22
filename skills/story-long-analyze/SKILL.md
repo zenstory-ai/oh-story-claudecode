@@ -12,7 +12,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > Agent 兼容性：只检查当前宿主的 agent；ZCode 查插件注册的同名角色，用 `Agent` 按实际 schema 派发，不要求 `.zcode/agents`。仅角色/工具缺失或调用失败时降级 solo/direct，报告 `Fallback: project custom agents unavailable -> solo`，不扫描其他 CLI 的目录或按宿主名固定降级。
 >
-> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 44` 不一致时（标记缺失、字段缺失/非整数、小于或大于 44）照常按当前宿主角色来源检查并 spawn，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 44）` 并提示重新运行 `/story-setup` 后新开会话；大于 44 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct。
+> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 45` 不一致时（标记缺失、字段缺失/非整数、小于或大于 45）照常按当前宿主角色来源检查并 spawn，同时报告 `Notice: agents bundle 版本不匹配（项目 {N}，本版 45）` 并提示重新运行 `/story-setup` 后新开会话；大于 45 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct。
 
 ## 分析边界
 
@@ -29,7 +29,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ## 运行约定
 
-- `{PYTHON}`：依次试 `python3`、`python`、`py -3`，用第一个能运行的。`{story-long-analyze skill 根}` 是本文件所在目录，`{拆文目录}` 是 `拆文库/{书名}/`。
+- 运行脚本使用 `node`（Node.js 18+）；Stage 4 人物关系图脚本仍用 Python（见 stage4-characters-settings.md）。`{story-long-analyze skill 根}` 是本文件所在目录，`{拆文目录}` 是 `拆文库/{书名}/`。
 - 首次拆一本书时，把作者给的 TXT 存为 `{拆文目录}/原文/原文.txt`；若编码不是 UTF-8（常见为 GBK），先转成 UTF-8，否则子代理按行号读取时会乱码。
 - 全文不足 2 万字或认不出章节标题时多半是短篇，建议作者改用 `/story-short-analyze`；作者坚持或由导入调用（篇幅已在导入时定好）时照常按长篇拆。
 
@@ -54,7 +54,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 没有书名或原文时询问书名、平台和原文路径；已有完整成果直接使用时不强制索要原文。已有目录先运行只读检查器：
 
 ```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/inspect_existing_assets.py" --root "拆文库/{书名}" --compact
+node "{story-long-analyze skill 根}/scripts/inspect_existing_assets.js" --root "拆文库/{书名}" --compact
 ```
 
 路径错误必须停止。已有摘要一律不覆盖：要重拆某章就删掉它的 `章节/第N章_摘要.md` 和覆盖它的 `_analysis_cache/批次-*.md`（只删摘要会从缓存原样补回），整本重拆就换一个新目录。`schema_version` 只报告，不作为新旧门禁，也不得在复用时改写。新旧投影混存要报告来源，但不要求重拆。

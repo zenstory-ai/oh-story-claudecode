@@ -37,25 +37,25 @@
     },
     {
       "name": "story-tracking-transaction",
-      "source": "skills/story-long-write/scripts/tracking_commit.py",
+      "source": "skills/story-long-write/scripts/tracking_commit.js",
       "targets": [
-        "skills/story-import/scripts/tracking_commit.py",
-        "skills/story-review/scripts/tracking_commit.py"
+        "skills/story-import/scripts/tracking_commit.js",
+        "skills/story-review/scripts/tracking_commit.js"
       ]
     },
     {
       "name": "story-wordcount-core",
-      "source": "skills/story-long-write/scripts/wordcount_core.py",
+      "source": "skills/story-long-write/scripts/wordcount_core.js",
       "targets": [
-        "skills/story-import/scripts/wordcount_core.py",
-        "skills/story-review/scripts/wordcount_core.py"
+        "skills/story-import/scripts/wordcount_core.js",
+        "skills/story-review/scripts/wordcount_core.js"
       ]
     },
     {
       "name": "story-author-memory-transaction",
-      "source": "skills/story-long-write/scripts/author_memory_commit.py",
+      "source": "skills/story-long-write/scripts/author_memory_commit.js",
       "targets": [
-        "skills/story-short-write/scripts/author_memory_commit.py"
+        "skills/story-short-write/scripts/author_memory_commit.js"
       ]
     },
     {
@@ -77,6 +77,7 @@
       "source": "skills/story-setup/references/templates/hooks/story_hook_core.js",
       "targets": [
         "skills/story-setup/references/antigravity/hooks/story_hook_core.js",
+        "skills/story-setup/references/codex/hooks/story_hook_core.js",
         "skills/story-setup/references/opencode/story_hook_core.js",
         "skills/story-setup/references/zcode/hooks/story_hook_core.js"
       ]
@@ -99,9 +100,9 @@
     },
     {
       "name": "outline-volume-view",
-      "source": "skills/story-long-write/scripts/outline_view.py",
+      "source": "skills/story-long-write/scripts/outline_view.js",
       "targets": [
-        "skills/story-import/scripts/outline_view.py"
+        "skills/story-import/scripts/outline_view.js"
       ]
     }
   ]

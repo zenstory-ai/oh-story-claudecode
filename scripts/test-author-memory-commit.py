@@ -16,12 +16,13 @@ from typing import Any
 
 
 REPO = Path(__file__).resolve().parents[1]
-TOOL = REPO / "skills" / "story-long-write" / "scripts" / "author_memory_commit.py"
+TOOL = REPO / "skills" / "story-long-write" / "scripts" / "author_memory_commit.js"
+NODE = shutil.which("node") or "node"
 
 
 def run(*args: str, expect: int = 0) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
-        [sys.executable, str(TOOL), *args],
+        [NODE, str(TOOL), *args],
         cwd=REPO,
         text=True,
         encoding="utf-8",
@@ -131,15 +132,21 @@ def query(workspace: Path, *args: str, expect: int = 0) -> dict[str, Any]:
     return document
 
 
-def load_tool_module() -> Any:
-    """就地加载被测脚本。下面几项不变式要在函数级别穷举，走子进程太慢。"""
-    spec = importlib.util.spec_from_file_location("author_memory_commit", TOOL)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+def run_node_check(js_code: str, payload: object = None) -> dict[str, Any]:
+    completed = subprocess.run(
+        [NODE, "-e", js_code, str(TOOL)],
+        input=json.dumps(payload, ensure_ascii=False) if payload is not None else "",
+        cwd=REPO, text=True, encoding="utf-8", capture_output=True, check=False,
+    )
+    if completed.returncode != 0:
+        raise AssertionError(f"node check failed ({completed.returncode}):\nstdout={completed.stdout}\nstderr={completed.stderr}")
+    return json.loads(completed.stdout) if completed.stdout.strip() else {}
 
 
-def synthetic_state(generator: random.Random, module: Any, *, book: str | None, books: list[str], genres: list[str], workflows: list[str]) -> dict[str, Any]:
+KINDS = ("prose_style", "story_design", "workflow", "delivery", "interaction")
+
+
+def synthetic_state(generator: random.Random, *, book: str | None, books: list[str], genres: list[str], workflows: list[str]) -> dict[str, Any]:
     """合成一份 store：book=None 是项目级（含存量 book 条目），否则是该书的书级 store。"""
     values = {"book": books, "genre": genres, "workflow": workflows}
     prefix = "BP" if book is not None else "AP"
@@ -152,7 +159,7 @@ def synthetic_state(generator: random.Random, module: Any, *, book: str | None, 
             level, value = "book", book
         items[f"{prefix}{number:03d}"] = {
             "id": f"{prefix}{number:03d}",
-            "kind": generator.choice(module.KINDS),
+            "kind": generator.choice(KINDS),
             "scope": {"level": level, "value": value},
             "assertion": "文" * generator.randint(1, 40),
             "status": generator.choice(["active"] * 6 + ["pending", "superseded"]),
@@ -167,145 +174,128 @@ def synthetic_state(generator: random.Random, module: Any, *, book: str | None, 
 
 
 def assert_no_false_negatives() -> None:
-    """核心不变式：写入回执没给提醒 ⟹ 任何真实 query 都不会漏条。
-
-    这是整套「写入即预警」机制成立的前提。估算与真实查询是两段代码，任何一处
-    口径漂移（scope 切片不按 casefold 归并、切片轻重不算 JSON 分隔符、状态过滤
-    不一致、项目级存量 book 条目被误算或误返回）都会让作者拿到回执却丢条目——
-    正是本机制要消灭的失败模式。固定种子的随机库穷举比任何手工 fixture 都难绕过。
-    两级 store 下分别穷举「带书目录」与「不带书目录」两种真实查询。
-    """
-    module = load_tool_module()
+    """核心不变式：写入回执没给提醒 ⟹ 任何真实 query 都不会漏条。"""
     books = ["甲", "Lucky", "lucky", "LUCKY", "乙"]
     genres = ["悬疑", "Urban", "urban"]
     workflows = ["长篇", "short", "SHORT"]
     generator = random.Random(4290918)
-
-    def real_query_omitted(project_state, book_state, kinds, requested):
-        # oracle 就是 command_query 走的那条纯函数路径（merged_query），不是在测试里
-        # 再实现一遍查询——否则估算与「真实查询」同源，信封少算一个字段也测不出。
-        return module.merged_query(project_state, book_state, set(kinds), requested)[1]
-
-    warned_libraries = 0
+    cases = []
     for _ in range(300):
-        project_state = synthetic_state(generator, module, book=None, books=books, genres=genres, workflows=workflows)
+        project_state = synthetic_state(generator, book=None, books=books, genres=genres, workflows=workflows)
         visible_book = generator.choice(books + [None])
-        book_state = None if visible_book is None else synthetic_state(generator, module, book=visible_book, books=books, genres=genres, workflows=workflows)
-        warnings = module.query_budget_warnings(project_state, book_state)
-        warned_libraries += any("最坏查询" in warning for warning in warnings)
-        for task, kinds in module.QUERY_COMBOS.items():
-            if any(f"「{task}」" in warning for warning in warnings):
-                continue
-            for genre, workflow in itertools.product(genres + [None], workflows + [None]):
-                requested = {"genre": genre, "workflow": workflow}
-                for visible in ([book_state] if book_state is not None else []) + [None]:
-                    omitted = real_query_omitted(project_state, visible, set(kinds), requested)
-                    assert not omitted, (
-                        f"写入端没提醒「{task}」，但 query(book_root={'有' if visible else '无'}, genre={genre}, workflow={workflow}) "
-                        f"漏了 {omitted}——估算与真实查询不是同一把尺"
-                    )
-    assert warned_libraries > 20, "随机库里触发提醒的太少，这个属性测试没覆盖到超编区间"
+        book_state = None if visible_book is None else synthetic_state(generator, book=visible_book, books=books, genres=genres, workflows=workflows)
+        cases.append({"project_state": project_state, "book_state": book_state})
+    js = r"""
+const fs = require('fs');
+const assert = require('assert');
+const mod = require(process.argv[1]);
+const { cases, genres, workflows } = JSON.parse(fs.readFileSync(0, 'utf8'));
+let warnedLibraries = 0;
+for (const { project_state, book_state } of cases) {
+  const warnings = mod.queryBudgetWarnings(project_state, book_state);
+  if (warnings.some((w) => w.includes('最坏查询'))) warnedLibraries += 1;
+  for (const [task, kinds] of Object.entries(mod.QUERY_COMBOS)) {
+    if (warnings.some((w) => w.includes(`「${task}」`))) continue;
+    for (const genre of [...genres, null]) {
+      for (const workflow of [...workflows, null]) {
+        const requested = { genre, workflow };
+        const visList = book_state ? [book_state, null] : [null];
+        for (const visible of visList) {
+          const { omittedIds } = mod.mergedQuery(project_state, visible, new Set(kinds), requested);
+          assert.equal(omittedIds.length, 0,
+            `写入端没提醒「${task}」，但 query(book_root=${visible ? '有' : '无'}, genre=${genre}, workflow=${workflow}) 漏了 ${omittedIds}`);
+        }
+      }
+    }
+  }
+}
+assert(warnedLibraries > 20, `warnedLibraries=${warnedLibraries} <= 20`);
+process.stdout.write(JSON.stringify({ warnedLibraries }));
+"""
+    run_node_check(js, {"cases": cases, "genres": genres, "workflows": workflows})
 
 
 def assert_slice_weight_uses_rendered_lines() -> None:
-    """挑「最重切片」必须按执行者读到的行算，与装填同一把尺。
+    """挑「最重切片」必须按执行者读到的行算，与装填同一把尺。"""
+    js = r"""
+const assert = require('assert');
+const mod = require(process.argv[1]);
+const item = (number, value, assertion) => ({
+  id: `AP${String(number).padStart(3, '0')}`, kind: 'prose_style',
+  scope: { level: 'genre', value }, assertion, status: 'active',
+  importance: 'medium', updated_revision: 400, confirmation_count: 1,
+});
+const items = {};
+for (let i = 0; i < 12; i++) items[`AP${String(i + 1).padStart(3, '0')}`] = item(i + 1, '甲'.repeat(60), `甲短${i}`);
+for (let i = 0; i < 12; i++) items[`AP${String(i + 100).padStart(3, '0')}`] = item(i + 100, '乙', `乙偏好${i}：` + '文'.repeat(52));
+const heavyJson = Object.values(items).filter((e) => e.scope.value.startsWith('甲'));
+const heavyLines = Object.values(items).filter((e) => e.scope.value === '乙');
+const jsonWeight = (arr) => arr.reduce((a, e) => a + Buffer.byteLength(JSON.stringify(mod.compactItem(e)), 'utf8'), 0);
+assert(jsonWeight(heavyJson) > jsonWeight(heavyLines));
+assert(mod.sliceWeight(heavyJson) < mod.sliceWeight(heavyLines));
+assert.equal(mod.fitItems([...heavyJson].sort(mod.compareQueryItems), 700).omittedIds.length, 0);
+assert(mod.fitItems([...heavyLines].sort(mod.compareQueryItems), 700).omittedIds.length > 0);
+const warnings = mod.queryBudgetWarnings({ items, state_revision: 700, journal: [] }, null);
+assert(warnings.some((w) => w.includes('最坏查询')));
 
-    按 JSON 字节挑会挑错：scope 取值很长、断言很短的切片 JSON 更重，渲染成
-    「- 断言（编号）」后却更轻，于是估算判「装得下」而真实查询溢出——warnings
-    假阴性。下面的 fixture 两把尺子挑的切片不同，且只有乙会溢出。
-    """
-    module = load_tool_module()
-
-    def item(number: int, value: str, assertion: str) -> dict[str, Any]:
-        return {
-            "id": f"AP{number:03d}", "kind": "prose_style",
-            "scope": {"level": "genre", "value": value},
-            "assertion": assertion, "status": "active",
-            "importance": "medium", "updated_revision": 400, "confirmation_count": 1,
-        }
-
-    items = {}
-    for index in range(12):
-        items[f"AP{index + 1:03d}"] = item(index + 1, "甲" * 60, f"甲短{index}")
-    for index in range(12):
-        items[f"AP{index + 100:03d}"] = item(index + 100, "乙", f"乙偏好{index}：" + "文" * 52)
-    heavy_json = [entry for entry in items.values() if entry["scope"]["value"].startswith("甲")]
-    heavy_lines = [entry for entry in items.values() if entry["scope"]["value"] == "乙"]
-
-    def json_weight(entries: list[dict[str, Any]]) -> int:
-        return sum(len(json.dumps(module.compact_item(entry), ensure_ascii=False).encode("utf-8")) for entry in entries)
-
-    assert json_weight(heavy_json) > json_weight(heavy_lines), "fixture 前提：甲的 JSON 更重（按 JSON 挑会挑甲）"
-    assert module.slice_weight(heavy_json) < module.slice_weight(heavy_lines), "fixture 前提：乙渲染出的行更重（必须挑乙）"
-    assert not module.fit_items(sorted(heavy_json, key=module.query_sort_key), 700)[1], "甲自己装得下"
-    assert module.fit_items(sorted(heavy_lines, key=module.query_sort_key), 700)[1], "乙自己会溢出"
-    warnings = module.query_budget_warnings({"items": items, "state_revision": 700, "journal": []}, None)
-    assert any("最坏查询" in warning for warning in warnings), "挑错切片会让超编的乙被漏报——切片轻重必须按渲染后的行算"
-
-    # 少而长 对 多而短：只比断言字节会挑「甲」，可每行还有 14 字节固定开销，「乙」渲染后更重。
-    def entry(number: int, level: str, value: str | None, chars: int) -> dict[str, Any]:
-        return {**item(number, value or "", "文" * chars), "scope": {"level": level, "value": value}}
-
-    mixed = {}
-    for index in range(12):
-        mixed[f"AP{index + 1:03d}"] = entry(index + 1, "global", None, 40)
-    mixed["AP013"] = entry(13, "global", None, 6)
-    for index in range(3):
-        mixed[f"AP{index + 20:03d}"] = entry(index + 20, "genre", "甲", 40)
-    for index in range(5):
-        mixed[f"AP{index + 30:03d}"] = entry(index + 30, "genre", "乙", 23)
-    few_long = [e for e in mixed.values() if e["scope"]["value"] == "甲"]
-    many_short = [e for e in mixed.values() if e["scope"]["value"] == "乙"]
-    assert sum(len(e["assertion"].encode("utf-8")) for e in few_long) > sum(len(e["assertion"].encode("utf-8")) for e in many_short)
-    assert module.slice_weight(few_long) < module.slice_weight(many_short), "fixture 前提：乙渲染后更重"
-    library = {"items": mixed, "state_revision": 700, "journal": []}
-    assert module.merged_query(library, None, {"prose_style"}, {"genre": "乙", "workflow": None})[1], "真实查询乙会漏条"
-    assert any("最坏查询" in w for w in module.query_budget_warnings(library, None)), "每行固定开销必须算进切片轻重"
+const entry = (number, level, value, chars) => ({ ...item(number, value || '', '文'.repeat(chars)), scope: { level, value } });
+const mixed = {};
+for (let i = 0; i < 12; i++) mixed[`AP${String(i + 1).padStart(3, '0')}`] = entry(i + 1, 'global', null, 40);
+mixed['AP013'] = entry(13, 'global', null, 6);
+for (let i = 0; i < 3; i++) mixed[`AP${String(i + 20).padStart(3, '0')}`] = entry(i + 20, 'genre', '甲', 40);
+for (let i = 0; i < 5; i++) mixed[`AP${String(i + 30).padStart(3, '0')}`] = entry(i + 30, 'genre', '乙', 23);
+const fewLong = Object.values(mixed).filter((e) => e.scope.value === '甲');
+const manyShort = Object.values(mixed).filter((e) => e.scope.value === '乙');
+assert(fewLong.reduce((a, e) => a + Buffer.byteLength(e.assertion, 'utf8'), 0) > manyShort.reduce((a, e) => a + Buffer.byteLength(e.assertion, 'utf8'), 0));
+assert(mod.sliceWeight(fewLong) < mod.sliceWeight(manyShort));
+const library = { items: mixed, state_revision: 700, journal: [] };
+assert(mod.mergedQuery(library, null, new Set(['prose_style']), { genre: '乙', workflow: null }).omittedIds.length > 0);
+assert(mod.queryBudgetWarnings(library, null).some((w) => w.includes('最坏查询')));
+"""
+    run_node_check(js)
 
 
 def assert_omitted_follow_priority_and_lines_fit() -> None:
-    """装填只量执行者读到的行；漏项全数列出、按候选优先级排序、附断言首句。
-
-    漏项清单不进执行者 prompt，所以不封顶——作者要知道的是哪几条没带上，
-    清单截断会让排在后面的条目永远不被提起。
-    """
-    module = load_tool_module()
-    items = [{
-        "id": f"AP{number:03d}",
-        "kind": "prose_style",
-        "scope": {"level": "global", "value": None},
-        "assertion": f"第{number}条" + "文" * 36,
-        "importance": "medium",
-        "updated_revision": 100 - number,
-        "confirmation_count": 1,
-    } for number in range(1, 41)]
-    items.sort(key=module.query_sort_key)
-    result, omitted = module.fit_items([dict(item) for item in items], 500)
-    order = {item["id"]: index for index, item in enumerate(items)}
-    assert len(omitted) > 20, "fixture 必须漏到旧封顶 20 以上，才能证明漏项不再被截断"
-    assert len(result["items"]) + result["omitted"] == len(items), "条目守恒"
-    assert result["omitted_ids"] == omitted == sorted(omitted, key=order.__getitem__), "漏项全数列出且按候选优先级排序"
-    assert set(result["omitted_summaries"]) == set(omitted), "每个漏项都要有给作者看的首句"
-    assert all(len(summary) <= 15 for summary in result["omitted_summaries"].values())
-    assert result["lines"] == [f"- {item['assertion']}（{item['id']}）" for item in result["items"]], "lines 就是执行者读到的原文＋编号"
-    used = sum(len((line + "\n").encode("utf-8")) for line in result["lines"])
-    assert used <= module.QUERY_MAX_BYTES, "lines 必须装在注入预算内"
-    first_dropped = next(item for item in items if item["id"] == omitted[0])
-    assert used + module.line_bytes(first_dropped) > module.QUERY_MAX_BYTES, "第一个漏项确实装不下，不是被提前放弃"
-    # 写手读到的文字计 2048：40 个字（120 字节）的断言能装 15 条，旧的 JSON 外壳口径只装得下 8 条。
-    full = [{**item, "assertion": "文" * 40} for item in items[:15]]
-    assert not module.fit_items(full, 500)[1], "按行计量时 15 条 40 字断言必须全部装下"
-    assert set(result["omitted_importance"]) == set(omitted), "合并多次查询时要靠重要度重排漏项"
-    # 边界：lines 正好 2048 字节全部装下，多 1 字节最后一条就进漏项
-    exact = full + [{**items[15], "assertion": "文" * 8}]
-    assert sum(module.line_bytes(item) for item in exact) == module.QUERY_MAX_BYTES
-    assert not module.fit_items(exact, 500)[1], "正好 2048 字节必须全部装下"
-    over = full + [{**items[15], "assertion": "文" * 8 + "x"}]
-    assert module.fit_items(over, 500)[1] == [items[15]["id"]], "多 1 字节最后一条进漏项"
-    # 跳过不中断：装不下的长条不挡后面装得下的短条
-    queue = full[:14] + [{**items[20], "assertion": "长" * 250}, {**items[21], "assertion": "短"}]
-    skipped_result, skipped = module.fit_items(queue, 500)
-    assert skipped == [items[20]["id"]] and skipped_result["items"][-1]["id"] == items[21]["id"], "装不下的跳过，后面的短条照装"
+    """装填只量执行者读到的行；漏项全数列出、按候选优先级排序、附断言首句。"""
+    js = r"""
+const assert = require('assert');
+const mod = require(process.argv[1]);
+const items = Array.from({ length: 40 }, (_, idx) => {
+  const number = idx + 1;
+  return {
+    id: `AP${String(number).padStart(3, '0')}`, kind: 'prose_style',
+    scope: { level: 'global', value: null }, assertion: `第${number}条` + '文'.repeat(36),
+    importance: 'medium', updated_revision: 100 - number, confirmation_count: 1,
+  };
+});
+items.sort(mod.compareQueryItems);
+const { result, omittedIds: omitted } = mod.fitItems(items.map((x) => ({ ...x })), 500);
+const order = Object.fromEntries(items.map((item, idx) => [item.id, idx]));
+assert(omitted.length > 20);
+assert.equal(result.items.length + result.omitted, items.length);
+assert.deepEqual(result.omitted_ids, omitted);
+assert.deepEqual(omitted, [...omitted].sort((a, b) => order[a] - order[b]));
+assert.deepEqual(new Set(Object.keys(result.omitted_summaries)), new Set(omitted));
+assert(Object.values(result.omitted_summaries).every((s) => Array.from(s).length <= 15));
+assert.deepEqual(result.lines, result.items.map((item) => `- ${item.assertion}（${item.id}）`));
+const used = result.lines.reduce((a, line) => a + Buffer.byteLength(line + '\n', 'utf8'), 0);
+assert(used <= mod.QUERY_MAX_BYTES);
+const firstDropped = items.find((item) => item.id === omitted[0]);
+assert(used + mod.lineBytes(firstDropped) > mod.QUERY_MAX_BYTES);
+const full = items.slice(0, 15).map((item) => ({ ...item, assertion: '文'.repeat(40) }));
+assert.equal(mod.fitItems(full, 500).omittedIds.length, 0);
+assert.deepEqual(new Set(Object.keys(result.omitted_importance)), new Set(omitted));
+const exact = [...full, { ...items[15], assertion: '文'.repeat(8) }];
+assert.equal(exact.reduce((a, item) => a + mod.lineBytes(item), 0), mod.QUERY_MAX_BYTES);
+assert.equal(mod.fitItems(exact, 500).omittedIds.length, 0);
+const over = [...full, { ...items[15], assertion: '文'.repeat(8) + 'x' }];
+assert.deepEqual(mod.fitItems(over, 500).omittedIds, [items[15].id]);
+const queue = [...full.slice(0, 14), { ...items[20], assertion: '长'.repeat(250) }, { ...items[21], assertion: '短' }];
+const { result: skippedResult, omittedIds: skipped } = mod.fitItems(queue, 500);
+assert.deepEqual(skipped, [items[20].id]);
+assert.equal(skippedResult.items[skippedResult.items.length - 1].id, items[21].id);
+"""
+    run_node_check(js)
 
 
 def assert_single_root_layout(temporary: Path, input_path: Path) -> None:
@@ -1160,6 +1150,10 @@ def main() -> None:
         assert len(after_legacy["items"]) == 1, "强化路径不得派生重复条目"
         assert after_legacy["items"]["AP001"]["confirmation_count"] == 2
         run("check", "--workspace", str(legacy_long_workspace))
+        # CRLF regression: derived views rewritten with \r\n (e.g. git autocrlf=true on Windows) must still pass check
+        profile_path = memory_dir(legacy_long_workspace) / "作者画像.md"
+        profile_path.write_bytes(profile_path.read_text(encoding="utf-8").replace("\n", "\r\n").encode("utf-8"))
+        run("check", "--workspace", str(legacy_long_workspace))
         new_long = record(legacy_long_workspace, input_path, remember("legacy-new-long", preference(legacy_assertion + "再补一句。", "新的长断言。")), expect=2)
         assert "超出 120 字节上限" in new_long.stderr, "新建条目仍受一句话上限约束"
 
@@ -1174,7 +1168,7 @@ def main() -> None:
     # 只锚 prompt 与运行时 CLI / 槽位的对接片段，不钉措辞
     injection_contracts = {
         # 写一章的填槽说明随「只在交给写手时才用」迁到 agent-calls.md（v0.8.2）。
-        REPO / "skills/story-long-write/scripts/build_writer_prompt.py": (
+        REPO / "skills/story-long-write/scripts/build_writer_prompt.js": (
             "——— 作者偏好（",
         ),
         # 查到的偏好要进子代理 prompt 的槽位，否则 query 照跑、结果到不了写手。
@@ -1206,8 +1200,8 @@ def main() -> None:
                           for owner in owners
                           for name in ("author-memory.md",)}
     assert set((REPO / "skills").glob("*/references/author-memory*.md")) == expected_protocols
-    assert set((REPO / "skills").glob("*/scripts/author_memory_commit.py")) == {
-        REPO / "skills" / owner / "scripts/author_memory_commit.py" for owner in owners}
+    assert set((REPO / "skills").glob("*/scripts/author_memory_commit.js")) == {
+        REPO / "skills" / owner / "scripts/author_memory_commit.js" for owner in owners}
     # #436：写作入口和协议不再引导推断写入。
     for path in sorted(expected_protocols) + [REPO / "skills" / owner / "SKILL.md" for owner in owners]:
         content = path.read_text(encoding="utf-8")

@@ -71,8 +71,9 @@ Stage 4 直接按主题拆成多个文件，与导入和长篇写作的项目结
 
 关系图只从 `角色/角色关系.md` 生成，不手画、不另建关系事实：
 
-```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/render_relation_chart.py" --root "{拆文目录}" --png
+```bash
+for PYBIN in python3 python py; do "$PYBIN" -c "" 2>/dev/null && break; done
+"$PYBIN" "{story-long-analyze skill 根}/scripts/render_relation_chart.py" --root "{拆文目录}" --png
 ```
 
 它总是写出 `人物关系图/人物关系图.md`（Mermaid 图＋文字清单，文字清单保留中文，是主产物）；只有装了 matplotlib 且找到能显示图中全部文字的字体时，才另画 `核心人物关系.png` 与 `关键关系演变.png`，表情等符号不画进图片。字体不够就不出图，不改画拼音或首字母版，把脚本返回的 `author_message` 转告作者。

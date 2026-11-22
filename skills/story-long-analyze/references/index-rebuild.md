@@ -1,6 +1,6 @@
 # 原文变化与章号对不上
 
-`build_chapter_index.py` 因原文变化非零退出，或返回 `chapter_mapping_ambiguous`、`index_would_shrink` 时读本文件；把脚本的 `author_message` 按 [author-facing.md](author-facing.md)「停下来或出错时」转告作者。
+`build_chapter_index.js` 因原文变化非零退出，或返回 `chapter_mapping_ambiguous`、`index_would_shrink` 时读本文件；把脚本的 `author_message` 按 [author-facing.md](author-facing.md)「停下来或出错时」转告作者。
 
 原文未变时直接复用索引。原文变化后脚本先非零退出，作者确认继续后再加 `--rebuild`。重建沿用已有索引的章号口径：已有索引第 1 章是正式章节、而原文开头有楔子/序章/第0章（即上次用了 `--fold-prologue`），自动照样并入，无需再加参数；重建出的前面各章与已有索引对不上（`chapter_mapping_ambiguous:position=N` 或 `index_would_shrink`）时不写索引，返回 `author_message`。追加新章时旧章 hash 保持稳定，输出仅列出新增或内容变化的 `pending_chapters`。
 
@@ -10,7 +10,7 @@
 
 原文有楔子且旧章号无法对齐时，给作者三个选择；没有楔子时只提供后两项：
 
-1. **按旧章号继续（推荐）**：`build_chapter_index.py ... --fold-prologue`，开头的楔子/序章/引子/前言/第0章并进第一个正式章节，编号回到旧版口径，旧成果原样复用；输出里的 `folded_into_first_chapter` 列出被并入的章节标签（如「楔子」「第0章」）。楔子内容随第一章读取，不单独生成深拆文件；在报告「还不确定的地方」说明章号处理方式。
+1. **按旧章号继续（推荐）**：`build_chapter_index.js ... --fold-prologue`，开头的楔子/序章/引子/前言/第0章并进第一个正式章节，编号回到旧版口径，旧成果原样复用；输出里的 `folded_into_first_chapter` 列出被并入的章节标签（如「楔子」「第0章」）。楔子内容随第一章读取，不单独生成深拆文件；在报告「还不确定的地方」说明章号处理方式。
 2. **按新章号重拆（有楔子时单独成章）**：把除 `原文/` 外所有按旧章号写的产物——`章节/`、`剧情/`、`角色/`、`设定/`、`人物关系图/`、`快速预览.md`、`概要.md`、`拆文报告.md`、`文风.md`、`_analysis_cache/批次-*.md` 和 `_progress.md`——挪进 `_analysis_cache/legacy/旧章号/`（挪走，不删除），再从 Stage 0 按新章号重拆。旧库只拆到黄金三章时代价最小。
 3. **换一个新目录整本重拆**。
 

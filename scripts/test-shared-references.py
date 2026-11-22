@@ -13,9 +13,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 CHECKER = SCRIPT_DIR / "shared-references.py"
-CONSUMERS = SCRIPT_DIR / "check-agent-reference-consumers.py"
-SIMILARITY = SCRIPT_DIR / "check-reference-similarity.py"
-SHORT_ANALYSIS = SCRIPT_DIR / "check-short-analysis-scope.py"
+LINT_REPO = SCRIPT_DIR / "lint-repo.py"
 
 
 def write(path: Path, text: str) -> None:
@@ -548,7 +546,7 @@ def test_agent_reference_reachability() -> None:
         write(base / "agent-references/details/detail.md", "reachable\n")
         write(base / "agent-references/long-guide.md", "long\n")
         write(base / "agent-references/short-guide.md", "short\n")
-        result = run(CONSUMERS, "--root", str(root))
+        result = run(LINT_REPO, "--only", "agent-refs", "--root", str(root))
         assert result.returncode == 0, result.stdout + result.stderr
 
         # Check prefixes through the public CLI against deployed templates.
@@ -569,7 +567,7 @@ def test_agent_reference_reachability() -> None:
         ]
         for snippet in valid:
             write(writer, "# Writer\n" + snippet + "\n")
-            result = run(CONSUMERS, "--root", str(root))
+            result = run(LINT_REPO, "--only", "agent-refs", "--root", str(root))
             assert result.returncode == 0, (snippet, result.stdout, result.stderr)
 
         for snippet, line in [
@@ -587,101 +585,22 @@ def test_agent_reference_reachability() -> None:
             ("[索引](index.md)", 2),
         ]:
             write(writer, "# Writer\n" + snippet + "\n")
-            result = run(CONSUMERS, "--root", str(root))
+            result = run(LINT_REPO, "--only", "agent-refs", "--root", str(root))
             assert result.returncode == 1, (snippet, result.stdout, result.stderr)
             assert "INVALID AGENT REFERENCE PREFIX" in result.stdout, result.stdout
             assert f"templates/agents/narrative-writer.md:{line}:" in result.stdout.replace("\\", "/"), result.stdout
             assert canonical in result.stdout, result.stdout
 
         write(writer, f"read {canonical}missing.md\n")
-        result = run(CONSUMERS, "--root", str(root))
+        result = run(LINT_REPO, "--only", "agent-refs", "--root", str(root))
         assert result.returncode == 1, result.stdout + result.stderr
         assert "MISSING DEPLOYED AGENT REFERENCES" in result.stdout, result.stdout
         writer.unlink()
 
         write(base / "agent-references/orphan.md", "orphan\n")
-        result = run(CONSUMERS, "--root", str(root))
+        result = run(LINT_REPO, "--only", "agent-refs", "--root", str(root))
         assert result.returncode == 1
         assert "orphan.md" in result.stdout
-
-
-def test_reference_similarity_declarations() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        root = Path(tmp)
-        lines = [f"shared governance sentence number {index:02d}" for index in range(15)]
-        write(root / "skills/a/references/guide.md", "\n".join(lines) + "\n")
-        write(
-            root / "skills/b/references/derived.md",
-            "\n".join(lines[:-1] + ["derived consumer sentence differs here"]) + "\n",
-        )
-        config = root / "shared-references.json"
-        config.write_text('{"version": 1, "groups": [], "tree_groups": []}', encoding="utf-8")
-        result = run(SIMILARITY, "--root", str(root), "--manifest", str(config))
-        assert result.returncode == 1
-        assert "UNDECLARED NEAR-IDENTICAL" in result.stdout
-
-        config.write_text(
-            json.dumps(
-                {
-                    "version": 1,
-                    "groups": [],
-                    "tree_groups": [],
-                    "derived_groups": [
-                        {
-                            "name": "guide-derivative",
-                            "reason": "different consumer contract",
-                            "members": [
-                                "skills/a/references/guide.md",
-                                "skills/b/references/derived.md",
-                            ],
-                        }
-                    ],
-                }
-            ),
-            encoding="utf-8",
-        )
-        result = run(SIMILARITY, "--root", str(root), "--manifest", str(config))
-        assert result.returncode == 0, result.stdout + result.stderr
-
-
-def test_short_analysis_scope() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        root = Path(tmp)
-        skill = root / "skills/story-short-analyze"
-        write(
-            skill / "SKILL.md",
-            "\n".join(f"read references/{name}" for name in (
-                "analysis-short-genres.md",
-                "analysis-short-patterns.md",
-                "analysis-short-mechanics.md",
-                "analysis-short-suspense.md",
-                "analysis-short-hooks.md",
-                "analysis-characters.md",
-                "analysis-submission.md",
-            )),
-        )
-        for name in (
-            "analysis-short-genres.md",
-            "analysis-short-patterns.md",
-            "analysis-short-mechanics.md",
-            "analysis-short-suspense.md",
-            "analysis-short-hooks.md",
-            "analysis-characters.md",
-            "analysis-submission.md",
-        ):
-            write(skill / "references" / name, "# 源文观察\n\n按位置报告证据与作用。\n")
-
-        result = run(SHORT_ANALYSIS, "--root", str(root))
-        assert result.returncode == 0, result.stdout + result.stderr
-
-        write(
-            skill / "references/analysis-short-patterns.md",
-            "# 源文观察\n\n每章必备一种爽点，推荐结构为 40%。\n",
-        )
-        result = run(SHORT_ANALYSIS, "--root", str(root))
-        assert result.returncode == 1
-        assert "long-form playbook token" in result.stdout
-        assert "prescribed percentage" in result.stdout
 
 
 def main() -> int:
@@ -691,8 +610,6 @@ def main() -> int:
     test_tree_file_symlink_cannot_escape_root()
     test_undeclared_reference_symlink_cannot_escape_root()
     test_agent_reference_reachability()
-    test_reference_similarity_declarations()
-    test_short_analysis_scope()
     print("PASS: shared reference manifest and deployed consumer guards")
     return 0
 

@@ -17,8 +17,8 @@
 
 1. 检查章号最大的 `正文/第NNN章_*.md` 是否完整，确定最后完整章号 `N`；不能仅凭最大文件名判定。
 2. 从旧 `追踪/` 现有文件（角色状态、伏笔、时间线等，文件名按项目实际情况）和最近 3-5 章正文，重建当前状态：核心角色快照、未回收伏笔、已揭示时间线事件、长期约束、下一章承诺。角色快照的反推方法见 [character-state-reverse.md](character-state-reverse.md)。
-3. 按 [import-tracking.md](import-tracking.md) 构造初始化事务（其中点名的 tracking-initialization.md 完整读取），`last_chapter` 写 `N`（第 1..N 章不伪造逐章记录），执行 `tracking_commit.py init`。
+3. 按 [import-tracking.md](import-tracking.md) 构造初始化事务（其中点名的 tracking-initialization.md 完整读取），`last_chapter` 写 `N`（第 1..N 章不伪造逐章记录），执行 `tracking_commit.js init`。
 4. `init` 会把旧追踪结构按原样整体移入 `追踪/_旧追踪存档/` 再建当前协议——旧内容不删除、不参与解析，留给作者查阅。
-5. 跑 `tracking_commit.py check` 确认通过，再回 `/story-long-write` 写下一章（第 N+1 章）续写。
+5. 跑 `tracking_commit.js check` 确认通过，再回 `/story-long-write` 写下一章（第 N+1 章）续写。
 
 重建结果以第 2 步的证据为准；拿不准的字段留空或写进 `continuity_risks`，不杜撰。用户明确要求重拆全书时才走完整导入。

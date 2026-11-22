@@ -2,12 +2,12 @@
 
 ## 当前版本
 
-助手版本 44（v0.10.5）。已有项目更新技能包后，在项目根重跑 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或直接点名），再新开会话。
+助手版本 45（v0.10.5）。已有项目更新技能包后，在项目根重跑 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或直接点名），再新开会话。
 
 - `setup_skill_version: 1.3.12`
-- `agents_version: 44`
+- `agents_version: 45`
 
-`.story-deployed` 字段不全，或 `agents_version` 不是整数、低于 44，都算待更新，重跑 story-setup 即可。项目里的 `agents_version` 大于 44，说明本机技能包比项目旧：先更新 oh-story-claudecode，不要用旧包覆盖。各版本改了什么见仓库根目录 `CHANGELOG.md`。
+`.story-deployed` 字段不全，或 `agents_version` 不是整数、低于 45，都算待更新，重跑 story-setup 即可。项目里的 `agents_version` 大于 45，说明本机技能包比项目旧：先更新 oh-story-claudecode，不要用旧包覆盖。各版本改了什么见仓库根目录 `CHANGELOG.md`。
 
 ## 升级步骤
 
@@ -17,7 +17,12 @@
 4. 正在写的长篇：确认每本书有 `追踪/_tracking-state.json`。没有就按下方「追踪模型迁移」重建，否则写下一章会被拦。
 5. 拆文成果或细纲不满足当前格式时，按检查提示定点补齐，不因单项缺口整本重拆。
 
-## 本次更新必须重跑 story-setup（v0.10.5，助手版本 44）
+## 本次更新必须重跑 story-setup（助手版本 45）
+
+- 五个支持 Hook 的宿主（Claude Code、Codex、OpenCode、Antigravity、ZCode）全部统一到单一 Node.js 18+ 共享核 `story_hook_core.js`：Claude Code 的 `.claude/hooks/` 收敛为 `run-story-hook.sh` + `story_hook_cli.js` + `story_hook_core.js`（重跑 story-setup 会自动清理旧版独立 `.sh` 脚本并刷新 `.claude/settings.local.json`），Codex 改用 `story_codex_hook.js` + `story_hook_core.js`，OpenCode `pre-commit` 改为调用同一共享核。
+- 需要本机 PATH 中有 Node.js 18+；缺 Node 时会在会话起点发出提示。书稿、设定、追踪不用迁移。
+
+## v0.10.5 的改动（助手版本 44）
 
 - 写手、排纲、拆文、审稿助手与各端写后钩子按真人网文校准了万字短篇句式阻断门槛、退化与截断检查、弯引号默认、审稿细则和 0.10 细纲字段；重跑 story-setup 后新开会话才生效。
 - 书稿、设定、追踪不用迁移。
@@ -45,7 +50,7 @@
 ## v0.10.0 的改动（助手版本 39）
 
 - 长篇写作的写手、排纲助手、项目规则都改了，重跑 story-setup 后新开会话才生效。
-- 书稿、设定、追踪不用迁移。老书的卷纲、细纲照样能读能写；想换成新写法（标题末尾注释代替「作用域」行、细纲用「属于哪段剧情」「这章怎么走」「可以放开写的地方」等白话字段、每章松紧用「爆发／推进／修炼／感情或关系戏／日常／过渡」，排纲笔记挪到书目录下的隐藏目录 `.story/排纲笔记/`），在书目录跑一次可选的转换：`.agents/skills/story-long-write/scripts/convert_outline_format.py {书目录}`（路径按宿主不同，先加 `--dry-run` 看会改哪些文件）。转换只换写法不改内容；刻度台阶、打脸债、压力线轮转三张表原样留着，由你决定删不删。
+- 书稿、设定、追踪不用迁移。老书的卷纲、细纲照样能读能写，不必转换（如需当年一次性格式转换脚本 `convert_outline_format.py`，可从仓库 `v0.10.5` tag 取用）。
 - 作者记忆只用你确认过的条目。之前记下但没确认的写作习惯不再生效，想保留的再说一次。
 - 正文里引号内的省略号不再被替换；长篇、短篇一起生效。
 
@@ -165,7 +170,7 @@ OpenClaw、Reasonix 和通用模式把 skill 放在项目 `skills/` 里，重跑
 | 缺 `_tracking-state.json` 但已有正文 | 日更停止；Claude Code、Codex、OpenCode、ZCode、Antigravity 上写正文会被 hook 直接拦下，其他工具由写作流程自己停下 |
 | 存在但自动生成的追踪文件被手改 | `check` 报 `derived view differs from _tracking-state.json` |
 
-迁移**不需要重跑全书拆解**：正文、`设定/`、`大纲/`、`拆文库/` 都不受影响，只重建 `追踪/`。执行 `/story-import` 的「旧追踪项目迁移」：数出最后完整章号 `N`，从旧追踪文件与最近几章正文整理出当前状态，构造 `last_chapter=N` 的初始化事务跑 `tracking_commit.py init`。旧追踪文件会原样移入 `追踪/_旧追踪存档/` 留底，不删除、也不再读取。
+迁移**不需要重跑全书拆解**：正文、`设定/`、`大纲/`、`拆文库/` 都不受影响，只重建 `追踪/`。执行 `/story-import` 的「旧追踪项目迁移」：数出最后完整章号 `N`，从旧追踪文件与最近几章正文整理出当前状态，构造 `last_chapter=N` 的初始化事务跑 `tracking_commit.js init`。旧追踪文件会原样移入 `追踪/_旧追踪存档/` 留底，不删除、也不再读取。
 
 退役结构：`_tracking-meta.json`、`时间线/事件库.json` 及更早的追踪文件不再使用，`commit` 与 `check` 遇到会直接拒绝。
 
@@ -184,7 +189,7 @@ OpenClaw、Reasonix 和通用模式把 skill 放在项目 `skills/` 里，重跑
 3. 对每本书运行一次即可整批搬家，幂等、中途失败直接重跑：
 
    ```text
-   {PYTHON} {所用写作 skill 根}/scripts/author_memory_commit.py migrate --workspace {工作区} --book-root {工作区}/长篇/{书名}
+   node {所用写作 skill 根}/scripts/author_memory_commit.js migrate --workspace {工作区} --book-root {工作区}/长篇/{书名}
    ```
 
    断言、原话证据、确认次数、重要度原样保留；与全局条目的冲突候选在迁移后退回待确认。也可以对 agent 说「整理作者记忆」，迁移会列为默认提案项。
@@ -192,7 +197,7 @@ OpenClaw、Reasonix 和通用模式把 skill 放在项目 `skills/` 里，重跑
 **单书布局**（`正文/`、`追踪/` 直接在工作区根）：书级数据存储在 `{工作区}/.story/作者记忆/书级/`，迁移时 `--book-root` 就传工作区本身：
 
    ```text
-   {PYTHON} {所用写作 skill 根}/scripts/author_memory_commit.py migrate --workspace {工作区} --book-root {工作区}
+   node {所用写作 skill 根}/scripts/author_memory_commit.js migrate --workspace {工作区} --book-root {工作区}
    ```
 
 书名默认取存量本书条目里的书名；存量里有多本书的条目时用 `--book {书名}` 指定。用过 main 上预发布版本、查询时报 `project-level state must not carry state.book` 的工作区，带 `--book-root {工作区}` 运行任一命令即自动修复，不丢条目。

@@ -24,7 +24,7 @@ cp "$REPO_ROOT"/skills/story-setup/references/codex/agents/*.toml \
   "$WORKSPACE/.codex/agents/"
 cp "$REPO_ROOT/skills/story-setup/references/codex/hooks/hooks.json" \
   "$WORKSPACE/.codex/hooks.json"
-cp "$REPO_ROOT"/skills/story-setup/references/codex/hooks/{story_codex_hook.py,run-story-hook.sh,run-story-hook.cmd} \
+cp "$REPO_ROOT"/skills/story-setup/references/codex/hooks/{story_codex_hook.js,story_hook_core.js,run-story-hook.sh,run-story-hook.cmd} \
   "$WORKSPACE/.codex/hooks/"
 cp "$REPO_ROOT/skills/story-setup/references/codex/AGENTS.md.tmpl" \
   "$WORKSPACE/AGENTS.md"

@@ -29,19 +29,31 @@ import {
 type ToolInput = Record<string, unknown>
 type TextPart = { type: "text"; text: string }
 
+function realpathBest(value: string): string {
+  try {
+    return typeof fs.realpathSync.native === "function"
+      ? fs.realpathSync.native(value)
+      : fs.realpathSync(value)
+  } catch {
+    return path.resolve(value)
+  }
+}
+
 // 2.x 的后台服务一个进程服务多个项目，process.cwd() 不是用户项目：一切路径都以插件所在
 // location（ctx.location.directory，会话工作目录）为起点。项目根是它的 git toplevel。
 function projectRoot(directory: string): string {
   try {
-    return execSync("git rev-parse --show-toplevel", {
-      cwd: directory,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-      // Windows: without this, git flashes a console window as the plugin loads.
-      windowsHide: true,
-    }).trim()
+    return realpathBest(
+      execSync("git rev-parse --show-toplevel", {
+        cwd: directory,
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+        // Windows: without this, git flashes a console window as the plugin loads.
+        windowsHide: true,
+      }).trim()
+    )
   } catch {
-    return directory
+    return realpathBest(directory)
   }
 }
 
@@ -53,8 +65,8 @@ function targetBase(root: string, directory: string, input: ToolInput): string {
   let canonicalRoot = path.resolve(root)
   try {
     if (!fs.statSync(candidate).isDirectory()) return directory
-    candidate = fs.realpathSync(candidate)
-    canonicalRoot = fs.realpathSync(root)
+    candidate = realpathBest(candidate)
+    canonicalRoot = realpathBest(root)
   } catch {
     return directory
   }
@@ -155,7 +167,7 @@ function preCompactOutput(directory: string): string {
     const ctxPath = path.join(bookDir, "追踪", "上下文.md")
     if (fs.existsSync(ctxPath)) {
       const lineCount = fs.readFileSync(ctxPath, "utf-8").split("\n").length
-      const relPath = path.relative(root, ctxPath)
+      const relPath = safeRelative(root, ctxPath)
       lines.push(`Writing context: ${relPath} (${lineCount} lines)`)
     } else {
       lines.push("Active state: not found")
@@ -208,7 +220,7 @@ function appendNote(
 export default {
   id: "oh-story.story-hooks",
   async setup(ctx) {
-    const directory = ctx.location.directory
+    const directory = realpathBest(ctx.location.directory)
     const seenSessions = new Set<string>()
     const pendingCommitWarnings = new Map<string, string>()
 

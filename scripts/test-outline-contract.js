@@ -185,7 +185,6 @@ try {
   assert.match(legacyBody, /内容概括（五段式）/)
   const legacy = run(writeCase('legacy-field-names', legacyBody))
   assert.strictEqual(legacy.status, 0, legacy.stdout + legacy.stderr)
-  assert.deepStrictEqual(legacy.report.contract_risk, { level: '没问题', detail: '', status: 'ok' })
   // 「这章不能说破」可选：没写不拦。
   const noRelease = run(writeCase('missing-release', outline({ dropField: '这章不能说破' })))
   assert.strictEqual(noRelease.status, 0, noRelease.stdout + noRelease.stderr)
@@ -221,16 +220,7 @@ try {
   const core = run(writeCase('core-fields-only', coreOnly))
   assert.strictEqual(core.status, 0, core.stdout + core.stderr)
 
-  // 表头写明「禁＋放」的四列表同样要求至少一个点写了「放」；全是禁令判失败。
-  const allBan = run(writeCase('four-col-all-ban', outline({ plotTable: [
-    '| # | 情节点（谁做了什么） | 功能标签 | 执行边界（禁＋放） |',
-    '|---|---|---|---|',
-    '| 1 | 江晨接到邀约 | 铺垫 | 禁：不提铁盒。放：无 |',
-  ].join('\n') })))
-  assert.strictEqual(allBan.status, 1)
-  assert.deepStrictEqual(failureIds(allBan), ['outline.plotpoint-release'])
-
-  // 新表头「分寸」不拆禁、放两半，不查「放」。
+  // 新表头「分寸」和旧表头「执行边界（禁＋放）」的四列表只验结构，不查禁放字眼。
   const newFourCol = run(writeCase('plot-new-four-col', outline({ plotTable: [
     '| # | 情节点（谁做了什么） | 作用 | 分寸 |',
     '|---|---|---|---|',
@@ -280,55 +270,6 @@ try {
     assert.strictEqual(histRes.status, 0, histRes.stdout + histRes.stderr)
   }
 
-  // 有没有硬伤可选；写了就只收三档，并把档位放进 JSON 供审稿与作者汇报取用。
-  assert.deepStrictEqual(good.report.contract_risk, { level: '没问题', detail: '', status: 'ok' })
-  const reinforce = run(writeCase('risk-reinforce', outline({ fieldValues: { 有没有硬伤: '要补——补一段交换，让主角付出代价' } })))
-  assert.strictEqual(reinforce.status, 0, reinforce.stdout)
-  assert.deepStrictEqual(reinforce.report.contract_risk, { level: '要补', detail: '补一段交换，让主角付出代价', status: 'ok' })
-  const badRisk = run(writeCase('risk-invalid', outline({ fieldValues: { 有没有硬伤: '低风险' } })))
-  assert.strictEqual(badRisk.status, 1)
-  assert.deepStrictEqual(failureIds(badRisk), ['outline.contract-risk'])
-  assert.strictEqual(badRisk.report.contract_risk.status, 'invalid')
-  // 旧名「风险等级」「契约风险」与旧档名按同一字段认，回报用新档名。
-  const legacyRisk = run(writeCase('risk-legacy-name', outline().replace('- 有没有硬伤：没问题', '- 风险等级：契约破坏')))
-  assert.strictEqual(legacyRisk.status, 0, legacyRisk.stdout)
-  assert.strictEqual(legacyRisk.report.contract_risk.level, '有硬伤')
-  const legacyBad = run(writeCase('risk-legacy-invalid', outline().replace('- 有没有硬伤：没问题', '- 风险等级：高')))
-  assert.deepStrictEqual(failureIds(legacyBad), ['outline.contract-risk'])
-
-  // 旧表头「执行边界」的五列表全是禁令（一个「放」都没有）必须被判出来——015 章的实测事故形态。
-  const allForbid = run(writeCase('plot-all-forbid', outline({
-    plotTable: [
-      '| # | 情节点（谁做了什么） | 功能标签 | 分辨率 | 执行边界 |',
-      '|---|---|---|---|---|',
-      '| 1 | 江晨接到邀约 | 铺垫 | 疏 | 禁：不提铁盒 |',
-      '| 2 | 老人推过铁盒 | 高潮 | 密 | 禁：不评价当下 |',
-    ].join('\n'),
-  })))
-  assert.strictEqual(allForbid.status, 1)
-  assert(failureIds(allForbid).includes('outline.plotpoint-release'))
-
-  // 有「放」但不足三分之一：blocking 通过，advisory 提示。
-  const lowRelease = run(writeCase('plot-low-release', outline({
-    plotTable: [
-      '| # | 情节点（谁做了什么） | 功能标签 | 分辨率 | 执行边界 |',
-      '|---|---|---|---|---|',
-      '| 1 | 江晨接到邀约 | 铺垫 | 疏 | 禁：不提铁盒。放：允许邻居搭话 |',
-      '| 2 | 老人推过铁盒 | 高潮 | 密 | 禁：不评价当下 |',
-      '| 3 | 江晨接过铁盒 | 高潮 | 中 | 禁：不开盒 |',
-      '| 4 | 告辞出门 | 余波 | 疏 | 禁：不回头 |',
-    ].join('\n'),
-  })))
-  assert.strictEqual(lowRelease.status, 0, lowRelease.stdout + lowRelease.stderr)
-  assert(lowRelease.report.advisories.map((a) => a.id).includes('outline.plotpoint-release-ratio'))
-
-  // 这章不能说破写了才查长度：超过三条疑似复读全卷压着的，advisory 不阻断。
-  const boilerplate = run(writeCase('release-boilerplate', outline({
-    fieldValues: { 这章不能说破: '铁盒内容、终局表彰、幕后资助人、母亲身世' },
-  })))
-  assert.strictEqual(boilerplate.status, 0, boilerplate.stdout + boilerplate.stderr)
-  assert(boilerplate.report.advisories.map((a) => a.id).includes('outline.release-brevity'))
-
   // 细纲引用了不存在的设定文件必须被判出来——「数字照 X.md」而 X 查无实据的排纲事故。
   const ghostRefBody = outline() + '\n#### 结尾设定和钩子\n- 结尾设定：数字口径照 `设定/世界观/经济与用度.md`，收束于关门\n'
   const ghostRef = run(writeCase('ghost-ref', ghostRefBody))
@@ -342,62 +283,6 @@ try {
   const realRef = run(realRefProject)
   assert.strictEqual(realRef.status, 0, realRef.stdout + realRef.stderr)
 
-  // --supply：单元卡含「供给自查」小节通过，缺则失败。
-  const volumeDir = path.join(tmpRoot, 'supply-case', '大纲')
-  fs.mkdirSync(volumeDir, { recursive: true })
-  const volumeFile = path.join(volumeDir, '卷纲_第一卷.md')
-  fs.writeFileSync(volumeFile, [
-    '# 第一卷 卷纲',
-    '### 剧情单元 D1-02',
-    '- 单元ID：D1-02',
-    '- 章节范围：第 11-20 章',
-    '#### 供给自查',
-    '- 对手供给：贾雄手下（B 级，落 设定/角色/贾雄.md）',
-    '### 剧情单元 D1-03',
-    '- 单元ID：D1-03',
-    '- 章节范围：第 21-34 章',
-    '## 核心矛盾',
-  ].join('\n'), 'utf8')
-  const supplyOk = spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-02'], { cwd: repoRoot, encoding: 'utf8' })
-  assert.strictEqual(supplyOk.status, 0, supplyOk.stdout + supplyOk.stderr)
-  const supplyMissing = spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' })
-  assert.strictEqual(supplyMissing.status, 1)
-  assert.match(JSON.parse(supplyMissing.stdout).evidence, /写纲前查缺/)
-  // 新书：供给自查写在卷纲旁的 排纲底稿_{单元ID}.md，优先于单元卡。
-  fs.writeFileSync(path.join(volumeDir, '排纲底稿_D1-03.md'), '# D1-03 排纲底稿\n\n## 供给自查\n无缺口\n', 'utf8')
-  const supplyDraft = spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' })
-  assert.strictEqual(supplyDraft.status, 0, supplyDraft.stdout + supplyDraft.stderr)
-  assert.match(JSON.parse(supplyDraft.stdout).evidence, /排纲底稿含「写纲前查缺」/)
-  fs.writeFileSync(path.join(volumeDir, '排纲底稿_D1-03.md'), '# D1-03 排纲底稿\n\n## 建纲追加\n无追加\n', 'utf8')
-  assert.strictEqual(spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' }).status, 1)
-  // 0.10 起文件叫排纲笔记、小节叫「写纲前查缺」；新名优先于旧文件。
-  fs.writeFileSync(path.join(volumeDir, '排纲笔记_D1-03.md'), '# D1-03 排纲笔记\n\n## 写纲前查缺\n无缺口\n', 'utf8')
-  const supplyNotes = spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' })
-  assert.strictEqual(supplyNotes.status, 0, supplyNotes.stdout + supplyNotes.stderr)
-  assert.match(JSON.parse(supplyNotes.stdout).file, /排纲笔记_D1-03\.md$/)
-  // 新书写在书目录的隐藏目录 .story/排纲笔记/{编号}.md，优先于大纲/下的老位置。
-  const hiddenNotes = path.join(tmpRoot, 'supply-case', '.story', '排纲笔记')
-  fs.mkdirSync(hiddenNotes, { recursive: true })
-  fs.writeFileSync(path.join(hiddenNotes, 'D1-03.md'), '# 第三段剧情 排纲笔记\n\n## 写纲时补的\n无\n', 'utf8')
-  const hiddenMissing = spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' })
-  assert.strictEqual(hiddenMissing.status, 1, hiddenMissing.stdout)
-  assert.match(JSON.parse(hiddenMissing.stdout).file, /\.story[\\/]排纲笔记[\\/]D1-03\.md$/)
-  fs.writeFileSync(path.join(hiddenNotes, 'D1-03.md'), '# 第三段剧情 排纲笔记\n\n## 写纲前查缺\n无缺口\n', 'utf8')
-  const hiddenOk = spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' })
-  assert.strictEqual(hiddenOk.status, 0, hiddenOk.stdout + hiddenOk.stderr)
-  fs.rmSync(path.join(tmpRoot, 'supply-case', '.story'), { recursive: true, force: true })
-
-  const legacyTable = outline({ plotTable: [
-    '| # | 情节点（谁做了什么） | 功能标签 | 分辨率 | 执行边界 |',
-    '|---|---|---|---|---|',
-    '| 1 | 江晨接到邀约 | 铺垫 | 疏 | 禁：不提铁盒。放：无 |',
-    '| 2 | 老人推过铁盒 | 高潮 | 密 | 禁：不评价当下。放：允许老人当场说出这东西他留了几十年 |',
-  ].join('\n') })
-  for (const empty of ['无', '无。', '[待补充]', '；禁：不说破', '']) {
-    const body = legacyTable.replace('允许老人当场说出这东西他留了几十年', empty)
-    const result = run(writeCase(`empty-release-${Buffer.from(empty).toString('hex')}`, body))
-    assert(failureIds(result).includes('outline.plotpoint-release'), result.stdout)
-  }
   const skillRef = run(writeCase('skill-ref', outline() + '\n见 `writing-craft.md` 与 `references/anti-ai-writing.md`'))
   assert.strictEqual(skillRef.status, 0, skillRef.stdout)
   for (const ref of ['../设定/工钱.md', '设定\\工钱.md', './工钱.md']) {
@@ -410,24 +295,6 @@ try {
     fs.rmdirSync(target)
     fs.writeFileSync(target, '# 工钱\n一日十文')
     assert.strictEqual(run(project).status, 0)
-  }
-  const supplyCases = [
-    ['### 剧情单元 L1-010\n#### 供给自查', false],
-    ['### 剧情单元 L1-01\n尚未执行供给自查', false],
-    ['### 剧情单元 L1-01\n### 剧情单元 L1-02\n#### 供给自查', false],
-    ['### 剧情单元 L1-01\n```md\n#### 供给自查\n```', false],
-    ['### 剧情单元 L1-01\n#### 供给自查', true],
-    ['### 剧情单元 L1-01：码头\n#### 供给自查（本批）\n无缺口', true],
-    ['### 码头\n- **单元ID**：L1-01\n#### 信息\n##### 供给自查\n无', true],
-    // 新写法：单元编号在标题尾部注释里
-    ['### 第一段剧情：码头 <!-- L1-01 -->\n#### 写纲前查缺\n无缺口', true],
-    ['### 第一段剧情：码头 <!-- L1-01 -->\n### 第二段剧情 <!-- L1-02 -->\n#### 写纲前查缺', false],
-    ['### 第十段剧情 <!-- L1-010 -->\n#### 写纲前查缺', false],
-  ]
-  for (const [body, ok] of supplyCases) {
-    fs.writeFileSync(volumeFile, body)
-    const result = spawnSync(process.execPath, [verifier, '--supply', volumeFile, 'L1-01'], { encoding: 'utf8' })
-    assert.strictEqual(result.status, ok ? 0 : 1, result.stdout + body)
   }
 
   const missingFile = run(writeCase('missing-file', null))

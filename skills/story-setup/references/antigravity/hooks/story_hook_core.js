@@ -4,10 +4,32 @@ const fs = require("node:fs")
 const path = require("node:path")
 const { spawnSync } = require("node:child_process")
 
+function realpathNative(value) {
+  return typeof fs.realpathSync.native === "function"
+    ? fs.realpathSync.native(value)
+    : fs.realpathSync(value)
+}
+
+function canonicalPath(value) {
+  let cur = path.resolve(value)
+  const tail = []
+  while (true) {
+    try {
+      const real = realpathNative(cur)
+      return tail.length ? path.join(real, ...tail.reverse()) : real
+    } catch {
+      const parent = path.dirname(cur)
+      if (parent === cur) return path.resolve(value)
+      tail.push(path.basename(cur))
+      cur = parent
+    }
+  }
+}
+
 function existingDir(value) {
   if (typeof value !== "string" || !value.trim()) return null
   try {
-    const resolved = fs.realpathSync(path.resolve(value))
+    const resolved = realpathNative(path.resolve(value))
     return fs.statSync(resolved).isDirectory() ? resolved : null
   } catch {
     return null
@@ -16,8 +38,13 @@ function existingDir(value) {
 
 function safeRelative(root, target) {
   try {
+    const isInsideRel = (rel) =>
+      Boolean(rel) && rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel)
     const rel = path.relative(path.resolve(root), path.resolve(target))
-    return rel && !rel.startsWith("..") ? rel.split(path.sep).join("/") : String(target)
+    if (isInsideRel(rel)) return rel.split(path.sep).join("/")
+    const canonRel = path.relative(canonicalPath(root), canonicalPath(target))
+    if (isInsideRel(canonRel)) return canonRel.split(path.sep).join("/")
+    return String(target)
   } catch {
     return String(target)
   }
@@ -25,7 +52,9 @@ function safeRelative(root, target) {
 
 function resolveTarget(root, target, base = root) {
   const normalized = String(target || "").replace(/\\/g, "/")
-  return path.isAbsolute(normalized) ? path.resolve(normalized) : path.resolve(base || root, normalized)
+  if (path.isAbsolute(normalized)) return path.resolve(normalized)
+  if (/^[A-Za-z]:\//.test(normalized)) return "/" + path.win32.normalize(normalized).replace(/\\/g, "/")
+  return path.resolve(base || root, normalized)
 }
 
 function firstLine(file) {
@@ -109,7 +138,7 @@ function trackingCheckpointIssue(book, requireState = false, expectedLastCommitt
   const state = path.join(book, "追踪", "_tracking-state.json")
   if (!fs.existsSync(state)) {
     return requireState
-      ? `追踪/_tracking-state.json 缺失；已有正文项目走 /story-import 的「旧追踪项目迁移」重建追踪（不必重跑全书拆解），新书先用 tracking_commit.py init 初始化`
+      ? `追踪/_tracking-state.json 缺失；已有正文项目走 /story-import 的「旧追踪项目迁移」重建追踪（不必重跑全书拆解），新书先用 tracking_commit.js init 初始化`
       : null
   }
   let document
@@ -170,7 +199,7 @@ function continuityFindings(root) {
         const contextTime = fs.statSync(context).mtimeMs
         if (newest > contextTime + 1000) {
           const latest = chapters.reduce((left, right) => fs.statSync(left).mtimeMs > fs.statSync(right).mtimeMs ? left : right)
-          messages.push(`[continuity] ${safeRelative(root, book)}：正文已更新到「${path.basename(latest)}」但续写状态卡更早——为该章提交 tracking_commit.py 事务、check 通过后再续写，禁止分别手改 上下文.md/伏笔.md。`)
+          messages.push(`[continuity] ${safeRelative(root, book)}：正文已更新到「${path.basename(latest)}」但续写状态卡更早——为该章提交 tracking_commit.js 事务、check 通过后再续写，禁止分别手改 上下文.md/伏笔.md。`)
         }
       } catch {}
     }
@@ -180,7 +209,7 @@ function continuityFindings(root) {
       try {
         const contextSize = fs.statSync(context).size
         if (contextSize > 12288) {
-          messages.push(`[continuity] ${safeRelative(root, book)}：追踪/上下文.md 已 ${contextSize} 字节，超出续写状态卡预算 12288 字节——提交一份 mode=revision 事务让 tracking_commit.py 整份重建，不要手改也不要继续追加。`)
+          messages.push(`[continuity] ${safeRelative(root, book)}：追踪/上下文.md 已 ${contextSize} 字节，超出续写状态卡预算 12288 字节——提交一份 mode=revision 事务让 tracking_commit.js 整份重建，不要手改也不要继续追加。`)
         }
       } catch {}
     }
@@ -942,7 +971,7 @@ function maskStyleText(text, whitelist) {
 function toxicRescanHint(absolute) {
   const match = absolute ? path.basename(absolute).match(/^第0*(\d+)章.*\.md$/) : null
   if (match && path.basename(path.dirname(absolute)) === "正文") {
-    return `完整检查：{PYTHON} <story-long-write>/scripts/storyctl.py chapter check --project <书目录> --chapter ${match[1]}`
+    return `完整检查：node <story-long-write>/scripts/storyctl.js chapter check --project <书目录> --chapter ${match[1]}`
   }
   return "完整扫描：node <skill>/scripts/check-ai-patterns.js --check <正文文件>"
 }
@@ -1138,7 +1167,11 @@ function proseAfterWrite(root, absolute) {
     const bytes = fs.statSync(absolute).size
     if (bytes < 200) findings.push(`【落盘】正文仅 ${bytes} 字节，疑似未写完/落盘失败（quota/超时中断？），请核对并补写。`)
     const text = fs.readFileSync(absolute, "utf8")
-    findings.push(...proseNetFindings(text, loadStyleWhitelist(absolute), toxicRescanHint(absolute)))
+    const net = proseNetFindings(text, loadStyleWhitelist(absolute), toxicRescanHint(absolute))
+    if (net.length) {
+      findings.push("【退化/工程词/毒句式】（硬信号：截断/拒绝语/工程词→重写该段；毒句式→就地改写；命中即处理，别留给下一章）")
+      findings.push(...net)
+    }
   } catch {
     return ""
   }
@@ -1354,6 +1387,115 @@ function stagedMarkdownWarnings(root) {
   return warnings.length ? `=== Story Commit Warnings（advisory only）===\n${warnings.join("\n")}\n=== End Warnings ===` : ""
 }
 
+// 与 tracking_commit.js FORESHADOW_STATUSES 保持同步（由 test-story-hook-core.mjs 校验）。
+const FORESHADOW_NORMAL_STATUSES = new Set(["已埋", "已回收", "放弃"])
+const FORESHADOW_WARN_STATUSES = new Set(["已过期"])
+
+function countMarkdownFiles(dir) {
+  let count = 0
+  function walk(base) {
+    let entries = []
+    try { entries = fs.readdirSync(base, { withFileTypes: true }) } catch { return }
+    for (const entry of entries) {
+      const full = path.join(base, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (entry.isFile() && entry.name.endsWith(".md")) count += 1
+    }
+  }
+  walk(dir)
+  return count
+}
+
+function analysisIncomplete(progressFile) {
+  let text = ""
+  try { text = fs.readFileSync(progressFile, "utf8") } catch { return true }
+  const match = text.match(/最终状态[：:]\s*([A-Za-z_]+)/)
+  if (!match) return true
+  return match[1] !== "completed" && match[1] !== "completed_with_errors"
+}
+
+function discoverIncompleteAnalyses(root) {
+  const libDir = path.join(root, "拆文库")
+  if (!existingDir(libDir)) return []
+  const results = []
+  function walk(base) {
+    let entries = []
+    try { entries = fs.readdirSync(base, { withFileTypes: true }) } catch { return }
+    entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+    for (const entry of entries) {
+      const full = path.join(base, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (entry.isFile() && entry.name === "_progress.md" && analysisIncomplete(full)) {
+        results.push(full)
+      }
+    }
+  }
+  walk(libDir)
+  return results
+}
+
+function hasAbnormalForeshadowing(foreshadowFile) {
+  let text = ""
+  try { text = fs.readFileSync(foreshadowFile, "utf8") } catch { return false }
+  for (const rawLine of text.split(/\r?\n/)) {
+    if (!rawLine.startsWith("|")) continue
+    if (/^\|[-:\s|]+$/.test(rawLine)) continue
+    const cols = rawLine.split("|")
+    // awk -F'|' $6 对应 split('|')[5]（第 0 段为行首 '|' 之前的空串）
+    const status = String(cols[5] || "").replace(/^[\s\u3000]+|[\s\u3000]+$/g, "")
+    if (!status || status === "状态" || /^状态\{/.test(status)) continue
+    if (FORESHADOW_WARN_STATUSES.has(status) || !FORESHADOW_NORMAL_STATUSES.has(status)) return true
+  }
+  return false
+}
+
+function detectStoryGaps(root) {
+  const books = discoverAllBooks(root)
+  if (!books.length) return ""
+  const blocks = []
+  for (const book of books) {
+    const bookName = path.basename(book)
+    const warnings = []
+    const bodyDir = path.join(book, "正文")
+    const bodyFile = path.join(book, "正文.md")
+    const settingDir = path.join(book, "设定")
+    const trackingDir = path.join(book, "追踪")
+    const outlineDir = path.join(book, "大纲")
+
+    let chapterCount = 0
+    if (existingDir(bodyDir)) chapterCount = countMarkdownFiles(bodyDir)
+    else if (fs.existsSync(bodyFile)) chapterCount = 1
+    const settingCount = existingDir(settingDir) ? countMarkdownFiles(settingDir) : 0
+    if (chapterCount > 10 && settingCount < 3) {
+      warnings.push(`[WARN] ${bookName}：正文 ${chapterCount} 章，但设定文件只有 ${settingCount} 个，建议补充设定。`)
+    }
+
+    const foreshadowFile = path.join(trackingDir, "伏笔.md")
+    if (fs.existsSync(foreshadowFile) && hasAbnormalForeshadowing(foreshadowFile)) {
+      warnings.push(`[WARN] ${bookName}：伏笔.md 中检测到过期或异常的伏笔条目，建议跑 /story-review lean 或做一次伏笔审计。`)
+    }
+
+    if (existingDir(bodyDir) || fs.existsSync(bodyFile)) {
+      if (existingDir(trackingDir) && !existingDir(outlineDir)) {
+        warnings.push(`[WARN] ${bookName}：已有 正文/ 但缺少 大纲/，建议先搭大纲。`)
+      } else if (!existingDir(trackingDir) && !fs.existsSync(path.join(book, "小节大纲.md"))) {
+        warnings.push(`[WARN] ${bookName}：已有正文但缺少 小节大纲.md，建议先搭大纲。`)
+      }
+    }
+
+    if (warnings.length) {
+      blocks.push(`检查：${bookName}\n${warnings.join("\n")}`)
+    }
+  }
+
+  for (const progressFile of discoverIncompleteAnalyses(root)) {
+    blocks.push(`[WARN] 拆文未完成：${safeRelative(root, progressFile)}，运行 /story-long-analyze 继续。`)
+  }
+  blocks.push(...continuityFindings(root))
+  if (!blocks.length) return ""
+  return `=== 写作缺口检测 ===\n${blocks.join("\n")}\n`
+}
+
 module.exports = {
   existingDir,
   safeRelative,
@@ -1372,7 +1514,14 @@ module.exports = {
   proseAfterWrite,
   shellWords,
   isGitCommitCommand,
+  isCharacterSheetPath,
   stagedMarkdownWarnings,
+  FORESHADOW_NORMAL_STATUSES,
+  FORESHADOW_WARN_STATUSES,
+  DESLOP_SKIP_MARKER,
+  analysisIncomplete,
+  discoverIncompleteAnalyses,
+  detectStoryGaps,
   TERMINAL,
   QUOTE_OPENERS,
   SOFT_PATTERNS,

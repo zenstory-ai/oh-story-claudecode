@@ -7,16 +7,16 @@
 | Source path | Target path | Owner class | Merge mode | Validation check |
 |-------------|-------------|-------------|------------|------------------|
 | `skills/story-setup/references/templates/CLAUDE.md.tmpl` | `CLAUDE.md` | user+managed | managed block merge | contains story skill routing sections |
-| `skills/story-setup/references/templates/hooks/` | `.claude/hooks/` | story-setup managed | recursive replace | `session-*.sh`, `detect-story-gaps.sh`, `validate-story-commit.sh`, `guard-outline-before-prose.sh`, `check-prose-after-write.sh`, `story_hook_core.js`, `story_hook_cli.js`, `lib/common.sh`, `lib/sentinel.sh` exist；`story_hook_core.js` 与 OpenCode/ZCode/Antigravity 副本字节一致 |
+| `skills/story-setup/references/templates/hooks/` | `.claude/hooks/` | story-setup managed | recursive replace | `run-story-hook.sh`, `story_hook_cli.js`, `story_hook_core.js` exist；`node --check` 语法有效；`story_hook_core.js` 与 Codex/OpenCode/ZCode/Antigravity 副本字节一致 |
 | `skills/story-setup/references/templates/rules/*.md` | `.claude/rules/*.md` | story-setup managed | replace | every rule contains `paths` frontmatter |
 | `skills/story-setup/references/templates/agents/*.md` | `.claude/agents/*.md` | story-setup managed | replace | 7 agent files exist |
 | `skills/story-setup/references/agent-references/*.md` | `.claude/skills/story-setup/references/agent-references/*.md` | story-setup managed | replace | every `story-setup/references/agent-references/*.md` reference resolves |
 | `skills/story-setup/references/templates/settings-hooks.json` | `.claude/settings.local.json` | user+managed | replace managed registrations by stable hook identity | hook JSON valid；旧 matcher 注册已迁移、当前模板命令各一份、用户 hook 保留 |
-| `skills/story-setup/scripts/merge-claude-settings.py` | 部署时执行，不复制到项目 | story-setup helper | execute | 替换已知 story hook 注册、保留用户 hooks/顶层字段，v24→v25 迁移与重复执行幂等 |
-| `skills/story-setup/scripts/copy-path-safety.py` | 每个递归复制步骤前执行，不复制到项目专用目录 | story-setup helper | execute | JSON 仅 `copy_allowed: true` 时允许复制；symlink 同对象 no-op；target 位于 source 内时停止 |
+| `skills/story-setup/scripts/merge-hooks.js` | 部署时执行，不复制到项目 | story-setup helper | execute (`--host claude`) | 替换已知 story hook 注册、保留用户 hooks/顶层字段，v24→v25 迁移与重复执行幂等 |
+| `skills/story-setup/scripts/copy-path-safety.js` | 每个递归复制步骤前执行，不复制到项目专用目录 | story-setup helper | execute | JSON 仅 `copy_allowed: true` 时允许复制；symlink 同对象 no-op；target 位于 source 内时停止 |
 | generated sentinel | `.story-deployed` | story-setup managed | replace | contains `agents_version`, `setup_skill_version`, `target_cli`, `resolver_strategy`, `references_dir` |
 
-`references/templates/hooks/` 内容：8 个 hook 脚本模板 + `story_hook_core.js`（正文网/大纲守卫/连续性/commit 侦测的共享实现，与 OpenCode/ZCode/Antigravity 同一份）+ `story_hook_cli.js`（bash hook 调核的 node 桥）+ `lib/common.sh`/`lib/sentinel.sh`。正文兜底 `check-prose-after-write.sh` 限 PostToolUse Write/Edit；`cat>`/`tee` 等 Bash 写正文在 Claude 端仅运行写前守卫。
+`references/templates/hooks/` 内容：`run-story-hook.sh`（统一启动器，探测 Node.js 18+ 并路由 8 个 Claude hook 事件）+ `story_hook_core.js`（正文网/大纲守卫/缺口检测/连续性/commit 侦测的共享实现，与 Codex/OpenCode/ZCode/Antigravity 同一份）+ `story_hook_cli.js`（Claude Code 统一 Node 适配器及 `analysis-input-guard`）。正文兜底限 PostToolUse Write/Edit；`cat>`/`tee` 等 Bash 写正文在 Claude 端仅运行写前守卫。
 
 ## 部署 CLAUDE.md
 
@@ -24,11 +24,9 @@
 
 ## 部署 Hooks
 
-- **递归复制完整目录树**：将 `skills/story-setup/references/templates/hooks/` 复制到用户项目 `.claude/hooks/`
-- 必须保留子目录 `lib/`，其中：
-  - `lib/common.sh` 提供 `project_root`、`discover_active_book`、`discover_all_books`
-  - `lib/sentinel.sh` 提供 `.story-deployed` 字段读取
-- 只需对 `.claude/hooks/*.sh` 设置执行权限（`chmod +x`）；`lib/*.sh` 由 hook `source`，不要求可执行位
+- **递归复制完整目录树**：先用 `copy-path-safety.js --prune-orphans` 清理旧版退役脚本（旧 8 个 `.sh` 与 `lib/`），再将 `skills/story-setup/references/templates/hooks/` 复制到用户项目 `.claude/hooks/`
+- 需对 `.claude/hooks/run-story-hook.sh` 设置执行权限（`chmod +x`）
+- Hook 运行时依赖 PATH 中的 Node.js 18+（缺 Node 时 `session-start` 会提示安装并 fail-open）
 
 ## 部署 Rules
 
@@ -53,21 +51,21 @@
 
 先看 `.claude/settings.local.json` 是否存在：存在则读取现有配置，后续合并；不存在则由 helper 创建新文件。
 
-1. 按现有跨平台规则探测 Python：`for PYBIN in python3 python py; do "$PYBIN" -c "" 2>/dev/null && break; done`；无可用解释器时停止，不手写或简化合并。
-2. 调用 `"$PYBIN" "{story-setup skill目录}/scripts/merge-claude-settings.py" --existing "{项目}/.claude/settings.local.json" --template "{story-setup skill目录}/references/templates/settings-hooks.json" --output "{项目}/.claude/settings.local.json"`。
+1. 确认 PATH 中存在 `node`（Node.js 18+）；不可用时停止，不手写或简化合并。
+2. 调用 `node "{story-setup skill目录}/scripts/merge-hooks.js" --host claude --existing "{项目}/.claude/settings.local.json" --template "{story-setup skill目录}/references/templates/settings-hooks.json" --output "{项目}/.claude/settings.local.json"`。
 3. helper 会移除所有已知 story-setup hook 的历史注册，再追加当前模板；因此 matcher/timeout/if 能随版本升级，同时混在旧 block 中的用户 hook 与未知顶层字段原样保留。写后解析 JSON，验证模板命令各一份、用户配置仍在，再复跑 helper 比较文件字节确认幂等。
 
 ## 部署标记补充
 
 - `references_dir` 写 `.claude/skills/story-setup/references/agent-references`（多端时与其他端逗号拼接）。
-- 同时创建一次性标记文件 `.claude/.agents-pending-restart`（空文件即可）。session-start.sh 在下一个会话启动时据此确认 agents 已随新会话注册，并自动删除该标记——用来向用户确认「重启已生效」。
+- 同时创建一次性标记文件 `.claude/.agents-pending-restart`（空文件即可）。`session-start` hook 在下一个会话启动时据此确认 agents 已随新会话注册，并自动删除该标记——用来向用户确认「重启已生效」。
 
 ## 验证
 
 1. 验证 hooks 注册：
-   - 检查 `.claude/settings.local.json` 中的 hooks 字段是否正确
-   - 检查 `.claude/hooks/` 下的脚本是否存在且有执行权限
-   - 检查 `.claude/hooks/lib/common.sh` 与 `.claude/hooks/lib/sentinel.sh` 是否存在
+   - 检查 `.claude/settings.local.json` 中的 hooks 字段是否正确（全部经 `run-story-hook.sh` 路由，旧版独立 `.sh` 注册已清理）
+   - 检查 `.claude/hooks/run-story-hook.sh` 存在且有执行权限
+   - 检查 `.claude/hooks/story_hook_cli.js` 与 `.claude/hooks/story_hook_core.js` 存在且 `node --check` 语法有效
 2. 验证 rules 路径：
    - 检查 `.claude/rules/` 下的规则文件是否存在且包含 `paths` frontmatter
 3. 验证 agents：

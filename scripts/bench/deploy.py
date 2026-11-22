@@ -50,11 +50,16 @@ def render(tmpl, proj):
 
 def instructions(pkg, host, tmpl, path, proj):
     """项目指令文件：包里有管理块合并脚本就照 story-setup 合并（多端共用一份文件），旧包按原样渲染。"""
-    merger = pkg / 'skills/story-setup/scripts/merge-project-instructions.py'
-    if not merger.is_file():
+    merger_js = pkg / 'skills/story-setup/scripts/merge-project-instructions.js'
+    merger_py = pkg / 'skills/story-setup/scripts/merge-project-instructions.py'
+    if merger_js.is_file():
+        cmd = ['node', str(merger_js)]
+    elif merger_py.is_file():
+        cmd = [sys.executable, str(merger_py)]
+    else:
         path.write_text(render(tmpl, proj), encoding='utf-8')
         return
-    subprocess.run([sys.executable, str(merger), '--host', host, '--template', str(tmpl),
+    subprocess.run([*cmd, '--host', host, '--template', str(tmpl),
                     '--existing', str(path), '--output', str(path), '--project-name', proj.name],
                    check=True, stdout=subprocess.DEVNULL)
 
@@ -97,7 +102,12 @@ def deploy_claude(pkg, proj, contract):
         for f in (tpl / sub).glob('*.md'):
             shutil.copy2(f, claude / sub / f.name)
     settings = claude / 'settings.local.json'
-    subprocess.run([sys.executable, str(setup / 'scripts/merge-claude-settings.py'),
+    merge_hooks_js = setup / 'scripts/merge-hooks.js'
+    if merge_hooks_js.is_file():
+        merge_cmd = ['node', str(merge_hooks_js), '--host', 'claude']
+    else:
+        merge_cmd = [sys.executable, str(setup / 'scripts/merge-claude-settings.py')]
+    subprocess.run([*merge_cmd,
                     '--existing', str(settings), '--template', str(tpl / 'settings-hooks.json'),
                     '--output', str(settings)], check=True, stdout=subprocess.DEVNULL)
     sentinel(proj, contract, 'claude-code', '.claude/skills/story-setup/references/agent-references')
@@ -114,10 +124,18 @@ def deploy_codex(pkg, proj, contract):
     for f in (ref / 'agents').glob('*.toml'):
         shutil.copy2(f, codex / 'agents' / f.name)
     (codex / 'hooks').mkdir(exist_ok=True)
-    for name in ('story_codex_hook.py', 'run-story-hook.sh', 'run-story-hook.cmd'):
-        shutil.copy2(ref / 'hooks' / name, codex / 'hooks' / name)
+    for name in ('story_codex_hook.js', 'story_hook_core.js', 'run-story-hook.sh', 'run-story-hook.cmd'):
+        if (ref / 'hooks' / name).is_file():
+            shutil.copy2(ref / 'hooks' / name, codex / 'hooks' / name)
+    if (ref / 'hooks' / 'story_codex_hook.py').is_file():
+        shutil.copy2(ref / 'hooks' / 'story_codex_hook.py', codex / 'hooks' / 'story_codex_hook.py')
     (codex / 'hooks/run-story-hook.sh').chmod(0o755)
-    subprocess.run([sys.executable, str(setup / 'scripts/merge-codex-hooks.py'),
+    merge_hooks_js = setup / 'scripts/merge-hooks.js'
+    if merge_hooks_js.is_file():
+        merge_cmd = ['node', str(merge_hooks_js), '--host', 'codex']
+    else:
+        merge_cmd = [sys.executable, str(setup / 'scripts/merge-codex-hooks.py')]
+    subprocess.run([*merge_cmd,
                     '--existing', str(codex / 'hooks.json'), '--template', str(ref / 'hooks/hooks.json'),
                     '--output', str(codex / 'hooks.json')], check=True, stdout=subprocess.DEVNULL)
     copytree(setup / 'references/agent-references', codex / 'skills/story-setup/references/agent-references')

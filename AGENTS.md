@@ -4,15 +4,21 @@
 
 ## 这个仓库是什么
 
-一个网文写作 skill 套件：14 个 skill（`skills/<name>/SKILL.md` + `references/`），加上面向 Claude Code、Codex、OpenCode、OpenClaw、Antigravity、ZCode、Reasonix 七个编程 Agent（宿主）的适配层。产品是写在 Markdown 里的写作方法与工作流契约，不是运行时程序。`scripts/` 下是仓库自己的守卫、测试和代码生成脚本（索引见 [scripts/README.md](scripts/README.md)），不是 skill 运行时脚本。
+一个网文写作 skill 套件：14 个 skill（`skills/<name>/SKILL.md` + `references/` + 运行时工具），加上面向 Claude Code、Codex、OpenCode、OpenClaw、Antigravity、ZCode、Reasonix 七个编程 Agent（宿主）的适配层。产品是 **Markdown 写作方法与工作流契约 + 确定性运行时工具**（精确字数统计、原子状态追踪、AI 句式/退化/标点检测、多宿主 Hook 与本地工作台）的混合套件：
+
+- **留在 Markdown**：写作技法、结构设计、节奏与审美判断、面向作者的交互流程。
+- **留在代码**：文件 I/O、精确计字、原子状态完整性、机械检测与多宿主 Hook 调度。
+- **举证门槛**：没有可复现的真实故障用例，不新增守卫脚本或正则禁词；新增守卫必须对应明确会破坏运行时的失效模式。
+
+`scripts/` 下是仓库自己的守卫、测试和代码生成脚本（索引见 [scripts/README.md](scripts/README.md)），不是 skill 运行时脚本。
 
 ## 改动前必须知道的规矩
 
 - **frontmatter 单行键值**：`description` 不用 `|`/`>` 块，`metadata` 是单行 JSON，OpenClaw 依赖这一点。
 - **不跨 skill 引用文件**：除基础组件 `browser-cdp` 外，一个 skill 的 SKILL.md / references 不得引用另一个 skill 的文件；共享内容走 `scripts/shared-references.json` / `scripts/shared-assets.json` 登记。
 - **热路径有字数预算**：SKILL.md、references 和 agent 模板受 `scripts/doc-budget.json` 约束，加正文要么删等量旧文本，要么显式调高预算并说明。每个角色每次调用（含条件分支与会同时发生的叠加组合）的加载硬上限 35K（去空白字符，`path_ceiling`），豁免只能列进 `path_ceiling.exempt` 并写明原因；条件读取默认互斥，会叠加的要登记进 `stacking`，腾字数优先把少见时刻的规则搬进按时刻读的 reference。
-- **工作流编号是契约**：Step / Phase / Stage 编号与引用绑定由 `skill-numbering.py` 守卫，重排要跑它的级联而不是手改。
-- **改 agent 模板或 CLAUDE.md.tmpl 后必须重新生成适配层**（OpenCode、Codex、Antigravity 等）并提交生成结果，否则适配层 CI 红。
+- **工作流编号用连续整数**：Step / Phase / Stage 标题与引用不写小数标签（如 `Step 1.5`、`Phase 2.1`、`Stage 0.5`），由 `scripts/lint-repo.py` 守卫。
+- **改 agent 模板或 CLAUDE.md.tmpl 后必须重新生成适配层**（OpenCode、Codex、Antigravity、ZCode 等）并提交生成结果，否则适配层 CI 红。
 - **skill 文档禁止裸调 `python3`**，须走 python3 → python → py 探测。
 - **改名或移动任一 `scripts/` 脚本**，要同步 `.github/workflows/*.yml`、CONTRIBUTING.md、scripts/README.md 和调用它的兄弟脚本。
 - **作者会打开的文件和汇报只用白话**：卷纲、细纲、题材定位等模板与给作者的汇报里，不写脚本名、字段口径、内部编号和自造词（作用域、契约、任务包、主会话之类）；机器要按名读的字段在模板里用注释标出谁在读。不设禁词守卫，靠评审守住。
@@ -22,7 +28,7 @@
 
 ## 验证
 
-强制清单以 `.github/workflows/cross-platform.yml` 为准；提交前按 [CONTRIBUTING.md](CONTRIBUTING.md)「CI 检查」里的本地命令跑一遍与改动相关的守卫，至少 `bash scripts/static-check.sh`、`python3 scripts/skill-numbering.py check`、`bash scripts/check-doc-budget.sh`、`bash scripts/check-shared-files.sh`。
+强制清单以 `.github/workflows/cross-platform.yml` 为准；提交前按 [CONTRIBUTING.md](CONTRIBUTING.md)「CI 检查」里的本地命令跑一遍与改动相关的守卫，至少 `python3 scripts/lint-repo.py` 和 `node scripts/check-doc-budget.mjs`。
 
 ## 重要改动必须留笔记
 

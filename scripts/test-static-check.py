@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -11,8 +10,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CHECKER = REPO_ROOT / "scripts/static-check.py"
-LAUNCHER = REPO_ROOT / "scripts/static-check.sh"
+CHECKER = REPO_ROOT / "scripts/lint-repo.py"
 
 
 def write(path: Path, text: str) -> None:
@@ -20,9 +18,9 @@ def write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def run(root: Path) -> subprocess.CompletedProcess[str]:
+def run(root: Path, only: str = "static") -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, str(CHECKER), "--root", str(root)],
+        [sys.executable, str(CHECKER), "--only", only, "--root", str(root)],
         check=False,
         capture_output=True,
         text=True,
@@ -448,28 +446,25 @@ def test_brace_enumerations_name_each_file() -> None:
             )
 
 
-def test_launcher_reports_missing_git_repository() -> None:
-    bash = shutil.which("bash")
-    if bash is None:
-        print("SKIP: bash unavailable, launcher guard not exercised")
-        return
-    with tempfile.TemporaryDirectory(prefix="story-static-launcher-") as tmp:
-        outside = Path(tmp) / "not-a-repo"
-        outside.mkdir()
-        launcher = outside / "static-check.sh"
-        launcher.write_text(LAUNCHER.read_text(encoding="utf-8"), encoding="utf-8")
-
-        proc = subprocess.run(
-            [bash, str(launcher)],
-            cwd=str(outside),
-            check=False,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
+def test_dotted_workflow_label_guard() -> None:
+    with tempfile.TemporaryDirectory(prefix="story-static-numbering-") as tmp:
+        root = Path(tmp)
+        write(
+            root / "skills/demo/SKILL.md",
+            "---\nname: demo\ndescription: Demo\n---\n# Demo\n\n"
+            "### Step 1\n\n### Step 2\n\n"
+            "```md\n### Step 1.5 (example inside code fence is ignored)\n```\n",
         )
-        # `set -e` 曾让裸赋值直接中断脚本：退出码 128 且无任何提示
-        assert proc.returncode == 1, f"exit={proc.returncode}\n{proc.stdout}{proc.stderr}"
-        assert "not in a git repository" in proc.stderr, proc.stdout + proc.stderr
+        ok = run(root, only="numbering")
+        assert ok.returncode == 0, ok.stdout + ok.stderr
+
+        write(
+            root / "skills/demo/references/flow.md",
+            "# Flow\n\n### Step 1.5：插入步骤\n\nPhase 2.1 and Stage 0.5\n",
+        )
+        bad = run(root, only="numbering")
+        assert bad.returncode == 1, bad.stdout + bad.stderr
+        assert "Step 1.5" in bad.stdout and "Phase 2.1" in bad.stdout and "Stage 0.5" in bad.stdout
 
 
 def main() -> None:
@@ -489,8 +484,8 @@ def main() -> None:
     test_cjk_joined_globs_validate_every_named_path()
     test_wildcard_mentions_do_not_hide_dead_references()
     test_brace_enumerations_name_each_file()
-    test_launcher_reports_missing_git_repository()
-    print("PASS: structured static-check regression")
+    test_dotted_workflow_label_guard()
+    print("PASS: structured static-check & numbering regression")
 
 
 if __name__ == "__main__":

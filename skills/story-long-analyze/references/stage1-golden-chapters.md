@@ -7,7 +7,7 @@
 全新和部分完成且要读原文时先建索引（原文放置见 SKILL.md「运行约定」）：
 
 ```text
-"{PYTHON}" "{story-long-analyze skill 根}/scripts/build_chapter_index.py" --source "{拆文目录}/原文/原文.txt" --output "{拆文目录}/chapter_index.csv" --locator-path "原文/原文.txt"
+node "{story-long-analyze skill 根}/scripts/build_chapter_index.js" --source "{拆文目录}/原文/原文.txt" --output "{拆文目录}/chapter_index.csv" --locator-path "原文/原文.txt"
 ```
 
 完整旧成果直接使用或纯增强时不建索引。原文变化或章号对不上时脚本会停下并返回 `author_message`，按 [index-rebuild.md](index-rebuild.md) 处理。

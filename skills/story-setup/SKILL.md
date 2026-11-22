@@ -21,14 +21,14 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ## Phase 1：判断宿主与项目
 
-**先自检参考目录**：以正在执行的本 `SKILL.md` 所在目录为准，列出与它同级的 `references/` 下的子目录，核对下面 9 个名字是否都在**且都非空**——`agent-references`、`templates`、`opencode`、`codex`、`antigravity`、`zcode`、`openclaw`、`reasonix`、`generic`；同级 `references/deploy-*.md`（8 份宿主部署文件）、`scripts/merge-claude-settings.py`、`scripts/merge-codex-hooks.py`、`scripts/merge-antigravity-hooks.py`、`scripts/generate-antigravity-agents.mjs`、`scripts/deploy-antigravity-skills.py`、`scripts/merge-project-instructions.py` 与 `scripts/copy-path-safety.py` 也必须存在（宿主部署步骤、Claude/Codex/Antigravity hooks 合并、Antigravity Skills 物化与 agent 生成、项目指令合并、递归复制安全检查依赖它们）。有缺即 skill 包没装全，**立即停止，不写任何部署文件**，报告里区分「缺目录」「目录为空」和「缺脚本或部署文件」，并给修复指令：「story-setup 参考资料包不完整，缺 {路径}。按你的安装方式重装 oh-story-claudecode（命令行装的重跑 `npx skills add zenstory-ai/oh-story-claudecode -y -g`，marketplace / Plugin Management 装的在面板里重装），再执行 /story-setup。」
+**先自检参考目录**：以正在执行的本 `SKILL.md` 所在目录为准，列出与它同级的 `references/` 下的子目录，核对下面 9 个名字是否都在**且都非空**——`agent-references`、`templates`、`opencode`、`codex`、`antigravity`、`zcode`、`openclaw`、`reasonix`、`generic`；同级 `references/deploy-*.md`（8 份宿主部署文件）、`scripts/merge-hooks.js`、`scripts/generate-antigravity-agents.mjs`、`scripts/deploy-antigravity-skills.js`、`scripts/merge-project-instructions.js` 与 `scripts/copy-path-safety.js` 也必须存在（宿主部署步骤、Claude/Codex/Antigravity hooks 合并、Antigravity Skills 物化与 agent 生成、项目指令合并、递归复制安全检查依赖它们）。有缺即 skill 包没装全，**立即停止，不写任何部署文件**，报告里区分「缺目录」「目录为空」和「缺脚本或部署文件」，并给修复指令：「story-setup 参考资料包不完整，缺 {路径}。按你的安装方式重装 oh-story-claudecode（命令行装的重跑 `npx skills add zenstory-ai/oh-story-claudecode -y -g`，marketplace / Plugin Management 装的在面板里重装），再执行 /story-setup。」
 
 > 判据是「有没有 `SKILL.md`」：只看正在执行的 `SKILL.md` 同级的 `references/`。项目内 `.claude/skills/story-setup/`、`.codex/skills/story-setup/` 和 OpenCode 的 `skills/story-setup/` 只有 `references/agent-references/`、不含 `SKILL.md`，不会是执行目录，也不要拿它们核对。Antigravity / ZCode / OpenClaw / Reasonix / generic 的项目副本是整份 skill 拷贝、自带 `SKILL.md`，9 个子目录本就齐全，照常核对即可。
 
 1. 检查当前目录是否已部署过（存在 `.story-deployed`）
-   - `agents_version` 缺失、非整数或小于 `44` → 标记为待更新，继续执行当前部署
-   - `agents_version: 44` → 使用 AskUserQuestion 确认是否重新部署；提示里写明重新部署只用**当前本地 skill 包**刷新项目文件，要拿 skill 本身的新版本得先更新 oh-story-claudecode（`npx skills add` 或 marketplace），再回来重跑
-   - `agents_version` 大于 `44` → 当前 story-setup 比项目部署旧；停止以避免降级覆盖，提示先更新 oh-story-claudecode，不写任何部署文件
+   - `agents_version` 缺失、非整数或小于 `45` → 标记为待更新，继续执行当前部署
+   - `agents_version: 45` → 使用 AskUserQuestion 确认是否重新部署；提示里写明重新部署只用**当前本地 skill 包**刷新项目文件，要拿 skill 本身的新版本得先更新 oh-story-claudecode（`npx skills add` 或 marketplace），再回来重跑
+   - `agents_version` 大于 `45` → 当前 story-setup 比项目部署旧；停止以避免降级覆盖，提示先更新 oh-story-claudecode，不写任何部署文件
    - 同时读 `target_cli` 字段。**已部署项目以 sentinel 里的值为准**：非空时（逗号分隔的多端组合原样保留）这些端照常重新部署，不再让作者选；第 4 步仍判断当前宿主：判断出来且不在其中（作者换了软件）→ AskUserQuestion 问「这个文件夹之前是给 {已部署宿主名} 装的，你现在用的是 {当前宿主名}，要一起装上吗？」（「一起装上（推荐）」「只更新原来的」），选前者就加进 `target_cli`；判断不出不问。字段缺失或为空才走第 4-6 步。用户明确要求增删目标端时，用 AskUserQuestion 在现有值基础上改，改完的值写回 sentinel。
    - `target_cli` 不含 opencode、但项目里有 `.opencode/plugins/story-hooks.ts` 或 `.opencode/agents/`（多端部署时 OpenCode 曾被版本门拦下）→ 用 AskUserQuestion 问是否把 OpenCode 加回来；选加回则先过 [references/deploy-opencode.md](references/deploy-opencode.md) 的「部署前置」，通过后写回 `target_cli`
 2. 检查是否有书名目录（包含 `追踪/` 子目录的目录，或用户自定义结构）
@@ -62,11 +62,11 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 Phase 2 幂等：复制、写入与各宿主合并重复执行结果一致。受管目录中只覆盖 oh-story 自己的 14 个 skill、7 个助手、hook 与规则文件，保留同目录里作者自己的文件；不覆盖书稿、设定、大纲、追踪和 `.active-book`。工具、权限或网络问题中断后，从头重跑即可，不另清理半成品；`create only if absent` 的用户状态文件（见清单 Owner class）不会被覆盖。
 
-**两列基准目录不同**：`Source path` 相对当前 `SKILL.md` 所在包目录；`Target path` 相对用户项目根。每个递归复制步骤前，先把通配符具体化为单个源/目标，再用同级 `scripts/copy-path-safety.py` 检查（按 `Path.resolve` / `realpath` 跟随 symlink，两侧存在时用 `samefile` 核对文件系统对象，目标位于源目录内判 `target-descendant` 拦截；**只比字符串不算检查**）：`status: same` 时 no-op 禁复制；仅 `copy_allowed: true` 可复制；其余异常状态停止并报告。无法跑脚本时须用文件系统 API 做完全相同的 realpath、samefile 与 target-descendant 检查，无法确认即停止。
+**两列基准目录不同**：`Source path` 相对当前 `SKILL.md` 所在包目录；`Target path` 相对用户项目根。每个递归复制步骤前，先把通配符具体化为单个源/目标，再用同级 `scripts/copy-path-safety.js` 检查（按 `Path.resolve` / `realpath` 跟随 symlink，两侧存在时用 `samefile` 核对文件系统对象，目标位于源目录内判 `target-descendant` 拦截；**只比字符串不算检查**）：`status: same` 时 no-op 禁复制；仅 `copy_allowed: true` 可复制；其余异常状态停止并报告。无法跑脚本时须用文件系统 API 做完全相同的 realpath、samefile 与 target-descendant 检查，无法确认即停止。
 
 **部署前清理自嵌套残留与独占目录退役文件**：
 - 自嵌套残留：`{.claude,.codex,.zcode}/skills/story-setup/references/agent-references/` 与项目根 `skills/story-setup/references/agent-references/` 若多出 `agent-references/` 层，以及 `skills/story-setup/skills/`，整段删掉并记入报告。
-- 独占目录退役文件：覆盖各端 `agent-references/`、`.claude/hooks/` 及 ZCode / OpenClaw / Reasonix / generic 的 14 个已知 `{.zcode/skills,skills}/{skill-name}/` 前，按 `python3` → `python` → `py` 探测解释器运行 `scripts/copy-path-safety.py --prune-orphans <源目录> <目标目录>`（仅 `status: safe` 且目标非 symlink 时删源端已删文件与空子目录，`pruned` 记入报告；`same` 零改动；无解释器时按同一安全条件手工清理）。`agents/`、`rules/`、`commands/` 与顶层 `skills/` 只按已知名字覆盖 oh-story 条目，不删同级用户文件或目录。
+- 独占目录退役文件：覆盖各端 `agent-references/`、`.claude/hooks/` 及 ZCode / OpenClaw / Reasonix / generic 的 14 个已知 `{.zcode/skills,skills}/{skill-name}/` 前，运行 `node "{story-setup skill目录}/scripts/copy-path-safety.js" --prune-orphans <源目录> <目标目录>`（仅 `status: safe` 且目标非 symlink 时删源端已删文件与空子目录，`pruned` 记入报告；`same` 零改动；无 Node.js 时按同一安全条件手工清理）。`agents/`、`rules/`、`commands/` 与顶层 `skills/` 只按已知名字覆盖 oh-story 条目，不删同级用户文件或目录。
 
 ### Step 1：按宿主部署
 
@@ -88,16 +88,16 @@ Phase 2 幂等：复制、写入与各宿主合并重复执行结果一致。受
 ### Step 2：创建部署标记
 
 - 仅为本次成功部署的目标创建或更新 `.story-deployed`（sentinel file）；全部目标停止时保留旧标记，不创建新标记。
-- 写入以下字段（YAML `key: value` 格式，hook 用 `references/templates/hooks/lib/sentinel.sh` 读取）：
+- 写入以下字段（YAML `key: value` 格式，由 Claude/Codex/OpenCode/ZCode/Antigravity 各自的 hook 读取）：
   ```
   deployed_at: <date -u +"%Y-%m-%dT%H:%M:%SZ">
-  agents_version: 44
+  agents_version: 45
   setup_skill_version: 1.3.12
   target_cli: claude-code（或 opencode、codex、antigravity、zcode、openclaw、reasonix、generic，或其任意组合）
   resolver_strategy: project-local-skill-reference
   references_dir: .claude/skills/story-setup/references/agent-references（Codex 写 .codex/skills/...；Antigravity 写 .agents/skills/...；ZCode 写 .zcode/skills/...；OpenCode / OpenClaw / Reasonix / generic 写 skills/...；多端用逗号分隔）
   ```
-- 此文件供 session-start.sh 和写作 skill 检测部署状态，避免重复提示
+- 此文件供 `session-start` hook 和写作 skill 检测部署状态，避免重复提示
 - 宿主部署文件里「部署标记补充」要求的额外标记一并创建（如 Claude Code 的重启确认标记）
 
 ## Phase 3：验证安装
@@ -120,10 +120,10 @@ Phase 2 幂等：复制、写入与各宿主合并重复执行结果一致。受
 
 ## 项目指令合并（CLAUDE.md / AGENTS.md）
 
-每个宿主在项目指令文件里占一个管理块：`<!-- oh-story:{宿主} 开始 … -->` 到 `<!-- oh-story:{宿主} 结束 -->`，块里是渲染后的模板；Claude Code 写 `CLAUDE.md`，其余宿主共用根 `AGENTS.md`。按 `python3` → `python` → `py` 的顺序探测出可用的 Python 记为 `PYBIN`，运行：
+每个宿主在项目指令文件里占一个管理块：`<!-- oh-story:{宿主} 开始 … -->` 到 `<!-- oh-story:{宿主} 结束 -->`，块里是渲染后的模板；Claude Code 写 `CLAUDE.md`，其余宿主共用根 `AGENTS.md`。使用 Node.js 运行：
 
 ```text
-"$PYBIN" "{story-setup skill目录}/scripts/merge-project-instructions.py" --host {宿主} --template {该宿主模板} --existing {项目指令文件} --output {项目指令文件} --project-name {项目名}
+node "{story-setup skill目录}/scripts/merge-project-instructions.js" --host {宿主} --template {该宿主模板} --existing {项目指令文件} --output {项目指令文件} --project-name {项目名}
 ```
 
 规则（无法运行脚本时照此手工合并）：

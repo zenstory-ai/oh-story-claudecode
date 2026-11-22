@@ -1,31 +1,23 @@
 #!/usr/bin/env node
 "use strict"
 
-// story_hook_cli.js — Claude Code bash hook 的 node 桥
-// Claude 侧 hook 是 bash（settings.json 挂 bash 脚本），归核逻辑走这里 require 的
-// 共享核 story_hook_core.js——和 OpenCode/ZCode 用的是同一份，由 check-shared-files
-// 保证字节相同。归核（单份实现在 core）的面：正文网（prose-net）、路径抽取
-// （extract-target）、Bash 正文写入前置门（prose-command-guard）、git commit 侦测
-// （is-git-commit）、连续性（continuity）、追踪检查点（tracking-checkpoint）。
-// 尚未归核、各端独立实现的面：
-//   - Write/Edit/MultiEdit 的大纲/细纲阻断判定：Claude 走 guard-outline-before-prose.sh
-//     纯 bash。它必须在无 node 的运行时也拦得住（官方推荐的原生二进制装法不带 Node），
-//     所以保留纯 bash 判定。Bash 命令要先区分真正写入和只读提及，故经本 CLI 复用共享核；
-//     node 缺席时该命令面降级放行。追踪检查点同样因要解析 JSON，经 tracking-checkpoint
-//     子命令执行、node 缺席时降级放行。
-//     codex prose_block_reason ↔ core proseBlockReason 由
-//     scripts/test-prose-net-parity.sh Part E 锁 parity。
-//   - staged markdown warnings：Claude 走 validate-story-commit.sh bash grep；codex
-//     staged_markdown_warnings ↔ core stagedMarkdownWarnings 同由 Part E 锁 parity。
-//     匹配语义与文案以 JS core 为准。
-// 各端只留读写各自 hook I/O 格式的薄壳。node 天生按 UTF-8 写 stdout，顺带免掉了
-// 旧内嵌 python 那套 cp936/LC_ALL 编码体操。
+// story_hook_cli.js — Claude Code 统一 Node.js Hook 适配器
+// 承接 .claude/settings.local.json 注册的全部 8 个 Claude Code hook 事件，以及
+// chapter-extractor.md 的 frontmatter 内联守卫 `analysis-input-guard`。
+// 共享写正文守卫/正文兜底网/缺口检测/连续性/commit 校验逻辑全部来自同目录的
+// story_hook_core.js（五端字节一致，由 check-shared-files.sh 守卫）。
 
 const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
-const core = require("./story_hook_core.js")
+const { spawnSync } = require("node:child_process")
+
+const CURRENT_AGENTS_VERSION = 45
+const REQUIRED_HOOK_FILES = ["run-story-hook.sh", "story_hook_cli.js", "story_hook_core.js"]
+const NESTED_INPUT_KEYS = ["tool_input", "input", "parameters", "args"]
 
 function readStdin() {
+  if (process.stdin.isTTY) return ""
   try {
     return fs.readFileSync(0, "utf8")
   } catch {
@@ -33,7 +25,9 @@ function readStdin() {
   }
 }
 
-const NESTED_INPUT_KEYS = ["tool_input", "input", "parameters", "args"]
+function readRawInput() {
+  return process.env.CLAUDE_TOOL_INPUT || process.env.HOOK_INPUT || readStdin()
+}
 
 function digString(value, keys, allowEmpty = false) {
   if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -54,135 +48,448 @@ const digCommand = (value) => digString(value, ["command", "cmd", "script"], tru
 const digWorkingDirectory = (value) =>
   digString(value, ["cwd", "working_directory", "workingDirectory"])
 
-const [command, ...args] = process.argv.slice(2)
+function existingDirFallback(value) {
+  if (typeof value !== "string" || !value.trim()) return null
+  try {
+    const resolved = fs.realpathSync(path.resolve(value))
+    return fs.statSync(resolved).isDirectory() ? resolved : null
+  } catch {
+    return null
+  }
+}
 
-if (command === "extract-target") {
-  // PostToolUse 工具输入 JSON → 目标文件路径。无输入/解析失败/无路径都以非零退出，
-  // 让 bash 侧静默放行（与旧 python sys.exit(1) 一致）。
-  const raw = process.env.HOOK_INPUT || readStdin()
-  if (!raw) process.exit(1)
+function deployedWorkspaceRoot() {
+  try {
+    const hooksDir = path.resolve(__dirname)
+    if (path.basename(hooksDir) === "hooks" && path.basename(path.dirname(hooksDir)) === ".claude") {
+      const root = path.dirname(path.dirname(hooksDir))
+      if (fs.existsSync(root) && fs.statSync(root).isDirectory()) return fs.realpathSync(root)
+    }
+  } catch {}
+  return null
+}
+
+function projectRoot(input = null) {
+  const envRoot = existingDirFallback(process.env.CLAUDE_PROJECT_DIR)
+  if (envRoot) return envRoot
+  const inputCwd = input ? existingDirFallback(digWorkingDirectory(input)) : null
+  const cwd = inputCwd || process.cwd()
+  try {
+    const result = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      windowsHide: true,
+    })
+    if (result.status === 0 && result.stdout.trim()) {
+      const gitRoot = existingDirFallback(result.stdout.trim())
+      if (gitRoot) return gitRoot
+    }
+  } catch {}
+  const deployed = deployedWorkspaceRoot()
+  if (deployed) return deployed
+  return existingDirFallback(cwd) || path.resolve(cwd)
+}
+
+function isPathInside(root, candidate, pathApi = path) {
+  const relation = pathApi.relative(root, candidate)
+  return relation === "" || (
+    !pathApi.isAbsolute(relation)
+    && relation !== ".."
+    && !relation.startsWith(`..${pathApi.sep}`)
+  )
+}
+
+function targetBase(root, obj) {
+  const requested = existingDirFallback(digWorkingDirectory(obj))
+  if (requested && isPathInside(root, requested)) return requested
+  return root
+}
+
+function readSentinel(root) {
+  const file = path.join(root, ".story-deployed")
+  if (!fs.existsSync(file)) return null
+  let text = ""
+  try {
+    text = fs.readFileSync(file, "utf8")
+  } catch {
+    return {}
+  }
+  const fields = {}
+  for (const rawLine of text.split(/\r?\n/)) {
+    const idx = rawLine.indexOf(":")
+    if (idx <= 0) continue
+    const key = rawLine.slice(0, idx).trim()
+    if (!key || Object.prototype.hasOwnProperty.call(fields, key)) continue
+    let value = rawLine.slice(idx + 1).trim()
+    if (value.length >= 2 && ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))) {
+      value = value.slice(1, -1).trim()
+    }
+    fields[key] = value
+  }
+  return fields
+}
+
+function gitText(root, args) {
+  try {
+    const result = spawnSync("git", ["-C", root, ...args], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      windowsHide: true,
+    })
+    if (result.status === 0 && result.stdout) return result.stdout.replace(/\r?\n$/, "")
+  } catch {}
+  return ""
+}
+
+function gitNullCount(root, args) {
+  try {
+    const result = spawnSync("git", ["-C", root, "-c", "core.quotepath=false", ...args], {
+      encoding: "buffer",
+      stdio: ["ignore", "pipe", "ignore"],
+      windowsHide: true,
+    })
+    if (result.status === 0 && result.stdout) {
+      return result.stdout.toString("utf8").split("\0").filter(Boolean).length
+    }
+  } catch {}
+  return 0
+}
+
+function compareSemver(a, b) {
+  const pa = String(a).split(".").map((n) => Number.parseInt(n, 10) || 0)
+  const pb = String(b).split(".").map((n) => Number.parseInt(n, 10) || 0)
+  const len = Math.max(pa.length, pb.length)
+  for (let i = 0; i < len; i += 1) {
+    const diff = (pa[i] || 0) - (pb[i] || 0)
+    if (diff !== 0) return diff
+  }
+  return 0
+}
+
+function checkVersionUpdate(root) {
+  if (process.env.STORY_NO_UPDATE_CHECK) return ""
+  const home = process.env.HOME || process.env.USERPROFILE || os.homedir() || ""
+  const candidates = [
+    path.join(root, ".claude", "skills", "story", "VERSION"),
+    home ? path.join(home, ".claude", "skills", "story", "VERSION") : "",
+  ].filter(Boolean)
+  const vfile = candidates.find((candidate) => fs.existsSync(candidate))
+  if (!vfile) return ""
+  let cur = ""
+  try {
+    cur = fs.readFileSync(vfile, "utf8").replace(/[^0-9.]/g, "")
+  } catch {
+    return ""
+  }
+  if (!cur) return ""
+
+  const cacheBase = home || root
+  const cacheFile = path.join(cacheBase, ".claude", ".story-update-cache")
+  const now = Math.floor(Date.now() / 1000)
+  let last = 0
+  let latest = ""
+  try {
+    if (fs.existsSync(cacheFile)) {
+      const lines = fs.readFileSync(cacheFile, "utf8").split(/\r?\n/)
+      const parsedLast = Number.parseInt(lines[0] || "0", 10)
+      if (Number.isFinite(parsedLast)) last = parsedLast
+      latest = (lines[1] || "").trim()
+    }
+  } catch {}
+
+  if (now - last < 86400) return ""
+
+  latest = ""
+  try {
+    const res = spawnSync(
+      "curl",
+      ["-fsS", "--max-time", "5", "https://api.github.com/repos/zenstory-ai/oh-story-claudecode/releases/latest"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], windowsHide: true }
+    )
+    if (res.status === 0 && res.stdout) {
+      const tagMatch = res.stdout.match(/"tag_name"\s*:\s*"([^"]+)"/)
+      const verMatch = tagMatch && tagMatch[1].match(/[0-9][0-9.]*/)
+      if (verMatch) latest = verMatch[0]
+    }
+  } catch {}
+
+  try {
+    fs.mkdirSync(path.dirname(cacheFile), { recursive: true })
+    fs.writeFileSync(cacheFile, `${now}\n${latest}\n`, "utf8")
+  } catch {}
+
+  if (latest && latest !== cur && compareSemver(latest, cur) > 0) {
+    return `[INFO] 网文工具箱有新版本 v${latest}（当前 v${cur}）。更新：npx skills add zenstory-ai/oh-story-claudecode -y -g 后重跑 /story-setup；或对 /story 说“检查更新”。关掉提醒：export STORY_NO_UPDATE_CHECK=1\n`
+  }
+  return ""
+}
+
+function countFileLines(file) {
+  try {
+    const text = fs.readFileSync(file, "utf8")
+    if (!text) return 0
+    return text.endsWith("\n") ? text.split("\n").length - 1 : text.split("\n").length
+  } catch {
+    return 0
+  }
+}
+
+function hasTopLevelMarkdown(dirPath) {
+  try {
+    return fs.readdirSync(dirPath, { withFileTypes: true }).some((entry) => entry.isFile() && entry.name.endsWith(".md"))
+  } catch {
+    return false
+  }
+}
+
+function handleSessionStart(core) {
+  const raw = readRawInput()
+  let obj = {}
+  try {
+    if (raw.trim()) {
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) obj = parsed
+    }
+  } catch {}
+
+  const root = projectRoot(obj)
+  const source = typeof obj.source === "string" ? obj.source : ""
+  let output = ""
+
+  const pendingRestart = path.join(root, ".claude", ".agents-pending-restart")
+  if (fs.existsSync(pendingRestart) && source !== "compact" && source !== "clear") {
+    output += "[INFO] story-setup 刚部署/更新了 agents，本会话已重新加载——story-architect、narrative-writer 等 custom agent 现已注册可用。\n"
+    output += "  若写作 skill 仍提示 spawn 失败 / 降级 solo，说明你还在部署时的旧会话里，请再新开一个 Claude Code 会话。\n\n"
+    try { fs.unlinkSync(pendingRestart) } catch {}
+  }
+
+  const sentinel = readSentinel(root)
+  if (sentinel !== null) {
+    const missingHooks = REQUIRED_HOOK_FILES.filter((file) => !fs.existsSync(path.join(root, ".claude", "hooks", file)))
+    if (missingHooks.length) {
+      output += `[WARN] .story-deployed 存在但缺少 hook：${missingHooks.join(" ")} \n`
+      output += "  修复：重新运行 /story-setup 恢复缺失的 hook。\n\n"
+    }
+
+    const versionRaw = sentinel.agents_version || ""
+    if (!/^[0-9]+$/.test(versionRaw)) {
+      output += "[WARN] .story-deployed 缺少数字 agents_version。重新运行 /story-setup。\n\n"
+    } else {
+      const version = Number.parseInt(versionRaw, 10)
+      if (version < CURRENT_AGENTS_VERSION) {
+        output += `[WARN] story-setup agents_version=${version} 低于 v${CURRENT_AGENTS_VERSION}。重新运行 /story-setup 刷新 hooks、agents 和 references（部署后需新开会话）。\n\n`
+      } else if (version > CURRENT_AGENTS_VERSION) {
+        output += `[WARN] story-setup agents_version=${version} 高于本 hook 支持的 v${CURRENT_AGENTS_VERSION}。不要降级覆盖；请先更新 oh-story-claudecode。\n\n`
+      }
+    }
+
+    for (const field of ["setup_skill_version", "target_cli", "resolver_strategy", "references_dir"]) {
+      if (!sentinel[field]) {
+        output += `[WARN] .story-deployed 缺少 ${field} 字段。重新运行 /story-setup 刷新部署元信息。\n\n`
+      }
+    }
+
+    const refsRaw = sentinel.references_dir || ""
+    if (refsRaw) {
+      const missingRefs = []
+      for (const entry of refsRaw.split(",").map((item) => item.trim()).filter(Boolean)) {
+        const resolved = path.isAbsolute(entry) ? entry : path.resolve(root, entry)
+        if (!hasTopLevelMarkdown(resolved)) missingRefs.push(entry)
+      }
+      if (missingRefs.length) {
+        output += `[WARN] story-setup 参考资料包缺失或为空：${missingRefs.join(", ")}。重新运行 /story-setup；若重跑后仍报这条，是 skill 包本身没装全，按你的安装方式重装 oh-story-claudecode（npx skills add 或 marketplace 面板）再部署。\n\n`
+      }
+    }
+  } else {
+    output += "[WARN] 写作环境未部署。运行 /story-setup 初始化。\n\n"
+  }
+
+  const branch = gitText(root, ["branch", "--show-current"])
+  if (branch) {
+    output += "=== 写作进度 ===\n"
+    output += `分支：${branch}\n`
+    const recent = gitText(root, ["log", "--oneline", "-5"])
+    if (recent) output += `${recent}\n`
+    output += "\n"
+  }
+
+  const book = core.discoverActiveBook(root)
+  if (book) {
+    const contextFile = path.join(book, "追踪", "上下文.md")
+    if (fs.existsSync(contextFile)) {
+      let snapshot = ""
+      try {
+        snapshot = fs.readFileSync(contextFile, "utf8").split(/\r?\n/).slice(0, 18).join("\n")
+      } catch {}
+      output += `--- 当前位置 ---\n${snapshot}\n---\n\n`
+    }
+  }
+
+  const incomplete = core.discoverIncompleteAnalyses(root)
+  if (incomplete.length > 0) {
+    output += `[INFO] 拆文库/ 中有 ${incomplete.length} 个未完成拆文。运行 /story-long-analyze 或 /story-short-analyze。\n`
+  }
+
+  output += checkVersionUpdate(root)
+
+  if (output) process.stdout.write(output)
+}
+
+function handleDetectStoryGaps(core) {
+  const root = projectRoot()
+  const out = core.detectStoryGaps(root)
+  if (out) process.stdout.write(out)
+}
+
+function formatLocalTimestamp(date) {
+  const pad = (n) => String(n).padStart(2, "0")
+  const offsetMin = -date.getTimezoneOffset()
+  const sign = offsetMin >= 0 ? "+" : "-"
+  const abs = Math.abs(offsetMin)
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}${sign}${pad(Math.floor(abs / 60))}${pad(abs % 60)}`
+}
+
+function handleSessionEnd(core) {
+  if (process.env.STORY_SESSION_LOG !== "1") return
+  const root = projectRoot()
+  const book = core.discoverActiveBook(root)
+  if (!book) return
+  const trackingDir = path.join(book, "追踪")
+  try {
+    if (fs.existsSync(trackingDir) && fs.statSync(trackingDir).isDirectory()) {
+      fs.appendFileSync(path.join(trackingDir, "session-log.txt"), `[${formatLocalTimestamp(new Date())}] session ended\n`, "utf8")
+    }
+  } catch {}
+}
+
+function handlePreCompact(core) {
+  const root = projectRoot()
+  const lines = ["=== Pre-Compact Summary ==="]
+  const book = core.discoverActiveBook(root)
+  const ctx = book ? path.join(book, "追踪", "上下文.md") : ""
+  if (book && fs.existsSync(ctx)) {
+    lines.push(`Writing context: ${core.safeRelative(root, ctx)} (${countFileLines(ctx)} lines)`)
+  } else {
+    lines.push("Active state: not found")
+  }
+  const changed = gitNullCount(root, ["diff", "--name-only", "-z"])
+  const staged = gitNullCount(root, ["diff", "--name-only", "--cached", "-z"])
+  lines.push(`Git: ${changed} unstaged, ${staged} staged`)
+  lines.push("=== Pre-Compact Complete ===")
+  process.stdout.write(lines.join("\n") + "\n")
+}
+
+function handlePostCompact(core) {
+  const root = projectRoot()
+  const book = core.discoverActiveBook(root)
+  const ctx = book ? path.join(book, "追踪", "上下文.md") : ""
+  if (book && fs.existsSync(ctx)) {
+    process.stdout.write(`Context was compacted. Read ${core.safeRelative(root, ctx)} (${countFileLines(ctx)} lines) to restore writing context.\n`)
+  } else {
+    process.stdout.write("Context was compacted. Check 追踪/上下文.md to restore context.\n")
+  }
+}
+
+function handlePreToolProseGuard(core) {
+  const raw = readRawInput()
+  if (!raw || !raw.trim()) return
+  let obj
+  try {
+    obj = JSON.parse(raw)
+  } catch (error) {
+    const detail = error && error.message ? error.message : String(error)
+    process.stderr.write(`⚠ Bash 正文写入守卫解析失败，本次按 fail-open 放行；请改用 Write/Edit 或修复 hook：${detail}\n`)
+    return
+  }
+
+  const root = projectRoot(obj)
+  const base = targetBase(root, obj)
+  const directTarget = digTargetPath(obj)
+  if (directTarget) {
+    const abs = core.resolveTarget(root, directTarget, base)
+    const reason = core.proseBlockReason(root, abs)
+    if (reason) {
+      process.stderr.write(`${reason}\n`)
+      process.exit(2)
+    }
+    return
+  }
+
+  const shellCommand = digCommand(obj)
+  if (!shellCommand) return
+  const seen = new Set()
+  for (const target of core.extractProseTargets(shellCommand)) {
+    const abs = core.resolveTarget(root, target, base)
+    if (seen.has(abs)) continue
+    seen.add(abs)
+    const reason = core.proseBlockReason(root, abs)
+    if (reason) {
+      process.stderr.write(`${reason}（已从 Bash 命令识别到正文写入目标。）\n`)
+      process.exit(2)
+    }
+  }
+}
+
+function handlePreToolCommitAdvisory(core) {
+  let command = process.env.STORY_COMMIT_COMMAND || ""
+  let obj = {}
+  if (!command) {
+    const raw = readRawInput()
+    if (!raw || !raw.trim()) return
+    try {
+      obj = JSON.parse(raw)
+    } catch {
+      return
+    }
+    command = digCommand(obj)
+  }
+  if (!command || !core.isGitCommitCommand(command)) return
+  const root = projectRoot(obj)
+  const warnings = core.stagedMarkdownWarnings(root)
+  if (warnings) process.stdout.write(`${warnings}\n`)
+}
+
+function handlePostToolProseCheck(core) {
+  const raw = readRawInput()
+  if (!raw || !raw.trim()) return
   let obj
   try {
     obj = JSON.parse(raw)
   } catch {
-    process.exit(1)
+    return
   }
   const target = digTargetPath(obj)
-  if (!target) process.exit(1)
-  process.stdout.write(target)
-} else if (command === "prose-command-guard") {
-  // Claude Bash PreToolUse JSON → 真正的正文写入目标 → 共享核阻断原因。只识别共享核明确
-  // 支持的重定向/tee/touch/cp/mv/install 写法；grep 等只读提及不会产生 target。无目标正常
-  // 放行；解析/共享核异常用独立退出码交给 bash 壳显式告警后 fail-open，不能伪装成“无目标”。
-  const root = args[0]
-  const raw = process.env.HOOK_INPUT || readStdin()
-  try {
-    if (!root || !raw) process.exit(0)
-    const obj = JSON.parse(raw)
-    const shellCommand = digCommand(obj)
-    if (!shellCommand) process.exit(0)
-    let base = root
-    const requestedBase = core.existingDir(digWorkingDirectory(obj))
-    if (requestedBase) {
-      const relative = path.relative(path.resolve(root), requestedBase)
-      if (!relative.startsWith("..") && !path.isAbsolute(relative)) base = requestedBase
-    }
-    const seen = new Set()
-    for (const target of core.extractProseTargets(shellCommand)) {
-      const absolute = core.resolveTarget(root, target, base)
-      if (seen.has(absolute)) continue
-      seen.add(absolute)
-      const reason = core.proseBlockReason(root, absolute)
-      if (reason) {
-        process.stdout.write(`${reason}（已从 Bash 命令识别到正文写入目标。）`)
-        break
-      }
-    }
-  } catch (error) {
-    const detail = error && error.message ? error.message : String(error)
-    process.stderr.write(`[story-guard] Bash 正文目标解析失败，已降级放行：${detail}`)
-    process.exit(3)
-  }
-} else if (command === "prose-net") {
-  // 轻量确定性网（含毒句式）。字数只由 storyctl 的公开命令测量，不在 Adapter 内复制。
-  // 书级 .deslop-whitelist 与另四端同口径（core.loadStyleWhitelist 按正文所在书目录找）。
-  // 读文件/白名单失败静默退出（兜底不反噬流程，与 core.proseAfterWrite 的降级一致）。
-  const absolute = args[0]
-  let text
-  let whitelist
-  try {
-    text = fs.readFileSync(absolute, "utf8")
-    whitelist = core.loadStyleWhitelist(absolute)
-  } catch {
-    process.exit(0)
-  }
-  const out = core.proseNetFindings(text, whitelist, core.toxicRescanHint(absolute))
-  if (out.length) process.stdout.write(out.join("\n"))
-} else if (command === "prose-toxic") {
-  // 毒句式确定性检测单跑（供 guard 前置门 / 手工复扫调用；prose-net 已含同一组结果）。
-  // 契约：stdout 空 = 干净；非空 = findings 行（每行一条，末行为清零要求 + 完整扫描提示）。
-  // 文件读不了或任何内部异常一律 exit 0 静默放行（与本 CLI 的降级哲学一致，兜底不反噬流程）。
-  const absolute = args[0]
-  try {
-    const text = fs.readFileSync(absolute, "utf8")
-    const out = core.toxicPhraseFindings(text, core.loadStyleWhitelist(absolute), core.toxicRescanHint(absolute))
-    if (out.length) process.stdout.write(out.join("\n"))
-  } catch {
-    process.exit(0)
-  }
-} else if (command === "tracking-checkpoint") {
-  // 追踪检查点门（BLOCKING 面）：guard-outline-before-prose.sh 调本子命令复用共享核
-  // trackingCheckpointIssue，与 codex py / opencode / zcode 同一份判定（issue #305 之前
-  // Claude 侧独缺这道门，同一工程同一次写正文，主力端放行、另三端拦下）。
-  // 用法：tracking-checkpoint <root> <bookDir> <上一章号|->
-  //   首建新章传上一章号，做「上一章事务是否已提交」的顺序校验；
-  //   正文已存在（续写/改稿/回炉）传 `-`，只校验 state 自身的存在/schema/修订一致性。
-  // 契约：stdout 空 = 放行；非空 = 完整拦截文案，与 core.proseBlockReason 逐字一致。
-  // node 缺席时 bash 侧根本不调本子命令（等同放行），故内部异常也一律 exit 0 静默放行，
-  // 与本 CLI 其余子命令的降级哲学一致（兜底不反噬流程）。
-  const [root, book, expectedRaw] = args
-  try {
-    // 注意别写成 Number(expectedRaw) 直接判整数：空串会被转成 0，把「续写」误当成
-    // 「首建第 1 章」去校验顺序。先排掉空串/缺省/占位符 `-`。
-    const expected =
-      expectedRaw && expectedRaw !== "-" && Number.isInteger(Number(expectedRaw))
-        ? Number(expectedRaw)
-        : null
-    const issue = core.trackingCheckpointIssue(book, true, expected)
-    if (issue) process.stdout.write(`⛔ 写正文被拦截：${core.safeRelative(root, book)} 的${issue}。`)
-  } catch {
-    process.exit(0)
-  }
-} else if (command === "is-git-commit") {
-  // git commit 侦测。命令优先取 STORY_COMMIT_COMMAND，缺省再从 HOOK_INPUT 挖 command/cmd/script。
-  // 用共享核 isGitCommitCommand（js 分词语义，与 OpenCode/ZCode 一致；对「引号内分隔符」这类
-  // 边界与旧 python shlex 有已文档化、仅 advisory 的差异）。是 git commit → exit 0，否则 exit 1。
-  let raw = process.env.STORY_COMMIT_COMMAND || ""
-  if (!raw) {
-    const hookInput = process.env.HOOK_INPUT || ""
-    if (!hookInput) process.exit(1)
-    let obj
+  if (!target) return
+  const root = projectRoot(obj)
+  const base = targetBase(root, obj)
+  const abs = core.resolveTarget(root, target, base)
+  const out = core.proseAfterWrite(root, abs)
+  if (out) process.stdout.write(`${out}\n`)
+}
+
+function canonicalPath(value) {
+  let cur = path.resolve(value)
+  const tail = []
+  while (true) {
     try {
-      obj = JSON.parse(hookInput)
+      const real = fs.realpathSync(cur)
+      return tail.length ? path.join(real, ...tail.reverse()) : real
     } catch {
-      obj = {}
+      const parent = path.dirname(cur)
+      if (parent === cur) return path.resolve(value)
+      tail.push(path.basename(cur))
+      cur = parent
     }
-    raw = digCommand(obj)
   }
-  if (!raw) process.exit(1)
-  process.exit(core.isGitCommitCommand(raw) ? 0 : 1)
-} else if (command === "continuity") {
-  // 跨批连续性兜底：追踪 staleness + 章节标题去重。用共享核 continuityFindings（消息串与旧
-  // python 逐字一致；多书/并列去重的排序按 js 语义，仅影响 advisory 顺序）。
-  const root = args[0]
-  const out = core.continuityFindings(root)
-  if (out.length) process.stdout.write(out.join("\n") + "\n")
-} else if (command === "analysis-input-guard") {
+}
+
+function handleAnalysisInputGuard() {
   // chapter-extractor 的 PreToolUse(Write) 内联守卫：它只许把批次结果写到
   // {拆文目录}/_analysis_cache/输入-{RAW|REUSE}-{起章}-{止章}.md。拆文目录以存在
   // chapter_index.csv 或 _progress.md 认定，且必须在项目根内。exit 2 阻断并把原因交回子代理；
   // 读不到输入视为无从判断，放行（提交脚本仍会完整校验文件内容）。
-  const raw = process.env.HOOK_INPUT || readStdin()
+  const raw = readRawInput()
   let obj
   try {
     obj = JSON.parse(raw)
@@ -191,8 +498,8 @@ if (command === "extract-target") {
   }
   const target = digTargetPath(obj)
   if (!target) process.exit(0)
-  const root = path.resolve(process.env.CLAUDE_PROJECT_DIR || digString(obj, ["cwd"]) || process.cwd())
-  const absolute = path.resolve(root, target)
+  const root = canonicalPath(process.env.CLAUDE_PROJECT_DIR || digString(obj, ["cwd"]) || process.cwd())
+  const absolute = canonicalPath(path.resolve(root, target))
   const reasons = []
   const match = /^输入-(RAW|REUSE)-(\d+)-(\d+)\.md$/.exec(path.basename(absolute))
   if (!match) reasons.push("文件名必须是 输入-{RAW|REUSE}-{起章}-{止章}.md")
@@ -203,8 +510,7 @@ if (command === "extract-target") {
   else if (!["chapter_index.csv", "_progress.md"].some((name) => fs.existsSync(path.join(bookDir, name)))) {
     reasons.push("上级目录不是拆文目录（缺 chapter_index.csv 与 _progress.md）")
   }
-  const relative = path.relative(root, absolute)
-  if (relative.startsWith("..") || path.isAbsolute(relative)) reasons.push("路径在项目目录之外")
+  if (!isPathInside(root, absolute)) reasons.push("路径在项目目录之外")
   if (reasons.length) {
     process.stderr.write(
       `⛔ chapter-extractor 写入被拦截：${target}\n${reasons.join("；")}。\n` +
@@ -212,6 +518,61 @@ if (command === "extract-target") {
     )
     process.exit(2)
   }
-} else {
-  process.exit(2)
+}
+
+function main() {
+  const command = process.argv[2] || ""
+  if (command === "analysis-input-guard") {
+    handleAnalysisInputGuard()
+    return
+  }
+
+  let core
+  try {
+    core = require("./story_hook_core.js")
+  } catch (error) {
+    const detail = error && error.message ? error.message : String(error)
+    if (command === "pre-tool-prose-guard") {
+      process.stderr.write(`⚠ Bash 正文写入守卫解析失败，本次按 fail-open 放行；请改用 Write/Edit 或修复 hook：${detail}\n`)
+      return
+    }
+    if (command === "session-start") {
+      process.stdout.write(`[WARN] story_hook_core.js 加载失败：${detail}。重新运行 /story-setup 恢复。\n`)
+      return
+    }
+    process.stderr.write(`[oh-story claude hook] failed to load story_hook_core.js: ${detail}\n`)
+    return
+  }
+
+  try {
+    if (command === "session-start") handleSessionStart(core)
+    else if (command === "detect-story-gaps") handleDetectStoryGaps(core)
+    else if (command === "session-end") handleSessionEnd(core)
+    else if (command === "pre-compact") handlePreCompact(core)
+    else if (command === "post-compact") handlePostCompact(core)
+    else if (command === "pre-tool-prose-guard") handlePreToolProseGuard(core)
+    else if (command === "pre-tool-commit-advisory") handlePreToolCommitAdvisory(core)
+    else if (command === "post-tool-prose-check") handlePostToolProseCheck(core)
+    else {
+      process.stderr.write(`unknown oh-story Claude hook event: ${command}\n`)
+      process.exit(2)
+    }
+  } catch (error) {
+    const detail = error && error.message ? error.message : String(error)
+    if (command === "pre-tool-prose-guard") {
+      process.stderr.write(`⚠ Bash 正文写入守卫解析失败，本次按 fail-open 放行；请改用 Write/Edit 或修复 hook：${detail}\n`)
+      return
+    }
+    process.stderr.write(`[oh-story claude hook] ${detail}\n`)
+  }
+}
+
+if (require.main === module) main()
+
+module.exports = {
+  CURRENT_AGENTS_VERSION,
+  REQUIRED_HOOK_FILES,
+  projectRoot,
+  readSentinel,
+  isPathInside,
 }

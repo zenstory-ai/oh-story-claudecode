@@ -22,18 +22,18 @@ Agents read relevant character, dialogue and twist references as needed. Unread 
 
 ## Automation Hooks
 
-`/story-setup` deploys 8 automation hooks for Claude Code:
+`/story-setup` deploys a unified Node.js 18+ hook runtime for Claude Code (`run-story-hook.sh` + `story_hook_cli.js` + `story_hook_core.js`, shared across Codex, OpenCode, ZCode, and Antigravity), covering 8 events:
 
-| Hook | Trigger | Function |
-|:-----|:---------|:---------|
-| session-start.sh | Session start | Display branch, progress snapshot, deconstruction status |
-| session-end.sh | Session end | Log session to `追踪/session-log.txt` |
-| detect-story-gaps.sh | Session start | Detect setting gaps, missing outlines, foreshadowing breaks |
-| pre-compact.sh | Before context compaction | Save progress snapshot path and line-count summary |
-| post-compact.sh | After context compaction | Prompt to read progress snapshot for context recovery |
-| validate-story-commit.sh | git commit | Check hardcoded attributes, setting required fields (warning only, non-blocking) |
-| guard-outline-before-prose.sh | Before writing prose (Write/Edit) | Blocks first creation of a chapter/story body when its 细纲/小节大纲 is missing (blocking) — enforces outline-first |
-| check-prose-after-write.sh | After writing prose (Write/Edit) | Lightly scan for truncation, leaked workflow terms, and deterministic AI phrasing (advisory; word count is measured by the writing workflow before delivery) |
+| Event | Trigger | Function |
+|:------|:--------|:---------|
+| `session-start` | Session start | Display branch, progress snapshot, deconstruction status, and deployment checks |
+| `detect-story-gaps` | Session start | Detect setting gaps, missing outlines, foreshadowing breaks, and continuity drift |
+| `session-end` | Session end | Optionally log session end to `追踪/session-log.txt` (when `STORY_SESSION_LOG=1`) |
+| `pre-compact` | Before context compaction | Save progress snapshot path and line-count summary |
+| `post-compact` | After context compaction | Prompt to read progress snapshot for context recovery |
+| `pre-tool-commit-advisory` | git commit | Check hardcoded attributes and setting required fields (warning only, non-blocking) |
+| `pre-tool-prose-guard` | Before writing prose (Bash/Write/Edit) | Blocks prose writes when outline/tracking checkpoint fails or prior chapter has unresolved toxic phrasing (blocking) |
+| `post-tool-prose-check` | After writing prose (Write/Edit) | Lightly scan for truncation, leaked workflow terms, and deterministic AI phrasing (advisory; word count is measured by the writing workflow before delivery) |
 
 ## Project File Structure
 

@@ -43,7 +43,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > 专业 agent 只查当前宿主：Claude `.claude/agents`、OpenCode `.opencode/agents`、Codex `.codex/agents` TOML、Antigravity `.agents/agents`（`invoke_subagent` + 同名 `TypeName`）；ZCode 查已启用插件注册的同名角色，用 `Agent` 工具按实际 schema 派发，不要求 `.zcode/agents`。返回 unknown agent 时按下面的降级处理，不因宿主名或其他端目录存在而降级。
 >
-> 版本：项目根 `.story-deployed` 的 `agents_version` 与本版 `agents_version: 44` 不一致（缺失、非整数、更小或更大）时照常按当前宿主角色来源检查并 spawn，只对作者说一句「写作助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」；大于 44 时额外提示先更新 oh-story-claudecode。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct，对作者只说「这次我自己写」。
+> 版本：项目根 `.story-deployed` 的 `agents_version` 与本版 `agents_version: 45` 不一致（缺失、非整数、更小或更大）时照常按当前宿主角色来源检查并 spawn，只对作者说一句「写作助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」；大于 45 时额外提示先更新 oh-story-claudecode。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct，对作者只说「这次我自己写」。
 
 ---
 
@@ -86,11 +86,11 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ### 路径与术语约定
 
-> `{PYTHON}` 依次试 `python3`、`python`、`py -3`，用第一个能跑的；`{skill 根}` 是本 skill 所在目录。
+> `{skill 根}` 是本 skill 所在目录。
 >
 > **对标资料**：路径查找、无对标的判定、缺资料怎么办，都只在 benchmark-recall.md 定义。
 >
-> **卷纲不整读**：一律走 `{PYTHON} {skill 根}/scripts/outline_view.py --chapter {章号} {卷纲路径}`（知道编号也可用 `--unit {编号}`；只要卷级部分用 `--contract`，看目录用 `--toc`）；找不到就核对章节范围或先补卷纲，不改用整读。
+> **卷纲不整读**：一律走 `node {skill 根}/scripts/outline_view.js --chapter {章号} {卷纲路径}`（知道编号也可用 `--unit {编号}`；只要卷级部分用 `--contract`，看目录用 `--toc`）；找不到就核对章节范围或先补卷纲，不改用整读。
 >
 > **新增物三级**（缺东西时三种处理；排纲、写正文、处置共用；只看下一章需不需要知道它存在过）：
 > - **直接写**：微连接、路人、器物、地名细部、一次性对话、现场细节；不申报。
@@ -112,7 +112,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 #### 追踪
 
-所有追踪写入都走 `scripts/tracking_commit.py`：追踪数据统一记在 `追踪/_tracking-state.json` 里，`上下文.md`、角色快照、`伏笔.md`、时间线都由它自动生成，禁止手改。体积上限由脚本检查；字段与上限见 [tracking-transaction.md](references/tracking-transaction.md)。
+所有追踪写入都走 `scripts/tracking_commit.js`：追踪数据统一记在 `追踪/_tracking-state.json` 里，`上下文.md`、角色快照、`伏笔.md`、时间线都由它自动生成，禁止手改。体积上限由脚本检查；字段与上限见 [tracking-transaction.md](references/tracking-transaction.md)。
 
 ---
 

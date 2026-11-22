@@ -5,7 +5,7 @@
 每章按本文件执行，日更批次见 `workflow-daily.md`。
 
 **缺文件先修，本轮不写**（修好再从「检查细纲」开始；告诉作者用下方「写不下去、要停下时」的问法）：
-- `tracking_commit.py check` 不过：按它的提示修。
+- `tracking_commit.js check` 不过：按它的提示修。
 - 已有正文却缺 `_tracking-state.json`：请作者走 `/story-import`「旧追踪项目迁移」；新书还没有正文时不算缺，按下方初始化。
 - 自动生成的视图与 state 不一致：按 [tracking-transaction.md](tracking-transaction.md) 为该章提交 `mode=revision` 事务重建，不手改、不继续下一章。
 - 有对标却缺情绪模块／节奏／文风：请作者用 `/story-long-analyze` 补拆。本书有自定义文风时不缺文风；无对标（判定见 [benchmark-recall.md](benchmark-recall.md)）或召回降档成立时都不算缺。
@@ -22,10 +22,10 @@
 
 新书还没有 `_tracking-state.json` 时先按 [tracking-initialization.md](tracking-initialization.md) 初始化。
 
-1. **检查细纲**：读 `大纲/细纲_第{N}章.md` 全文，跑 `outline_view.py --chapter {N} {卷纲路径}`（知道编号可用 `--unit {编号}`）取全卷规矩、当前剧情段与压住不揭的事项（日更同段本批复用，**不整读卷纲**）。缺细纲或缺两行见开头。
-2. **读取上下文**：`tracking_commit.py check` → `追踪/上下文.md` 全 7 栏 → 细纲点名的 `设定/势力/`、`设定/世界观/` 相关条目；角色卡交写手时只列名字由写手读，主会话自写才读。久别角色读 `追踪/角色状态/{名}.md`；更旧信息按 workflow-daily「旧信息查找步骤」查。
+1. **检查细纲**：读 `大纲/细纲_第{N}章.md` 全文，跑 `outline_view.js --chapter {N} {卷纲路径}`（知道编号可用 `--unit {编号}`）取全卷规矩、当前剧情段与压住不揭的事项（日更同段本批复用，**不整读卷纲**）。缺细纲或缺两行见开头。
+2. **读取上下文**：`tracking_commit.js check` → `追踪/上下文.md` 全 7 栏 → 细纲点名的 `设定/势力/`、`设定/世界观/` 相关条目；角色卡交写手时只列名字由写手读，主会话自写才读。久别角色读 `追踪/角色状态/{名}.md`；更旧信息按 workflow-daily「旧信息查找步骤」查。
 3. **写前准备**：
-   - **组装脚本**：跑 `{PYTHON} {skill 根}/scripts/build_writer_prompt.py --project {项目根} --chapter {N} --out`（`====` 以上为 prompt、以下为核对报告；exit 2 修完重跑，不手拼绕过）。
+   - **组装脚本**：跑 `node {skill 根}/scripts/build_writer_prompt.js --project {项目根} --chapter {N} --out`（`====` 以上为 prompt、以下为核对报告；exit 2 修完重跑，不手拼绕过）。
    - **状态筛选**：从续写状态卡取本章在场角色、要碰/要避的伏笔、下一章承诺与长期约束。
    - **召回**：核对报告写「召回降档：成立」时直接用脚本输出；不成立时完整读 [benchmark-recall.md](benchmark-recall.md) 执行全量召回。
    - **意图与硬伤确认**：一句话写清本章意图；细纲是唯一剧情蓝图，新增物按 SKILL.md「新增物三级」；后面才揭开的东西不因章尾钩子提前打出；细纲或剧情段标了「要补」时把补法写进本章意图，标了「有硬伤」先按 workflow-outline 修纲再写。
@@ -34,12 +34,12 @@
 6. **正文执行**：整章一次写完，批准内容写完即停，不为字数加剧情。已部署 narrative-writer 时按 [agent-calls.md](agent-calls.md)「写一章」派发并核对它只消费了批准情节点；未部署则主会话自写并自列新增物申报表。写完自查删改四类问题：工整对仗/金句点题；叙述者跳出来替读者点题、复述刚演过的情绪或照搬细纲结论（角色自己的利害盘算、因果说明与直白情绪正常保留，别改成手眼小动作）；不改变局面的手眼/道具微动作代偿；章尾感悟升华或预告。
 7. **检测收口**：
    - 细纲每个情节点**至少出现一次**，漏则退回补写。
-   - 运行 `{PYTHON} {skill 根}/scripts/storyctl.py chapter check --project {项目根} --chapter {N} --fix-punctuation --plain`：一次整理标点并跑 AI 句式、退化（`check-degeneration.js`）、细纲照搬、字数与碎度/动作心理比（后两项仅参考）。改动后重跑，不再单调各检测脚本；工具未跑通则不提交并告知作者（缺 Node 提示装 Node.js 18+）。
-   - **字数出了范围**：欠字不补、不重试，用下方字数问法请作者选；超字交 narrative-writer 按 agent-calls「超字一次净删」删一次（自写同样只删不加），复检仍超请作者选。选 1 → `chapter accept-current-length`（不到目标一半或超长未压缩被拒时先告知/先删一次，作者坚持加 `--force`）；选 2 → 等作者改完细纲或目标后回本步；选 3 → 删本章正文与工作目录，不提交。
+   - 运行 `node {skill 根}/scripts/storyctl.js chapter check --project {项目根} --chapter {N} --fix-punctuation --plain`：一次整理标点并跑 AI 句式、退化（`check-degeneration.js`）、细纲照搬、字数与碎度/动作心理比（后两项仅参考）。改动后重跑，不再单调各检测脚本；工具未跑通则不提交并告知作者（缺 Node 提示装 Node.js 18+）。
+   - **字数出了范围**：欠字不补、不重试，用下方字数问法请作者选；超字交 narrative-writer 按 agent-calls「超字一次净删」删一次（自写同样只删不加），复检仍超请作者选。选 1 → `chapter accept-current-length`（不到目标一半被拒时先告知，作者坚持加 `--force`）；选 2 → 等作者改完细纲或目标后回本步；选 3 → 删本章正文与工作目录，不提交。
 8. **检查钩子与爽点**：章尾有往下看的理由，推进/爆发章爽点到位；不达标只修批准内容，修后重跑「检测收口」。
 9. **元信息扫描**：标题行以外清掉第X章、上一章、本章、前文、后文、伏笔、细纲、读者等工程词，改成角色感知的事件锚点。
 10. **检测结果处理**：检测器的必须改与 checker 的 S1/S2 必须修；建议看与 S3 读原文确属问题才改（拿不准按类别查 `references/banned-words.md` 对应节，不整读）；细纲照搬里判定保留的补进细纲「原样出现的原话」（旧名复沓锚句，不算改大纲）。改完重跑「检测收口」复扫。
-11. **更新追踪**：跑 `{PYTHON} {skill 根}/scripts/tracking_commit.py draft --project {项目根} --chapter {N}` 预填 `tracking.json`，只填 `delta`、本章结尾时间/场景与变化的核心角色快照（`character_snapshots`），撤下的约束/风险写入 `delta.retired_context_items`；出错才读 [tracking-transaction.md](tracking-transaction.md)。再跑 `{PYTHON} {skill 根}/scripts/storyctl.py chapter commit --project {项目根} --chapter {N} --input {工作目录}/tracking.json`（接受当前长度换 `accept-current-length`）。判为「登记」的申报项一并提交；有「先问作者」项时暂停提交。「本章没写成的」：细纲没给的追加进本段排纲笔记「写纲时补的」，先问作者的走下方处置表。
+11. **更新追踪**：跑 `node {skill 根}/scripts/tracking_commit.js draft --project {项目根} --chapter {N}` 预填 `tracking.json`，只填 `delta`、本章结尾时间/场景与变化的核心角色快照（`character_snapshots`），撤下的约束/风险写入 `delta.retired_context_items`；出错才读 [tracking-transaction.md](tracking-transaction.md)。再跑 `node {skill 根}/scripts/storyctl.js chapter commit --project {项目根} --chapter {N} --input {工作目录}/tracking.json`（接受当前长度换 `accept-current-length`）。判为「登记」的申报项一并提交；有「先问作者」项时暂停提交。「本章没写成的」：细纲没给的追加进本段排纲笔记「写纲时补的」，先问作者的走下方处置表。
 12. **提交后核对**：返回 `tracking_committed: true` 即本章完成。
 
 ## 向作者汇报

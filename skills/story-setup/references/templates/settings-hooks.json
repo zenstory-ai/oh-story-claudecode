@@ -5,12 +5,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-story-hook.sh session-start",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/detect-story-gaps.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-story-hook.sh detect-story-gaps",
             "timeout": 10
           }
         ]
@@ -21,7 +21,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-end.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-story-hook.sh session-end",
             "timeout": 5
           }
         ]
@@ -33,7 +33,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/validate-story-commit.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-story-hook.sh pre-tool-commit-advisory",
             "timeout": 15,
             "if": "Bash(git commit*)"
           }
@@ -44,7 +44,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-outline-before-prose.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-story-hook.sh pre-tool-prose-guard",
             "timeout": 10
           }
         ]
@@ -56,7 +56,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check-prose-after-write.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-story-hook.sh post-tool-prose-check",
             "timeout": 15
           }
         ]
@@ -67,7 +67,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre-compact.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-story-hook.sh pre-compact",
             "timeout": 10
           }
         ]
@@ -78,7 +78,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post-compact.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-story-hook.sh post-compact",
             "timeout": 10
           }
         ]

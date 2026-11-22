@@ -79,6 +79,7 @@ function projectRoot() {
       cwd,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
+      windowsHide: true,
     })
     if (result.status === 0 && result.stdout.trim()) return path.resolve(result.stdout.trim())
   } catch {}

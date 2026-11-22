@@ -1,6 +1,6 @@
 # 核心角色当前快照反推规则（长篇导入）
 
-> 长篇导入时，将核心角色截至最后完整章的状态写入初始化事务 `character_snapshots`，由 `tracking_commit.py init` 生成 `追踪/角色状态/{角色名}.md`。
+> 长篇导入时，将核心角色截至最后完整章的状态写入初始化事务 `character_snapshots`，由 `tracking_commit.js init` 生成 `追踪/角色状态/{角色名}.md`。
 
 ## 一、输入来源
 
@@ -79,4 +79,4 @@
 - [ ] 角色已知信息没有混入作者真相
 - [ ] 未结事项都有正文证据，未来设计仍在大纲
 - [ ] 单角色快照目标不超过 16384 字节（超目标仅提醒，不阻断）；单文件硬上限 65536 字节
-- [ ] `tracking_commit.py check` 通过
+- [ ] `tracking_commit.js check` 通过

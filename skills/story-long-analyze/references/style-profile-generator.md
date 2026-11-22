@@ -29,7 +29,7 @@
 3. 样本不足时确认 `chapter_index.csv` 与原文存在。缺索引时只运行：
 
    ```text
-   "{PYTHON}" "{story-long-analyze skill 根}/scripts/build_chapter_index.py" --source "{拆文目录}/原文/原文.txt" --output "{拆文目录}/chapter_index.csv" --locator-path "原文/原文.txt"
+   node "{story-long-analyze skill 根}/scripts/build_chapter_index.js" --source "{拆文目录}/原文/原文.txt" --output "{拆文目录}/chapter_index.csv" --locator-path "原文/原文.txt"
    ```
 
 4. 从索引选 4–6 章，覆盖已有资料能确认的不同基调；每章按行号取一段 300–500 字连续原句，写入或更新 `_style-sample.txt`；
@@ -37,7 +37,7 @@
 6. 落盘后运行：
 
    ```text
-   "{PYTHON}" "{story-long-analyze skill 根}/scripts/manage_analysis_run.py" mark-stage --root "{拆文目录}" --stage stage6 --output "文风.md"
+   node "{story-long-analyze skill 根}/scripts/manage_analysis_run.js" mark-stage --root "{拆文目录}" --stage stage6 --output "文风.md"
    ```
 
 索引、原文和有效样本都不存在时停止，返回“无法取得可验证文风锚点”，不得生成锚点全空的可用文风。
