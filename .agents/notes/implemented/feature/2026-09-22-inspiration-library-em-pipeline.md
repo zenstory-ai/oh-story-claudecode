@@ -5,6 +5,7 @@ Date: 2026-09-22
 Issue: PR #387（依赖 PR #386）
 Related: [2026-09-22-long-analyze-single-state-runtime](../architecture/2026-09-22-long-analyze-single-state-runtime.md)
 Related（接手收口）：[2026-09-23-inspiration-library-takeover](../simplification/2026-09-23-inspiration-library-takeover.md)——逐章挂点与子串近义判定已在该篇撤回
+Superseded-by: [2026-11-21-retire-inspiration-library-and-fix-drift](../simplification/2026-11-21-retire-inspiration-library-and-fix-drift.md)——三层灵感库管道已退役，EM 机制卡保留在单书拆文 `剧情/情绪模块.md` 中直接消费
 
 ## Problem
 

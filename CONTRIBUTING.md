@@ -87,8 +87,8 @@ PR 自动运行 `.github/workflows/cross-platform.yml`，拆为两个 job：`rep
 - `scripts/check-story-setup-deployment.sh` — story-setup 部署完整性
 - `python3 scripts/check-plugin-packaging.py` + `python3 scripts/test-plugin-packaging.py` — Claude/ZCode/Reasonix catalog 与 manifest 打包检查及黑盒变异回归
 - 七个宿主适配检查：`check-claude-adapter.sh`、`check-codex-adapter.sh`、`check-antigravity-adapter.sh`、`check-opencode-adapter.sh`、`check-openclaw-skills.sh`、`check-zcode-adapter.sh`、`check-reasonix-adapter.sh`
-- Hook 行为回归（Claude / Codex / OpenCode / Antigravity / ZCode 五端统一基于 Node.js 18+ 共享核 `story_hook_core.js`）：`node --test scripts/test-story-hook-core.mjs scripts/test-claude-hooks.mjs scripts/test-codex-hooks.mjs scripts/test-antigravity-hooks.mjs scripts/test-opencode-plugin.mjs`、`test-zcode-hooks.sh`
-- 核心运行时回归：`test-storyctl.py`、`test-writer-pipeline.py`、`test-chapter-completion-lifecycle.py`、`test-tracking-commit.py`、`test-author-memory-commit.py`、`test-long-analyze-runtime.py`、`test-inspiration-index.py`、`test-publish-format.py`、`test-style-precedence.py`
+- Hook 行为回归（Claude / Codex / OpenCode / Antigravity / ZCode 五端统一基于 Node.js 18+ 共享核 `story_hook_core.js`）：`node --test scripts/test-story-hook-core.mjs scripts/test-claude-hooks.mjs scripts/test-codex-hooks.mjs scripts/test-antigravity-hooks.mjs scripts/test-zcode-hooks.mjs`、`node --experimental-strip-types --test scripts/test-opencode-plugin.mjs`
+- 核心运行时回归：`test-storyctl.py`、`test-writer-pipeline.py`、`test-chapter-completion-lifecycle.py`、`test-tracking-commit.py`、`test-author-memory-commit.py`、`test-long-analyze-runtime.py`、`test-publish-format.py`、`test-style-precedence.py`
 - 采集脚本 `node --check` 语法校验
 
 以上为代表性列举；**强制清单按 `.github/workflows/cross-platform.yml` 为准**，每个脚本的用途与触发时机见 [scripts/README.md](scripts/README.md)。另有 `.github/workflows/cli-compat.yml` 在相关 PR、每周定时和手动触发时安装官方当前版本，真实运行 Claude Code、Codex、OpenCode、OpenClaw、Reasonix 的无鉴权 smoke。
@@ -121,7 +121,6 @@ python3 scripts/test-storyctl.py
 python3 scripts/test-chapter-completion-lifecycle.py
 python3 scripts/test-author-memory-commit.py
 python3 scripts/test-long-analyze-runtime.py
-python3 scripts/test-inspiration-index.py
 python3 scripts/test-scan-aggregate.py
 bash scripts/check-scan-runtime-policy.sh
 python3 scripts/test-scan-runtime-policy.py
@@ -133,8 +132,8 @@ bash scripts/check-opencode-adapter.sh
 bash scripts/check-openclaw-skills.sh
 bash scripts/check-zcode-adapter.sh
 bash scripts/check-reasonix-adapter.sh
-node --test scripts/test-story-hook-core.mjs scripts/test-claude-hooks.mjs scripts/test-codex-hooks.mjs scripts/test-antigravity-hooks.mjs scripts/test-opencode-plugin.mjs
-bash scripts/test-zcode-hooks.sh
+node --test scripts/test-story-hook-core.mjs scripts/test-claude-hooks.mjs scripts/test-codex-hooks.mjs scripts/test-antigravity-hooks.mjs scripts/test-zcode-hooks.mjs
+node --experimental-strip-types --test scripts/test-opencode-plugin.mjs
 bash scripts/check-python-invocation.sh
 bash scripts/test-charcount-portable.sh
 bash scripts/test-charcount-portable.sh --stub
@@ -355,7 +354,7 @@ ZCode 采用「原生 plugin + `story-setup` workspace 部署」双入口：
 ```bash
 python3 scripts/generate-zcode-agents.py --check
 bash scripts/check-zcode-adapter.sh
-bash scripts/test-zcode-hooks.sh
+node --test scripts/test-zcode-hooks.mjs
 node --test scripts/test-story-hook-core.mjs
 ```
 
