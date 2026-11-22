@@ -8,7 +8,7 @@ SKILL.md 路由到「日更续写」后按本文件控制批次；每章正文�
 
 ## Step 1：快速上下文加载
 
-运行 `tracking_commit.js check`，取 `last_committed_chapter + 1` 作本批首章 N、`state_revision` 作修订号，并核对 `追踪/上下文.md` 的当前位置（7 栏，自动生成，禁止手改；schema 与修复见 [tracking-transaction.md](tracking-transaction.md)，出错时才读）；章号不一致、缺 state 或视图不一致时停下，按 workflow-chapter 开头「缺文件先修」修好再开始，不扫描正文猜编号。每章要读的上下文按 workflow-chapter「读取上下文」；`追踪/伏笔.md`、`时间线/`、`逐章记录/` 默认不整读，缺旧信息按下方「旧信息查找步骤」定点查。
+运行 `tracking_commit.js check`，取 `last_committed_chapter + 1` 作本批首章 N、`state_revision` 作修订号，并核对 `追踪/上下文.md` 的当前位置（7 栏，自动生成，默认不手改；schema 与修复见 [tracking-transaction.md](tracking-transaction.md)，出错时才读）；章号不一致、缺 state 或 check 报错（exit 2）时停下按 workflow-chapter 开头「缺文件先修」修好再开始，若仅返回 `drift_warnings`（exit 0，视图被手改过）先问作者吸回修订还是按 state 重建，不扫描正文猜编号。每章要读的上下文按 workflow-chapter「读取上下文」；`追踪/伏笔.md`、`时间线/`、`逐章记录/` 默认不整读，缺旧信息按下方「旧信息查找步骤」定点查。
 
 确定范围后直接进 Step 2，不问"是否继续"；K 默认 2-3 章，作者另给按作者。章号冲突、范围超纲或需改变既定故事安排时暂停确认；每章正常提交追踪不另问。
 
@@ -20,10 +20,10 @@ SKILL.md 路由到「日更续写」后按本文件控制批次；每章正文�
 
 1. **读取写作计划**：按 全卷规矩 → 当前剧情段 → 章节细纲 确定；`outline_view.js --chapter {N}` 取一次全卷与本段内容，本批复用，不整读卷纲。批写完检查是否超前、拖慢或偏离阶段节奏：下一章要补偿的进 `next_chapter_commitments`，跨章风险进 `continuity_risks`。
 2. **逐章执行**：每章按 workflow-chapter「单章写作流程」走完，叠加：
-   - **上一章欠账**：写本章前上一章不得有未清 blocking 毒句式（写前 hook 不可用时对上一章跑一次 `chapter check`；标了 `<!-- 去味:跳过 -->` 的除外）。
+   - **上一章欠账**：写前 hook 会对上一章未处理的高风险 AI 句式（`review_required`）给出非阻断提醒（hook 不可用时可对上一章跑 `chapter check`；标 `<!-- 去味:跳过 -->` 除外），按需先修或在提交时传 `--ack` / `--ack-all` 确认。
    - **状态来源**：不整读 `_tracking-state.json`；久别核心角色读 `追踪/角色状态/{名}.md`，重新活跃后放进本章事务的 `context.active_character_names`。
    - **本章技法与召回**：主会话自写时一批只读一份本章技法（见 SKILL.md「本章技法」），交写手时每章照填类别；story-explorer 召回的 `gaps` 按 benchmark-recall.md 分流。
-   - **当轮清零与提交追踪**：hook 推回的命中当轮清零；每章写完立即按 workflow-chapter「更新追踪」提交，成功才进下一章（字数出了范围按「检测收口」请作者选，不私自跳过）。
+   - **当轮收口与提交追踪**：硬阻断项（退化、未闭合注释等，含 hook 推回的硬缺陷）当轮清零，风格 `review_required` 项改写或提交时传 `--ack` 确认；每章写完立即按 workflow-chapter「更新追踪」提交，成功才进下一章（字数出了范围按「检测收口」请作者选，不私自跳过）。
 
 ### 旧信息查找步骤
 
@@ -51,7 +51,7 @@ SKILL.md 路由到「日更续写」后按本文件控制批次；每章正文�
 
 **本步不再写追踪内容**，只做：
 
-1. `tracking_commit.js check` 通过，本批每章都有逐章记录；缺失或超限回到该章事务修正重跑，不手补文件。
+1. `tracking_commit.js check` 通过且无 `drift_warnings`（严格核查加 `--strict`），本批每章都有逐章记录；缺失或触及 65536 字节硬上限时回该章事务修正重跑（常规体积超建议值仅出 `warnings`），不手补文件。
 2. **收拢各章「本章没写成的」**：细纲没给的记进排纲笔记「写纲时补的」；要作者定的（连同排纲笔记里还没定的）放进批末汇报问作者；都没有就不提。
 
 然后按 SKILL.md「面向作者的汇报」口头汇报，不另存文件；内部核对翻成故事话再说：

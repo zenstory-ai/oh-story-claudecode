@@ -7,7 +7,7 @@ Phase 5 只读本文件和导入记录（`{书目录}/.story/work/导入记录.m
 先完成内部自检；未通过时回到对应时刻修复，仍无法完成才向作者说明影响和办法。
 
 - 导入记录中此前各项进度已勾上（短篇跳过细纲与追踪）；「汇报与激活」在本时刻 Step 3 完成后再勾。
-- **长篇**：`正文/` 章节文件数等于导入范围章数；每章都有 `大纲/细纲_第XXX章.md`，且对全部细纲再跑一次 `node {story-import skill 根}/scripts/check-outline-contract.js --json {书目录}/大纲/细纲_第*.md` 通过；再跑一次 `node {story-import skill 根}/scripts/tracking_commit.js check --project {书目录}` 通过；原文没分卷时卷划分已经作者确认；`拆文库/{导入书名}/` 未被复制到 `对标/`。
+- **长篇**：`正文/` 章节文件数等于导入范围章数；每章都有 `大纲/细纲_第XXX章.md`，且对全部细纲再跑一次 `node {story-import skill 根}/scripts/check-outline-contract.js --json {书目录}/大纲/细纲_第*.md` 无 `hard_failures`（复核 `soft_warnings`，严格核查加 `--strict`）；再跑一次 `node {story-import skill 根}/scripts/tracking_commit.js check --project {书目录}` 通过且无 `drift_warnings`（严格核查加 `--strict`）；原文没分卷时卷划分已经作者确认；`拆文库/{导入书名}/` 未被复制到 `对标/`。
 - **短篇**：`正文.md`、`设定.md`、`小节大纲.md` 都在，未误建 `追踪/`、`大纲/`、`正文/`。
 
 ## Step 2：导入完成报告
