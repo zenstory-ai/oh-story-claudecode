@@ -117,7 +117,14 @@ class FinalChapterFlowTests(unittest.TestCase):
         return json.loads((self.project / "追踪/_tracking-state.json").read_text(encoding="utf-8"))
 
     def write_contract(
-        self, chapter: int, actual: int, *, target: int = 1000, blocking: bool = False, extra: str = ""
+        self,
+        chapter: int,
+        actual: int,
+        *,
+        target: int = 1000,
+        blocking: bool = False,
+        review_prefix: str = "",
+        extra: str = "",
     ) -> None:
         (self.project / "大纲").mkdir(exist_ok=True)
         (self.project / "正文").mkdir(exist_ok=True)
@@ -127,7 +134,7 @@ class FinalChapterFlowTests(unittest.TestCase):
             "| 1 | 江晨完成一次审核 | 推进 | 不新增支线 |\n",
             encoding="utf-8",
         )
-        prefix = "他回头——门已经关了。" if blocking else ""
+        prefix = "作为AI，我无法继续创作这部分内容。" if blocking else review_prefix
         fill = max(0, actual - len(prefix) - 1)
         (self.project / "正文" / f"第{chapter:03d}章_测试.md").write_text(
             f"# 第{chapter}章\n{prefix}" + "字" * fill + "。",
@@ -440,6 +447,96 @@ class FinalChapterFlowTests(unittest.TestCase):
         self.write_contract(2, 1000)
         second = self.run_chapter("commit", 2, document=transaction(2, self.state()["state_revision"]))
         self.assertIsNone(second["work_dir_removed"])
+
+    def test_review_and_ack_soft_gate_for_style_and_borderline_length(self) -> None:
+        # 1. Stylistic review_required items (em-dash + voice-contrast): check exits 0 with status=review_required.
+        style_prefix = "他回头——门已经关了。声音不大，却压住了全场。她声音不高，却把账念清了。"
+        self.write_contract(1, 1000, review_prefix=style_prefix)
+        checked = self.run_chapter("check", 1, expect=0)
+        self.assertEqual(checked["status"], "review_required")
+        self.assertEqual(checked["quality"]["status"], "review_required")
+        self.assertEqual(checked["quality"]["blocking_findings"], [])
+        rule_ids = {item["rule_id"] for item in checked["review_required_items"]}
+        self.assertEqual(rule_ids, {"em-dash", "voice-contrast"})
+        self.assertIn("--ack", checked["review_guidance"])
+
+        # --plain output clearly lists rule IDs, line numbers, excerpts, and --ack instructions.
+        plain_proc = subprocess.run(
+            [NODE, str(STORYCTL), "chapter", "check", "--project", str(self.project), "--chapter", "1", "--plain"],
+            cwd=ROOT, text=True, encoding="utf-8", capture_output=True, check=False,
+        )
+        self.assertEqual(plain_proc.returncode, 0, plain_proc.stderr)
+        self.assertIn("[em-dash]", plain_proc.stdout)
+        self.assertIn("[voice-contrast]", plain_proc.stdout)
+        self.assertIn("第 2 行", plain_proc.stdout)
+        self.assertIn("--ack <rule-id>:<简短理由>", plain_proc.stdout)
+
+        # Commit without --ack fails with structured REVIEW_ACK_REQUIRED and zero state mutation.
+        refused = self.run_chapter("commit", 1, document=transaction(1, self.state()["state_revision"]), expect=2)
+        self.assertEqual(refused["error_code"], "REVIEW_ACK_REQUIRED")
+        self.assertEqual(set(refused["unacknowledged_rules"]), {"em-dash", "voice-contrast"})
+        self.assertEqual(self.state()["last_committed_chapter"], 0)
+
+        # Partial --ack still fails listing the remaining unacknowledged rule.
+        partial = self.run_chapter(
+            "commit", 1, document=transaction(1, self.state()["state_revision"]),
+            extra=["--ack", "em-dash:戏剧停顿"], expect=2,
+        )
+        self.assertEqual(partial["error_code"], "REVIEW_ACK_REQUIRED")
+        self.assertEqual(partial["unacknowledged_rules"], ["voice-contrast"])
+
+        # Full repeatable --ack succeeds and emits acknowledged_reviews.
+        committed = self.run_chapter(
+            "commit", 1, document=transaction(1, self.state()["state_revision"]),
+            extra=["--ack", "em-dash:戏剧停顿", "--ack", "voice-contrast:人物气场反差"],
+        )
+        self.assertTrue(committed["tracking_committed"])
+        acks_by_rule = {row["rule_id"]: row["reason"] for row in committed["acknowledged_reviews"]}
+        self.assertEqual(acks_by_rule, {"em-dash": "戏剧停顿", "voice-contrast": "人物气场反差"})
+
+        # 2. --ack-all acknowledges all stylistic review_required items at once.
+        self.write_contract(2, 1000, review_prefix=style_prefix)
+        committed_all = self.run_chapter(
+            "commit", 2, document=transaction(2, self.state()["state_revision"]),
+            extra=["--ack-all", "全章台词氛围需要保留"],
+        )
+        self.assertTrue(committed_all["tracking_committed"])
+        self.assertEqual(
+            {row["rule_id"] for row in committed_all["acknowledged_reviews"]},
+            {"em-dash", "voice-contrast"},
+        )
+
+        # 3. --ack length:<reason> accepts borderline wordcount (50%-85% or >115%) without accept-current-length,
+        #    while <50% remains hard BELOW_ACCEPT_FLOOR unless --force is passed.
+        self.write_contract(3, 800, target=1000)
+        len_ok = self.run_chapter(
+            "commit", 3, document=transaction(3, self.state()["state_revision"]),
+            extra=["--ack", "length:节奏自然收束不注水"],
+        )
+        self.assertTrue(len_ok["tracking_committed"])
+        self.assertEqual(self.state()["wordcount_records"]["3"]["resolution"], "accepted_current_length")
+        self.assertEqual(len_ok["acknowledged_reviews"][0]["rule_id"], "length")
+
+        self.write_contract(4, 400, target=1000)
+        too_short = self.run_chapter(
+            "commit", 4, document=transaction(4, self.state()["state_revision"]),
+            extra=["--ack", "length:短章试水"], expect=2,
+        )
+        self.assertEqual(too_short["error_code"], "BELOW_ACCEPT_FLOOR")
+        forced = self.run_chapter(
+            "commit", 4, document=transaction(4, self.state()["state_revision"]),
+            extra=["--ack", "length:作者指定短章", "--force"],
+        )
+        self.assertTrue(forced["tracking_committed"])
+
+        # 4. Hard blocks (degeneration) can NEVER be bypassed with --ack or --ack-all.
+        self.write_contract(5, 1000, blocking=True)
+        hard_blocked = self.run_chapter(
+            "commit", 5, document=transaction(5, self.state()["state_revision"]),
+            extra=["--ack-all", "试图跳过硬伤"], expect=2,
+        )
+        self.assertEqual(hard_blocked["error_code"], "QUALITY_BLOCKED")
+        self.assertEqual(self.state()["last_committed_chapter"], 4)
 
 
 if __name__ == "__main__":

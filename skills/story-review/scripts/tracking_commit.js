@@ -18,12 +18,13 @@ const wordcountCore = require('./wordcount_core.js');
 
 const INPUT_SCHEMA_VERSION = 1;
 const TRACKING_SCHEMA_VERSION = 4;
+const VIEW_HARD_CAP_BYTES = 65536;
 const DELTA_TARGET_BYTES = 1536;
 const DELTA_MAX_BYTES = 3072;
 const CONTEXT_TARGET_BYTES = 8192;
 const CONTEXT_MAX_BYTES = 12288;
 const SNAPSHOT_TARGET_BYTES = 16384;
-const SNAPSHOT_MAX_BYTES = 65536;
+const SNAPSHOT_MAX_BYTES = VIEW_HARD_CAP_BYTES;
 const SNAPSHOT_ITEM_MAX_BYTES = 600;
 const DRAFT_INLINE_SNAPSHOTS_MAX_BYTES = 16384;
 const ACTIVE_CHARACTER_MAX = 20;
@@ -192,25 +193,30 @@ function charLen(text) {
   return Array.from(text).length;
 }
 
-let _lengthIssues = null;
+let _softWarnings = null;
+
+function addSoftWarning(message) {
+  if (_softWarnings !== null && !_softWarnings.includes(message)) {
+    _softWarnings.push(message);
+  }
+}
 
 function lengthHint(label, text, maxBytes) {
   const size = byteSize(text);
   const chars = charLen(text);
   const allowed = Math.max(1, Math.floor((maxBytes * chars) / size));
-  return `${label} exceeds ${maxBytes} bytes（现 ${chars} 字，上限约 ${allowed} 字，至少删 ${chars - allowed} 字）`;
+  return `${label} exceeds ${maxBytes} bytes（现 ${chars} 字，建议上限约 ${allowed} 字，不影响本次提交）`;
 }
 
-function cleanText(value, label, { allowEmpty = false, maxBytes = 768 } = {}) {
+function cleanText(value, label, { allowEmpty = false, maxBytes = 768, hardMaxBytes = null } = {}) {
   requireCondition(typeof value === 'string', `${label} must be a string`);
   const cleaned = value.replace(/\|/g, '｜').trim().replace(/\s+/g, ' ');
   requireCondition(allowEmpty || Boolean(cleaned), `${label} must not be empty`);
-  if (byteSize(cleaned) > maxBytes) {
-    const msg = lengthHint(label, cleaned, maxBytes);
-    if (_lengthIssues === null) {
-      throw new TrackingError(msg);
-    }
-    _lengthIssues.push(msg);
+  if (hardMaxBytes !== null) {
+    requireCondition(byteSize(cleaned) <= hardMaxBytes, `${label} exceeds hard cap of ${hardMaxBytes} bytes`);
+  }
+  if (maxBytes !== null && byteSize(cleaned) > maxBytes) {
+    addSoftWarning(lengthHint(label, cleaned, maxBytes));
   }
   return cleaned;
 }
@@ -234,14 +240,14 @@ function requireKnownKeys(mapping, allowed, label) {
 
 function cleanStringList(value, label, { maximum = null, itemMaxBytes = 384 } = {}) {
   const values = asList(value, label);
-  if (maximum !== null) {
-    requireCondition(values.length <= maximum, `${label} may contain at most ${maximum} items`);
+  if (maximum !== null && values.length > maximum) {
+    addSoftWarning(`${label} has ${values.length} items（建议最多 ${maximum} 项，不影响本次提交）`);
   }
   return values.map((item, index) => cleanText(item, `${label}[${index}]`, { maxBytes: itemMaxBytes }));
 }
 
 function safeFileComponent(value, label) {
-  const name = cleanText(value, label, { maxBytes: 180 }).normalize('NFC');
+  const name = cleanText(value, label, { maxBytes: 180, hardMaxBytes: 180 }).normalize('NFC');
   requireCondition(!INVALID_FILE_CHARS.test(name), `${label} contains an invalid filename character`);
   requireCondition(name !== '.' && name !== '..' && !name.endsWith('.') && !name.endsWith(' '), `${label} is not a safe filename`);
   const stem = name.split('.')[0].toUpperCase();
@@ -707,7 +713,13 @@ function renderForeshadow(rows, revision) {
         `${row.status} | ${row.importance} | 第${row.updated_chapter}章 |`
     );
   }
-  return `${lines.join('\n')}\n`;
+  const payload = `${lines.join('\n')}\n`;
+  const size = byteSize(payload);
+  requireCondition(
+    size <= VIEW_HARD_CAP_BYTES,
+    `foreshadow view (${size} bytes) exceeds hard cap of ${VIEW_HARD_CAP_BYTES} bytes`
+  );
+  return payload;
 }
 
 function normalizeTimelineChange(value, label, { allowDelete, throughChapter }) {
@@ -817,7 +829,17 @@ function renderTimelineViews(events, revision) {
     );
     readerLines.push(`| ${identifier} | ${event.reader_knowledge} | 第${event.updated_chapter}章 |`);
   }
-  return { author: `${authorLines.join('\n')}\n`, reader: `${readerLines.join('\n')}\n` };
+  const author = `${authorLines.join('\n')}\n`;
+  const reader = `${readerLines.join('\n')}\n`;
+  requireCondition(
+    byteSize(author) <= VIEW_HARD_CAP_BYTES,
+    `author timeline view (${byteSize(author)} bytes) exceeds hard cap of ${VIEW_HARD_CAP_BYTES} bytes`
+  );
+  requireCondition(
+    byteSize(reader) <= VIEW_HARD_CAP_BYTES,
+    `reader timeline view (${byteSize(reader)} bytes) exceeds hard cap of ${VIEW_HARD_CAP_BYTES} bytes`
+  );
+  return { author, reader };
 }
 
 function validateContextInput(value, { includeInitialFields }) {
@@ -839,10 +861,12 @@ function validateContextInput(value, { includeInitialFields }) {
     active_character_names: activeNames,
     continuity_risks: cleanStringList(context.continuity_risks ?? [], 'context.continuity_risks', { maximum: 5 }),
   };
-  requireCondition(
-    normalized.active_character_names.length <= ACTIVE_CHARACTER_MAX,
-    `context.active_character_names may contain at most ${ACTIVE_CHARACTER_MAX} names`
-  );
+  if (normalized.active_character_names.length > ACTIVE_CHARACTER_MAX) {
+    addSoftWarning(
+      `context.active_character_names has ${normalized.active_character_names.length} names` +
+        `（建议最多 ${ACTIVE_CHARACTER_MAX} 人，不影响本次提交）`
+    );
+  }
   const keySet = new Set(normalized.active_character_names.map(portableNameKey));
   requireCondition(
     keySet.size === normalized.active_character_names.length,
@@ -857,7 +881,9 @@ function validateContextInput(value, { includeInitialFields }) {
         summary: cleanText(item.summary, `context.recent_chapters[${idx}].summary`, { maxBytes: 360 }),
       };
     });
-    requireCondition(recent.length <= 3, 'context.recent_chapters may contain at most 3 items');
+    if (recent.length > 3) {
+      addSoftWarning(`context.recent_chapters has ${recent.length} items（建议最多 3 项，不影响本次提交）`);
+    }
     normalized.recent_chapters = recent;
     normalized.next_chapter_commitments = cleanStringList(
       context.next_chapter_commitments ?? [],
@@ -928,7 +954,11 @@ function renderContext(state) {
   const headingsMatch =
     headings.length === CONTEXT_HEADINGS.length && headings.every((h, idx) => h === CONTEXT_HEADINGS[idx]);
   requireCondition(headingsMatch, 'generated context headings do not match the seven-section schema');
-  requireCondition(byteSize(payload) <= CONTEXT_MAX_BYTES, `hot context exceeds ${CONTEXT_MAX_BYTES} bytes`);
+  const contextSize = byteSize(payload);
+  requireCondition(
+    contextSize <= VIEW_HARD_CAP_BYTES,
+    `hot context (${contextSize} bytes) exceeds hard cap of ${VIEW_HARD_CAP_BYTES} bytes`
+  );
   return payload;
 }
 
@@ -1075,19 +1105,19 @@ function renderDelta(chapter, title, delta, coreNames) {
   }
   const payload = `${lines.join('\n')}\n`;
   const size = byteSize(payload);
-  if (size > DELTA_MAX_BYTES) {
+  if (size > VIEW_HARD_CAP_BYTES) {
     const longest = lines
       .filter((line) => line.startsWith('- '))
       .sort((a, b) => charLen(b) - charLen(a))
       .slice(0, 3);
     const chars = charLen(payload);
-    const allowed = Math.floor((DELTA_MAX_BYTES * chars) / size);
+    const allowed = Math.floor((VIEW_HARD_CAP_BYTES * chars) / size);
     const summary = longest
       .map((line) => `${Array.from(line).slice(2, 18).join('')}…（${charLen(line) - 2} 字）`)
       .join('；');
     throw new TrackingError(
-      `chapter delta is ${size} bytes; hard cap is ${DELTA_MAX_BYTES}（逐章记录现 ${chars} 字，` +
-        `上限约 ${allowed} 字，至少压缩 ${chars - allowed} 字；最长几项：${summary}）`
+      `chapter delta (${size} bytes) exceeds hard cap of ${VIEW_HARD_CAP_BYTES} bytes（逐章记录现 ${chars} 字，` +
+        `安全上限约 ${allowed} 字，至少压缩 ${chars - allowed} 字；最长几项：${summary}）`
     );
   }
   return payload;
@@ -1170,17 +1200,17 @@ function loadState(project) {
   return normalizeState(readJson(filePath));
 }
 
-function normalizeInitialDocument(document) {
-  _lengthIssues = [];
+function normalizeInitialDocument(document, warningsOut = null) {
+  _softWarnings = [];
   let stateDoc;
-  let issues;
+  let warnings;
   try {
     stateDoc = _normalizeInitialDocument(document);
   } finally {
-    issues = _lengthIssues;
-    _lengthIssues = null;
+    warnings = _softWarnings;
+    _softWarnings = null;
   }
-  requireCondition(issues.length === 0, `${issues.length} 个字段超长，一次改完再提交：${issues.join('；')}`);
+  if (warningsOut) warningsOut.push(...warnings);
   return normalizeState(stateDoc);
 }
 
@@ -1256,21 +1286,21 @@ function recountRevisedChapter(project, chapter, previous, drift) {
   throw new TrackingError(`第${chapter}章${drift.join('和')}已改，字数出了作者范围；${RECOUNT_HINT}`);
 }
 
-function normalizeTransaction(project, state, document) {
-  _lengthIssues = [];
+function normalizeTransaction(project, state, document, { allowGap = false, warningsOut = null } = {}) {
+  _softWarnings = [];
   let transaction;
-  let issues;
+  let warnings;
   try {
-    transaction = _normalizeTransaction(project, state, document);
+    transaction = _normalizeTransaction(project, state, document, { allowGap });
   } finally {
-    issues = _lengthIssues;
-    _lengthIssues = null;
+    warnings = _softWarnings;
+    _softWarnings = null;
   }
-  requireCondition(issues.length === 0, `${issues.length} 个字段超长，一次改完再提交：${issues.join('；')}`);
+  if (warningsOut) warningsOut.push(...warnings);
   return transaction;
 }
 
-function _normalizeTransaction(project, state, document) {
+function _normalizeTransaction(project, state, document, { allowGap = false } = {}) {
   const root = asMapping(document, 'transaction');
   requireKnownKeys(
     root,
@@ -1289,7 +1319,26 @@ function _normalizeTransaction(project, state, document) {
   requireCondition(expectedRevision === state.state_revision, 'tracking state changed since this transaction was prepared');
   const last = state.last_committed_chapter;
   if (mode === 'append') {
-    requireCondition(chapter === last + 1, `append chapter must be ${last + 1}, got ${chapter}`);
+    if (allowGap) {
+      if (chapter > last + 1) {
+        const skippedRange = chapter - 1 > last + 1 ? `第${last + 1}-${chapter - 1}章` : `第${last + 1}章`;
+        addSoftWarning(
+          `跳章提交：当前最后提交章为第${last}章，本次直接提交第${chapter}章（跳过${skippedRange}）`
+        );
+      } else if (chapter <= last) {
+        const targetDelta = deltaPath(trackingRoot(project), chapter);
+        requireCondition(
+          chapter > state.imported_through_chapter && !exists(targetDelta),
+          `chapter ${chapter} is already committed; use mode=revision`
+        );
+        addSoftWarning(`补交跳过章节：当前最后提交章为第${last}章，本次补交第${chapter}章`);
+      }
+    } else {
+      requireCondition(
+        chapter === last + 1,
+        `append chapter must be ${last + 1}, got ${chapter}（如有意跳章提交，请加 --allow-gap）`
+      );
+    }
   } else {
     requireCondition(chapter <= last, `cannot revise unwritten chapter ${chapter}; last committed chapter is ${last}`);
   }
@@ -1306,7 +1355,7 @@ function _normalizeTransaction(project, state, document) {
       `character ${name} conflicts with existing character ${existing}`
     );
   }
-  const throughChapter = mode === 'append' ? chapter : last;
+  const throughChapter = mode === 'append' ? Math.max(chapter, last) : last;
   const delta = normalizeDelta(root.delta, {
     throughChapter,
     snapshots,
@@ -1357,7 +1406,7 @@ function mergeTransaction(state, transaction) {
   const nextState = deepClone(state);
   const chapter = transaction.chapter;
   if (transaction.mode === 'append') {
-    nextState.last_committed_chapter = chapter;
+    nextState.last_committed_chapter = Math.max(state.last_committed_chapter, chapter);
   }
   nextState.state_revision += 1;
   Object.assign(nextState.characters, transaction.snapshots);
@@ -1439,7 +1488,7 @@ function mergeTransaction(state, transaction) {
   const recent = [...recentByChapter.values()].sort((a, b) => a.chapter - b.chapter).slice(-3);
   const currentLast = nextState.last_committed_chapter;
   const nextCommitments =
-    transaction.mode === 'append' || chapter === currentLast
+    (transaction.mode === 'append' && chapter >= currentLast) || chapter === currentLast
       ? transaction.delta.next_chapter_commitments
       : state.context.next_chapter_commitments;
   nextState.context = {
@@ -1484,15 +1533,33 @@ function writeViews(tracking, views) {
   }
 }
 
-function warnSizes(views, deltaPayload = null) {
-  if (deltaPayload !== null && byteSize(deltaPayload) > DELTA_TARGET_BYTES) {
-    emit(`WARNING: chapter delta is ${byteSize(deltaPayload)} bytes; target is <= ${DELTA_TARGET_BYTES}`, {
-      error: true,
-    });
+function emitWarning(message, warningsOut = null) {
+  if (warningsOut && !warningsOut.includes(message)) {
+    warningsOut.push(message);
+  }
+  emit(`WARNING: ${message}`, { error: true });
+}
+
+function warnSizes(views, deltaPayload = null, warningsOut = null) {
+  if (deltaPayload !== null) {
+    const deltaSize = byteSize(deltaPayload);
+    if (deltaSize > DELTA_MAX_BYTES) {
+      emitWarning(
+        `chapter delta is ${deltaSize} bytes; recommended cap is <= ${DELTA_MAX_BYTES} bytes（不影响本次提交，建议后续精简）`,
+        warningsOut
+      );
+    } else if (deltaSize > DELTA_TARGET_BYTES) {
+      emitWarning(`chapter delta is ${deltaSize} bytes; target is <= ${DELTA_TARGET_BYTES}`, warningsOut);
+    }
   }
   const contextSize = byteSize(views['上下文.md']);
-  if (contextSize > CONTEXT_TARGET_BYTES) {
-    emit(`WARNING: hot context is ${contextSize} bytes; target is <= ${CONTEXT_TARGET_BYTES}`, { error: true });
+  if (contextSize > CONTEXT_MAX_BYTES) {
+    emitWarning(
+      `hot context is ${contextSize} bytes; recommended cap is <= ${CONTEXT_MAX_BYTES} bytes（不影响本次提交，建议精简活跃角色或状态行）`,
+      warningsOut
+    );
+  } else if (contextSize > CONTEXT_TARGET_BYTES) {
+    emitWarning(`hot context is ${contextSize} bytes; target is <= ${CONTEXT_TARGET_BYTES}`, warningsOut);
   }
   for (const [relative, payload] of Object.entries(views)) {
     if (!relative.startsWith('角色状态/')) continue;
@@ -1501,17 +1568,17 @@ function warnSizes(views, deltaPayload = null) {
       const chars = charLen(payload);
       const targetChars = Math.max(1, Math.floor((SNAPSHOT_TARGET_BYTES * chars) / size));
       const stem = path.basename(relative, '.md');
-      emit(
-        `WARNING: character snapshot ${stem} is ${size} bytes; target is <= ${SNAPSHOT_TARGET_BYTES}` +
+      emitWarning(
+        `character snapshot ${stem} is ${size} bytes; target is <= ${SNAPSHOT_TARGET_BYTES}` +
           `（现 ${chars} 字，建议目标约 ${targetChars} 字；不影响本次提交，` +
           '后续更新时可将已了结事项或已被新状态取代的旧阶段归并为当前值）',
-        { error: true }
+        warningsOut
       );
     }
   }
 }
 
-function warnEmptiedSnapshots(previousCharacters, updatedSnapshots) {
+function warnEmptiedSnapshots(previousCharacters, updatedSnapshots, warningsOut = null) {
   const labels = {
     abilities_resources: '能力与资源',
     relationships: '关键关系',
@@ -1527,17 +1594,17 @@ function warnEmptiedSnapshots(previousCharacters, updatedSnapshots) {
       }
     }
     if (emptied.length) {
-      emit(
-        `WARNING: 角色快照「${name}」把 ${emptied.join('、')}` +
+      emitWarning(
+        `角色快照「${name}」把 ${emptied.join('、')}` +
           ' 清空成了空列表；character_snapshots 提交的是角色完整当前状态，不是只写本章新增。' +
           '若非有意清空，请从 draft 的 snapshot_files 读回完整快照修改后重提。',
-        { error: true }
+        warningsOut
       );
     }
   }
 }
 
-function warnEmptiedRecord(chapter, previous, delta) {
+function warnEmptiedRecord(chapter, previous, delta, warningsOut = null) {
   const labels = {
     character_changes: '角色变化',
     foreshadow_changes: '伏笔变化',
@@ -1552,18 +1619,19 @@ function warnEmptiedRecord(chapter, previous, delta) {
     }
   }
   if (emptied.length) {
-    emit(
-      `WARNING: 第${chapter}章修订把逐章记录的 ${emptied.join('、')}` +
+    emitWarning(
+      `第${chapter}章修订把逐章记录的 ${emptied.join('、')}` +
         ' 清空了；修订的 delta 是本章完整记录，不是只写改动。不是有意删除就用 draft 重新预填后再提交。',
-      { error: true }
+      warningsOut
     );
   }
 }
 
-function initializeLocked(project, document) {
+function initializeLocked(project, document, { warningsOut = null } = {}) {
   const tracking = trackingRoot(project);
   requireCondition(!exists(statePath(project)), 'tracking state already exists; init never overwrites project state');
-  const state = normalizeInitialDocument(document);
+  const softWarnings = [];
+  const state = normalizeInitialDocument(document, softWarnings);
   const views = renderViews(state);
   const statePayload = jsonPayload(state);
   const archived = archiveRetiredTrackingPaths(tracking);
@@ -1572,7 +1640,8 @@ function initializeLocked(project, document) {
   }
   writeViews(tracking, views);
   _hooks.atomicWriteText(statePath(project), statePayload);
-  warnSizes(views);
+  for (const msg of softWarnings) emitWarning(msg, warningsOut);
+  warnSizes(views, null, warningsOut);
   if (archived.length) {
     emit(
       `NOTE: 旧追踪结构已原样移入 追踪/${RETIRED_ARCHIVE_DIR}/：${archived.join(', ')}；` +
@@ -1583,8 +1652,8 @@ function initializeLocked(project, document) {
   return state;
 }
 
-function initialize(project, document) {
-  return withProjectWriteLock(project, () => initializeLocked(project, document));
+function initialize(project, document, options = {}) {
+  return withProjectWriteLock(project, () => initializeLocked(project, document, options));
 }
 
 function parseChapterRecord(filePath) {
@@ -1640,11 +1709,12 @@ function parseChapterRecord(filePath) {
   return record;
 }
 
-function applyTransactionLocked(project, document) {
+function applyTransactionLocked(project, document, { allowGap = false, warningsOut = null } = {}) {
   const tracking = trackingRoot(project);
   requireNoRetiredTrackingPaths(tracking);
   const state = loadState(project);
-  const transaction = normalizeTransaction(project, state, document);
+  const softWarnings = [];
+  const transaction = normalizeTransaction(project, state, document, { allowGap, warningsOut: softWarnings });
   const nextState = mergeTransaction(state, transaction);
   const filePath = deltaPath(tracking, transaction.chapter);
   const previousRecord = transaction.mode === 'revision' ? parseChapterRecord(filePath) : null;
@@ -1667,26 +1737,41 @@ function applyTransactionLocked(project, document) {
   writeIfChanged(filePath, deltaPayload);
   writeViews(tracking, views);
   _hooks.atomicWriteText(statePath(project), nextStatePayload);
-  warnSizes(views, deltaPayload);
-  warnEmptiedSnapshots(state.characters, transaction.snapshots);
+  for (const msg of softWarnings) emitWarning(msg, warningsOut);
+  warnSizes(views, deltaPayload, warningsOut);
+  warnEmptiedSnapshots(state.characters, transaction.snapshots, warningsOut);
   if (previousRecord !== null) {
-    warnEmptiedRecord(transaction.chapter, previousRecord, transaction.delta);
+    warnEmptiedRecord(transaction.chapter, previousRecord, transaction.delta, warningsOut);
   }
   return nextState;
 }
 
-function applyTransaction(project, document) {
-  return withProjectWriteLock(project, () => applyTransactionLocked(project, document));
+function applyTransaction(project, document, options = {}) {
+  return withProjectWriteLock(project, () => applyTransactionLocked(project, document, options));
 }
 
-function checkProject(project) {
+function checkProject(project, { strict = false, warningsOut = null, driftWarningsOut = null } = {}) {
   const tracking = trackingRoot(project);
   requireNoRetiredTrackingPaths(tracking);
   const state = loadState(project);
   const lastChapter = state.last_committed_chapter;
   const requiredDeltaStart = state.imported_through_chapter + 1;
+  const driftWarnings = driftWarningsOut || [];
   for (let chapter = requiredDeltaStart; chapter <= lastChapter; chapter += 1) {
-    requireCondition(exists(deltaPath(tracking, chapter)), `chapter delta ${chapter} is missing`);
+    if (!exists(deltaPath(tracking, chapter))) {
+      if (strict) {
+        throw new TrackingError(`chapter delta ${chapter} is missing`);
+      }
+      const message = `chapter delta ${chapter} is missing（可能为跳章提交或手工删除；请询问作者是否需要补交该章记录）`;
+      driftWarnings.push({
+        type: 'missing_delta',
+        chapter,
+        file: `逐章记录/第${padChapter(chapter)}章.md`,
+        message,
+        prompt: '请询问作者：该章是否为有意跳章，或需要补交该章记录？',
+      });
+      emit(`WARNING: ${message}`, { error: true });
+    }
   }
   const deltaDir = path.join(tracking, '逐章记录');
   if (isDir(deltaDir)) {
@@ -1701,17 +1786,51 @@ function checkProject(project) {
         `chapter delta ${chapter} filename is not canonical`
       );
       requireCondition(chapter <= lastChapter, `chapter delta ${chapter} exceeds last_committed_chapter`);
-      requireCondition(fs.statSync(fullPath).size <= DELTA_MAX_BYTES, `chapter delta ${chapter} exceeds ${DELTA_MAX_BYTES} bytes`);
+      const deltaBytes = fs.statSync(fullPath).size;
+      requireCondition(
+        deltaBytes <= VIEW_HARD_CAP_BYTES,
+        `chapter delta ${chapter} (${deltaBytes} bytes) exceeds hard cap of ${VIEW_HARD_CAP_BYTES} bytes`
+      );
+      if (deltaBytes > DELTA_MAX_BYTES) {
+        emitWarning(
+          `chapter delta ${chapter} is ${deltaBytes} bytes; recommended cap is <= ${DELTA_MAX_BYTES} bytes`,
+          warningsOut
+        );
+      }
     }
   }
   const expectedViews = renderViews(state);
   for (const [relative, expected] of Object.entries(expectedViews)) {
     const filePath = path.join(tracking, relative);
-    requireCondition(exists(filePath), `derived view is missing: ${relative}`);
-    requireCondition(
-      fs.readFileSync(filePath, 'utf8').replace(/\r\n/g, '\n') === expected,
-      `derived view differs from _tracking-state.json: ${relative}`
-    );
+    if (!exists(filePath)) {
+      if (strict) {
+        throw new TrackingError(`derived view is missing: ${relative}`);
+      }
+      const message = `derived view is missing: ${relative}（请询问作者：是否按 _tracking-state.json 重建派生视图？）`;
+      driftWarnings.push({
+        type: 'missing_view',
+        file: relative,
+        message,
+        prompt: '请询问作者：按 _tracking-state.json 重建缺失视图，还是补充对应修订事务？',
+      });
+      emit(`WARNING: ${message}`, { error: true });
+      continue;
+    }
+    if (fs.readFileSync(filePath, 'utf8').replace(/\r\n/g, '\n') !== expected) {
+      if (strict) {
+        throw new TrackingError(`derived view differs from _tracking-state.json: ${relative}`);
+      }
+      const message =
+        `derived view differs from _tracking-state.json: ${relative}` +
+        '（检测到手工修改或未同步视图；请询问作者：要将手工改动吸回 _tracking-state.json，还是按 JSON 重建？）';
+      driftWarnings.push({
+        type: 'view_drift',
+        file: relative,
+        message,
+        prompt: '请询问作者：将手工改动吸回 _tracking-state.json（提交 mode=revision 事务），还是按 JSON 重建？',
+      });
+      emit(`WARNING: ${message}`, { error: true });
+    }
   }
   const expectedCharFiles = new Set(
     Object.keys(expectedViews)
@@ -1723,7 +1842,25 @@ function checkProject(project) {
   const sameFiles =
     actualCharFiles.size === expectedCharFiles.size &&
     [...actualCharFiles].every((name) => expectedCharFiles.has(name));
-  requireCondition(sameFiles, 'character snapshot files differ from tracking state');
+  if (!sameFiles) {
+    if (strict) {
+      throw new TrackingError('character snapshot files differ from tracking state');
+    }
+    const extraFiles = [...actualCharFiles].filter((name) => !expectedCharFiles.has(name)).sort();
+    const missingFiles = [...expectedCharFiles].filter((name) => !actualCharFiles.has(name)).sort();
+    const message =
+      'character snapshot files differ from tracking state' +
+      `（多余：${extraFiles.join('、') || '无'}；缺失：${missingFiles.join('、') || '无'}；` +
+      '请询问作者：要吸回手工改动还是按 _tracking-state.json 重建？）';
+    driftWarnings.push({
+      type: 'character_files_drift',
+      extra_files: extraFiles,
+      missing_files: missingFiles,
+      message,
+      prompt: '请询问作者：将手工新增/修改的角色视图吸回状态，还是按 _tracking-state.json 重建？',
+    });
+    emit(`WARNING: ${message}`, { error: true });
+  }
   return state;
 }
 
@@ -1810,11 +1947,22 @@ function entryShapes(chapter) {
   };
 }
 
-function draftTransaction(project, chapter, { state = null } = {}) {
+function draftTransaction(project, chapter, { state = null, allowGap = false } = {}) {
   const st = state || loadState(project);
   const last = st.last_committed_chapter;
-  requireCondition(chapter >= 1 && chapter <= last + 1, `draft chapter must be between 1 and ${last + 1}`);
-  const mode = chapter === last + 1 ? 'append' : 'revision';
+  if (allowGap) {
+    requireCondition(chapter >= 1, `draft chapter must be >= 1`);
+  } else {
+    requireCondition(
+      chapter >= 1 && chapter <= last + 1,
+      `draft chapter must be between 1 and ${last + 1}（如有意跳章可加 --allow-gap）`
+    );
+  }
+  const mode =
+    chapter > last ||
+    (allowGap && chapter > st.imported_through_chapter && !exists(deltaPath(trackingRoot(project), chapter)))
+      ? 'append'
+      : 'revision';
   let title = '';
   const outlineDir = path.join(String(project), '大纲');
   if (isDir(outlineDir)) {
@@ -2018,7 +2166,16 @@ function parseCliArgs(argv) {
   if (!['init', 'commit', 'check', 'draft'].includes(command)) {
     return { error: `invalid command: ${command}` };
   }
-  const args = { command, project: null, input: null, chapter: null, out: null, force: false };
+  const args = {
+    command,
+    project: null,
+    input: null,
+    chapter: null,
+    out: null,
+    force: false,
+    strict: false,
+    allowGap: false,
+  };
   for (let i = 1; i < argv.length; i += 1) {
     const token = argv[i];
     const readVal = (flag) => {
@@ -2039,6 +2196,10 @@ function parseCliArgs(argv) {
         args.out = readVal('--out');
       } else if (command === 'draft' && token === '--force') {
         args.force = true;
+      } else if (command === 'check' && token === '--strict') {
+        args.strict = true;
+      } else if ((command === 'commit' || command === 'draft') && token === '--allow-gap') {
+        args.allowGap = true;
       } else {
         return { error: `unrecognized argument: ${token}` };
       }
@@ -2060,7 +2221,7 @@ function main(argv = process.argv.slice(2)) {
   const args = parseCliArgs(argv);
   if (args.help) {
     process.stdout.write(
-      'usage: node tracking_commit.js {init,commit,check,draft} --project DIR [--input FILE] [--chapter N] [--out FILE] [--force]\n'
+      'usage: node tracking_commit.js {init,commit,check,draft} --project DIR [--input FILE] [--chapter N] [--out FILE] [--force] [--strict] [--allow-gap]\n'
     );
     return 0;
   }
@@ -2069,6 +2230,8 @@ function main(argv = process.argv.slice(2)) {
     return 2;
   }
   let result;
+  const warnings = [];
+  const driftWarnings = [];
   try {
     let project;
     try {
@@ -2079,7 +2242,7 @@ function main(argv = process.argv.slice(2)) {
     }
     if (args.command === 'draft') {
       const state = loadState(project);
-      let { document, extra } = draftTransaction(project, args.chapter, { state });
+      let { document, extra } = draftTransaction(project, args.chapter, { state, allowGap: args.allowGap });
       const allCharacters = state.characters;
       const previousPosition = document.mode === 'append' ? extra : {};
       const prefillNotes = document.mode === 'revision' ? extra.notes || [] : [];
@@ -2171,11 +2334,18 @@ function main(argv = process.argv.slice(2)) {
       return 0;
     }
     if (args.command === 'init') {
-      result = initialize(project, readJson(args.input));
+      result = initialize(project, readJson(args.input), { warningsOut: warnings });
     } else if (args.command === 'commit') {
-      result = applyTransaction(project, readJson(args.input));
+      result = applyTransaction(project, readJson(args.input), {
+        allowGap: args.allowGap,
+        warningsOut: warnings,
+      });
     } else {
-      result = checkProject(project);
+      result = checkProject(project, {
+        strict: args.strict,
+        warningsOut: warnings,
+        driftWarningsOut: driftWarnings,
+      });
     }
   } catch (err) {
     if (err instanceof TrackingError || (err && typeof err.code === 'string')) {
@@ -2184,12 +2354,15 @@ function main(argv = process.argv.slice(2)) {
     }
     throw err;
   }
-  emit(
-    JSON.stringify({
-      last_committed_chapter: result.last_committed_chapter,
-      state_revision: result.state_revision,
-    })
-  );
+  const output = {
+    last_committed_chapter: result.last_committed_chapter,
+    state_revision: result.state_revision,
+    warnings,
+  };
+  if (args.command === 'check') {
+    output.drift_warnings = driftWarnings;
+  }
+  emit(JSON.stringify(output));
   return 0;
 }
 

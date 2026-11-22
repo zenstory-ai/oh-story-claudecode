@@ -35,14 +35,18 @@ class StyleTests(unittest.TestCase):
     def node(self, script, *args):
         return subprocess.run(['node', str(script), *map(str, args)], capture_output=True, encoding='utf-8')
 
-    def scan(self):
-        return self.node(SCRIPTS / 'check-ai-patterns.js', '--json', '--fail-on=blocking', self.file)
+    def scan(self, fail_on='review_required'):
+        return self.node(SCRIPTS / 'check-ai-patterns.js', '--json', f'--fail-on={fail_on}', self.file)
 
     def test_default_check_still_blocks(self):
         self.file.write_text('## 第1章 门\n“钥匙在——”\n钥匙在手——门开了。\n' + BLOCKING_NOT_IS, encoding='utf-8')
+        self.assertEqual(self.scan('blocking').returncode, 0)
         result = self.scan()
         self.assertEqual(result.returncode, 1, result.stderr)
-        findings = json.loads(result.stdout)['findings']
+        payload = json.loads(result.stdout)
+        findings = payload['findings']
+        self.assertGreater(payload['review_required'], 0)
+        self.assertEqual(payload['blocking'], 0)
         self.assertEqual({'em-dash', 'not-is-comparison'}, {f['type'] for f in findings})
         self.assertEqual([3], [f['line'] for f in findings if f['type'] == 'em-dash'])
 
@@ -52,9 +56,9 @@ class StyleTests(unittest.TestCase):
         result = self.scan()
         self.assertEqual(result.returncode, 1)
         findings = json.loads(result.stdout)['findings']
-        blocking = [f for f in findings if f['severity'] == 'blocking']
-        self.assertEqual(['voice-contrast', 'voice-contrast'], [f['type'] for f in blocking])
-        self.assertIn('声音不大', blocking[0]['excerpt'])
+        review_req = [f for f in findings if f['severity'] == 'review_required']
+        self.assertEqual(['voice-contrast', 'voice-contrast'], [f['type'] for f in review_req])
+        self.assertIn('声音不大', review_req[0]['excerpt'])
 
     def test_pause_normalizer_keeps_author_choice_and_removes_unapproved_pause(self):
         self.allow.write_text('# 来源：文风；旁白停顿保留破折号\n——\n……\n', encoding='utf-8')
@@ -105,19 +109,27 @@ class StyleTests(unittest.TestCase):
         (self.book / '追踪/_tracking-state.json').write_text(json.dumps({'schema_version': 4, 'state_revision': 0, 'last_committed_chapter': 1}), encoding='utf-8')
         (self.book / '追踪/上下文.md').write_text('> 状态修订：0', encoding='utf-8')
         next_file = self.book / '正文/第002章_再见.md'
-        for body, approved, should_block in [
+        for body, approved, should_warn in [
             (BLOCKING_NOT_IS, '', True),
             (BLOCKING_NOT_IS, APPROVED, False),
             (BLOCKING_NOT_IS + BLOCKING_VOICE, APPROVED, True),
         ]:
             self.file.write_text(body, encoding='utf-8')
             self.allow.write_text(approved, encoding='utf-8')
-            result = self.node('-e', "console.log(JSON.stringify(require(process.argv[1]).proseBlockReason(process.argv[2],process.argv[3])));", HOOK, self.root, next_file)
+            result = self.node(
+                '-e',
+                "const h=require(process.argv[1]); console.log(JSON.stringify({block: h.proseBlockReason(process.argv[2],process.argv[3]), warnings: h.prosePreWriteWarnings(process.argv[2],process.argv[3])}));",
+                HOOK,
+                self.root,
+                next_file,
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
-            reason = json.loads(result.stdout)
-            self.assertEqual(reason is not None, should_block)
-            if should_block:
-                self.assertIn('毒句式', reason)
+            payload = json.loads(result.stdout)
+            self.assertIsNone(payload['block'])
+            warnings = payload['warnings']
+            self.assertEqual(len(warnings) > 0, should_warn)
+            if should_warn:
+                self.assertIn('毒句式', '\n'.join(warnings))
         (self.book / '大纲/细纲_第002章.md').unlink()
         result = self.node('-e', "console.log(JSON.stringify(require(process.argv[1]).proseBlockReason(process.argv[2],process.argv[3])));", HOOK, self.root, next_file)
         self.assertEqual(result.returncode, 0, result.stderr)

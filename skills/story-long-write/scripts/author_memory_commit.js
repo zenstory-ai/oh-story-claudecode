@@ -27,6 +27,7 @@ function sleepMs(ms) {
 const INPUT_SCHEMA_VERSION = 1;
 const STATE_SCHEMA_VERSION = 1;
 const STATE_MAX_BYTES = 2 * 1024 * 1024;
+const VIEW_HARD_CAP_BYTES = 65536;
 const PROFILE_MAX_BYTES = 12288;
 const JOURNAL_MAX_BYTES = 24576;
 const QUERY_MAX_BYTES = 2048;
@@ -115,11 +116,14 @@ function utf8Bytes(str) {
   return Buffer.byteLength(str, 'utf8');
 }
 
-function cleanText(value, label, { maxBytes = 768 } = {}) {
+function cleanText(value, label, { maxBytes = 768, hardMaxBytes = null } = {}) {
   requireCondition(typeof value === 'string', `${label} must be a string`);
   const cleaned = value.replace(/\|/g, '｜').trim().replace(/\s+/g, ' ');
   requireCondition(Boolean(cleaned), `${label} must not be empty`);
-  requireCondition(utf8Bytes(cleaned) <= maxBytes, `${label} exceeds ${maxBytes} bytes`);
+  const cap = hardMaxBytes !== null ? hardMaxBytes : maxBytes;
+  if (cap !== null) {
+    requireCondition(utf8Bytes(cleaned) <= cap, `${label} exceeds ${cap} bytes`);
+  }
   return cleaned;
 }
 
@@ -936,15 +940,14 @@ function fingerprint(preference) {
   return JSON.stringify(sortKeysDeep(value));
 }
 
-function requireNewItemAssertion(preference) {
+function checkNewItemAssertion(preference, warnings) {
   const size = utf8Bytes(preference.assertion);
-  requireCondition(
-    size <= ASSERTION_MAX_BYTES,
-    `新条目的 assertion ${size} 字节，超出 ${ASSERTION_MAX_BYTES} 字节上限——` +
-      '断言限一句话，需要解释的背景写进 reason。若这是对已有条目的重申，' +
-      '原样使用该条目的 assertion 即可强化（不受本上限约束）；' +
-      '若确实是几条互不依赖的偏好，才拆成几条分别记录。'
-  );
+  if (size > ASSERTION_MAX_BYTES) {
+    warnings.push(
+      `新条目的 assertion ${size} 字节，超出建议上限 ${ASSERTION_MAX_BYTES} 字节（不影响本次写入；` +
+        '建议后续精简为一句话，背景写进 reason；若是对已有条目的重申，原样使用该条目的 assertion 即可强化）。'
+    );
+  }
 }
 
 function requireScopeFitsStore(state, scope) {
@@ -969,8 +972,8 @@ function nextItemId(state) {
   return itemId;
 }
 
-function allocateItem(state, preference, revision) {
-  requireNewItemAssertion(preference);
+function allocateItem(state, preference, revision, warnings = []) {
+  checkNewItemAssertion(preference, warnings);
   requireScopeFitsStore(state, preference.scope);
   return {
     id: nextItemId(state),
@@ -1007,7 +1010,7 @@ function requireItem(state, itemId, label) {
   return state.items[itemId];
 }
 
-function applyRemember(state, preference, revision) {
+function applyRemember(state, preference, revision, warnings = []) {
   requireScopeFitsStore(state, preference.scope);
   const prefFp = fingerprint(preference);
   for (const item of Object.values(state.items)) {
@@ -1024,7 +1027,7 @@ function applyRemember(state, preference, revision) {
     item.status = 'active';
     return `强化 ${item.id}：${item.assertion}`;
   }
-  const item = allocateItem(state, preference, revision);
+  const item = allocateItem(state, preference, revision, warnings);
   state.items[item.id] = item;
   return `新增 ${item.id}（${item.status}）：${item.assertion}`;
 }
@@ -1045,7 +1048,7 @@ function releaseConflicts(state, removedIds, revision) {
   return released;
 }
 
-function applyReplace(state, operation, revision) {
+function applyReplace(state, operation, revision, warnings = []) {
   const oldItems = operation.old_ids.map((itemId) => requireItem(state, itemId, 'replace'));
   for (const item of oldItems) {
     requireCondition(
@@ -1053,7 +1056,7 @@ function applyReplace(state, operation, revision) {
       `replace target ${item.id} is already ${item.status}`
     );
   }
-  const replacement = allocateItem(state, operation.preference, revision);
+  const replacement = allocateItem(state, operation.preference, revision, warnings);
   replacement.status = 'active';
   replacement.conflicts_with = [];
   state.items[replacement.id] = replacement;
@@ -1118,6 +1121,7 @@ function applyTransaction(state, transaction, digest, { store }) {
       updated: state,
       summaries: [`事务已应用于修订 ${applied.revision}，本次为幂等重放`],
       replayed: true,
+      txWarnings: [],
     };
   }
   requireCondition(
@@ -1127,11 +1131,12 @@ function applyTransaction(state, transaction, digest, { store }) {
   const updated = deepClone(state);
   const revision = updated.state_revision + 1;
   const summaries = [];
+  const txWarnings = [];
   for (const operation of transaction.operations) {
     if (operation.action === 'remember') {
-      summaries.push(applyRemember(updated, operation.preference, revision));
+      summaries.push(applyRemember(updated, operation.preference, revision, txWarnings));
     } else if (operation.action === 'replace') {
-      summaries.push(applyReplace(updated, operation, revision));
+      summaries.push(applyReplace(updated, operation, revision, txWarnings));
     } else {
       summaries.push(applyForget(updated, operation, revision));
     }
@@ -1140,6 +1145,7 @@ function applyTransaction(state, transaction, digest, { store }) {
     updated: sealTransaction(updated, transaction.transaction_id, digest, summaries, { store }),
     summaries,
     replayed: false,
+    txWarnings,
   };
 }
 
@@ -1219,18 +1225,25 @@ function renderViews(state) {
     '作者画像.md': renderProfile(state),
     '变更记录.md': renderJournal(state),
   };
-  const limits = { '作者画像.md': PROFILE_MAX_BYTES, '变更记录.md': JOURNAL_MAX_BYTES };
+  const softTargets = { '作者画像.md': PROFILE_MAX_BYTES, '变更记录.md': JOURNAL_MAX_BYTES };
+  const viewWarnings = [];
   for (const [name, payload] of Object.entries(views)) {
+    const size = utf8Bytes(payload);
     requireCondition(
-      utf8Bytes(payload) <= limits[name],
-      `${name} exceeds ${limits[name]} bytes; consolidate old memory first`
+      size <= VIEW_HARD_CAP_BYTES,
+      `${name} (${size} bytes) exceeds hard cap of ${VIEW_HARD_CAP_BYTES} bytes; consolidate old memory first`
     );
+    if (size > softTargets[name]) {
+      viewWarnings.push(
+        `${name} 当前 ${size} 字节，超出建议上限 ${softTargets[name]} 字节（不影响本次写入；说「整理作者记忆」可合并旧条目）`
+      );
+    }
   }
-  return views;
+  return { views, viewWarnings };
 }
 
 function writeSnapshot(store, state) {
-  const views = renderViews(state);
+  const { views, viewWarnings } = renderViews(state);
   const statePayload = jsonPayload(state);
   requireCondition(
     utf8Bytes(statePayload) <= STATE_MAX_BYTES,
@@ -1244,6 +1257,7 @@ function writeSnapshot(store, state) {
     fs.unlinkSync(legacyView);
   }
   writeIfChanged(store.statePath, statePayload);
+  return viewWarnings;
 }
 
 // ---------------------------------------------------------------------------
@@ -1475,8 +1489,10 @@ function commandInit(workspace, bookRoot, book) {
     if (state === null) {
       state = emptyState(store.book);
     }
-    writeSnapshot(store, state);
-    return { ok: true, command: 'init', revision: state.state_revision, ...storeFields(store) };
+    const viewWarnings = writeSnapshot(store, state);
+    const out = { ok: true, command: 'init', revision: state.state_revision, ...storeFields(store) };
+    if (viewWarnings.length) out.warnings = viewWarnings;
+    return out;
   });
 }
 
@@ -1489,8 +1505,8 @@ function commandCommit(workspace, bookRoot, book, inputPath) {
     requireCondition(exists(store.statePath), `${store.label} author memory is not initialized; run init first`);
     const state = loadState(store);
     const digest = transactionDigest(transaction);
-    const { updated, summaries, replayed } = applyTransaction(state, transaction, digest, { store });
-    writeSnapshot(store, updated);
+    const { updated, summaries, replayed, txWarnings } = applyTransaction(state, transaction, digest, { store });
+    const viewWarnings = writeSnapshot(store, updated);
     const { projectState, bookState, loadWarnings } = visibleStates(store, updated, workspace, bookRoot, book);
     return {
       ok: true,
@@ -1500,7 +1516,7 @@ function commandCommit(workspace, bookRoot, book, inputPath) {
       replayed,
       item_ids: updated.applied_transactions[transaction.transaction_id].item_ids,
       summaries,
-      warnings: [...loadWarnings, ...queryBudgetWarnings(projectState, bookState)],
+      warnings: [...txWarnings, ...viewWarnings, ...loadWarnings, ...queryBudgetWarnings(projectState, bookState)],
       ...storeFields(store),
     };
   });
@@ -1525,8 +1541,8 @@ function commandRecord(workspace, bookRoot, book, inputPath) {
       operations: [event.operation],
     };
     const digest = transactionDigest(transaction);
-    const { updated, summaries, replayed } = applyTransaction(state, transaction, digest, { store });
-    writeSnapshot(store, updated);
+    const { updated, summaries, replayed, txWarnings } = applyTransaction(state, transaction, digest, { store });
+    const viewWarnings = writeSnapshot(store, updated);
     const record = updated.applied_transactions[transactionId];
     const itemIds = record.item_ids;
     const receipt = `Author Memory Receipt: r${record.revision} · ${itemIds.join(', ')}`;
@@ -1541,7 +1557,7 @@ function commandRecord(workspace, bookRoot, book, inputPath) {
       item_ids: itemIds,
       receipt,
       summaries,
-      warnings: [...loadWarnings, ...queryBudgetWarnings(projectState, bookState)],
+      warnings: [...txWarnings, ...viewWarnings, ...loadWarnings, ...queryBudgetWarnings(projectState, bookState)],
       ...storeFields(store),
     };
   });
@@ -1579,41 +1595,81 @@ function commandQuery(workspace, bookRoot, kinds, book, genre, workflow) {
   return result;
 }
 
-function checkStore(store) {
+function checkStore(store, { strict = false } = {}) {
   const state = loadState(store);
   requireCondition(state !== null, `${store.label} author memory is not initialized`);
-  const views = renderViews(state);
+  const { views, viewWarnings } = renderViews(state);
+  const driftWarnings = [];
   for (const [name, expected] of Object.entries(views)) {
     const viewPath = path.join(store.root, name);
-    requireCondition(exists(viewPath), `missing derived view: ${viewPath}`);
-    requireCondition(
-      fs.readFileSync(viewPath, 'utf8').replace(/\r\n/g, '\n') === expected,
-      `derived view is stale or edited: ${viewPath}`
-    );
+    if (!exists(viewPath)) {
+      if (strict) {
+        throw new AuthorMemoryError(`missing derived view: ${viewPath}`);
+      }
+      driftWarnings.push({
+        store: store.kind,
+        type: 'missing_view',
+        file: name,
+        path: viewPath,
+        message: `missing derived view: ${viewPath}（请询问作者：是否按 _author-memory-state.json 重建派生视图？）`,
+        prompt: '请询问作者：按 _author-memory-state.json 重建派生视图，还是补充对应事务？',
+      });
+      continue;
+    }
+    if (fs.readFileSync(viewPath, 'utf8').replace(/\r\n/g, '\n') !== expected) {
+      if (strict) {
+        throw new AuthorMemoryError(`derived view is stale or edited: ${viewPath}`);
+      }
+      driftWarnings.push({
+        store: store.kind,
+        type: 'view_drift',
+        file: name,
+        path: viewPath,
+        message:
+          `derived view is stale or edited: ${viewPath}（检测到手工修改或未同步视图；` +
+          '请询问作者：要将手工改动通过事务吸回作者记忆，还是按 _author-memory-state.json 重建？）',
+        prompt: '请询问作者：将手工改动吸回 _author-memory-state.json，还是按 JSON 重建派生视图？',
+      });
+    }
   }
   const counts = {};
   for (const status of STATUSES) {
     counts[status] = Object.values(state.items).filter((item) => item.status === status).length;
   }
-  return { revision: state.state_revision, counts };
+  return { revision: state.state_revision, counts, driftWarnings, viewWarnings };
 }
 
-function commandCheck(workspace, bookRoot, book) {
+function commandCheck(workspace, bookRoot, book, { strict = false } = {}) {
   prepareWorkspace(workspace, bookRoot);
   const project = projectStore(workspace);
   const result = { ok: true, command: 'check' };
+  const driftWarnings = [];
+  const viewWarnings = [];
   if (bookRoot) {
     const store = bookStore(workspace, bookRoot, book);
-    result.book = { name: store.book, root: store.root, ...checkStore(store) };
+    const checked = checkStore(store, { strict });
+    result.book = { name: store.book, root: store.root, revision: checked.revision, counts: checked.counts };
+    driftWarnings.push(...checked.driftWarnings);
+    viewWarnings.push(...checked.viewWarnings);
     if (exists(project.statePath)) {
-      result.project = { root: project.root, ...checkStore(project) };
+      const projChecked = checkStore(project, { strict });
+      result.project = { root: project.root, revision: projChecked.revision, counts: projChecked.counts };
+      driftWarnings.push(...projChecked.driftWarnings);
+      viewWarnings.push(...projChecked.viewWarnings);
     }
   } else {
-    result.project = { root: project.root, ...checkStore(project) };
+    const projChecked = checkStore(project, { strict });
+    result.project = { root: project.root, revision: projChecked.revision, counts: projChecked.counts };
+    driftWarnings.push(...projChecked.driftWarnings);
+    viewWarnings.push(...projChecked.viewWarnings);
   }
   const primary = result.project || result.book;
   result.revision = primary.revision;
   result.counts = primary.counts;
+  result.drift_warnings = driftWarnings;
+  if (viewWarnings.length) {
+    result.warnings = viewWarnings;
+  }
   return result;
 }
 
@@ -1778,6 +1834,7 @@ function parseCliArgs(argv) {
     kind: [],
     genre: null,
     workflow: null,
+    strict: false,
   };
   for (let i = 1; i < argv.length; i += 1) {
     const token = argv[i];
@@ -1795,6 +1852,8 @@ function parseCliArgs(argv) {
         args.book = readVal('--book');
       } else if ((command === 'commit' || command === 'record') && (token === '--input' || token.startsWith('--input='))) {
         args.input = readVal('--input');
+      } else if (command === 'check' && token === '--strict') {
+        args.strict = true;
       } else if (command === 'query' && (token === '--kind' || token.startsWith('--kind='))) {
         const val = readVal('--kind');
         if (!KINDS.includes(val)) {
@@ -1823,7 +1882,7 @@ function main(argv = process.argv.slice(2)) {
   const args = parseCliArgs(argv);
   if (args.help) {
     process.stdout.write(
-      'usage: node author_memory_commit.js {init,commit,record,query,migrate,check} --workspace DIR [--book-root DIR] [--book NAME] [--input FILE] [--kind KIND ...]\n'
+      'usage: node author_memory_commit.js {init,commit,record,query,migrate,check} --workspace DIR [--book-root DIR] [--book NAME] [--input FILE] [--kind KIND ...] [--strict]\n'
     );
     return 0;
   }
@@ -1851,7 +1910,7 @@ function main(argv = process.argv.slice(2)) {
     } else if (args.command === 'migrate') {
       result = commandMigrate(args.workspace, args.bookRoot, args.book);
     } else {
-      result = commandCheck(args.workspace, args.bookRoot, args.book);
+      result = commandCheck(args.workspace, args.bookRoot, args.book, { strict: args.strict });
     }
     emit(result);
     return 0;

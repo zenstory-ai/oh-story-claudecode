@@ -131,18 +131,40 @@ test("Codex pre-tool-prose-guard, commit advisory, session-start, compact, and s
     writeCleanState(path.join(root, "cwd-book"), 7)
     assert.equal(invoke("pre-tool-prose-guard", relPayload), "")
 
-    // apply_patch, existing rewrite, mismatch state
+    // apply_patch, existing rewrite, corrupt state (HARD) vs mismatch/jump/prior-toxic (SOFT)
     assertDenied(
       invoke("pre-tool-prose-guard", { tool_name: "apply_patch", tool_input: { command: "*** Begin Patch\n*** Add File: book/正文/第002章_新局.md\n+正文\n*** End Patch\n" } }),
       "apply_patch missing outline"
     )
     write(path.join(root, "book/正文/第009章_已存在.md"), "")
     assert.equal(invoke("pre-tool-prose-guard", { tool_name: "Write", tool_input: { file_path: "book/正文/第009章_已存在.md" } }), "")
-    write(path.join(root, "book/追踪/_tracking-state.json"), JSON.stringify({ schema_version: 4, state_revision: 1, last_committed_chapter: 0 }))
+
+    // Corrupt _tracking-state.json still hard-denies
+    write(path.join(root, "book/追踪/_tracking-state.json"), "{not-json\n")
     assert.match(
-      assertDenied(invoke("pre-tool-prose-guard", { tool_name: "Write", tool_input: { file_path: "book/正文/第009章_已存在.md" } }), "mismatch state"),
-      /mode=revision 事务重建派生视图/
+      assertDenied(invoke("pre-tool-prose-guard", { tool_name: "Write", tool_input: { file_path: "book/正文/第009章_已存在.md" } }), "corrupt state"),
+      /无法解析/
     )
+
+    // Manual 上下文.md revision mismatch is softened to non-blocking additionalContext (no permissionDecision:"deny")
+    write(path.join(root, "book/追踪/_tracking-state.json"), JSON.stringify({ schema_version: 4, state_revision: 1, last_committed_chapter: 0 }))
+    const mismatchOut = JSON.parse(invoke("pre-tool-prose-guard", { tool_name: "Write", tool_input: { file_path: "book/正文/第009章_已存在.md" } }))
+    assert.equal(mismatchOut.hookSpecificOutput?.hookEventName, "PreToolUse")
+    assert.equal(mismatchOut.hookSpecificOutput?.permissionDecision, undefined)
+    assert.match(mismatchOut.hookSpecificOutput?.additionalContext, /写正文前软门禁提醒/)
+    assert.match(mismatchOut.hookSpecificOutput?.additionalContext, /状态修订/)
+    writeCleanState(path.join(root, "book"), 1)
+
+    // Prior-chapter toxic prose & out-of-order chapter jump emit non-blocking additionalContext
+    write(path.join(root, "book/正文/第001章_旧.md"), "# 第1章\n声音不大，却带着一股狠劲。他声音不高，却压住了整间屋子。\n")
+    writeOutline(path.join(root, "book/大纲/细纲_第2章.md"))
+    const toxicOut = JSON.parse(invoke("pre-tool-prose-guard", { tool_name: "Write", tool_input: { file_path: "book/正文/第002章_新局.md" } }))
+    assert.equal(toxicOut.hookSpecificOutput?.permissionDecision, undefined)
+    assert.match(toxicOut.hookSpecificOutput?.additionalContext, /疑似 AI 毒句式/)
+    writeOutline(path.join(root, "book/大纲/细纲_第5章.md"))
+    const jumpOut = JSON.parse(invoke("pre-tool-prose-guard", { tool_name: "Write", tool_input: { file_path: "book/正文/第005章_跳章.md" } }))
+    assert.equal(jumpOut.hookSpecificOutput?.permissionDecision, undefined)
+    assert.match(jumpOut.hookSpecificOutput?.additionalContext, /有意跳章起草/)
     writeCleanState(path.join(root, "book"))
 
     // Short prose & story-import window
@@ -155,9 +177,13 @@ test("Codex pre-tool-prose-guard, commit advisory, session-start, compact, and s
     fs.mkdirSync(path.join(root, "拆文库/impbook"), { recursive: true })
     assert.equal(invoke("pre-tool-prose-guard", { tool_name: "Write", tool_input: { file_path: "impbook/正文/第1章_导入.md" } }), "")
     writeOutline(path.join(root, "impbook/大纲/细纲_第2章.md"))
-    write(path.join(root, "impbook/追踪/_tracking-state.json"), JSON.stringify({ schema_version: 4, state_revision: 1, last_committed_chapter: 1 }))
+    write(path.join(root, "impbook/追踪/_tracking-state.json"), "{corrupt-json\n")
     write(path.join(root, "impbook/追踪/上下文.md"), "> 状态修订：0\n")
-    assertDenied(invoke("pre-tool-prose-guard", { tool_name: "Write", tool_input: { file_path: "impbook/正文/第2章_导入后续.md" } }), "post-import invalid state")
+    assertDenied(invoke("pre-tool-prose-guard", { tool_name: "Write", tool_input: { file_path: "impbook/正文/第2章_导入后续.md" } }), "post-import corrupt state")
+    write(path.join(root, "impbook/追踪/_tracking-state.json"), JSON.stringify({ schema_version: 4, state_revision: 1, last_committed_chapter: 1 }))
+    const impSoftOut = JSON.parse(invoke("pre-tool-prose-guard", { tool_name: "Write", tool_input: { file_path: "impbook/正文/第2章_导入后续.md" } }))
+    assert.equal(impSoftOut.hookSpecificOutput?.permissionDecision, undefined)
+    assert.match(impSoftOut.hookSpecificOutput?.additionalContext, /状态修订/)
 
     // Bash mention vs write
     assert.equal(invoke("pre-tool-prose-guard", { tool_name: "Bash", tool_input: { command: "grep -n book/正文/第7章.md notes.md" } }), "")

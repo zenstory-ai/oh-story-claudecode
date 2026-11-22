@@ -174,9 +174,10 @@ class TrackingCommitTests(unittest.TestCase):
         command: str,
         document: dict[str, object] | None = None,
         *,
+        extra: list[str] | None = None,
         expect: int = 0,
     ) -> subprocess.CompletedProcess[str]:
-        args = [NODE, str(TOOL), command, "--project", str(self.project)]
+        args = [NODE, str(TOOL), command, "--project", str(self.project), *(extra or [])]
         if document is not None:
             document = json.loads(json.dumps(document, ensure_ascii=False))
             if command == "commit" and "expected_state_revision" not in document:
@@ -417,11 +418,12 @@ class TrackingCommitTests(unittest.TestCase):
 
         self.assertEqual(self.read_state()["state_revision"], 0)
         self.assertIn("状态修订：1", (self.project / "追踪/上下文.md").read_text(encoding="utf-8"))
+        # An orphaned future chapter delta from a crashed transaction is a hard integrity error (exit 2).
         self.run_tool("check", expect=2)
 
         self.run_tool("commit", document)
         self.assertEqual(self.read_state()["state_revision"], 1)
-        self.run_tool("check")
+        self.run_tool("check", extra=["--strict"])
 
     def test_stale_revision_cannot_overwrite_newer_state(self) -> None:
         self.init()
@@ -499,17 +501,28 @@ class TrackingCommitTests(unittest.TestCase):
 
         path = tracking / "角色状态/江晨.md"
         path.write_text("# 任意手改格式\n", encoding="utf-8")
-        result = self.run_tool("check", expect=2)
-        self.assertIn("derived view differs from _tracking-state.json", result.stderr)
+        # Default check softens manual edit to structured drift_warnings (exit 0) with author prompt.
+        soft = self.run_tool("check", expect=0)
+        payload = json.loads(soft.stdout)
+        self.assertEqual(len(payload["drift_warnings"]), 1)
+        self.assertEqual(payload["drift_warnings"][0]["type"], "view_drift")
+        self.assertIn("derived view differs from _tracking-state.json", payload["drift_warnings"][0]["message"])
+        self.assertIn("询问作者", payload["drift_warnings"][0]["prompt"])
+        # --strict explicitly enforces exit 2 on derived view drift.
+        strict_res = self.run_tool("check", extra=["--strict"], expect=2)
+        self.assertIn("derived view differs from _tracking-state.json", strict_res.stderr)
 
         self.run_tool("commit", transaction(2))
-        self.run_tool("check")
+        self.run_tool("check", extra=["--strict"])
 
     def test_check_rejects_orphan_character_file(self) -> None:
         self.init()
         orphan = self.project / "追踪/角色状态/CONFLICT.md"
         orphan.write_text("# orphan\n", encoding="utf-8")
-        result = self.run_tool("check", expect=2)
+        soft = self.run_tool("check", expect=0)
+        payload = json.loads(soft.stdout)
+        self.assertTrue(any(w["type"] == "character_files_drift" for w in payload["drift_warnings"]))
+        result = self.run_tool("check", extra=["--strict"], expect=2)
         self.assertIn("character snapshot files differ", result.stderr)
 
     def test_draft_prefills_current_context_so_only_the_delta_is_written(self) -> None:
@@ -856,11 +869,14 @@ class TrackingCommitTests(unittest.TestCase):
         document = transaction(1, foreshadow=True)
         document["delta"]["result"] = "江晨" * 100
         document["delta"]["foreshadow_changes"][0]["summary"] = "老兵" * 70
-        result = self.run_tool("commit", document, expect=2)
-        self.assertIn("2 个字段超长", result.stderr)
-        self.assertIn("delta.result exceeds 480 bytes（现 200 字，上限约 160 字，至少删 40 字）", result.stderr)
-        self.assertIn("summary exceeds 360 bytes（现 140 字，上限约 120 字，至少删 20 字）", result.stderr)
-        self.assertEqual(self.read_state()["last_committed_chapter"], 0)
+        result = self.run_tool("commit", document, expect=0)
+        payload = json.loads(result.stdout)
+        self.assertEqual(self.read_state()["last_committed_chapter"], 1)
+        self.assertIn("delta.result exceeds 480 bytes（现 200 字，建议上限约 160 字", result.stderr)
+        self.assertIn("summary exceeds 360 bytes（现 140 字，建议上限约 120 字", result.stderr)
+        self.assertTrue(any("delta.result exceeds 480 bytes" in w for w in payload["warnings"]))
+        self.assertTrue(any("summary exceeds 360 bytes" in w for w in payload["warnings"]))
+        self.run_tool("check", extra=["--strict"])
 
     def test_unknown_fields_are_rejected(self) -> None:
         invalid_init = initial_document()
@@ -1040,26 +1056,25 @@ class TrackingCommitTests(unittest.TestCase):
             document["character_snapshots"][name] = entry
         return document
 
-    def test_twenty_active_characters_pass_and_the_twenty_first_is_rejected_before_any_write(self) -> None:
-        result = self.run_tool("init", self.cast_document(21), expect=2)
-        self.assertIn("at most 20 names", result.stderr)
-        # 只允许留下加锁时建的空 追踪/ 目录。
-        self.assertFalse((self.project / "追踪/_tracking-state.json").exists())
-        self.assertFalse((self.project / "追踪/上下文.md").exists())
-        self.assertFalse((self.project / "追踪/角色状态").exists())
-
-        self.run_tool("init", self.cast_document(20))
-        context = (self.project / "追踪/上下文.md").read_text(encoding="utf-8")
-        self.assertIn("女主20｜", context)
-        self.run_tool("check")
+    def test_twenty_active_characters_pass_and_above_twenty_warns_without_blocking(self) -> None:
+        # >20 active characters and >6 constraints / >5 risks now emit structured warnings instead of hard exit 2.
+        over_init = self.cast_document(21)
+        over_init["context"]["long_term_constraints"] = [f"约束{i}" for i in range(7)]
+        over_init["context"]["continuity_risks"] = [f"风险{i}" for i in range(6)]
+        result = self.run_tool("init", over_init, expect=0)
+        payload = json.loads(result.stdout)
+        self.assertTrue(any("active_character_names has 21 names" in w for w in payload["warnings"]))
+        self.assertTrue(any("long_term_constraints has 7 items" in w for w in payload["warnings"]))
+        self.assertTrue(any("continuity_risks has 6 items" in w for w in payload["warnings"]))
+        self.run_tool("check", extra=["--strict"])
 
         overflow = transaction(1, character=True)
         overflow["context"]["active_character_names"] = self.read_state()["context"]["active_character_names"] + ["江晨"]
-        before = self.read_state()
-        result = self.run_tool("commit", overflow, expect=2)
-        self.assertIn("at most 20 names", result.stderr)
-        self.assertEqual(self.read_state(), before)
-        self.assertFalse((self.project / "追踪/逐章记录/第001章.md").exists())
+        overflow["context"]["long_term_constraints"] = self.read_state()["context"]["long_term_constraints"]
+        overflow["context"]["continuity_risks"] = self.read_state()["context"]["continuity_risks"]
+        commit_res = self.run_tool("commit", overflow, expect=0)
+        self.assertTrue(any("active_character_names has 22 names" in w for w in json.loads(commit_res.stdout)["warnings"]))
+        self.run_tool("check", extra=["--strict"])
 
     def test_existing_state_with_six_to_twenty_active_characters_still_checks_drafts_and_commits(self) -> None:
         # 旧版只收 6 人；作者改过脚本写下的 7–20 人 state，升级后必须照常 check / draft / commit。
@@ -1086,37 +1101,37 @@ class TrackingCommitTests(unittest.TestCase):
                 self.assertEqual(len(state["context"]["active_character_names"]), count)
                 self.run_tool("check")
 
-    def test_hot_context_byte_cap_still_rejects_a_full_cast_before_any_write(self) -> None:
-        result = self.run_tool("init", self.cast_document(20, long_fields=True), expect=2)
-        self.assertIn("hot context exceeds 12288 bytes", result.stderr)
-        self.assertFalse((self.project / "追踪/_tracking-state.json").exists())
-        self.assertFalse((self.project / "追踪/上下文.md").exists())
-        self.assertFalse((self.project / "追踪/角色状态").exists())
+    def test_hot_context_soft_warns_above_12kb_and_hard_rejects_above_64kb(self) -> None:
+        # >12288B hot context now succeeds with structured warning; >65536B safety cap hard-rejects before any write.
+        soft_res = self.run_tool("init", self.cast_document(20, long_fields=True), expect=0)
+        self.assertIn("hot context is", soft_res.stderr)
+        self.assertIn("12288 bytes", soft_res.stderr)
+        self.assertTrue(any("12288 bytes" in w for w in json.loads(soft_res.stdout)["warnings"]))
+        self.run_tool("check", extra=["--strict"])
 
-        self.run_tool("init", self.cast_document(20))
-        grown = transaction(1)
+        # >65536B hot context still hard-rejects before writing anything.
+        huge = transaction(1)
         names = self.read_state()["context"]["active_character_names"]
-        grown["context"]["active_character_names"] = names
-        grown["delta"]["character_changes"] = [{"name": name, "change": "心思写满"} for name in names]
-        grown["character_snapshots"] = {
-            name: {**snapshot(), "identity": "身" * 80, "state": "状" * 100, "goal": "目" * 100} for name in names
-        }
+        huge["context"]["active_character_names"] = names
+        huge["context"]["long_term_constraints"] = self.read_state()["context"]["long_term_constraints"] + [
+            "超长约束" * 2000 for _ in range(3)
+        ]
         before = self.read_state()
         context_before = (self.project / "追踪/上下文.md").read_bytes()
-        result = self.run_tool("commit", grown, expect=2)
-        self.assertIn("hot context exceeds 12288 bytes", result.stderr)
+        result = self.run_tool("commit", huge, expect=2)
+        self.assertIn("exceeds hard cap of 65536 bytes", result.stderr)
         self.assertEqual(self.read_state(), before)
         self.assertEqual((self.project / "追踪/上下文.md").read_bytes(), context_before)
         self.assertFalse((self.project / "追踪/逐章记录/第001章.md").exists())
 
     def test_snapshot_utf8_multibyte_boundary_and_list_item_limit(self) -> None:
         self.init()
-        # 列表单项允许 200 个中文字（600 UTF-8 字节），201 字报字数提示并不写盘。
-        too_long_item = transaction(1, character=True)
-        too_long_item["character_snapshots"]["江晨"]["abilities_resources"] = ["剑" * 201]
-        failed_item = self.run_tool("commit", too_long_item, expect=2)
-        self.assertIn("exceeds 600 bytes（现 201 字，上限约 200 字，至少删 1 字）", failed_item.stderr)
-        self.assertEqual(self.read_state()["state_revision"], 0)
+        # 列表单项 >600 字节降为 warning，不再阻断提交。
+        long_item = transaction(1, character=True)
+        long_item["character_snapshots"]["江晨"]["abilities_resources"] = ["剑" * 201]
+        warned_item = self.run_tool("commit", long_item, expect=0)
+        self.assertIn("exceeds 600 bytes（现 201 字，建议上限约 200 字", warned_item.stderr)
+        self.assertEqual(self.read_state()["state_revision"], 1)
 
         # 构造渲染后恰好 65536 UTF-8 字节（中文 3 字节 + ASCII 精确补齐）的快照：通过；再多 1 个汉字（+3 字节）即拒。
         base_snap = {
@@ -1129,33 +1144,32 @@ class TrackingCommitTests(unittest.TestCase):
             "knowledge": ["秘" * 10],
             "open_threads": ["债" * 10],
         }
-        probe = transaction(1, character=True)
+        probe = transaction(2, character=True)
         probe["character_snapshots"]["江晨"] = json.loads(json.dumps(base_snap, ensure_ascii=False))
         self.run_tool("commit", probe)
         current_bytes = len((self.project / "追踪/角色状态/江晨.md").read_bytes())
-        # 第 2 章提交时 revision 从 1 变成 2（位数相同，字节差仅来自新增列表项）。
+        # 第 3 章提交时 revision 从 2 变成 3（位数相同，字节差仅来自新增列表项）。
         remaining = 65536 - current_bytes
         exact_snap = json.loads(json.dumps(base_snap, ensure_ascii=False))
         while remaining > 603:
             exact_snap["knowledge"].append("剑" * 200)
             remaining -= 603
         self.assertGreater(remaining, 10)
-        # 最后一条 `- ` + payload + `\n` 增加 3 + byte_size(payload) 字节，且不超过单项 600 字节。
         payload_budget = remaining - 3
         cjk_count, ascii_rem = divmod(payload_budget, 3)
         exact_item = ("阵" * cjk_count) if ascii_rem == 0 else ("阵" * cjk_count + "A" * ascii_rem)
         exact_snap["knowledge"].append(exact_item)
-        exact_tx = transaction(2, character=True)
+        exact_tx = transaction(3, character=True)
         exact_tx["character_snapshots"]["江晨"] = exact_snap
         self.run_tool("commit", exact_tx)
         snapshot_file = self.project / "追踪/角色状态/江晨.md"
         self.assertEqual(len(snapshot_file.read_bytes()), 65536)
         self.assertLess(len(snapshot_file.read_text(encoding="utf-8")), 25000)
-        self.run_tool("check")
+        self.run_tool("check", extra=["--strict"])
 
         over_by_one_hanzi = json.loads(json.dumps(exact_snap, ensure_ascii=False))
         over_by_one_hanzi["open_threads"][0] = over_by_one_hanzi["open_threads"][0] + "多"
-        over_tx = transaction(3, character=True)
+        over_tx = transaction(4, character=True)
         over_tx["character_snapshots"]["江晨"] = over_by_one_hanzi
         before = self.read_state()
         rejected = self.run_tool("commit", over_tx, expect=2)
@@ -1163,7 +1177,7 @@ class TrackingCommitTests(unittest.TestCase):
         self.assertIn("exceeds hard cap of 65536 bytes", rejected.stderr)
         self.assertEqual(self.read_state(), before)
         self.assertEqual(len(snapshot_file.read_bytes()), 65536)
-        self.assertFalse((self.project / "追踪/逐章记录/第003章.md").exists())
+        self.assertFalse((self.project / "追踪/逐章记录/第004章.md").exists())
 
     def test_multi_character_accumulation_draft_files_revision_and_reactivation_across_copies(self) -> None:
         # 1. init 一次性汇总多字段超长，修正后导入含大快照与非在场核心角色的 60 章存量项目。
@@ -1180,10 +1194,9 @@ class TrackingCommitTests(unittest.TestCase):
             }
 
         bad_init = initial_document(last_chapter=60)
-        bad_init["book_title"] = "书" * 100
-        bad_init["context"]["position"]["scene"] = "场" * 100
+        bad_init["schema_version"] = 99
         bad_res = self.run_tool("init", bad_init, expect=2)
-        self.assertIn("2 个字段超长", bad_res.stderr)
+        self.assertIn("schema_version is unsupported", bad_res.stderr)
         self.assertFalse((self.project / "追踪/_tracking-state.json").exists())
 
         init_doc = initial_document(last_chapter=60)
@@ -1337,6 +1350,54 @@ class TrackingCommitTests(unittest.TestCase):
         self.assertEqual(doc["chapter_title"], "夜雨来客")
         leftovers = list(draft_path.parent.glob("*.tmp"))
         self.assertEqual(leftovers, [], f"atomic draft write left temp files: {leftovers}")
+
+    def test_delta_soft_warns_above_3kb_and_hard_rejects_above_64kb(self) -> None:
+        self.init()
+        over_3k = transaction(1)
+        over_3k["delta"]["result"] = "江" * 1200  # ~3600 bytes > 3072B
+        res = self.run_tool("commit", over_3k, expect=0)
+        payload = json.loads(res.stdout)
+        self.assertTrue(any("3072 bytes" in w for w in payload["warnings"]))
+        self.assertIn("WARNING: chapter delta is", res.stderr)
+        self.run_tool("check", extra=["--strict"])
+
+        over_64k = transaction(2)
+        over_64k["delta"]["result"] = "江" * 23000  # ~69000 bytes > 65536B
+        before = self.read_state()
+        rejected = self.run_tool("commit", over_64k, expect=2)
+        self.assertIn("exceeds hard cap of 65536 bytes", rejected.stderr)
+        self.assertEqual(self.read_state(), before)
+
+    def test_allow_gap_permits_intentional_out_of_order_append_while_default_guards_typos(self) -> None:
+        self.init()
+        self.run_tool("commit", transaction(1))
+        # Default append rejects chapter 3 after chapter 1 (typo protection).
+        blocked = self.run_tool("commit", transaction(3), expect=2)
+        self.assertIn("append chapter must be 2, got 3", blocked.stderr)
+        self.assertIn("--allow-gap", blocked.stderr)
+
+        # With --allow-gap, draft & commit for chapter 3 succeed with a clear gap warning.
+        draft3 = subprocess.run(
+            [NODE, str(TOOL), "draft", "--project", str(self.project), "--chapter", "3", "--allow-gap"],
+            text=True, capture_output=True, check=False, encoding="utf-8",
+        )
+        self.assertEqual(draft3.returncode, 0, draft3.stderr)
+        self.assertEqual(json.loads(draft3.stdout)["mode"], "append")
+
+        gap_commit = self.run_tool("commit", transaction(3), extra=["--allow-gap"], expect=0)
+        gap_payload = json.loads(gap_commit.stdout)
+        self.assertEqual(gap_payload["last_committed_chapter"], 3)
+        self.assertTrue(any("跳章提交" in w for w in gap_payload["warnings"]))
+
+        # Default check exits 0 with missing_delta drift warning; --strict fails exit 2.
+        soft_check = json.loads(self.run_tool("check", expect=0).stdout)
+        self.assertTrue(any(w["type"] == "missing_delta" and w["chapter"] == 2 for w in soft_check["drift_warnings"]))
+        self.run_tool("check", extra=["--strict"], expect=2)
+
+        # Backfilling skipped chapter 2 via --allow-gap restores strict check cleanliness.
+        backfill = self.run_tool("commit", transaction(2), extra=["--allow-gap"], expect=0)
+        self.assertEqual(json.loads(backfill.stdout)["last_committed_chapter"], 3)
+        self.run_tool("check", extra=["--strict"])
 
 
 if __name__ == "__main__":

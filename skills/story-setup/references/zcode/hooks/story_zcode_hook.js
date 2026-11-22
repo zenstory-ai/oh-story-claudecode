@@ -23,6 +23,8 @@ const {
   extractProseTargets,
   extractPatchTargets,
   proseBlockReason,
+  prosePreWriteWarnings,
+  formatPreWriteAdvisory,
   isProsePath,
   duplicateTitleFindings,
   proseAfterWrite,
@@ -162,6 +164,7 @@ function targetPaths(input) {
 
 function preToolProseGuard() {
   const root = projectRoot()
+  const warnings = []
   for (const target of targetPaths(hookInput)) {
     const reason = proseBlockReason(root, target)
     if (reason) {
@@ -174,7 +177,10 @@ function preToolProseGuard() {
       })
       return
     }
+    warnings.push(...prosePreWriteWarnings(root, target))
   }
+  const advisory = formatPreWriteAdvisory(warnings)
+  if (advisory) emit(hookContext("PreToolUse", advisory))
 }
 
 function preToolCommitAdvisory() {

@@ -410,7 +410,7 @@ test("cross-file parity with check-ai-patterns.js across all 6 toxic prose rules
     const parsed = JSON.parse(det.stdout)
     const detByKey = Object.fromEntries(Object.keys(cases).map((k) => [k, new Set()]))
     for (const finding of parsed.findings) {
-      if (finding.severity !== "blocking") continue
+      if (finding.severity !== "blocking" && finding.severity !== "review_required") continue
       if (!TOXIC_RULES.includes(finding.type)) continue
       const key = fileToKey.get(finding.file)
       if (key) detByKey[key].add(finding.type)
@@ -644,7 +644,7 @@ test("proseBlockReason, outlineIsEmpty, debt gate, trackingCheckpointIssue, and 
     assert.ok(!varReason.includes("缺少细纲"))
     assert.match(core.proseBlockReason(root, path.join(root, "$(pwd)/book/正文/第001章_y.md")), /未展开的 shell 变量/)
 
-    // Debt gate & exemption markers
+    // Prior-chapter toxic prose: softened from hard block to non-blocking pre-write advisory warning
     const debtCases = [
       ["debt", `# 第1章 旧\n\n${toxic}`, true],
       ["marker", `# 第1章 旧\n<!-- 去味:跳过 -->\n${toxic}`, false],
@@ -653,22 +653,31 @@ test("proseBlockReason, outlineIsEmpty, debt gate, trackingCheckpointIssue, and 
       ["bare", `# 第1章 旧\n去味:跳过\n${toxic}`, true],
       ["marker7", `# 第1章 旧\n1\n2\n3\n4\n5\n<!-- 去味:跳过 -->\n${toxic}`, true],
     ]
-    for (const [name, prevBody, shouldBlock] of debtCases) {
+    for (const [name, prevBody, shouldWarn] of debtCases) {
       const b = path.join(root, name)
       write(path.join(b, "大纲/细纲_第2章.md"), filled)
       write(path.join(b, "正文/第1章_旧.md"), prevBody)
       writeCleanState(b, 1)
-      const reason = core.proseBlockReason(root, path.join(b, "正文/第2章_新.md"))
-      assert.equal(Boolean(reason), shouldBlock, name)
-      if (shouldBlock) assert.match(reason, /未清毒句式欠账/)
+      const target = path.join(b, "正文/第2章_新.md")
+      assert.equal(core.proseBlockReason(root, target), null, `${name}: prior-chapter toxic prose must not hard-block`)
+      const warnings = core.prosePreWriteWarnings(root, target)
+      assert.equal(warnings.length > 0, shouldWarn, name)
+      if (shouldWarn) {
+        assert.match(warnings.join("\n"), /写前复核提醒.*疑似 AI 毒句式/)
+        assert.match(core.formatPreWriteAdvisory(warnings), /写正文前软门禁提醒/)
+      }
     }
 
-    // Debt > 6 hits points to chapter check for chapter 1
+    // Prior-chapter > 6 hits does not hard-block, and advisory points to chapter check for chapter 1
     const many = path.join(root, "many")
     write(path.join(many, "大纲/细纲_第2章.md"), filled)
     write(path.join(many, "正文/第1章_旧.md"), "# 第1章 旧\n" + Array.from({ length: 8 }, (_, i) => `声音不大，却带着第${i + 1}股狠劲。`).join("\n") + "\n他把门关上了。\n")
     writeCleanState(many, 1)
-    assert.match(core.proseBlockReason(root, path.join(many, "正文/第2章_新.md")), /另有 2 处，完整检查：node <story-long-write>\/scripts\/storyctl\.js chapter check --project <书目录> --chapter 1/)
+    assert.equal(core.proseBlockReason(root, path.join(many, "正文/第2章_新.md")), null)
+    assert.match(
+      core.prosePreWriteWarnings(root, path.join(many, "正文/第2章_新.md")).join("\n"),
+      /另有 2 处，完整检查：node <story-long-write>\/scripts\/storyctl\.js chapter check --project <书目录> --chapter 1/
+    )
 
     // Empty outline boundary: 29 vs 30 chars, BOM+CRLF, dup, heading content, non-UTF8 GBK
     const body29 = "他推门进屋看见师父坐在柜台后面他推门进屋看见师父"
@@ -692,7 +701,7 @@ test("proseBlockReason, outlineIsEmpty, debt gate, trackingCheckpointIssue, and 
       if (shouldBlock) assert.match(reason, /细纲_第001章\.md）是空的/)
     }
 
-    // Tracking checkpoint matrix
+    // Tracking checkpoint matrix: 100% deterministic integrity issues stay HARD; manual 上下文.md mismatch & chapter jump are SOFT
     const cp = path.join(root, "cp")
     fs.mkdirSync(path.join(cp, "missing/追踪"), { recursive: true })
     assert.match(core.trackingCheckpointIssue(path.join(cp, "missing"), true, null), /_tracking-state\.json 缺失/)
@@ -702,14 +711,46 @@ test("proseBlockReason, outlineIsEmpty, debt gate, trackingCheckpointIssue, and 
     write(path.join(cp, "old/追踪/_tracking-state.json"), JSON.stringify({ schema_version: 3, state_revision: 0, last_committed_chapter: 7 }))
     write(path.join(cp, "old/追踪/上下文.md"), "> 状态修订：0\n")
     assert.match(core.trackingCheckpointIssue(path.join(cp, "old"), true, null), /schema_version=4/)
+    write(path.join(cp, "badrev/追踪/_tracking-state.json"), JSON.stringify({ schema_version: 4, last_committed_chapter: 7 }))
+    assert.match(core.trackingCheckpointIssue(path.join(cp, "badrev"), true, null), /缺少整数 state_revision/)
+    write(path.join(cp, "badlast/追踪/_tracking-state.json"), JSON.stringify({ schema_version: 4, state_revision: 0 }))
+    assert.match(core.trackingCheckpointIssue(path.join(cp, "badlast"), true, 7), /缺少整数 last_committed_chapter/)
+
     writeCleanState(path.join(cp, "mismatch"), 7, 1, 0)
-    assert.match(core.trackingCheckpointIssue(path.join(cp, "mismatch"), true, null), /mode=revision 事务重建派生视图/)
+    write(path.join(cp, "mismatch/大纲/细纲_第8章.md"), filled)
+    assert.equal(core.trackingCheckpointIssue(path.join(cp, "mismatch"), true, null), null)
+    assert.equal(core.proseBlockReason(root, path.join(cp, "mismatch/正文/第8章_新.md")), null)
+    assert.match(core.inspectTrackingCheckpoint(path.join(cp, "mismatch"), true, null).warnings.join("\n"), /状态修订.*mode=revision 事务/)
+    assert.match(core.prosePreWriteWarnings(root, path.join(cp, "mismatch/正文/第8章_新.md")).join("\n"), /状态修订/)
+
     writeCleanState(path.join(cp, "behind"), 6, 0, 0)
-    assert.match(core.trackingCheckpointIssue(path.join(cp, "behind"), true, 7), /必须先提交第7章追踪事务/)
+    write(path.join(cp, "behind/大纲/细纲_第8章.md"), filled)
+    assert.equal(core.trackingCheckpointIssue(path.join(cp, "behind"), true, 7), null)
+    assert.equal(core.proseBlockReason(root, path.join(cp, "behind/正文/第8章_跳章.md")), null)
+    assert.match(core.inspectTrackingCheckpoint(path.join(cp, "behind"), true, 7).warnings.join("\n"), /有意跳章起草/)
+    assert.match(core.prosePreWriteWarnings(root, path.join(cp, "behind/正文/第8章_跳章.md")).join("\n"), /有意跳章起草/)
+
     writeCleanState(path.join(cp, "valid"), 7, 0, 0)
     assert.equal(core.trackingCheckpointIssue(path.join(cp, "valid"), true, 7), null)
+    assert.deepEqual(core.inspectTrackingCheckpoint(path.join(cp, "valid"), true, 7).warnings, [])
     writeCleanState(path.join(cp, "revised"), 9, 0, 0)
     assert.equal(core.trackingCheckpointIssue(path.join(cp, "revised"), true, 7), null)
+    assert.deepEqual(core.inspectTrackingCheckpoint(path.join(cp, "revised"), true, 7).warnings, [])
+
+    // hasHardProseFindings distinguishes hard degeneration/truncation from stylistic-only toxic findings
+    const hardBook = path.join(root, "hard-vs-style")
+    const pad = "雨落在旧瓦上，檐角的水沿着石阶往下淌，院门外传来车轮碾过碎石的轻响。".repeat(5)
+    write(path.join(hardBook, "设定.md"), "# 设定\n")
+    const styleOnlyFile = path.join(hardBook, "正文/第001章_纯风格.md")
+    write(styleOnlyFile, `# 第1章\n\n${pad}\n${toxic}\n他关上了门。\n`)
+    assert.equal(core.hasHardProseFindings(root, styleOnlyFile), false)
+    assert.match(core.proseAfterWrite(root, styleOnlyFile), /voice-contrast/)
+    const truncatedFile = path.join(hardBook, "正文/第002章_截断.md")
+    write(truncatedFile, `# 第2章\n\n${pad}\n他冲过去一拳砸在`)
+    assert.equal(core.hasHardProseFindings(root, truncatedFile), true)
+    const tinyFile = path.join(hardBook, "正文/第003章_极短.md")
+    write(tinyFile, "他推开门。\n")
+    assert.equal(core.hasHardProseFindings(root, tinyFile), true)
 
     // Hot context > 12288 bytes warning
     const hot = path.join(root, "hot")

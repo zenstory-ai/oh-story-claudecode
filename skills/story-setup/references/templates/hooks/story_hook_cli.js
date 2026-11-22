@@ -381,12 +381,22 @@ function handlePreToolProseGuard(core) {
       process.stderr.write(`${reason}\n`)
       process.exit(2)
     }
+    const advisory = core.formatPreWriteAdvisory(core.prosePreWriteWarnings(root, abs))
+    if (advisory) {
+      process.stdout.write(JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          additionalContext: advisory,
+        },
+      }) + "\n")
+    }
     return
   }
 
   const shellCommand = digCommand(obj)
   if (!shellCommand) return
   const seen = new Set()
+  const warnings = []
   for (const target of core.extractProseTargets(shellCommand)) {
     const abs = core.resolveTarget(root, target, base)
     if (seen.has(abs)) continue
@@ -396,6 +406,16 @@ function handlePreToolProseGuard(core) {
       process.stderr.write(`${reason}（已从 Bash 命令识别到正文写入目标。）\n`)
       process.exit(2)
     }
+    warnings.push(...core.prosePreWriteWarnings(root, abs))
+  }
+  const advisory = core.formatPreWriteAdvisory(warnings)
+  if (advisory) {
+    process.stdout.write(JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        additionalContext: advisory,
+      },
+    }) + "\n")
   }
 }
 

@@ -756,11 +756,16 @@ def main() -> None:
 
         profile = memory / "作者画像.md"
         profile.write_text(profile.read_text(encoding="utf-8") + "手工污染\n", encoding="utf-8")
-        check_error = run("check", "--workspace", str(workspace), expect=2)
+        # Default check emits drift_warnings (exit 0); --strict exits 2.
+        soft_check = json.loads(run("check", "--workspace", str(workspace)).stdout)
+        assert soft_check["ok"] is True and len(soft_check["drift_warnings"]) == 1
+        assert "stale or edited" in soft_check["drift_warnings"][0]["message"]
+        assert "询问作者" in soft_check["drift_warnings"][0]["prompt"]
+        check_error = run("check", "--workspace", str(workspace), "--strict", expect=2)
         assert "stale or edited" in check_error.stderr
         replay = commit(workspace, input_path, reinforce)
         assert json.loads(replay.stdout)["replayed"] is True
-        run("check", "--workspace", str(workspace))
+        run("check", "--workspace", str(workspace), "--strict")
         assert "手工污染" not in profile.read_text(encoding="utf-8")
 
         record_event = remember("conversation-message-42", preference(
@@ -905,18 +910,21 @@ def main() -> None:
         assert book_commit["store"] == "book" and book_commit["item_ids"] == ["BP001", "BP002"]
         assert state(book_root)["items"]["BP001"]["superseded_by"] == "BP002"
 
-        # check 同时核对两级；书级画像被手改能查出
+        # check 同时核对两级；书级画像被手改默认出 drift_warnings，--strict 才 exit 2
         checked = json.loads(run("check", "--workspace", str(workspace), "--book-root", str(book_root)).stdout)
         assert checked["project"]["revision"] == 14 and checked["book"]["revision"] == 2 and checked["book"]["name"] == "雾港来信"
+        assert checked["drift_warnings"] == []
         book_profile = book_memory / "作者画像.md"
         book_profile.write_text(book_profile.read_text(encoding="utf-8") + "手工污染\n", encoding="utf-8")
-        assert "stale or edited" in run("check", "--workspace", str(workspace), "--book-root", str(book_root), expect=2).stderr
+        book_soft = json.loads(run("check", "--workspace", str(workspace), "--book-root", str(book_root)).stdout)
+        assert len(book_soft["drift_warnings"]) == 1 and "stale or edited" in book_soft["drift_warnings"][0]["message"]
+        assert "stale or edited" in run("check", "--workspace", str(workspace), "--book-root", str(book_root), "--strict", expect=2).stderr
         assert json.loads(commit(workspace, input_path, transaction("tx-book-replace", 1, [{
             "action": "replace", "old_ids": ["BP001"],
             "preference": replacement("本书对话可以慢，但不拿台词讲设定", "改一下说法。", scope_level="book", scope_value="雾港来信"),
         }]), "--book-root", str(book_root)).stdout)["replayed"] is True, "幂等重放也要重写快照"
         assert len(state(book_root)["items"]) == 2, "重放不得派生条目"
-        run("check", "--workspace", str(workspace), "--book-root", str(book_root))
+        run("check", "--workspace", str(workspace), "--book-root", str(book_root), "--strict")
 
         # 书目录改名后书名以 state 为准，不受目录名影响
         renamed_root = workspace / "长篇" / "雾港来信（改名）"
@@ -1062,15 +1070,19 @@ def main() -> None:
         assert query(auto_workspace, "--kind", "story_design", "--genre", "甜宠")["items"] == []
         run("check", "--workspace", str(auto_workspace))
 
-        # 断言限一句话：新建条目超 120 字节直接拒（存量条目的强化不受此限，见下方用例）
+        # 断言超 120 字节降为软提醒（成功落盘并带 warning），不再阻断写入
         long_assertion = transaction(
             "tx-assertion-too-long",
             state(auto_workspace)["state_revision"],
-            [{"action": "remember", "preference": preference("长" * 45, "太长的断言应当拆条。")}],
+            [{"action": "remember", "preference": preference("长" * 45, "较长断言应给提醒而非硬拦。")}],
         )
-        error = commit(auto_workspace, input_path, long_assertion, expect=2)
-        assert "超出 120 字节上限" in error.stderr
-        assert "强化" in error.stderr, "报错要告诉 agent 重申老条目该怎么走"
+        long_res = json.loads(commit(auto_workspace, input_path, long_assertion).stdout)
+        assert long_res["ok"] is True
+        assert any("120 字节" in w for w in long_res["warnings"]), long_res["warnings"]
+        # 清理这条测试偏好，不影响后续预算提醒精确用例
+        commit(auto_workspace, input_path, transaction("tx-forget-long", state(auto_workspace)["state_revision"], [{
+            "action": "forget", "item_id": long_res["item_ids"][0], "quote": "撤回测试条", "reason": "cleanup",
+        }]))
 
         # 提醒制：把「正文初稿/续写」组合撑到超编的写入照常成功，回执带 warnings
         before_revision = state(auto_workspace)["state_revision"]
@@ -1221,8 +1233,51 @@ def main() -> None:
         profile_path = memory_dir(legacy_long_workspace) / "作者画像.md"
         profile_path.write_bytes(profile_path.read_text(encoding="utf-8").replace("\n", "\r\n").encode("utf-8"))
         run("check", "--workspace", str(legacy_long_workspace))
-        new_long = record(legacy_long_workspace, input_path, remember("legacy-new-long", preference(legacy_assertion + "再补一句。", "新的长断言。")), expect=2)
-        assert "超出 120 字节上限" in new_long.stderr, "新建条目仍受一句话上限约束"
+        new_long = json.loads(record(legacy_long_workspace, input_path, remember("legacy-new-long", preference(legacy_assertion + "再补一句。", "新的长断言。"))).stdout)
+        assert new_long["ok"] is True
+        assert any("120 字节" in w for w in new_long["warnings"]), "新建长断言应出软提醒而不阻断"
+
+        # ---- 软视图上限（>12KB 作者画像提醒放行）vs 64 KiB 安全硬上限（拒写零落盘） ----
+        soft_view_ws = Path(temporary) / "软视图工作区"
+        soft_view_ws.mkdir()
+        run("init", "--workspace", str(soft_view_ws))
+        big_batch = [
+            {"action": "remember", "preference": preference(
+                f"偏好{i:03d}：" + "叙" * 180,
+                f"原话{i}",
+            )}
+            for i in range(30)
+        ]
+        soft_view_res = json.loads(commit(soft_view_ws, input_path, transaction("tx-soft-profile", 0, big_batch)).stdout)
+        assert soft_view_res["ok"] is True
+        assert len((memory_dir(soft_view_ws) / "作者画像.md").read_bytes()) > 12288
+        assert any("12288 字节" in w for w in soft_view_res["warnings"]), soft_view_res["warnings"]
+        run("check", "--workspace", str(soft_view_ws), "--strict")
+
+        # 超过 65536 字节硬帽必须拒写且零改动
+        hit_hard_cap = False
+        for batch_idx in range(1, 6):
+            rev = state(soft_view_ws)["state_revision"]
+            extra_batch = [
+                {"action": "remember", "preference": preference(
+                    f"超限{batch_idx}-{i:03d}：" + "叙" * 200,
+                    f"原话{batch_idx}-{i}",
+                )}
+                for i in range(25)
+            ]
+            before_snap = snapshot(memory_dir(soft_view_ws))
+            write_json(input_path, transaction(f"tx-hard-{batch_idx}", rev, extra_batch))
+            res_proc = subprocess.run(
+                [NODE, str(TOOL), "commit", "--workspace", str(soft_view_ws), "--input", str(input_path)],
+                cwd=REPO, text=True, encoding="utf-8", capture_output=True, check=False,
+            )
+            if res_proc.returncode == 2:
+                assert "exceeds hard cap of 65536 bytes" in res_proc.stderr, res_proc.stderr
+                assert snapshot(memory_dir(soft_view_ws)) == before_snap
+                hit_hard_cap = True
+                break
+            assert res_proc.returncode == 0, res_proc.stderr
+        assert hit_hard_cap, "must eventually hit the 65536 bytes hard cap"
 
         assert_single_root_layout(Path(temporary), input_path)
         assert_book_dir_is_not_single_root(Path(temporary), input_path)

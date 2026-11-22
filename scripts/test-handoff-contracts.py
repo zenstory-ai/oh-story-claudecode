@@ -738,7 +738,7 @@ def check_import_short(repo: Repo) -> list[str]:
     with tempfile.TemporaryDirectory(prefix="import-short-") as tmp:
         (Path(tmp) / "设定.md").write_text(settings, encoding="utf-8")
         (Path(tmp) / "小节大纲.md").write_text(outline, encoding="utf-8")
-        run = subprocess.run([node, str(ROOT / PHASE2_CHECK), "--json", tmp],
+        run = subprocess.run([node, str(ROOT / PHASE2_CHECK), "--json", "--strict", tmp],
                              capture_output=True, encoding="utf-8")
     try:
         failed = {item["id"] for item in json.loads(run.stdout)["failures"]}
@@ -977,10 +977,10 @@ DESLOP_WRITER_CALLERS = (
 def check_deslop_handoff(repo: Repo) -> list[str]:
     failures: list[str] = []
     detector = repo.text(DESLOP_DETECTOR)
-    m = re.search(r"blocking by default[^(]*\(([^)]*)\)", detector)
+    m = re.search(r"severity:\s*(?:review_required|blocking by default)[^(]*\(([^)]*)\)", detector)
     blocking = {c.strip() for c in m.group(1).split("/")} if m else set()
     if not blocking:
-        failures.append(f"{DESLOP_DETECTOR}：读不出 blocking 类别清单")
+        failures.append(f"{DESLOP_DETECTOR}：读不出 review_required/blocking 类别清单")
     node = shutil.which("node")
     if node is None:
         print("跳过检测类别索引核对：没有 node")

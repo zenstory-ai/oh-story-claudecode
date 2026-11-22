@@ -171,6 +171,53 @@ try {
   assert.ok(!fs.existsSync(pending), "clean edit_file rewrite must clear pending findings")
   assert.deepEqual(invoke("pre-invocation", { invocationNum: 1 }).value, {})
 
+  // Stylistic-only findings (toxic phrases, >=200B, 0 degeneration): PreInvocation still reminds, Stop does NOT force continue
+  write(
+    "短篇/正文.md",
+    `# 标题\n\n${clean}\n声音不大，却带着一股狠劲。他声音不高，却压住了整间屋子。\n他关上了门。\n`
+  )
+  post = invoke("post-tool-use", {
+    toolCall: { name: "write_file", args: { Path: "短篇/正文.md" } },
+  })
+  assert.equal(post.raw, "{}")
+  assert.ok(fs.existsSync(pending), "stylistic findings must still surface on PreInvocation")
+  response = invoke("pre-invocation", { invocationNum: 1 }).value
+  assert.match(response.injectSteps[0].ephemeralMessage, /voice-contrast/)
+  response = invoke("stop", { fullyIdle: true, terminationReason: "model_stop" }).value
+  assert.equal(response.decision, "stop", "Stop must NOT force continue on stylistic-only findings")
+  // Clean up pending before next assertions
+  write("短篇/正文.md", `# 标题\n\n${clean}\n`)
+  invoke("post-tool-use", { toolCall: { name: "edit_file", args: { Path: "短篇/正文.md" } } })
+
+  // Long prose pre-tool-use: corrupt state still hard-denies; prior-chapter toxic / chapter jump / manual revision emit allow+reason
+  const longOutline = "# 细纲\n江晨在雨夜推开旧书店的门，发现柜台后坐着失踪三年的师父，两人对视良久。\n"
+  write("长书软门/大纲/细纲_第2章.md", longOutline)
+  write("长书软门/大纲/细纲_第5章.md", longOutline)
+  write("长书软门/正文/第1章_旧.md", "# 第1章\n声音不大，却带着一股狠劲。他声音不高，却压住了整间屋子。\n")
+  write("长书软门/追踪/_tracking-state.json", "{corrupt-json\n")
+  response = invoke("pre-tool-use", {
+    toolCall: { name: "write_file", args: { Path: "长书软门/正文/第2章_新.md" } },
+  }).value
+  assert.equal(response.decision, "deny", "corrupt _tracking-state.json must still hard-deny")
+  assert.match(response.reason, /无法解析/)
+
+  write("长书软门/追踪/_tracking-state.json", JSON.stringify({ schema_version: 4, state_revision: 1, last_committed_chapter: 1 }))
+  write("长书软门/追踪/上下文.md", "> 状态修订：0\n")
+  response = invoke("pre-tool-use", {
+    toolCall: { name: "write_file", args: { Path: "长书软门/正文/第2章_新.md" } },
+  }).value
+  assert.equal(response.decision, "allow", "soft gates must allow write with advisory reason")
+  assert.match(response.reason, /写正文前软门禁提醒/)
+  assert.match(response.reason, /状态修订/)
+  assert.match(response.reason, /疑似 AI 毒句式/)
+
+  write("长书软门/追踪/上下文.md", "> 状态修订：1\n")
+  response = invoke("pre-tool-use", {
+    toolCall: { name: "write_file", args: { Path: "长书软门/正文/第5章_跳章.md" } },
+  }).value
+  assert.equal(response.decision, "allow", "out-of-order chapter jump must allow write with advisory reason")
+  assert.match(response.reason, /有意跳章起草/)
+
   const currentAgentsVer = JSON.parse(
     fs.readFileSync(path.join(repo, "scripts/current-contract.json"), "utf8")
   ).agents_version

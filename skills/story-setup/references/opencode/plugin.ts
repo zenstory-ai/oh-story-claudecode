@@ -12,6 +12,8 @@ import {
   extractProseTargets,
   extractPatchTargets,
   proseBlockReason,
+  prosePreWriteWarnings,
+  formatPreWriteAdvisory,
   proseAfterWrite,
   isGitCommitCommand,
   stagedMarkdownWarnings,
@@ -223,6 +225,7 @@ export default {
     const directory = realpathBest(ctx.location.directory)
     const seenSessions = new Set<string>()
     const pendingCommitWarnings = new Map<string, string>()
+    const pendingPreWriteWarnings = new Map<string, string>()
 
     // 会话首轮模型请求前注入部署状态、当前书目上下文与连续性缺口提醒（子代理与同会话后续轮次跳过）。
     await ctx.session.hook("context", (event) => {
@@ -254,38 +257,47 @@ export default {
       if (targets.length === 0 && !isCommit) return
 
       const root = projectRoot(directory)
+      const callKey = typeof event.id === "string" && event.id ? event.id : "__default__"
       if (targets.length > 0) {
         const base = targetBase(root, directory, input)
+        const warnings: string[] = []
         for (const target of [...new Set(targets)]) {
-          const reason = proseBlockReason(root, resolveTarget(root, target, base))
+          const abs = resolveTarget(root, target, base)
+          const reason = proseBlockReason(root, abs)
           if (reason) {
             const source = event.tool === "shell" ? "已从 Shell 命令识别到正文写入目标。" : "已识别到正文写入目标。"
             throw new Error(`${reason}（${source}）`)
           }
+          warnings.push(...prosePreWriteWarnings(root, abs))
         }
+        const advisory = formatPreWriteAdvisory(warnings)
+        if (advisory) pendingPreWriteWarnings.set(callKey, advisory)
+        else pendingPreWriteWarnings.delete(callKey)
       }
 
       if (isCommit) {
-        const callKey = typeof event.id === "string" && event.id ? event.id : "__default__"
         const warning = stagedMarkdownWarnings(root)
         if (warning) pendingCommitWarnings.set(callKey, warning)
         else pendingCommitWarnings.delete(callKey)
       }
     })
 
-    // 正文落盘兜底与 git commit 暂存提醒：写正文后（含 write/edit/patch 与 shell 重定向）跑轻量确定性网
-    // （截断/拒绝语/工程词/复读 + 落盘/字数/标题去重），并把提交前捕获的暂存区警告（若 pre-commit
+    // 正文落盘兜底与 git commit / 写前软门禁提醒：写正文后（含 write/edit/patch 与 shell 重定向）跑轻量确定性网
+    // （截断/拒绝语/工程词/复读 + 落盘/字数/标题去重），并把写前软门禁提醒与提交前捕获的暂存区警告（若 pre-commit
     // 未输出过）追加进工具返回内容让模型读到。非目标调用、无发现一律不动结果（静默放行）。
     await ctx.tool.hook("execute.after", (event) => {
       const callKey = typeof event.id === "string" && event.id ? event.id : "__default__"
       const commitWarning = pendingCommitWarnings.get(callKey) ?? ""
       pendingCommitWarnings.delete(callKey)
+      const preWriteWarning = pendingPreWriteWarnings.get(callKey) ?? ""
+      pendingPreWriteWarnings.delete(callKey)
       if (event.status !== "completed") return
       const input = asInput(event.input)
       const targets = proseTargets(event.tool, input)
-      if (targets.length === 0 && !commitWarning) return
+      if (targets.length === 0 && !commitWarning && !preWriteWarning) return
       try {
         const notes: string[] = []
+        if (preWriteWarning) notes.push(preWriteWarning)
         if (targets.length > 0) {
           const root = projectRoot(directory)
           const base = targetBase(root, directory, input)

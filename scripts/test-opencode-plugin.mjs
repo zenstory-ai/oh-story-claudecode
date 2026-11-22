@@ -172,16 +172,43 @@ try {
 
   fs.writeFileSync("book/正文/第002章_续写.md", "已有正文。\n", "utf8");
   await before("edit", { path: "book/正文/第002章_续写.md" });
+  // 损坏的 _tracking-state.json（100% 确定性错误）仍须硬拦
+  fs.writeFileSync("book/追踪/_tracking-state.json", "{corrupt-json\n", "utf8");
+  await assert.rejects(
+    () => before("edit", { path: "book/正文/第002章_续写.md" }),
+    /无法解析/,
+    "corrupt _tracking-state.json must still hard-block"
+  );
+  // 手工修改 上下文.md 导致状态修订不一致：软门禁放行（不 throw），并在 execute.after 附上非阻断提醒
   fs.writeFileSync(
     "book/追踪/_tracking-state.json",
     JSON.stringify({ schema_version: 4, state_revision: 1, last_committed_chapter: 0 }) + "\n",
     "utf8"
   );
-  await assert.rejects(
-    () => before("edit", { path: "book/正文/第002章_续写.md" }),
-    /mode=revision 事务重建派生视图/,
-    "existing prose revision must be blocked while derived state is inconsistent"
+  await before("edit", { path: "book/正文/第002章_续写.md" });
+  const revAfterOutput = await after("edit", { path: "book/正文/第002章_续写.md" }, "edit complete");
+  assert.match(revAfterOutput, /写正文前软门禁提醒/);
+  assert.match(revAfterOutput, /状态修订/);
+
+  // 上一章疑似毒句式 + 跳章首建：均软门禁放行（不 throw），并在 execute.after 附上提醒
+  writeCleanState("book", 1);
+  fs.writeFileSync(
+    "book/正文/第001章_开局.md",
+    `${"街灯一盏盏亮起。".repeat(30)}\n声音不大，却带着一股狠劲。他声音不高，却压住了整间屋子。\n他把门关上了。\n`,
+    "utf8"
   );
+  fs.writeFileSync("book/大纲/细纲_第6章.md", "# 细纲\n江晨在雨夜推开旧书店的门，发现柜台后坐着失踪三年的师父，两人对视良久。\n", "utf8");
+  await before("write", { path: "book/正文/第006章_跳章.md" });
+  const jumpAfterOutput = await after("write", { path: "book/正文/第006章_跳章.md" }, "write complete");
+  assert.match(jumpAfterOutput, /写正文前软门禁提醒/);
+  assert.match(jumpAfterOutput, /有意跳章起草/);
+  fs.writeFileSync("book/大纲/细纲_第2章.md", "# 细纲\n江晨在雨夜推开旧书店的门，发现柜台后坐着失踪三年的师父，两人对视良久。\n", "utf8");
+  fs.unlinkSync("book/正文/第002章_续写.md");
+  await before("write", { path: "book/正文/第002章_续写.md" });
+  const toxicAfterOutput = await after("write", { path: "book/正文/第002章_续写.md" }, "write complete");
+  assert.match(toxicAfterOutput, /写正文前软门禁提醒/);
+  assert.match(toxicAfterOutput, /疑似 AI 毒句式/);
+  fs.writeFileSync("book/正文/第002章_续写.md", "已有正文。\n", "utf8");
   writeCleanState("book", 3);
 
   await assert.rejects(
