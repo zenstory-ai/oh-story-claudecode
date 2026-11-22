@@ -29,7 +29,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ### Phase 1：读原文与三层扫描
 
-从正文路径确定书目录和篇幅：单个 `正文.md` 一般是短篇，`正文/` 下逐章文件一般是长篇；优先采用作者与项目的明确说明；短篇另读 [references/short-deslop.md](references/short-deslop.md) 的卖点保护。按开头的文风裁决读本书要求，通读本次正文，按需查相关前文和已定设计，不整读无关全书。资料缺失时继续有依据的部分，标明未知。本次涉及多章时，逐章完成 Phase 1–4 再进下一章，交给写手时每章派一次。
+从正文路径确定书目录和篇幅：单个 `正文.md` 一般是短篇，`正文/` 下逐章文件一般是长篇；优先采用作者与项目的明确说明；短篇另必读 [references/short-deslop.md](references/short-deslop.md)，其规则覆盖表优先于下方三份通用方法与词表的长篇默认值。按开头的文风裁决读本书要求，通读本次正文，按需查相关前文和已定设计，不整读无关全书。资料缺失时继续有依据的部分，标明未知。本次涉及多章时，逐章完成 Phase 1–4 再进下一章，交给写手时每章派一次。
 
 默认完整读取以下三份方法后扫描；明确限定范围时按 [references/deslop-gates.md](references/deslop-gates.md) 选择需要的方法：
 
@@ -39,10 +39,10 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | [references/narrative-focus.md](references/narrative-focus.md) | 场景作用、详略、关键过程与细节功能 |
 | [references/story-logic.md](references/story-logic.md) | 行为、因果、立场、变化、后果与知情顺序 |
 
-本地正文先运行确定性预检，只报告不改写。下列命令均从本 skill 根执行，正文参数使用绝对路径：
+本地正文先运行确定性预检，只报告不改写（单个短篇 `正文.md` 自动走 short 模式，非 `正文.md` 的短篇文件加 `--mode=short`）。下列命令均从本 skill 根执行，正文参数使用绝对路径：
 
 ```bash
-node scripts/check-ai-patterns.js --check --fail-on=review_required <正文文件...>
+node scripts/check-ai-patterns.js --check --fail-on=review_required [--mode=short] <正文文件...>
 ```
 
 脚本命中是定位线索，零命中不代替三层扫描。每类提示归哪层、判断什么，见 expression.md 末节的索引；风格规则高风险命中标为 `review_required`（重点复核：优先改写，确为剧情需要可说明理由保留或登记白名单），`advisory` 回到语境判断，不为归零机械改稿。完整词条仅在需要定位某种表达时查 [references/banned-words.md](references/banned-words.md)。
@@ -89,10 +89,10 @@ node scripts/check-ai-patterns.js --check --fail-on=review_required <正文文�
 
 对照改前原稿、已定设计和授权，回读完整场景：事实、人物选择、因果、情绪承接、空间方向和悬念是否保住，详写重心是否恢复，有没有引入新套式或新的剧情依据。三层各自复核；信息齐全却仍逐项播报、对白仍像提纲时，表达检查不算完成，脚本不能替代这一遍。
 
-文件改稿保存后先复扫：
+文件改稿保存后先复扫（短篇 `正文.md` 自动走 short 模式，其他短篇文件加 `--mode=short`）：
 
 ```bash
-node scripts/check-ai-patterns.js --check --fail-on=review_required <正文文件...>
+node scripts/check-ai-patterns.js --check --fail-on=review_required [--mode=short] <正文文件...>
 node scripts/check-degeneration.js --check --fail-on=blocking <正文文件...>
 ```
 
@@ -103,10 +103,10 @@ node scripts/check-degeneration.js --check --fail-on=blocking <正文文件...>
 语义改完、复扫无硬阻断后再整理标点。整份文件的完整去味默认整理；只改指定段落或问题时不跑，在范围内人工整理，范围外问题只作提示：
 
 ```bash
-node scripts/normalize-punctuation.js <正文文件...>
+node scripts/normalize-punctuation.js [--mode=short] <正文文件...>
 ```
 
-标点脚本保留引号、系统面板 `【…】` 与叙述旁白里的标准省略号 `……`（把非标省略号规整为 `……`）及对话引号内的破折号（统一成 `——`），把白名单以外的旁白破折号、双连字符换成逗号、句号、冒号或删去，并删除独立分隔线；不动问号和感叹号，默认不改引号。仅作者或项目明确要求时才加 `--quote-mode curly`、`--quote-mode ascii` 或 `--quote-mode yan`。白名单登记按文风裁决文件执行，不因脚本报警自行放行。
+标点脚本保留引号、系统面板 `【…】` 与叙述旁白里的标准省略号 `……`（把非标省略号规整为 `……`）及对话引号内的破折号（统一成 `——`）；长篇把白名单以外的旁白破折号、双连字符换成逗号、句号、冒号或删去，短篇（`正文.md` 自动或 `--mode=short`）保留叙述旁白里的标准 `——` 并将非标破折号规整为 `——`，均删除独立分隔线；不动问号和感叹号，默认不改引号。仅作者或项目明确要求时才加 `--quote-mode curly`、`--quote-mode ascii` 或 `--quote-mode yan`。白名单登记按文风裁决文件执行，不因脚本报警自行放行。
 
 完成一次改稿与复扫；仅为新发现的具体问题继续修补，全文扫描最多三轮。没有新问题即停，达到上限仍未解决的列入报告。脚本不可用时如实说明，继续可完成的语义检查，不宣称已通过。
 

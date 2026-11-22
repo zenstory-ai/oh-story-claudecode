@@ -69,8 +69,9 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 |---|---|
 | 通用内容评分 rubric | `story-review/references/quality-rubric.md` |
 | 去 AI 味方法 | `story-review/references/expression.md` · `story-review/references/narrative-focus.md` · `story-review/references/story-logic.md` |
+| 短篇卖点保护与覆盖 | `story-review/references/short-deslop.md` |
 | 词句信号索引 | `story-review/references/banned-words.md` |
-| 平台 rubric | `story-review/references/rubrics/{fanqie,qidian,zhihu}.md` |
+| 平台 rubric | `story-review/references/rubrics/{fanqie,qidian,zhihu,short-shuang}.md` |
 | 标点预检脚本 | `story-review/scripts/normalize-punctuation.js` |
 | AI句式预检脚本 | `story-review/scripts/check-ai-patterns.js` |
 
@@ -84,30 +85,31 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 - 任务卡点：角色办事被卡住时，是否卡出信息、关系、代价、选择或伏笔变化；卡点只剩流程细节、删掉不影响故事至少 S3。
 - 情绪曲线：是否有铺垫、升温、释放或反转；情绪平直或突兀至少 S2/S3。
 - 钩子与期待：开头或结尾是否制造后续问题；没有悬念或未完成期待至少 S2。
-- 开头新鲜度（仅开篇/前 3 章）：开局是否有具体人物/处境切口而非同题材默认套路；套路化开局即使有钩子也至少 S3，整体撞同题材模板 S2。
+- 开头新鲜度（仅开篇/前 3 章）：长篇开局须有具体人物/处境切口，撞同题材模板 S2、套路化至少 S3；短篇商业爆款套路开局只要赌注具体即豁免。
 - 角色动机：行为是否符合目标、性格、处境和关系压力；为剧情服务而失真是 S1/S2。
-- 对话质量：是否有潜台词、信息控制、角色差异；说明书式对话至少 S2。
+- 对话质量：有信息控制与角色差异（长篇重潜台词；短篇强冲突场允许直球摊牌、狠话与围观烘托）；说明书式对话至少 S2。
 - 设定一致性：不违背已写规则、时间线、角色属性；明确事实冲突通常 S1。
-- 文字自然度：具体、可感，直写情绪、算账判断、台词与有后果动作四条通道按需选用；AI 腔、陈词滥调、总结体或无后果手眼/道具微动作代偿情绪按影响定 S2/S3。
-- 句长节奏：按本书文风、语义承接与场景功能判断（区分意思走完的一句一段与三五字切碎的残句）；机械碎句、动作清单或臃肿长句按影响定 S3/S2。
-- 标点节奏：标点服务语气与声线（对话内 `——` 与有节制的 `……` 可用）；通篇句号化、随机堆砌问号/感叹号，或旁白未入白名单的 `——` 及 `……` 刷屏，按影响定 S3/S2。
+- 文字自然度：具体、可感，直写情绪、算账判断、台词与有后果动作四条通道按需选用（短篇常见反应短语、旁白剧透与主观审判按 `short-deslop.md` 保留）；AI 腔、陈词滥调、总结体或无后果手眼/道具微动作代偿按影响定 S2/S3。
+- 句长节奏：贴合本书文风与手机节奏（短篇允许竖屏一句一段与短句快切，不强求合长复句）；机械碎句、动作清单或臃肿长句按影响定 S3/S2。
+- 标点节奏：标点服务语气与声线（对话内 `——`、有节制 `……`，及短篇旁白转折 `——` 与高频 `！`/`？` 可用）；通篇句号化、随机堆砌，或长篇旁白未授权 `——` 及 `……` 刷屏，按影响定 S3/S2。
 - 具体字数表达校验：正文用“这五个字 / 短短四字”等具体字数评价台词、题字、信件、念头或弹幕时，须确认统计口径正确且有叙事必要；无法确认时按文字自然度问题处理，建议改成“这句话一落”“那几个字”等非具体数字表达。
 - 格式可读性：段落短、对话独立、无多余空行；格式阻碍阅读按 S3，严重混乱按 S2。
 - 剧情循环：目标 → 阻碍/变数 → 行动 → 代价/反馈 → 新期待；紧章缺少目标/阻碍/反馈通常至少 S2，松的章/过渡章至少交代目标、行动与状态变化。
 - 高潮构建：有高潮的章检查蓄能、情绪落差与兑现（强反转可用蓄能 → 假胜 → 崩解 → 反转/兑现），缺铺垫或兑现通常 S2/S3；细纲标明无高潮的松章看功能是否落地。
-- 关系进展：互动尺度必须匹配当前关系阶段；越界亲密、突然信任、突然敌对都需要铺垫，否则按影响定 S1/S2。
+- 关系进展：互动尺度匹配当前关系阶段，无触发跳变按影响定 S1/S2（短篇受篇幅限制，有明确触发事件即可快速决裂/翻脸/结盟）。
 - 伏笔状态：伏笔状态需可追踪；伏笔密度只作为结构风险提示，除非直接造成理解混乱，否则不升级到 S2+。
 
 三层去味 fallback 速查：
-- 表达：套词、总结句、工整句式是否机械复现或重复意思？词语本身只是线索，直写情绪、纠错对比与文风允许的叙述可保留。
-- 用笔：关键交锋或决定是否被概括，次要流程是否过详？压缩、展开均应保住人物体验和必要承接。
-- 故事：行动有什么来由、解决依据从何而来、前后改变了什么？安静场景可承载关系与认知变化，不强求冲突。
+- 表达：套词、总结句、工整句式是否机械复现或重复意思？短篇保留竖屏一句一段、口语吐槽、常见情绪反应短语与旁白转折 `——`。
+- 用笔：关键交锋或决定是否被概括，次要流程是否过详？短篇保留冷开场与快进节奏，不补慢热环境。
+- 故事：行动有什么来由、解决依据从何而来、前后改变了什么？短篇保留偷听、自爆、围观打脸等引擎，除悬疑外不按办案标准抠取证。
 - 处理原则：有原文证据才输出 finding，指出哪里影响读感、最小建议与资料限制；只报告，不落改，不默认拆短、加动作或新增剧情。
 
 平台 fallback 摘要（叠加在通用 rubric 上）：
 - 番茄长篇：强开局、强冲突、高频爽点/情绪反馈、低理解门槛。
 - 起点长篇：设定自洽、升级路径、长线期待、世界观承载力。
-- 短篇：开头钩子、反转有铺垫、情绪兑现、信息差推进。
+- 知乎盐言短篇：高密度导语、第一人称吐槽/信息差、30–40% 付费折页张力、竖屏短段、反转或痛快落点。
+- 商业短篇（番茄/七猫/黑岩/小程序/点众）：冷开场百字入冲突、竖屏一句一段与高对话占比、30–40% 付费强卡点、40%+ 连环反击、明账清算收尾。
 
 ---
 
@@ -132,15 +134,16 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
      | 长篇 | 起点 | `story-review/references/rubrics/qidian.md` |
      | 长篇 | 番茄 | `story-review/references/rubrics/fanqie.md` |
      | 长篇 | 晋江、其他、未定、没写 | 不叠加 |
-     | 短篇 | 知乎盐言（也写作盐选）、番茄、七猫、黑岩、小程序、未定、没写 | `story-review/references/rubrics/zhihu.md` |
+     | 短篇 | 知乎盐言（也写作盐选） | `story-review/references/rubrics/zhihu.md` |
+     | 短篇 | 番茄、七猫、黑岩、小程序、点众、未定、没写 | `story-review/references/rubrics/short-shuang.md` |
 
-   - 短篇另按 `设定.md`「平台基调」核对格式、引号和导语。
+   - 短篇同时必读 `story-review/references/short-deslop.md`（覆盖通用去味与词表默认值），并按 `设定.md`「平台基调」核对格式、引号和导语。
    - 在「这次怎么审的」里用白话说明按通用网文标准及叠加的平台要求（若有）审查。
-5. **形成审查基准包摘要**：把已加载的文件内容或内置 fallback 摘要压缩为 5-12 条审查标准，供后续 solo 和子 Agent 共用（保留剧情循环、高潮构建、关系进展、连贯句段反电报碎句各一条，审第 1-3 章时再加开头新鲜度）。
-6. **确定性预检（只报告，不修改）**：当审查范围包含本地正文文件路径时，运行本 skill 自带脚本：
+5. **形成审查基准包摘要**：把已加载的文件内容或内置 fallback 摘要压缩为 5-12 条审查标准，供后续 solo 和子 Agent 共用（保留剧情循环、高潮构建、关系进展、连贯句段反电报碎句各一条；长篇审第 1-3 章加开头新鲜度，短篇纳入 `short-deslop.md` 覆盖项）。
+6. **确定性预检（只报告，不修改）**：当审查范围包含本地正文文件路径时，运行本 skill 自带脚本（短篇 `正文.md` 自动走 short 模式，非 `正文.md` 的短篇文件加 `--mode=short`）：
    ```bash
-   node scripts/normalize-punctuation.js --check <正文文件...>
-   node scripts/check-ai-patterns.js --check --fail-on=review_required <正文文件...>
+   node scripts/normalize-punctuation.js --check [--mode=short] <正文文件...>
+   node scripts/check-ai-patterns.js --check --fail-on=review_required [--mode=short] <正文文件...>
    node scripts/check-degeneration.js --check <正文文件...>
    ```
    - `ellipsis`、`double-hyphen`、`markdown-divider` 归入 `format` findings；旁白引号外的 `em-dash` 只采用 `check-ai-patterns.js` 的语义改写建议（去重丢弃 `normalize-punctuation.js` 同位置的 `em-dash`；对话引号内被打断或拖音的 `——` 不报错）；默认 `--quote-mode keep`。另人工检查标点节奏是否通篇句号化或随机堆砌。
