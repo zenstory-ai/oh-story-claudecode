@@ -40,7 +40,7 @@ Hook 依赖 PATH 中的 `node`。部署后新开一个会话，可从项目目�
 
 在 Plugin Management 中添加本仓库并安装 `oh-story`，即可调用全部 14 个 Skills/Commands。市场名可能显示 `oh-story-zcode`（根 catalog）或 `oh-story-skills`（Claude catalog），任选一个即可，内容相同；旧版多条目安装按[升级指南](../skills/story-setup/UPGRADING.md#插件打包身份迁移v079-同版本修复)迁移。
 
-`$story-setup` 选择 `target_cli=zcode` 会部署 `.zcode/skills/`、`.zcode/commands/`、`.zcode/hooks/story_zcode_hook.js`，并合并 `.zcode/config.json` 与根 `AGENTS.md`；Hook 依赖 PATH 中的 `node`。注意：ZCode 3.7+ 出于安全限制会忽略项目级 `.zcode/config.json` 里的 `hooks`（`config_project_hooks_ignored`），写前守卫与写后检查须启用 `oh-story` 插件（或手动将 `hooks` 合入用户级 `~/.zcode/cli/config.json`）才会在运行时执行。
+`$story-setup` 选择 `target_cli=zcode` 会部署 `.zcode/skills/`、`.zcode/commands/`、`.zcode/hooks/{story_zcode_hook.js,story_hook_core.js}`，并合并 `.zcode/config.json` 与根 `AGENTS.md`；Hook 依赖 PATH 中的 `node`。注意：ZCode 3.7+ 出于安全限制会忽略项目级 `.zcode/config.json` 里的 `hooks`（`config_project_hooks_ignored`），写前守卫与写后检查须启用 `oh-story` 插件（或手动将 `hooks` 合入用户级 `~/.zcode/cli/config.json`）才会在运行时执行。
 
 当前 ZCode 支持插件子代理，`oh-story` 插件注册了 7 个专业角色（默认带 `injectAgentsMd: false`，避免把顶层 `AGENTS.md` 重复注入子代理），按当前 `Agent` 工具派发，只有角色或工具不可用时才降级。独立安装 Skills 不会注册这些角色，需启用插件；部署不创建 `.zcode/agents/`，也不写入用户主目录。升级插件后重跑 `$story-setup` 刷新项目快照与旧 AGENTS 指令，再新开会话。现有 Hook 适配不注册 `PreCompact` / `SessionEnd`，压缩后由 `SessionStart` 恢复上下文。详见 [ZCode 插件](https://zcode.z.ai/en/docs/plugin)与[子代理文档](https://zcode.z.ai/en/docs/subagents)。
 

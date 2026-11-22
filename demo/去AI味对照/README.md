@@ -3,7 +3,7 @@
 [English](README_EN.md)
 
 `story-deslop` 的本地检查是**写作 lint**：逐条匹配已知的 AI 句式模板，给出行号、命中片段和改写方向。
-blocking 项阻断，advisory 项交人工判断。
+`review_required` 项需复核（改写或附明确理由保留；加 `--fail-on=review_required` 时返回 exit 1），`advisory` 项交人工判断。
 
 本目录三个文件：
 
@@ -16,20 +16,20 @@ blocking 项阻断，advisory 项交人工判断。
 复现命令：
 
 ```bash
-node skills/story-deslop/scripts/check-ai-patterns.js --check --fail-on=blocking demo/去AI味对照/改前.md
+node skills/story-deslop/scripts/check-ai-patterns.js --check --fail-on=review_required demo/去AI味对照/改前.md
 ```
 
-## 扫描「改前.md」：8 处命中（3 blocking / 5 advisory），exit 1
+## 扫描「改前.md」：8 处命中（3 review_required / 5 advisory），exit 1
 
 ```
 改前.md:3:1: [advisory] cliche-density-tic: 套词密度过高：高危 AI 套词 8 处（24.9/千字）；不要同义词轮换，直接删或改成直白情绪、角色利害判断、对话或具体后果，别硬塞手眼小动作。 (仿佛 一丝 深吸一口气 缓缓 微微)
-改前.md:7:20: [blocking] em-dash: 叙述旁白不用破折号，按功能改写：打断→动作或抢白，停顿→逗号或省略，插入说明→逗号/冒号；勿一律改句号。 (么叫做命运的安排——不是巧合，而是一)
+改前.md:7:20: [review_required] em-dash: 叙述旁白不用破折号，按功能改写：打断→动作或抢白，停顿→逗号或省略，插入说明→逗号/冒号；勿一律改句号。 (么叫做命运的安排——不是巧合，而是一)
 改前.md:7:22: [advisory] not-is-comparison: 高频 AI 对比句式；删掉否定铺垫，直接写后项（直白情绪、判断、对话或具体细节皆可）。 (不是巧合，而是一种冥冥之中的注定)
 改前.md:11:1: [advisory] negation-parade: 否定排比：「没有X，没有Y…」/「没X，没有Y，只是Z」是 AI 高频排比模板；删掉否定清单，直接写现场实际有什么，最多留一个最有信息量的否定。 (没有犹豫，没有生涩，)
 改前.md:19:3: [advisory] voice-contrast: 音量反差腔：「声音不大/不高…却/但…」是 AI 高频反差模板；删掉音量铺垫，直接写台词分量、利害后果或在场者的立场反应。 (声音不大，却)
 改前.md:21:2: [advisory] not-is-comparison: 高频 AI 对比句式；删掉否定铺垫，直接写后项（直白情绪、判断、对话或具体细节皆可）。 (不是一次简单的弹奏，而是一场蓄谋已久的惊艳亮相)
-改前.md:23:6: [blocking] trailer-ending: 预告式总结收尾：「没人知道/才刚刚开始/正朝着…压了过去」是 AI 章尾预告腔；结尾停在具体决定、动作、画面或一句台词上，悬念让事件自己挂住，别替读者预告下一章。 (才刚刚开始)
-改前.md:25:1: [blocking] trailer-ending: 预告式总结收尾：「没人知道/才刚刚开始/正朝着…压了过去」是 AI 章尾预告腔；结尾停在具体决定、动作、画面或一句台词上，悬念让事件自己挂住，别替读者预告下一章。 (没人知道)
+改前.md:23:6: [review_required] trailer-ending: 预告式总结收尾：「没人知道/才刚刚开始/正朝着…压了过去」是 AI 章尾预告腔；结尾停在具体决定、动作、画面或一句台词上，悬念让事件自己挂住，别替读者预告下一章。 (才刚刚开始)
+改前.md:25:1: [review_required] trailer-ending: 预告式总结收尾：「没人知道/才刚刚开始/正朝着…压了过去」是 AI 章尾预告腔；结尾停在具体决定、动作、画面或一句台词上，悬念让事件自己挂住，别替读者预告下一章。 (没人知道)
 ```
 
 命中规则分布：`not-is-comparison` ×2 · `trailer-ending` ×2 · `cliche-density-tic` · `em-dash` · `negation-parade` · `voice-contrast`
@@ -42,7 +42,7 @@ node skills/story-deslop/scripts/check-ai-patterns.js --check --fail-on=blocking
 
 ## 两段对照
 
-| 改前（被拦下的写法） | 改后（正文原样） |
+| 改前（命中需复核项的写法） | 改后（正文原样） |
 |---|---|
 | 这一刻，他终于明白了什么叫做命运的安排——不是巧合，而是一种冥冥之中的注定。 | 指尖刚一碰下去，手指就自己走了起来，跑在了脑子前头。一串音落下去，他才后知后觉。<br>这是《离别开出花》的调子。 |
 | 键盘手的喉结滚动了一下，手中的搪瓷杯微微颤抖。<br>身后的战友们目光渐渐变了，那些原本准备好的调侃，仿佛被一只无形的手扼住了咽喉。 | 走廊上脚步声忽然停了。是乐队键盘手，手里端着一只搪瓷杯，人愣在原地，杯子里的水洒出来一点也没察觉。他身后跟着两个战友，一个张着嘴，半天没找回自己的声音，另一个手快，已经掏出手机对着门里录了起来。 |
@@ -50,4 +50,4 @@ node skills/story-deslop/scripts/check-ai-patterns.js --check --fail-on=blocking
 
 两段写的是同一件事。差别在于改前用抽象判词替读者定性，改后把同一件事落回现场的动作、对话和反应（如「心里却乐了」）。
 
-> 检查器只处理确定性的句式与标点问题，读感仍需人工判断；朱雀等外部 AI 检测只作自测参考，不是本检查的目标。
+> 检查器只定位常见句式与标点模式（`review_required` 需复核，`advisory` 供参考），读感仍需人工判断；朱雀等外部 AI 检测只作自测参考，不是本检查的目标。

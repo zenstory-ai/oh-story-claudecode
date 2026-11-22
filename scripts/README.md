@@ -39,9 +39,9 @@
 | `test-ai-patterns.mjs` | 确定性 AI 句式检测器 `check-ai-patterns.js` 原生 `node:test` 回归（含 >64KB stdout 排空与篇幅缩放） | CI（三平台，`node --test`） |
 | `test-degeneration.mjs` | 模型退化检测器 `check-degeneration.js` 原生 `node:test` 回归（含引号范围、meta-leak 与 skill 调用连线检查） | CI（三平台，`node --test`） |
 | `test-outline-copy.mjs` | 细纲照搬检测器 `check-outline-copy.js` 原生 `node:test` 回归（31 例，含 `--require` 异常注入与完成记录豁免） | CI（三平台，`node --test`） |
-| `test-phase2-contract.js` | 短篇 Phase 2 verifier 行为回归：设计字段、12 列大纲、字数区间、具名失败与 repair_scope | CI（三平台） |
-| `test-delivery-contract.js` | 短篇最终字数、节数、标记与空行交付契约回归 | CI（三平台） |
-| `test-outline-contract.js` | 长篇细纲结构验收：新旧字段名与小节名、「这章怎么走」五行、三到五列情节点表、字数口径与正负例回归 | CI（三平台） |
+| `test-phase2-contract.js` | 短篇 Phase 2 verifier 行为回归：设计字段、12 列大纲、字数区间、双轨 `hard_failures`/`soft_warnings` + `--strict`、具名失败与 repair_scope | CI（三平台） |
+| `test-delivery-contract.js` | 短篇最终字数、节数、标记、空行及双轨 `hard_failures`/`soft_warnings` + `--strict` 交付契约回归 | CI（三平台） |
+| `test-outline-contract.js` | 长篇细纲结构验收：新旧字段名与小节名、「这章怎么走」五行、三到五列情节点表、字数口径、双轨 `hard_failures`/`soft_warnings` + `--strict` 与正负例回归 | CI（三平台） |
 | `test-normalize-punctuation.js` | 标点归一化的只读检查、frontmatter/fence、CRLF、引号模式与幂等性 | CI（三平台） |
 | `test-scan-runtime.js` | CDP argv 边界/报错/JSON 契约与 7 个 scraper 无副作用 import；七猫、起点书库翻页与反爬字体解码 | CI（三平台） |
 | `test-scan-runtime-policy.py` | 变异验证 scan/browser 静态策略不会被无关或死代码关键词骗过 | CI（Linux）；改 `check-scan-runtime-policy.sh` 后 |
@@ -51,16 +51,16 @@
 | `test-style-precedence.py` | 书级表达豁免在深扫、标点整理、写后和下一章门禁中一致生效且不跨书 | CI（三平台） |
 | `test-tracking-commit.py` | 单权威追踪行为：原子 state、字数事件链、hash 失效、激活边界、幂等与并发提交 | CI（三平台） |
 | `test-storyctl.py` | `visible_chars_v1`、双层区间与作者范围、「字数目标」两端解析一致、章节检查状态与去味豁免、提交记录与 demo 同口径证据 | CI（三平台） |
-| `test-chapter-completion-lifecycle.py` | 公开 CLI 的 checkpoint、正常提交、欠长接受、超长压缩建议与放行、blocking quality 阻断与下一章继续 | CI（三平台） |
+| `test-chapter-completion-lifecycle.py` | 公开 CLI 的 checkpoint、正常提交、欠长接受、超长压缩建议与放行、硬伤阻断、`review_required` + `--ack` 放行与下一章继续 | CI（三平台） |
 | `test-author-memory-commit.py` | 工作区作者记忆行为：单事件回执、交写手的行 ≤2KB、证据候选、冲突替代、撤回、失败零写入、旧修订、幂等重放与派生修复 | CI（三平台） |
 | `test-long-analyze-runtime.py` | 长篇拆文单状态运行时：机械章节索引与逐章 hash、旧成果识别、只读计划、范围批次、旧章号与楔子对齐、原子提交、缓存恢复与关系图中文字体回退 | CI（三平台） |
-| `test-story-hook-core.mjs` | 五端（Claude / Codex / OpenCode / Antigravity / ZCode）共享 Node.js 18+ 钩子核心 `story_hook_core.js` 原生 `node:test` 回归：正文兜底轻量网、写前大纲守卫、跨批连续性缺口、伏笔状态与跳过标记同步、Windows 驱动器路径与 OpenCode `pre-commit.sh` | CI（三平台，`node --test`） |
+| `test-story-hook-core.mjs` | 五端（Claude / Codex / OpenCode / Antigravity / ZCode）共享 Node.js 18+ 钩子核心 `story_hook_core.js` 原生 `node:test` 回归：正文兜底轻量网、写前大纲守卫与非阻断 `prosePreWriteWarnings` 软提醒、五端 `agents_version` 过期提醒、`拆文库/` 与 `对标/` 书目发现跳过、跨批连续性缺口、伏笔状态与跳过标记同步、Windows 驱动器路径与 OpenCode `pre-commit.sh` | CI（三平台，`node --test`） |
 | `test-claude-hooks.mjs` | Claude Code 统一 Node hook CLI（`story_hook_cli.js` + `run-story-hook.sh`）原生 `node:test` 回归：全部 8 个事件、`analysis-input-guard`、缺 `node` fail-open 与真实 `zh_CN.GBK` 编码安全 | CI（三平台，`node --test`） |
 | `test-codex-hooks.mjs` | Codex Node hook（`story_codex_hook.js` + `run-story-hook.{sh,cmd}`）原生 `node:test` 回归：合成 stdin/stdout JSON 契约、大纲守卫、写后兜底与 `windowsHide: true` 断言 | CI（三平台，`node --test`） |
 | `test-codex-hook-merge.py` | Codex `hooks.json` 合并器的管理组替换、用户配置保留与幂等回归 | 被 `check-codex-adapter.sh` 调用 |
 | `test-zcode-hooks.mjs` | ZCode 严格 JSON Hook、正文守卫、版本提醒与连续性原生 `node:test` 回归 | CI（三平台，`node --test`） |
 | `test-zcode-agents.py` | ZCode 插件角色的工具白名单、禁止优先、模型继承、资料路径、无效输入零写入与生成漂移回归 | 被 `check-zcode-adapter.sh` 调用 |
-| `test-antigravity-hooks.mjs` | Antigravity 注册命令的 shell/字面 argv 兼容性、Hook I/O、正文守卫、artifact 桥接与 Stop 单次续跑 | CI（三平台，`node --test`） |
+| `test-antigravity-hooks.mjs` | Antigravity 注册命令的 shell/字面 argv 兼容性、Hook I/O、正文守卫、artifact 桥接与仅硬伤 findings 触发 Stop 单次续跑（纯风格不续跑） | CI（三平台，`node --test`） |
 | `test-antigravity-hook-merge.py` | `.agents/hooks.json` 顶层 `oh-story` 管理组替换、用户组保留与幂等回归 | 被 `check-antigravity-adapter.sh` 调用 |
 | `test-antigravity-skills-deploy.py` | Antigravity 14 个已知 Skill 原子物化、未知 Skill 保留、symlink fail-closed/显式迁移与防穿透写回归 | 被 `check-antigravity-adapter.sh` 调用 |
 | `test-opencode-plugin.mjs` | 以 2.x `setup(ctx)` 直接执行 OpenCode TypeScript plugin，验大纲守卫、Shell 绕过、写后检查、compaction 注入与 `ctx.location` 定位 | CI（三平台，`node --test`）；被 `check-opencode-adapter.sh` 调用 |

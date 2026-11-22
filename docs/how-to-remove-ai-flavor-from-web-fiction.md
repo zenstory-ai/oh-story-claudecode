@@ -40,10 +40,10 @@
 本地预检从 `story-deslop` 技能目录执行，文件参数使用绝对路径：
 
 ```bash
-node scripts/check-ai-patterns.js --check --fail-on=blocking <正文文件绝对路径>
+node scripts/check-ai-patterns.js --check --fail-on=review_required <正文文件绝对路径>
 ```
 
-检测器判断不了整篇故事立不立得住。表达提示要放回上下文复核；写作流程里的 blocking 命中仍须改过才能交稿。作者明确想留、确实起作用的原句，可记入白名单保留；其余句子保住原意改顺后再复扫，不能只写一句“这处保留”就算过关。
+检测器判断不了整篇故事立不立得住。句式规则分 `review_required` 与 `advisory` 两档（严格拦截须传 `--fail-on=review_required`，`--fail-on=blocking` 对纯句式命中返回 exit 0）；表达提示要放回上下文复核。写作流程里的 `review_required` 命中优先保住原意改顺后再复扫；作者明确想留、确实起作用的原句，长篇可通过 `storyctl.js` 的 `--ack <rule-id>:<reason>` 或 `--ack-all <reason>` 附简短理由放行，也可记入书级白名单长期保留。
 
 外部 AI 检测报告也只能帮助定位可对应到正文的问题。skill 不承诺检测分数，不靠注水、故意错字或打乱标点改分。
 

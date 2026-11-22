@@ -39,7 +39,7 @@ https://github.com/user-attachments/assets/8f9cc11b-1fb8-4cc5-a084-e0deb05ec791
 Oh Story 覆盖长篇与短篇网文全流程：**扫榜选材 → 拆解爆款 → 搭大纲写正文 → 去AI味 → 生成封面图**。它以 14 个 skill 的形式装进你正在用的编程 Agent，直接复用该工具的模型，无需显卡，也不用单独配模型。
 
 - **用文件系统当记忆** — 设定、大纲、正文、追踪分目录保存，追踪数据统一记在 `追踪/_tracking-state.json` 里，自动生成状态卡、伏笔清单、角色状态与「作者真相 / 读者已知」双时间线；压缩上下文或换新会话后照样从文件接着写。
-- **7 个专职角色与读写守卫** — 大纲、正文、一致性检查、人设、考据、书稿检索、拆书抽取各司其职；长篇缺细纲或上一章追踪未入账时先拦下，写完自动扫半截断章、大纲词漏入正文与常见 AI 腔（各 skill 按需加载参考资料，详见[架构与目录说明](docs/architecture.md)、[知识库清单](docs/knowledge-base.md)）。
+- **7 个专职角色与读写守卫** — 大纲、正文、一致性检查、人设、考据、书稿检索、拆书抽取各司其职；长篇缺细纲或追踪状态异常时先拦下，上一章追踪未入账等软条件会写前提醒，写完自动扫半截断章、大纲词漏入正文与常见 AI 腔（各 skill 按需加载参考资料，详见[架构与目录说明](docs/architecture.md)、[知识库清单](docs/knowledge-base.md)）。
 - **适配 7 款编程 Agent** — Claude Code · Codex CLI · Google Antigravity · OpenCode · ZCode · OpenClaw · Reasonix；支持子代理与 hooks 的工具由 `/story-setup` 自动部署，其他能读项目文件的通用 Agent 环境也能按 skill 流程直接用。
 - **面向主流长短篇平台** — 长篇覆盖起点中文网、番茄小说、晋江文学城、七猫小说、刺猬猫；短篇覆盖知乎盐言故事、番茄短篇、七猫短篇。
 
@@ -162,17 +162,17 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 
 ### 去 AI 味：先跑句式扫描，再按语境改稿
 
-`/story-deslop` 先用本地脚本扫描高频 AI 句式，标出行号、片段与改写方向。扫描一段人工构造的 AI 腔反例，共命中 8 处（3 处阻断 / 5 处建议）：
+`/story-deslop` 先用本地脚本扫描高频 AI 句式，标出行号、片段与改写方向。扫描一段人工构造的 AI 腔反例，共命中 8 处（3 处需复核 / 5 处建议）：
 
 ```text
-改前.md:7:20     [blocking] em-dash             (么叫做命运的安排——不是巧合，而是一)
-改前.md:23:6     [blocking] trailer-ending      (才刚刚开始)
-改前.md:25:1     [blocking] trailer-ending      (没人知道)
-改前.md:7:22     [advisory] not-is-comparison   (不是巧合，而是一种冥冥之中的注定)
-改前.md:11:1     [advisory] negation-parade     (没有犹豫，没有生涩，)
-改前.md:19:3     [advisory] voice-contrast      (声音不大，却)
-改前.md:21:2     [advisory] not-is-comparison   (不是一次简单的弹奏，而是一场蓄谋已久的惊艳亮相)
-改前.md:3:1      [advisory] cliche-density-tic  (仿佛 一丝 深吸一口气 缓缓 微微)
+改前.md:7:20     [review_required] em-dash             (么叫做命运的安排——不是巧合，而是一)
+改前.md:23:6     [review_required] trailer-ending      (才刚刚开始)
+改前.md:25:1     [review_required] trailer-ending      (没人知道)
+改前.md:7:22     [advisory]        not-is-comparison   (不是巧合，而是一种冥冥之中的注定)
+改前.md:11:1     [advisory]        negation-parade     (没有犹豫，没有生涩，)
+改前.md:19:3     [advisory]        voice-contrast      (声音不大，却)
+改前.md:21:2     [advisory]        not-is-comparison   (不是一次简单的弹奏，而是一场蓄谋已久的惊艳亮相)
+改前.md:3:1      [advisory]        cliche-density-tic  (仿佛 一丝 深吸一口气 缓缓 微微)
 ```
 
 第 21 章正文同一场戏跑同一套检查：**零命中，exit 0**。两段字数相近，改前用抽象判词替读者下结论，改后把人物的判断、对话和当场反应直接写出来。完整对照：**[demo/去AI味对照/](demo/去AI味对照/README.md)**
@@ -281,7 +281,7 @@ flowchart LR
 | `story-cover` | `/story-cover` `/封面` | 封面生成 · 输出封面提示词或调用 GPT-Image-2 出图（Codex 内置额度 / API） |
 | `browser-cdp` | `/browser-cdp` | 浏览器操控 · 复用本机浏览器登录态抓取榜单数据 |
 
-> `story-deslop` 本地脚本只对确定性的句式与标点硬伤做阻断，其余提示按实际读感取舍；朱雀等外部检测工具仅作自测参考。
+> 本地检查区分硬底线与文风提示：退化截断、未闭合注释与机械标点硬伤直接阻断，`story-deslop` 的句式规则标为需复核（`review_required`，长篇可改写或附理由 `--ack` 放行）与建议项（`advisory`），按实际读感取舍；朱雀等外部检测工具仅作自测参考。
 
 平时直接说白话也能触发：
 - 「帮我开书」→ `story-long-write`
