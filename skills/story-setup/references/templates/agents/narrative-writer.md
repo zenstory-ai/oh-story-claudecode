@@ -50,7 +50,7 @@ maxTurns: 30
 禁止只读裸文件名、禁止跳级、禁止跨 skill 读其他 skill 的 references。
 
 ## 参考文件体系（按行判定，命中即读，未命中不预加载）
-去味/审稿（含本次获准的局部剧情重写）只读文风、三方法、词表、范围接口与短篇格式/卖点保护；创作参考由独立写作/大修任务读。
+去味/审稿（含本次获准的局部剧情重写）只读文风、三层去味指南、词表与短篇格式/卖点保护；创作参考由独立写作/大修任务读。
 
 | 参考文件 | 必读条件 |
 |---|---|
@@ -58,8 +58,7 @@ maxTurns: 30
 | `story-setup/references/agent-references/writing-craft.md` | 写新正文或剧情重写时（从细纲到正文、场景推进、疏密分配）；去味审查不读 |
 | `story-setup/references/agent-references/banned-words.md` | 改写、去味或审查时（写新正文和净删压缩不读；主会话检测器只定位表达候选） |
 | `story-setup/references/agent-references/opening-design.md` | 开新书、或写前 3 章：只读「开篇落笔」一节 |
-| `story-setup/references/agent-references/expression.md` + `story-setup/references/agent-references/narrative-focus.md` + `story-setup/references/agent-references/story-logic.md` | 去味或审稿任务时三份完整读；范围受调用方约束，净删压缩不读 |
-| `story-setup/references/agent-references/deslop-gates.md` | 去味或审查前读范围映射、执行边界与验收 |
+| `story-setup/references/agent-references/deslop-guide.md` | 去味或审稿任务必读（表达/用笔/故事三层方法、限定范围映射与 23 类信号索引；净删压缩不读） |
 | `story-setup/references/agent-references/short-deslop.md` | 短篇写作、去味或审查必读（覆盖通用长篇默认） |
 | prompt「本章技法」写的那一份 | 写正文时读（类别与 story-long-write SKILL.md「本章技法」同步）：打脸 `story-setup/references/agent-references/style-combat-face.md`、反转 `story-setup/references/agent-references/long-reversal.md`、感情 `story-setup/references/agent-references/long-emotional-methods.md`（含「两种场景情绪结构」）、悬疑 `story-setup/references/agent-references/long-suspense.md`、日常装逼 `story-setup/references/agent-references/style-combat-face.md`「爽点公式与日常装逼」一节；「无」不读 |
 | `story-setup/references/agent-references/dialogue-mastery.md` | 写或改写正文且本章有对话时，审查不读（潜台词/信息控制/权力博弈；排版层不采纳其裸引语示例，对话落法以书级文风为准） |
@@ -79,7 +78,7 @@ maxTurns: 30
 
 ## 去AI味（三层诊断，定点任务按范围执行）
 
-缺省独立去味或完整审稿检查三层（词句干净也不跳过后两层）；指定问题或章末检测类别时只修该范围（按 `story-setup/references/agent-references/deslop-gates.md` 范围表执行，句子连接按 writing-craft「句子怎么连」）。先诊断故事与用笔再修表达，每项保留原文位置、读者损失和具体改法：已有文本支持的详略与承接直接修；新增动机、事件、证据或改变选择、结果、揭露时机须在已授权范围内执行（未授权给最小设计方案）；整段无功能内容可删，字数不够如实交回，不靠批量加动作或制造冲突去味。
+缺省独立去味或完整审稿检查三层（词句干净也不跳过后两层）；指定问题或章末检测类别时只修该范围（按 `story-setup/references/agent-references/deslop-guide.md` 范围表执行，句子连接按 writing-craft「句子怎么连」）。先诊断故事与用笔再修表达，每项保留原文位置、读者损失和具体改法：已有文本支持的详略与承接直接修；新增动机、事件、证据或改变选择、结果、揭露时机须在已授权范围内执行（未授权给最小设计方案）；整段无功能内容可删，字数不够如实交回，不靠批量加动作或制造冲突去味。
 
 ## 写完后自检（命中就地改，改完再交付，不逐项汇报过程）
 

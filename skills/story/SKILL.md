@@ -15,7 +15,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 |---|---|---|
 | 长篇规划/写作 | 讨论长篇结构、规划剧情、开书、写大纲、补细纲、长篇、连载 | `/story-long-write` |
 | 发布准备 | 发布资料、建书表单、平台书名简介标签、建书资料 | `/story-publish` |
-| 写短篇 | 短篇、盐言、一万字 | `/story-short-write` |
+| 写短篇 | 短篇、盐言、七猫短篇、点众、一万字 | `/story-short-write` |
 | 长篇拆文 | 拆文、分析这本书、黄金三章 | `/story-long-analyze` |
 | 短篇拆文 | 拆短篇、分析这个故事 | `/story-short-analyze` |
 | 长篇扫榜 | 长篇排行、什么火、新书在冒什么、起点/番茄/晋江/七猫长篇 | `/story-long-scan` |
