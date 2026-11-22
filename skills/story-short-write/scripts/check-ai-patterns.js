@@ -5,7 +5,7 @@ const fs = require('fs');
 const { loadStyleWhitelist, maskStyleText } = require('./style-whitelist.js');
 const path = require('path');
 
-const USAGE = `Usage: node check-ai-patterns.js [--check] [--json] [--fail-on=blocking|all] <file...>
+const USAGE = `Usage: node check-ai-patterns.js [--check] [--json] [--fail-on=blocking|review_required|all] <file...>
        node check-ai-patterns.js --list-review-classes
 
 Detect high-risk AI-flavor prose patterns that need human rewrite:
@@ -34,10 +34,10 @@ Detect high-risk AI-flavor prose patterns that need human rewrite:
   - 叙述省略号过密 (引号与面板外 …… 高密度刷屏，advisory)
 
 Book-local .deslop-whitelist literal spans are excluded from style scanning (no regex or ancestor inheritance).
-Each finding carries severity: blocking by default for generation/deslop cleanup (not-is-comparison / em-dash / voice-contrast / negation-parade / reverse-not-is / trailer-ending / trailer-summary), where single/low-count hits of rhetorical patterns downgrade to semantic advisory and high-density clusters block. This is a local style/readability gate, not an AIGC detector score; functional human text can be marked for review instead of hard-edited for a detector.
+Each finding carries severity: review_required for high-risk stylistic patterns (not-is-comparison / em-dash / voice-contrast / negation-parade / reverse-not-is / trailer-ending / trailer-summary), where single/low-count hits of rhetorical patterns downgrade to semantic advisory and high-density clusters (or narration em-dash / trailer-summary) require explicit review-and-ack. This is a local style/readability soft-gate, not an AIGC detector score; functional human text can be kept with explicit acknowledgement instead of hard-blocked.
 或 advisory (period-stutter / long-paragraph / micro-action-tic / negation-pair-tic / stock-reaction-tic / action-list-tic / abstract-summary-tic / cliche-density-tic / metaphor-density-tic / reasoning-chain-tic / system-notice-formality-tic / overcompressed-prose-tic / low-connective-density-tic / quote-emphasis-tic / formulaic-parallelism / ellipsis-density-tic，是提示，justified 的长推理/氛围段可保留)。
---fail-on=blocking 只在出现 blocking finding 时退出 1；默认 --fail-on=all 有任何 finding 即退出 1。
-Each finding also carries review: mechanical（表面形态确定、就地改写即可）或 semantic（可能承担叙事功能，需读上下文判断是否保留）；blocking 一律 mechanical。--list-review-classes 输出完整分类表（JSON）。
+--fail-on=blocking 只在出现 hard blocking finding 时退出 1（当前风格规则均为 review_required/advisory，故返回 0）；--fail-on=review_required 在出现 blocking 或 review_required finding 时退出 1；默认 --fail-on=all 有任何 finding 即退出 1。
+Each finding also carries review: mechanical（表面形态确定、就地改写或确认保留即可）或 semantic（可能承担叙事功能，需读上下文判断是否保留）；review_required / blocking 一律 mechanical。--list-review-classes 输出完整分类表（JSON）。
 HTML comments (<!-- ... -->, e.g. the 去味:跳过 exemption marker) are metadata, not prose, and are never scanned.
 
 The script reports findings only. It never rewrites text, because the safe fix is
@@ -364,7 +364,9 @@ for (let i = 2; i < process.argv.length; i += 1) {
     options.json = true;
   } else if (arg.startsWith('--fail-on=')) {
     const v = arg.slice('--fail-on='.length);
-    if (v !== 'blocking' && v !== 'all') die(`--fail-on must be 'blocking' or 'all'`);
+    if (v !== 'blocking' && v !== 'review_required' && v !== 'all') {
+      die("--fail-on must be 'blocking', 'review_required', or 'all'");
+    }
     options.failOn = v;
   } else if (arg === '-h' || arg === '--help') {
     process.stdout.write(`${USAGE}\n`);
@@ -404,8 +406,17 @@ for (const file of options.files) {
   allFindings.push(...findings);
 }
 
+const blockingCount = allFindings.filter((f) => f.severity === 'blocking').length;
+const reviewRequiredCount = allFindings.filter((f) => f.severity === 'review_required').length;
+const advisoryCount = allFindings.filter((f) => f.severity === 'advisory').length;
+
 if (options.json) {
-  process.stdout.write(`${JSON.stringify({ findings: allFindings }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({
+    findings: allFindings,
+    blocking: blockingCount,
+    review_required: reviewRequiredCount,
+    advisory: advisoryCount,
+  }, null, 2)}\n`);
 } else {
   for (const finding of allFindings) {
     console.log(`${finding.file}:${finding.line}:${finding.column}: [${finding.severity}] ${finding.type}: ${finding.message} (${finding.excerpt})`);
@@ -413,10 +424,15 @@ if (options.json) {
 }
 
 if (failed) process.exit(2);
-// --fail-on=blocking 只在出现 blocking finding 时退出 1（advisory 仅报告）；默认 all 沿用「有任何 finding 即 1」。
-// 用 process.exitCode 而非 process.exit(1)，确保 >64KB JSON 管道输出完整刷出后再退出。
-const hasBlocking = allFindings.some((f) => f.severity === 'blocking');
-if (options.failOn === 'blocking' ? hasBlocking : allFindings.length > 0) process.exitCode = 1;
+// --fail-on=blocking 只在出现 hard blocking finding 时退出 1；--fail-on=review_required 在 blocking/review_required 时退出 1；
+// 默认 all 沿用「有任何 finding 即 1」。用 process.exitCode 确保 >64KB JSON 管道输出完整刷出后再退出。
+const shouldFail =
+  options.failOn === 'blocking'
+    ? blockingCount > 0
+    : options.failOn === 'review_required'
+      ? blockingCount > 0 || reviewRequiredCount > 0
+      : allFindings.length > 0;
+if (shouldFail) process.exitCode = 1;
 
 function reviewClass(type) {
   const review = REVIEW_CLASSES[type];
@@ -529,7 +545,7 @@ function applyDensitySeverityGates(findings, proseChars = 0) {
       block = (counts.get('trailer-ending') || 0) >= TRAILER_ENDING_BLOCKING_MIN_HITS;
     }
     if (block === true) {
-      f.severity = 'blocking';
+      f.severity = 'review_required';
       f.review = 'mechanical';
     } else if (block === false) {
       f.severity = 'advisory';
@@ -554,7 +570,7 @@ function scanProsePatterns(proseLines) {
         line: lineNo,
         column: dash.index + 1,
         type: 'em-dash',
-        severity: 'blocking',
+        severity: 'review_required',
         message: '叙述旁白不用破折号，按功能改写：打断→动作或抢白，停顿→逗号或省略，插入说明→逗号/冒号；勿一律改句号。',
         excerpt: compact(text.slice(Math.max(0, dash.index - 8), dash.index + dash[0].length + 8)),
       });
@@ -609,7 +625,7 @@ function findVoiceContrast(proseLines) {
         line: lineNo,
         column: match.index + 1,
         type: 'voice-contrast',
-        severity: 'blocking',
+        severity: 'review_required',
         message: '音量反差腔：「声音不大/不高…却/但…」是 AI 高频反差模板；删掉音量铺垫，直接写台词分量、利害后果或在场者的立场反应。',
         excerpt: compact(text.slice(match.index, match.index + match[0].length)),
       });
@@ -650,7 +666,7 @@ function findNegationParade(proseLines) {
         line: lineNo,
         column: start + 1,
         type: 'negation-parade',
-        severity: 'blocking',
+        severity: 'review_required',
         message: '否定排比：「没有X，没有Y…」/「没X，没有Y，只是Z」是 AI 高频排比模板；删掉否定清单，直接写现场实际有什么，最多留一个最有信息量的否定。',
         excerpt: compact(text.slice(start, end)),
       });
@@ -740,7 +756,7 @@ function findReverseNotIs(proseLines) {
         line: lineNo,
         column: start + 1,
         type: 'reverse-not-is',
-        severity: 'blocking',
+        severity: 'review_required',
         message: '反序对比腔：「是A，不是B」与「不是A，是B」同族；删掉后置否定，直接写 A 的具体表现，或用细节让读者自己对比。',
         excerpt: compact(text.slice(start, start + match[0].length)),
       });
@@ -774,7 +790,7 @@ function findTrailerEnding(proseLines) {
         line: lineNo,
         column: match.index + 1,
         type: 'trailer-ending',
-        severity: 'blocking',
+        severity: 'review_required',
         message: '预告式总结收尾：「没人知道/才刚刚开始/正朝着…压了过去」是 AI 章尾预告腔；结尾停在具体决定、动作、画面或一句台词上，悬念让事件自己挂住，别替读者预告下一章。',
         excerpt: compact(text.slice(match.index, match.index + match[0].length)),
       });
@@ -786,7 +802,7 @@ function findTrailerEnding(proseLines) {
         line: lineNo,
         column: summaryMatch.index + 1,
         type: 'trailer-summary',
-        severity: 'blocking',
+        severity: 'review_required',
         message: '章尾状态总结体：「这一夜注定…/这一切都结束了/新的人生才刚刚开始/命运的齿轮」是把细纲的结尾设定原样写成了总结句；结尾设定要落成最后一个具体决定、动作、画面或台词，别替读者盖章。',
         excerpt: compact(text.slice(summaryMatch.index, summaryMatch.index + summaryMatch[0].length)),
       });
@@ -1595,7 +1611,7 @@ function findNotIsComparisons(text, getPosition) {
         line: position.line,
         column: position.column,
         type: 'not-is-comparison',
-        severity: 'blocking',
+        severity: 'review_required',
         message: '高频 AI 对比句式；删掉否定铺垫，直接写后项（直白情绪、判断、对话或具体细节皆可）。',
         excerpt: compact(raw),
       });

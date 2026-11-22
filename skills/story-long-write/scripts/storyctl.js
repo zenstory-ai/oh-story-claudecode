@@ -64,11 +64,14 @@ const NODE_REQUIRED =
 
 const CHECK_EXIT_CODES = {
   ready: 0,
+  review_required: 0,
   needs_decision: 0,
   blocked: 1,
   invalid: 1,
   tool_unavailable: 3,
 };
+const REVIEW_GUIDANCE =
+  '重点复核：建议修改，如确认剧情需要保留请在 commit 时传 `--ack <rule-id>:<简短理由>`';
 const ERROR_EXIT_CODES = { TOOL_UNAVAILABLE: 3 };
 const ACCEPT_FLOOR_RATIO = 0.5;
 const PLAIN_SHOWN = 8;
@@ -81,10 +84,11 @@ class CliArgumentError extends Error {
 }
 
 class ChapterRefused extends WordcountError {
-  constructor(code, message) {
+  constructor(code, message, details = null) {
     super(message);
     this.name = 'ChapterRefused';
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -276,6 +280,7 @@ function checkBlockingQuality(outline, body) {
   const root = __dirname;
   const exempt = deslopSkipped(body);
   const blocking = [];
+  const reviewRequired = [];
   const advisories = [];
   const toolErrors = [];
 
@@ -304,12 +309,18 @@ function checkBlockingQuality(outline, body) {
       if (name === 'degeneration' && row.review === undefined) {
         row.review = 'mechanical';
       }
-      if (exempt && name === 'ai-pattern' && finding.severity === 'blocking') {
+      if (
+        exempt &&
+        name === 'ai-pattern' &&
+        (finding.severity === 'blocking' || finding.severity === 'review_required')
+      ) {
         advisories.push({ ...row, severity: 'advisory', exempted: '去味:跳过' });
         continue;
       }
       if (finding.severity === 'blocking') {
         blocking.push(row);
+      } else if (finding.severity === 'review_required') {
+        reviewRequired.push({ ...row, rule_id: finding.type });
       } else {
         advisories.push(row);
       }
@@ -326,10 +337,22 @@ function checkBlockingQuality(outline, body) {
   } else {
     const completed = _hooks.runNodeScript(punctuation, ['--check', String(body)]);
     if (completed.status === 1) {
-      blocking.push({
-        type: 'PUNCTUATION_NOT_NORMALIZED',
-        message: (completed.stdout || completed.stderr || '').trim(),
-      });
+      const rawOut = (completed.stdout || completed.stderr || '').trim();
+      const lines = rawOut
+        ? rawOut
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean)
+        : [];
+      // 旁白破折号（em-dash）已由 check-ai-patterns.js 归入 review_required 走 Review-and-Ack；
+      // 未闭合 HTML 注释、非标省略号、双连字符、分隔线等确定性标点错误仍留作硬阻断。
+      const hardLines = lines.filter((line) => !/:\d+:\d+:\s*em-dash:/.test(line));
+      if (lines.length === 0 || hardLines.length > 0) {
+        blocking.push({
+          type: 'PUNCTUATION_NOT_NORMALIZED',
+          message: hardLines.length ? hardLines.join('\n') : rawOut,
+        });
+      }
     } else if (completed.status !== 0) {
       toolErrors.push({
         type: 'TOOL_ERROR',
@@ -365,8 +388,15 @@ function checkBlockingQuality(outline, body) {
   }
 
   return {
-    status: toolErrors.length ? 'unavailable' : blocking.length ? 'fail' : 'pass',
+    status: toolErrors.length
+      ? 'unavailable'
+      : blocking.length
+        ? 'fail'
+        : reviewRequired.length
+          ? 'review_required'
+          : 'pass',
     blocking_findings: blocking,
+    review_required_items: reviewRequired,
     advisories,
     semantic_advisories: semanticAdvisories(advisories),
     tool_errors: toolErrors,
@@ -376,8 +406,9 @@ _hooks.checkBlockingQuality = checkBlockingQuality;
 
 function checkStatus(length, quality) {
   if (quality.status === 'unavailable') return 'tool_unavailable';
-  if (quality.status !== 'pass') return 'blocked';
+  if (quality.status === 'fail') return 'blocked';
   if (length.status === 'invalid') return 'invalid';
+  if (quality.status === 'review_required') return 'review_required';
   return length.status === 'internal_pass' || length.status === 'borderline' ? 'ready' : 'needs_decision';
 }
 
@@ -395,10 +426,19 @@ function chapterCheck(project, chapter, authorRange = null) {
   }
   const length = evaluateWordcount(body, target, { chapter, authorRange: effectiveRange });
   const quality = _hooks.checkBlockingQuality(outlinePath, bodyPath);
+  const reviewItems = quality.review_required_items || [];
   const status = checkStatus(length, quality);
   let actions;
   if (status === 'ready') {
     actions = ['commit'];
+  } else if (status === 'review_required') {
+    if (length.status === 'over') {
+      actions = ['compress-once', 'accept-current-length', 'revise-outline-or-target', 'discard'];
+    } else if (length.status === 'under') {
+      actions = ['accept-current-length', 'revise-outline-or-target', 'discard'];
+    } else {
+      actions = ['revise', 'commit-with-ack'];
+    }
   } else if (status !== 'needs_decision') {
     actions = [];
   } else if (length.status === 'over') {
@@ -408,7 +448,7 @@ function chapterCheck(project, chapter, authorRange = null) {
   }
   const state = trackingCall(tracking.loadState, project);
   let compression = null;
-  if (length.status === 'over' && quality.status === 'pass') {
+  if (length.status === 'over' && (quality.status === 'pass' || quality.status === 'review_required')) {
     const actual = length.actual;
     compression = {
       mode: 'single_pass_remove_only',
@@ -422,12 +462,13 @@ function chapterCheck(project, chapter, authorRange = null) {
       },
     };
   }
-  return {
+  const payload = {
     schema: CHAPTER_CHECK_SCHEMA,
     status,
     chapter,
     length,
     quality,
+    review_required_items: reviewItems,
     fragmentation: fragmentation(body),
     prose_balance: proseBalance(body),
     compression,
@@ -436,6 +477,10 @@ function chapterCheck(project, chapter, authorRange = null) {
     next_chapter_started: state.last_committed_chapter > chapter,
     available_actions: actions,
   };
+  if (reviewItems.length) {
+    payload.review_guidance = REVIEW_GUIDANCE;
+  }
+  return payload;
 }
 
 function fixPunctuation(project, chapter, authorRange = null) {
@@ -460,22 +505,67 @@ function requireAcceptableLength(checked, { force }) {
   }
 }
 
+function parseAckArg(raw) {
+  const str = String(raw || '');
+  const idx = str.search(/[:：]/);
+  if (idx <= 0) {
+    throw new CliArgumentError(`argument --ack: expected <rule-id>:<reason>, got '${str}'`);
+  }
+  const ruleId = str.slice(0, idx).trim();
+  const reason = str.slice(idx + 1).trim();
+  if (!ruleId || !reason) {
+    throw new CliArgumentError(`argument --ack: both rule-id and reason must be non-empty, got '${str}'`);
+  }
+  return { ruleId, reason };
+}
+
 function chapterCommit(
   project,
   chapter,
   inputPath,
-  { acceptCurrentLength, authorRange = null, force = false }
+  { acceptCurrentLength, authorRange = null, force = false, acks = [], ackAll = null, allowGap = false }
 ) {
   const checked = chapterCheck(project, chapter, authorRange);
   if (checked.status === 'tool_unavailable') {
     const msg = checked.quality.tool_errors.map((item) => item.message).join('；') || NODE_REQUIRED;
     throw new ChapterRefused('TOOL_UNAVAILABLE', msg);
   }
-  if (checked.quality.status !== 'pass') {
+  if (checked.quality.status === 'fail') {
     throw new ChapterRefused('QUALITY_BLOCKED', 'blocking quality findings must be fixed before commit');
   }
+  const ackMap = new Map();
+  for (const entry of acks || []) {
+    ackMap.set(entry.ruleId, entry.reason);
+  }
+  const reviewItems = checked.quality.review_required_items || [];
+  const requiredRules = [...new Set(reviewItems.map((item) => item.rule_id || item.type))];
+  const unacknowledged = ackAll ? [] : requiredRules.filter((rule) => !ackMap.has(rule));
+  if (unacknowledged.length > 0) {
+    const cliHints = unacknowledged.map((rule) => `--ack ${rule}:<简短理由>`).join(' ');
+    throw new ChapterRefused(
+      'REVIEW_ACK_REQUIRED',
+      `有 ${unacknowledged.length} 类风格项待复核确认（${unacknowledged.join('、')}）：` +
+        `建议修改；如确认剧情需要保留，请重新 commit 并传 ${cliHints}（或 --ack-all <简短理由>）`,
+      {
+        unacknowledged_rules: unacknowledged,
+        review_required_items: reviewItems.filter((item) => unacknowledged.includes(item.rule_id || item.type)),
+      }
+    );
+  }
+  const acknowledgedReviews = [];
+  for (const rule of requiredRules) {
+    const matched = reviewItems.filter((item) => (item.rule_id || item.type) === rule);
+    acknowledgedReviews.push({
+      rule_id: rule,
+      reason: ackMap.get(rule) || ackAll,
+      count: matched.length,
+      lines: matched.map((item) => item.line).filter((line) => line !== undefined && line !== null),
+    });
+  }
+
   const lengthStatus = checked.length.status;
   const inUserBand = lengthStatus === 'internal_pass' || lengthStatus === 'borderline';
+  const lengthAckReason = ackMap.get('length') || null;
   let resolution;
   if (acceptCurrentLength) {
     requireCondition(
@@ -484,11 +574,35 @@ function chapterCommit(
     );
     requireAcceptableLength(checked, { force });
     resolution = 'accepted_current_length';
+    if (lengthAckReason) {
+      acknowledgedReviews.push({
+        rule_id: 'length',
+        reason: lengthAckReason,
+        actual: checked.length.actual,
+        target: checked.length.target,
+        status: lengthStatus,
+      });
+    }
+  } else if (lengthAckReason) {
+    if (!inUserBand) {
+      requireCondition(lengthStatus === 'under' || lengthStatus === 'over', 'chapter length is invalid');
+      requireAcceptableLength(checked, { force });
+      resolution = 'accepted_current_length';
+    } else {
+      resolution = 'within_user_band';
+    }
+    acknowledgedReviews.push({
+      rule_id: 'length',
+      reason: lengthAckReason,
+      actual: checked.length.actual,
+      target: checked.length.target,
+      status: lengthStatus,
+    });
   } else {
     if (!inUserBand) {
       throw new ChapterRefused(
         'LENGTH_OUT_OF_BAND',
-        'chapter length is outside the user band; use accept-current-length or revise it'
+        'chapter length is outside the user band; use --ack length:<reason>, accept-current-length, or revise it'
       );
     }
     resolution = 'within_user_band';
@@ -500,11 +614,12 @@ function chapterCommit(
     'tracking transaction must not provide wordcount'
   );
   document.wordcount = buildProjectWordcountRecord(project, chapter, { resolution, authorRange });
-  const state = trackingCall(tracking.applyTransaction, project, document);
+  const state = trackingCall(tracking.applyTransaction, project, document, { allowGap });
   checked.tracking_committed = state.last_committed_chapter >= chapter;
   checked.next_chapter_started = state.last_committed_chapter > chapter;
   checked.wordcount = state.wordcount_records[String(chapter)] || null;
   checked.mode = document.mode;
+  checked.acknowledged_reviews = acknowledgedReviews;
   try {
     checked.work_dir_removed = removeChapterWorkDir(project, chapter);
   } catch (err) {
@@ -522,14 +637,25 @@ function findingLine(row) {
   return `- ${where}${excerptPart}：${message}`;
 }
 
+function reviewRequiredLine(row) {
+  const where = row.line ? `第 ${row.line} 行` : '全章';
+  const ruleId = row.rule_id || row.type || 'unknown';
+  const excerpt = String(row.excerpt || '').trim();
+  const message = String(row.message || '').trim();
+  const excerptPart = excerpt ? `「${Array.from(excerpt).slice(0, 40).join('')}」` : '';
+  return `- [${ruleId}] ${where}${excerptPart}：${message}`;
+}
+
 function plainReport(result) {
   const chapter = result.chapter;
   const status = result.status;
   const length = result.length;
   const quality = result.quality;
+  const reviewItems = quality.review_required_items || result.review_required_items || [];
   const lines = [];
   let verdict = {
     ready: `第 ${chapter} 章检查完了，可以提交。`,
+    review_required: `第 ${chapter} 章没有硬伤，但有 ${reviewItems.length} 处风格项需要重点复核。`,
     needs_decision: `第 ${chapter} 章没有必须改的，但字数不在范围里，要请作者定。`,
     blocked: `第 ${chapter} 章有必须改的地方，改完再查一次。`,
     invalid: `第 ${chapter} 章正文是空的或读不出字数，先把正文写进去再查。`,
@@ -568,6 +694,10 @@ function plainReport(result) {
     lines.push(`必须改的 ${blocking.length} 处：`);
     for (const row of blocking) lines.push(findingLine(row));
   }
+  if (reviewItems.length) {
+    lines.push(`${REVIEW_GUIDANCE}（共 ${reviewItems.length} 处）：`);
+    for (const row of reviewItems) lines.push(reviewRequiredLine(row));
+  }
   const advisories = quality.advisories || [];
   if (advisories.length) {
     const semantic = quality.semantic_advisories || 0;
@@ -577,7 +707,7 @@ function plainReport(result) {
       lines.push(`- 另有 ${advisories.length - PLAIN_SHOWN} 处，见 chapter check 的完整结果`);
     }
   }
-  if (!blocking.length && !advisories.length && (status === 'ready' || status === 'needs_decision')) {
+  if (!blocking.length && !reviewItems.length && !advisories.length && (status === 'ready' || status === 'needs_decision')) {
     lines.push('没发现 AI 腔或写坏的地方。');
   }
   const frag = result.fragmentation || {};
@@ -672,6 +802,9 @@ function parseCliArgs(argv) {
     fixPunctuation: false,
     plain: false,
     force: false,
+    acks: [],
+    ackAll: null,
+    allowGap: false,
   };
   if (command === 'wordcount') {
     if (!['measure', 'check', 'checkpoint'].includes(sub)) {
@@ -735,8 +868,16 @@ function parseCliArgs(argv) {
         args.fixPunctuation = true;
       } else if (sub === 'check' && token === '--plain') {
         args.plain = true;
-      } else if (sub === 'accept-current-length' && token === '--force') {
+      } else if (sub !== 'check' && token === '--force') {
         args.force = true;
+      } else if (sub !== 'check' && token === '--allow-gap') {
+        args.allowGap = true;
+      } else if (sub !== 'check' && (token === '--ack' || token.startsWith('--ack='))) {
+        args.acks.push(parseAckArg(readVal('--ack')));
+      } else if (sub !== 'check' && (token === '--ack-all' || token.startsWith('--ack-all='))) {
+        const reason = readVal('--ack-all').trim();
+        if (!reason) throw new CliArgumentError('argument --ack-all: reason must be non-empty');
+        args.ackAll = reason;
       } else {
         throw new CliArgumentError(`unrecognized arguments: ${token}`);
       }
@@ -874,6 +1015,9 @@ function main(argv = process.argv.slice(2)) {
         acceptCurrentLength: args.subcommand === 'accept-current-length',
         authorRange,
         force: args.force,
+        acks: args.acks,
+        ackAll: args.ackAll,
+        allowGap: args.allowGap,
       });
     }
   } catch (err) {
@@ -882,7 +1026,13 @@ function main(argv = process.argv.slice(2)) {
       if (args.plain) {
         textLines(plainError(err.message));
       } else {
-        jsonLine({ schema: CHAPTER_ERROR_SCHEMA, status: 'error', error_code: code, message: err.message });
+        jsonLine({
+          schema: CHAPTER_ERROR_SCHEMA,
+          status: 'error',
+          error_code: code,
+          message: err.message,
+          ...(err instanceof ChapterRefused && err.details ? err.details : {}),
+        });
       }
       return ERROR_EXIT_CODES[code] ?? 2;
     }

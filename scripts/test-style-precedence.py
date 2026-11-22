@@ -35,14 +35,18 @@ class StyleTests(unittest.TestCase):
     def node(self, script, *args):
         return subprocess.run(['node', str(script), *map(str, args)], capture_output=True, encoding='utf-8')
 
-    def scan(self):
-        return self.node(SCRIPTS / 'check-ai-patterns.js', '--json', '--fail-on=blocking', self.file)
+    def scan(self, fail_on='review_required'):
+        return self.node(SCRIPTS / 'check-ai-patterns.js', '--json', f'--fail-on={fail_on}', self.file)
 
     def test_default_check_still_blocks(self):
         self.file.write_text('## 第1章 门\n“钥匙在——”\n钥匙在手——门开了。\n' + BLOCKING_NOT_IS, encoding='utf-8')
+        self.assertEqual(self.scan('blocking').returncode, 0)
         result = self.scan()
         self.assertEqual(result.returncode, 1, result.stderr)
-        findings = json.loads(result.stdout)['findings']
+        payload = json.loads(result.stdout)
+        findings = payload['findings']
+        self.assertGreater(payload['review_required'], 0)
+        self.assertEqual(payload['blocking'], 0)
         self.assertEqual({'em-dash', 'not-is-comparison'}, {f['type'] for f in findings})
         self.assertEqual([3], [f['line'] for f in findings if f['type'] == 'em-dash'])
 
@@ -52,9 +56,9 @@ class StyleTests(unittest.TestCase):
         result = self.scan()
         self.assertEqual(result.returncode, 1)
         findings = json.loads(result.stdout)['findings']
-        blocking = [f for f in findings if f['severity'] == 'blocking']
-        self.assertEqual(['voice-contrast', 'voice-contrast'], [f['type'] for f in blocking])
-        self.assertIn('声音不大', blocking[0]['excerpt'])
+        review_req = [f for f in findings if f['severity'] == 'review_required']
+        self.assertEqual(['voice-contrast', 'voice-contrast'], [f['type'] for f in review_req])
+        self.assertIn('声音不大', review_req[0]['excerpt'])
 
     def test_pause_normalizer_keeps_author_choice_and_removes_unapproved_pause(self):
         self.allow.write_text('# 来源：文风；旁白停顿保留破折号\n——\n……\n', encoding='utf-8')

@@ -5,9 +5,8 @@
 每章按本文件执行，日更批次见 `workflow-daily.md`。
 
 **缺文件先修，本轮不写**（修好再从「检查细纲」开始；告诉作者用下方「写不下去、要停下时」的问法）：
-- `tracking_commit.js check` 不过：按它的提示修。
+- `tracking_commit.js check` 报错（exit 2）：按提示修好；若仅返回 `drift_warnings`（自动生成的视图与 state 不一致，可能是作者手工修改），先问作者是要通过 `mode=revision` 吸回改动，还是按 `_tracking-state.json` 重建。
 - 已有正文却缺 `_tracking-state.json`：请作者走 `/story-import`「旧追踪项目迁移」；新书还没有正文时不算缺，按下方初始化。
-- 自动生成的视图与 state 不一致：按 [tracking-transaction.md](tracking-transaction.md) 为该章提交 `mode=revision` 事务重建，不手改、不继续下一章。
 - 有对标却缺情绪模块／节奏／文风：请作者用 `/story-long-analyze` 补拆。本书有自定义文风时不缺文风；无对标（判定见 [benchmark-recall.md](benchmark-recall.md)）或召回降档成立时都不算缺。
 
 **缺细纲**：写指定章时按 [outline-template.md](outline-template.md) 补建点名章细纲（目标情绪、主角目标/关键选择须明确，其余未知写 `[待补充]`），跑 `check-outline-contract.js` 验收再写，汇报里说补了什么；日更批内停在该章前问作者。
@@ -35,11 +34,11 @@
 7. **检测收口**：
    - 细纲每个情节点**至少出现一次**，漏则退回补写。
    - 运行 `node {skill 根}/scripts/storyctl.js chapter check --project {项目根} --chapter {N} --fix-punctuation --plain`：一次整理标点并跑 AI 句式、退化（`check-degeneration.js`）、细纲照搬、字数与碎度/动作心理比（后两项仅参考）。改动后重跑，不再单调各检测脚本；工具未跑通则不提交并告知作者（缺 Node 提示装 Node.js 18+）。
-   - **字数出了范围**：欠字不补、不重试，用下方字数问法请作者选；超字交 narrative-writer 按 agent-calls「超字一次净删」删一次（自写同样只删不加），复检仍超请作者选。选 1 → `chapter accept-current-length`（不到目标一半被拒时先告知，作者坚持加 `--force`）；选 2 → 等作者改完细纲或目标后回本步；选 3 → 删本章正文与工作目录，不提交。
+   - **字数出了范围**：欠字不补、不重试，用下方字数问法请作者选；超字交 narrative-writer 按 agent-calls「超字一次净删」删一次（自写同样只删不加），复检仍超请作者选。选 1 → `chapter accept-current-length` 或 `chapter commit --ack length:<简短理由>`（不到目标一半仍硬拦，作者坚持才加 `--force`）；选 2 → 等作者改完细纲或目标后回本步；选 3 → 删本章正文与工作目录，不提交。
 8. **检查钩子与爽点**：章尾有往下看的理由，推进/爆发章爽点到位；不达标只修批准内容，修后重跑「检测收口」。
 9. **元信息扫描**：标题行以外清掉第X章、上一章、本章、前文、后文、伏笔、细纲、读者等工程词，改成角色感知的事件锚点。
-10. **检测结果处理**：检测器的必须改与 checker 的 S1/S2 必须修；建议看与 S3 读原文确属问题才改（拿不准按类别查 `references/banned-words.md` 对应节，不整读）；细纲照搬里判定保留的补进细纲「原样出现的原话」（旧名复沓锚句，不算改大纲）。改完重跑「检测收口」复扫。
-11. **更新追踪**：跑 `node {skill 根}/scripts/tracking_commit.js draft --project {项目根} --chapter {N}` 预填 `tracking.json`，只填 `delta`、本章结尾时间/场景与变化的核心角色快照（`character_snapshots`），撤下的约束/风险写入 `delta.retired_context_items`；出错才读 [tracking-transaction.md](tracking-transaction.md)。再跑 `node {skill 根}/scripts/storyctl.js chapter commit --project {项目根} --chapter {N} --input {工作目录}/tracking.json`（接受当前长度换 `accept-current-length`）。判为「登记」的申报项一并提交；有「先问作者」项时暂停提交。「本章没写成的」：细纲没给的追加进本段排纲笔记「写纲时补的」，先问作者的走下方处置表。
+10. **检测结果处理**：硬阻断项（退化、未闭合注释、机械标点）与 checker 的 S1/S2 必须清零；风格重点复核项（`review_required`）逐条检查，优先修改，确为剧情需要保留则在提交时传 `--ack <rule-id>:<简短理由>`（或多类用 `--ack-all <简短理由>`）；普通建议看与 S3 读原文确属问题才改（拿不准按类别查 `references/banned-words.md` 对应节，不整读）；细纲照搬里判定保留的补进细纲「原样出现的原话」（旧名复沓锚句，不算改大纲）。改完重跑「检测收口」复扫。
+11. **更新追踪**：跑 `node {skill 根}/scripts/tracking_commit.js draft --project {项目根} --chapter {N}` 预填 `tracking.json`（有意跳章加 `--allow-gap`），只填 `delta`、本章结尾时间/场景与变化的核心角色快照（`character_snapshots`），撤下的约束/风险写入 `delta.retired_context_items`；出错才读 [tracking-transaction.md](tracking-transaction.md)。再跑 `node {skill 根}/scripts/storyctl.js chapter commit --project {项目根} --chapter {N} --input {工作目录}/tracking.json`（保留了风格复核项则附 `--ack <rule-id>:<简短理由>`；接受带外长度可附 `--ack length:<理由>` 或换 `accept-current-length`）。判为「登记」的申报项一并提交；有「先问作者」项时暂停提交。「本章没写成的」：细纲没给的追加进本段排纲笔记「写纲时补的」，先问作者的走下方处置表。
 12. **提交后核对**：返回 `tracking_committed: true` 即本章完成。
 
 ## 向作者汇报
@@ -52,7 +51,7 @@
 这章：{两三句讲发生了什么，停在哪个钩子上}。
 {写前补了细纲两行就一句：「细纲没写这章要让读者感受什么，我按卷纲补了：{补的内容}」；没有就删掉此行}
 {有需作者留意的新人物/新设定就一句话，如「加了个跑腿的小厮阿福，后面可能还会用」；没有就删掉此行}
-{自查结论一句话：「自查过设定和前文，没发现冲突」或「发现一处前后不一：{什么}，已按前文改正」}
+{自查结论一句话：「自查过设定和前文，没发现冲突」或「发现一处前后不一：{什么}，已按前文改正」；若提交时特意保留了某处风格写法，顺带一句白话说明留了哪处及原因}
 {有习惯没带上就用原话说，核对报告拼好了就照说；没有就删掉此行}
 下一章：第{N+1}章《{章名}》，要接着写吗？
 ```
@@ -92,7 +91,7 @@
 
 字数范围按 SKILL.md「记下本轮约束」。查三个维度：**情绪交付**（目标情绪是否兑现）、**钩子与爽点**（「检查钩子与爽点」）、**技术质量**（一致性、格式、禁用词；排查具体问题时才读 [long-chapter-quality.md](long-chapter-quality.md)）。
 
-**写后同轮清零**：同一轮内完成「检测收口」到「检测结果处理」，必须改的（含写后 hook 推回的毒句式）清零才算本章完成。**唯一豁免**：用户显式说"本章不去味/跳过检查"时，在该章标题行下加一行 `<!-- 去味:跳过 -->`（写后 hook 与下一章前的欠账拦截都认它）。退化类（复读、截断、拒绝语、工程词泄漏）只重写受影响段落，最多 2 次，仍失败按停下问法请作者定夺；故事内系统用语、弹幕、有功能的重复台词保留。
+**写后同轮清零**：同一轮内完成「检测收口」到「检测结果处理」，硬阻断项清零、风格重点复核项改净或带理由 `--ack` 确认才算本章完成。**跳过标记**：用户显式说"本章不去味/跳过检查"时，仍可在该章标题行下加 `<!-- 去味:跳过 -->`。退化类（复读、截断、拒绝语、工程词泄漏）只重写受影响段落，最多 2 次，仍失败按停下问法请作者定夺；故事内系统用语、弹幕、有功能的重复台词保留。
 
 ### Agent 调用：consistency-checker
 
