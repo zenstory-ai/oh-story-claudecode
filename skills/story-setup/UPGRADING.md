@@ -2,7 +2,7 @@
 
 ## 当前版本
 
-助手版本 45（v0.10.5）。已有项目更新技能包后，在项目根重跑 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或直接点名），再新开会话。
+助手版本 45（待发布版本 / Unreleased）。已有项目更新技能包后，在项目根重跑 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或直接点名），再新开会话。
 
 - `setup_skill_version: 1.3.12`
 - `agents_version: 45`
@@ -17,7 +17,7 @@
 4. 正在写的长篇：确认每本书有 `追踪/_tracking-state.json`。没有就按下方「追踪模型迁移」重建，否则写下一章会被拦。
 5. 拆文成果或细纲不满足当前格式时，按检查提示定点补齐，不因单项缺口整本重拆。
 
-## 本次更新必须重跑 story-setup（助手版本 45）
+## 待发布版本（Unreleased，助手版本 45，更新后必须重跑 story-setup）
 
 - 五个支持 Hook 的宿主（Claude Code、Codex、OpenCode、Antigravity、ZCode）全部统一到单一 Node.js 18+ 共享核 `story_hook_core.js`：Claude Code 的 `.claude/hooks/` 收敛为 `run-story-hook.sh` + `story_hook_cli.js` + `story_hook_core.js`（重跑 story-setup 会自动清理旧版独立 `.sh` 脚本并刷新 `.claude/settings.local.json`），Codex 改用 `story_codex_hook.js` + `story_hook_core.js`，OpenCode `pre-commit` 改为调用同一共享核。
 - 需要本机 PATH 中有 Node.js 18+；缺 Node 时会在会话起点发出提示。书稿、设定、追踪不用迁移。
@@ -79,7 +79,7 @@
 
 重跑一次 story-setup 就会装上当前版本，中间版本不用逐个补。下面是写书时会碰到的变化：
 
-- 长篇写后检查需要 Node.js 18+：缺 Node 时这一章不能提交，装好后重跑检查。长篇拆文需要 Python 3。
+- 长篇写后检查需要 Node.js 18+：缺 Node 时这一章不能提交，装好后重跑检查。长篇拆文仅可选的人物关系图 PNG 渲染（`render_relation_chart.py`）需要 Python 3。
 - 改已经提交过的章，写作流程会先生成这一章的修订草稿再提交，不直接改追踪文件。
 - 细纲可以加一行「字数范围：2000-2600」，填入你给的范围；没写就按默认上下浮动。老细纲、老卷纲照常可用，排纲时才按新格式补。
 - 写正文前细纲不能是空壳（去掉 `#` 号和空白不到 30 字会被拦）；标了 `<!-- 去味:跳过 -->` 的章不会因为这行标记被判有问题。

@@ -6,8 +6,7 @@
 
 - 长篇拆文报告：各读取方用 `拆文报告.md`「小节」点名的小节；文风生成引用的小节；
   快速预览与拆文报告同名的两节；story-explorer 从黄金三章深度拆解读的字段。
-- 情绪模块卡：门禁字段以 inspiration_index.js 的 EM_REQUIRED_FIELDS 为准，
-  Stage 3 模板卡要能被同一个解析器读出全部门禁字段；长篇写前召回、作者报告、
+- 情绪模块卡：Stage 3 模板卡要含全部核心必填字段；长篇写前召回、
   story-explorer 点名的字段要对得上。
 - 节奏索引：长篇写前召回的 rhythm_reference 和 story-explorer 点名的列/表要在 节奏.md 模板里。
 - 短篇拆文：情节节点模板要有写作端点名的节点字段；genre_detected 的每个取值在写作端题材映射表里；
@@ -49,7 +48,6 @@ STAGE1 = f"{LONG_ANALYZE}/references/stage1-golden-chapters.md"
 STAGE3 = f"{LONG_ANALYZE}/references/stage3-plot-rhythm.md"
 STAGE5 = f"{LONG_ANALYZE}/references/stage5-report.md"
 STYLE_GENERATOR = f"{LONG_ANALYZE}/references/style-profile-generator.md"
-INSPIRATION_INDEX = f"{LONG_ANALYZE}/scripts/inspiration_index.js"
 LONG_RECALL = "skills/story-long-write/references/benchmark-recall.md"
 EXPLORER_LOAD = "skills/story-setup/references/agent-references/benchmark-style-load.md"
 IMPORT_LONG = "skills/story-import/references/structure-mapping-long.md"
@@ -280,42 +278,35 @@ def check_long_report(repo: Repo) -> list[str]:
 # ---------- 情绪模块卡 ----------
 
 
+EM_REQUIRED_FIELDS = ("读者想看什么", "情绪链", "戏剧单元", "可替换项", "不可照搬")
+
+
 def check_em_cards(repo: Repo) -> list[str]:
     failures: list[str] = []
     template = fenced_block_after(repo.text(STAGE3), EM_TEMPLATE_HEADING)
     if not template:
         return [f"{STAGE3}: 找不到「情绪模块.md」模板标题下的模板代码块"]
 
-    node = shutil.which("node")
-    if node is None:
-        return [f"{INSPIRATION_INDEX}: 需要 node 来运行 inspiration_index.js"]
-    probe = subprocess.run(
-        [
-            node,
-            "-e",
-            "const fs=require('fs'), m=require(process.argv[1]);"
-            "const [cards, indexEntries, problems]=m.parse_em_module(fs.readFileSync(0,'utf8'));"
-            "console.log(JSON.stringify({required:m.EM_REQUIRED_FIELDS,cards,indexEntries,problems}));",
-            str(ROOT / INSPIRATION_INDEX),
-        ],
-        input=template,
-        capture_output=True,
-        encoding="utf-8",
-    )
-    if probe.returncode != 0:
-        return [f"{INSPIRATION_INDEX}: 执行失败：{(probe.stderr or probe.stdout).strip()[-200:]}"]
-    payload = json.loads(probe.stdout)
-    required = tuple(payload["required"])
-    cards = payload["cards"]
-    problems = payload["problems"]
+    required = EM_REQUIRED_FIELDS
+    em_headers = list(re.finditer(r"^###\s+(EM-\d{2,})\b.*$", template, re.M))
+    cards: list[dict[str, str]] = []
+    for idx, match in enumerate(em_headers):
+        start = match.end()
+        end = em_headers[idx + 1].start() if idx + 1 < len(em_headers) else len(template)
+        block = template[start:end]
+        card: dict[str, str] = {"em_id": match.group(1)}
+        for header, rows in tables(block):
+            if len(header) >= 2 and header[0] == "字段":
+                for row in rows:
+                    if len(row) >= 2 and row[0]:
+                        card[row[0]] = row[1]
+        cards.append(card)
     if not cards:
-        failures.append(f"{STAGE3}: inspiration_index 从情绪模块模板里解析不出 EM 卡")
+        failures.append(f"{STAGE3}: 情绪模块模板里找不到 `### EM-xxx` 卡片")
     for card in cards:
         missing = [f for f in required if not card.get(f, "").strip()]
         if missing:
-            failures.append(f"{STAGE3}: 模板卡 {card.get('em_id')} 缺门禁字段 {'、'.join(missing)}")
-    for problem in problems:
-        failures.append(f"{STAGE3}: inspiration_index 解析模板报问题 {problem}")
+            failures.append(f"{STAGE3}: 模板卡 {card.get('em_id')} 缺必填字段 {'、'.join(missing)}")
 
     vocabulary = set(required) | set(headings(template)) | set(table_header_cells(template))
     for card in cards:

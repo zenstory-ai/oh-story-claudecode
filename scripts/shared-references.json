@@ -68,6 +68,11 @@
       ]
     },
     {
+      "name": "long-emotional-methods",
+      "source": "skills/story-long-write/references/emotional-methods.md",
+      "targets": ["skills/story-setup/references/agent-references/long-emotional-methods.md"]
+    },
+    {
       "name": "short-emotional-methods",
       "source": "skills/story-short-write/references/emotional-methods.md",
       "targets": ["skills/story-setup/references/agent-references/short-emotional-methods.md"]
@@ -189,27 +194,11 @@
   ],
   "derived_groups": [
     {
-      "name": "character-basics-deployment",
-      "reason": "Setup deploys the writing character taxonomy as an agent reference with consumer-specific edits.",
-      "members": [
-        "skills/story-long-write/references/character-basics.md",
-        "skills/story-setup/references/agent-references/character-basics.md"
-      ]
-    },
-    {
       "name": "genre-readers-deployment",
       "reason": "Setup deploys the writing reader taxonomy as an agent reference with consumer-specific edits.",
       "members": [
         "skills/story-long-write/references/genre-readers.md",
         "skills/story-setup/references/agent-references/genre-readers.md"
-      ]
-    },
-    {
-      "name": "long-emotional-methods-deployment",
-      "reason": "Setup adjusts the title while deploying the long method.",
-      "members": [
-        "skills/story-long-write/references/emotional-methods.md",
-        "skills/story-setup/references/agent-references/long-emotional-methods.md"
       ]
     }
   ],

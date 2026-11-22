@@ -6,7 +6,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 ---
 # story-review：多视角对抗式审查
 
-> Spawn 版本提示（不阻断 spawn）：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 45` 不一致时（标记缺失、字段缺失/非整数、小于或大于 45）**照常按当前宿主角色来源检查并 spawn**；同时在「这次怎么审的」里用一句白话提示作者「审稿助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」，`Notice: agents bundle 版本不匹配（项目 {N}，本版 45）` 原文写进技术备注行；大于 45 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。版本提示本身不触发降级；文件缺失或异常、工具不可用、递归限制或调用失败按 Phase 0 处理，技术备注写 `Fallback: ... -> solo`。
+> 版本：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 45` 不一致时（标记缺失、字段缺失/非整数、小于或大于 45）**照常按当前宿主角色来源检查并 spawn**；同时在「这次怎么审的」里用一句白话提示作者「审稿助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」；大于 45 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。版本提示本身不触发降级；文件缺失或异常、工具不可用、递归限制或调用失败按 Phase 0 处理，在「这次怎么审的」里用一句白话说明，不另加技术备注行。
 
 你负责协调审查，找出小说的结构、角色、文字与设定问题，给出有原文依据的修改建议。
 
@@ -35,10 +35,10 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
       - **Codex agent（`.codex/agents/`）**：文件名为 `{agent}.toml`，TOML 必须可解析，且包含 `name`、`description`、`developer_instructions`；`name` 必须与目标 agent 完全一致。
       - **Antigravity agent（`.agents/agents/`）**：路径为 `.agents/agents/agent-name/agent.md`（`agent-name` 为目标 agent 名），frontmatter 必须可解析，且 `name` 与目标 agent 一致、`mainAgent: false`、`subagent: true`、`tools` 非空；缺失或不匹配视为 malformed。
       - **ZCode plugin agent**：注册名与目标角色一致；可读定义须有可解析的 `name`、`description` 和正文。定义不可直接读时以运行时注册为准，不扫描其他端文件。
-   - 任一必需角色缺失或 malformed 时不尝试派发，降级 `solo`；白话说明助手缺失或损坏，并建议当前宿主重部署（ZCode 更新/启用 oh-story 插件后新开会话）。`missing agents -> solo` / `malformed agents -> solo` 与问题角色/文件写进技术备注 Fallback、Files 两栏。
-5. **确认 Agent 工具可用**：Claude/OpenCode/Codex 需要当前运行时的子 Agent/Task 工具，Antigravity 需要 `invoke_subagent`，ZCode 用 `Agent` 按当前 schema 派发注册角色；不可用时降级 `solo`，技术备注写 `Fallback: agent tool unavailable -> solo`。
-6. **运行时失败降级**：如果任何 Agent spawn 返回失败、`subagent_type` / `agent` / `agent_type` / `TypeName` 不可用、frontmatter/TOML 运行时解析失败或子 Agent 无法启动，停止继续 spawn，改用 `solo` 重新审查，技术备注写 `Fallback: spawn failed -> solo` 与失败的 agent 名；不要把部分成功的 Agent 结果当成 full/lean 结论。
-7. **确定实际模式**：请求模式与实际模式都写进报告末尾的技术备注行。
+   - 任一必需角色缺失或 malformed 时不尝试派发，降级 `solo`；在「这次怎么审的」里白话说明审稿助手缺失或损坏，并建议当前宿主重部署（ZCode 更新/启用 oh-story 插件后新开会话）。
+5. **确认 Agent 工具可用**：Claude/OpenCode/Codex 需要当前运行时的子 Agent/Task 工具，Antigravity 需要 `invoke_subagent`，ZCode 用 `Agent` 按当前 schema 派发注册角色；不可用时降级 `solo`，在「这次怎么审的」里用白话说明由当前会话直接审。
+6. **运行时失败降级**：如果任何 Agent spawn 返回失败、`subagent_type` / `agent` / `agent_type` / `TypeName` 不可用、frontmatter/TOML 运行时解析失败或子 Agent 无法启动，停止继续 spawn，改用 `solo` 重新审查，并在「这次怎么审的」里用白话说明审稿助手未能启动、改为单人审；不要把部分成功的 Agent 结果当成 full/lean 结论。
+7. **确定实际模式**：在报告开头「这次怎么审的」里用白话说明实际审查方式与降级原因（如有），不另加技术备注行。
 
 ---
 
@@ -48,11 +48,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ### 报告面向作者（必须遵守）
 
-报告写给作者：审了什么、哪里要改、为什么（用读者感受和故事后果说，附原文引用）、要作者拍板的事、下一步。reviewer 名、S1–S4、Gate、检测器类别名、脚本名、PASS/FAIL、文件字段名不进正文；位置写「第 N 章「引文」」或「第 N 章第 M 段」。优先级换成白话（小节标题照模板）：S1、S2 → **必须改**，S3 → **建议改**，S4 → **可以不改**。执行路径只写在报告最后一行，格式固定：
-
-```text
-技术备注：Mode {请求}→{实际} · Fallback {none | project custom agents unavailable -> solo | missing agents -> solo | malformed agents -> solo | agent tool unavailable -> solo | spawn failed -> solo | subagent recursion guard -> solo} · Rubric {fanqie | qidian | zhihu | generic} ({file | embedded})[ · Files {缺失或异常的 agent 文件}][ · Notice {版本不匹配原文}]
-```
+报告写给作者：审了什么、哪里要改、为什么（用读者感受和故事后果说，附原文引用）、要作者拍板的事、下一步。reviewer 名、S1–S4、Gate、检测器类别名、脚本名、PASS/FAIL、文件字段名不进正文；位置写「第 N 章「引文」」或「第 N 章第 M 段」。优先级换成白话（小节标题照模板）：S1、S2 → **必须改**，S3 → **建议改**，S4 → **可以不改**。不加技术备注行：审查方式、是否降级单人审、是否用了内置标准以及助手版本提示，都在报告开头「这次怎么审的」里用白话说清。
 
 ### 参考资料解析顺序
 
@@ -80,7 +76,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ### 内置审查基准包（路径不可读时必用）
 
-如果上述参考文件在当前项目中不可读，**不要把审查降级为无 rubric，也不要在报告里说“无法加载具体 rubric”后停止使用标准**。必须使用本节内置基准包，技术备注行的 Rubric 来源写 `embedded`。
+如果上述参考文件在当前项目中不可读，**不要把审查降级为无 rubric，也不要在报告里说“无法加载具体 rubric”后停止使用标准**。必须使用本节内置基准包，并在「这次怎么审的」里注明按内置标准审查。
 
 通用网文内容 rubric：
 - 核心卖点：本章是否围绕明确卖点推进；看不出卖点至少 S2。
@@ -139,7 +135,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
      | 短篇 | 知乎盐言（也写作盐选）、番茄、七猫、黑岩、小程序、未定、没写 | `story-review/references/rubrics/zhihu.md` |
 
    - 短篇另按 `设定.md`「平台基调」核对格式、引号和导语。
-   - 技术备注行的 Rubric 写叠加的平台表（`fanqie | qidian | zhihu`），不叠加写 `generic`；括号里文件可读写 `file`，用了内置摘要写 `embedded`。
+   - 在「这次怎么审的」里用白话说明按通用网文标准及叠加的平台要求（若有）审查。
 5. **形成审查基准包摘要**：把已加载的文件内容或内置 fallback 摘要压缩为 5-12 条审查标准，供后续 solo 和子 Agent 共用（保留剧情循环、高潮构建、关系进展、连贯句段反电报碎句各一条，审第 1-3 章时再加开头新鲜度）。
 6. **确定性预检（只报告，不修改）**：当审查范围包含本地正文文件路径时，运行本 skill 自带脚本：
    ```bash
