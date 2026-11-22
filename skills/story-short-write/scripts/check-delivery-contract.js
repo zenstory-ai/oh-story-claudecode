@@ -51,7 +51,7 @@ function makeCheck(id, ok, evidence, expected, repair, severity = 'blocking') {
     file: '正文.md',
     evidence,
     expected,
-    references: ['references/short-format.md'],
+    references: ['SKILL.md'],
     repair,
   }
 }
@@ -144,7 +144,7 @@ function verify(projectDir, contract, options = {}) {
     'delivery.section-style',
     markers.length > 0 && styles.size === 1,
     markers.length ? `小节标记样式：${Array.from(styles).join('、')}` : '没有可识别的小节标记',
-    '建议全文统一使用 short-format.md 允许的一种小节标记',
+    '建议全文统一使用 SKILL.md 允许的一种小节标记',
     '复核小节标记样式：一般应全文统一，只调整标记行，不改正文内容。',
     'advisory'
   ))
