@@ -348,12 +348,18 @@ function checkBlockingQuality(outline, body) {
     });
   } else {
     const completed = _hooks.runNodeScript(outlineCopy, ['--outline', String(outline), String(body)]);
-    if (completed.status !== 0) {
+    if (completed.status === 1) {
       advisories.push({
         source: 'outline-copy',
         type: 'OUTLINE_COPY_REVIEW',
         review: 'semantic',
         message: (completed.stdout || '').trim(),
+      });
+    } else if (completed.status !== 0) {
+      toolErrors.push({
+        type: 'TOOL_ERROR',
+        tool: 'check-outline-copy.js',
+        message: (completed.stderr || '').trim() || `exited ${completed.status}`,
       });
     }
   }

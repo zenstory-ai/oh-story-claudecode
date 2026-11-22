@@ -316,6 +316,7 @@ function parseEntry(entry, file) {
     resolved: !UNRESOLVED_TITLES.has(entry.title) && !/^bookId:/.test(entry.title),
     author,
     genre,
+    section: entry.section || "",
     status: cls.status,
     words,
     metrics,

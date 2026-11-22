@@ -223,15 +223,47 @@ try {
   assert.strictEqual(run(["--quote-mode=curly", curly]).status, 0);
   assert.strictEqual(fs.readFileSync(curly, "utf8"), "“甲”与“乙‘丙’” don't ‘内嵌’\n");
 
+  // --quote-mode=curly 必须保护单行/跨行 HTML 注释与白名单字面量，并跨行延续引号栈。
+  const curlyMultiline = path.join(tmpDir, "curly-multiline.md");
+  fs.writeFileSync(
+    curlyMultiline,
+    '<!-- "comment" -->\n<!--\n"跨行注释"\n-->\n"第一段没收口\n第二段收口"\n',
+    "utf8"
+  );
+  assert.strictEqual(run(["--quote-mode=curly", curlyMultiline]).status, 0);
+  assert.strictEqual(
+    fs.readFileSync(curlyMultiline, "utf8"),
+    '<!-- "comment" -->\n<!--\n"跨行注释"\n-->\n“第一段没收口\n第二段收口”\n',
+    "curly mode must preserve HTML comments and close multi-line quotes cleanly"
+  );
+  assert.strictEqual(
+    run(["--check", "--quote-mode=curly", curlyMultiline]).status,
+    0,
+    "normalized multi-line curly quotes with HTML comments must pass --check idempotently"
+  );
+
+  // 白名单字面量中的引号在 quote-mode 下同样受保护。
+  const whitelistDir = path.join(tmpDir, "wl-book");
+  fs.mkdirSync(whitelistDir, { recursive: true });
+  fs.writeFileSync(path.join(whitelistDir, ".deslop-whitelist"), '"KEEP_RAW"\n', "utf8");
+  const wlFile = path.join(whitelistDir, "chapter.md");
+  fs.writeFileSync(wlFile, '系统弹出 "KEEP_RAW" 后，他说"走吧"。\n', "utf8");
+  assert.strictEqual(run(["--quote-mode=curly", wlFile]).status, 0);
+  assert.strictEqual(
+    fs.readFileSync(wlFile, "utf8"),
+    '系统弹出 "KEEP_RAW" 后，他说“走吧”。\n',
+    "style-whitelist spans must remain untouched in quote-mode"
+  );
+
   const ascii = path.join(tmpDir, "ascii.md");
-  fs.writeFileSync(ascii, "「甲」与“乙”\n", "utf8");
+  fs.writeFileSync(ascii, "<!-- “保留注释” -->\n「甲」与“乙”\n", "utf8");
   assert.strictEqual(run(["--quote-mode=ascii", ascii]).status, 0);
-  assert.strictEqual(fs.readFileSync(ascii, "utf8"), '"甲"与"乙"\n');
+  assert.strictEqual(fs.readFileSync(ascii, "utf8"), '<!-- “保留注释” -->\n"甲"与"乙"\n');
 
   const yan = path.join(tmpDir, "yan.md");
-  fs.writeFileSync(yan, '"甲"和“乙”\n', "utf8");
+  fs.writeFileSync(yan, '<!-- "保留注释" -->\n"甲"和“乙”\n', "utf8");
   assert.strictEqual(run(["--quote-mode", "yan", yan]).status, 0);
-  assert.strictEqual(fs.readFileSync(yan, "utf8"), "「甲」和「乙」\n");
+  assert.strictEqual(fs.readFileSync(yan, "utf8"), '<!-- "保留注释" -->\n「甲」和「乙」\n');
 
   const missing = run([path.join(tmpDir, "missing.md")]);
   assert.strictEqual(missing.status, 2);

@@ -864,10 +864,11 @@ function main(argv = process.argv.slice(2)) {
   const title = outlineFile ? extractTitle(readText(outlineFile) || '', args.chapter) : null;
   if (title) {
     const proseDir = path.join(project, '正文');
+    const ownChapterRe = new RegExp(`^第0*${args.chapter}章`);
     const clashes = isDir(proseDir)
       ? fs
           .readdirSync(proseDir)
-          .filter((n) => n.endsWith(`_${title}.md`) && !n.startsWith(`第${pad3(args.chapter)}章`))
+          .filter((n) => n.endsWith(`_${title}.md`) && !ownChapterRe.test(n))
           .sort()
       : [];
     report.push(`标题预检：《${title}》${clashes.length ? `与既有章重名 → ${clashes.join('、')}` : '无重名'}`);

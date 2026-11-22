@@ -41,14 +41,23 @@ def usage_add(tot, u):
 
 
 def check_status(text):
-    """chapter check 输出是一行 JSON；逐行找 story-chapter-check 的那行取 length.status。"""
-    for line in (text or '').splitlines():
-        line = line.strip()
+    """chapter check 输出为一行 JSON 或 --plain 白话报告；优先解析 JSON 取 length.status，否则回落白话行。"""
+    lines = [line.strip() for line in (text or '').splitlines()]
+    for line in lines:
         if 'story-chapter-check' in line and line.startswith('{'):
             try:
                 return json.loads(line)['length']['status']
             except (ValueError, KeyError, TypeError):
                 pass
+    for line in lines:
+        if re.search(r'比范围（[^）]+）少了约', line):
+            return 'under'
+        if re.search(r'比范围（[^）]+）多了约', line):
+            return 'over'
+        if re.search(r'(?<!不)在范围里', line):
+            return 'internal_pass'
+        if '正文是空的' in line:
+            return 'invalid'
     return None
 
 

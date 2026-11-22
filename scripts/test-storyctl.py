@@ -615,6 +615,19 @@ class ToolFailureTests(unittest.TestCase):
         self.assertEqual(unnormalized["status"], "fail", unnormalized)
         self.assertEqual(unnormalized["blocking_findings"][0]["type"], "PUNCTUATION_NOT_NORMALIZED")
 
+    @unittest.skipUnless(shutil.which("node"), "node absent")
+    def test_outline_copy_crash_is_tool_unavailable_not_advisory(self) -> None:
+        crashed = self._quality_with("check-outline-copy.js", 2, "")
+        self.assertEqual(crashed["status"], "unavailable", crashed)
+        self.assertEqual(crashed["advisories"], [], crashed)
+        self.assertEqual(crashed["tool_errors"][0]["type"], "TOOL_ERROR", crashed)
+        self.assertEqual(crashed["tool_errors"][0]["tool"], "check-outline-copy.js", crashed)
+        self.assertEqual(storyctl._check_status({"status": "internal_pass"}, crashed), "tool_unavailable")
+        overlap = self._quality_with("check-outline-copy.js", 1, "发现 1 处与细纲重合")
+        self.assertEqual(overlap["status"], "pass", overlap)
+        self.assertEqual(overlap["tool_errors"], [], overlap)
+        self.assertEqual(overlap["advisories"][0]["type"], "OUTLINE_COPY_REVIEW", overlap)
+
 
 class OutlineRangeOverrideTests(unittest.TestCase):
     def _project(self, directory: str, range_line: str) -> Path:

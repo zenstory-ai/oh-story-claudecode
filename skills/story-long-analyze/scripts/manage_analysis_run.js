@@ -1466,17 +1466,22 @@ function digestCommand(args) {
       throw new RunError("digest_empty_request", "pass --fields and/or --points");
     }
     const chapterDir = path.join(root, "章节");
-    const chapters = [];
+    const chapterFiles = new Map();
     if (isDir(chapterDir)) {
-      for (const name of fs.readdirSync(chapterDir)) {
+      for (const name of fs.readdirSync(chapterDir).sort()) {
         const match = /^第(\d+)章_摘要\.md$/.exec(name);
-        if (match) chapters.push(parseInt(match[1], 10));
+        if (!match) continue;
+        const chapter = parseInt(match[1], 10);
+        const filePath = path.join(chapterDir, name);
+        if (!chapterFiles.has(chapter) || name === `第${chapter}章_摘要.md`) {
+          chapterFiles.set(chapter, { chapter, filePath });
+        }
       }
     }
-    chapters.sort((a, b) => a - b);
-    for (const chapter of chapters) {
+    const chapters = Array.from(chapterFiles.values()).sort((a, b) => a.chapter - b.chapter);
+    for (const { chapter, filePath } of chapters) {
       if (window && (chapter < window[0] || chapter > window[1])) continue;
-      const text = normalized(decodeUtf8Strict(fs.readFileSync(summaryPath(root, chapter))));
+      const text = normalized(decodeUtf8Strict(fs.readFileSync(filePath)));
       const lines = [`### 第${chapter}章`];
       for (const name of fields) {
         lines.push(`- ${name}：${summaryField(text, name) || "未提供"}`);
