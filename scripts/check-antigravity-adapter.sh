@@ -121,10 +121,21 @@ for agent in agents:
 researcher = (root / 'story-researcher/agent.md').read_text(encoding='utf-8')
 assert 'has no WebSearch/webReader tool' in researcher
 assert 'never claim that web fallback ran' in researcher
-assert '### 第四步：WebSearch/webReader（兜底）' not in researcher
+assert '### 第三步：WebSearch/webReader（兜底）' not in researcher
+assert 'WebSearch/webReader（兜底）' not in researcher
 assert 'CDP 不可用时交回父会话' in researcher
+assert 'Antigravity custom subagent 只通过 `run_command` 使用 CDP' in researcher
+assert 'google | bing | websearch' not in researcher
 assert 'WebSearch/webReader 作为兜底' not in researcher
 PY
+
+mkdir -p "$TMP_DIR/drift-source" "$TMP_DIR/drift-dest"
+sed 's/CDP 可打开实际页面提取正文，搜索摘要用于定位来源；/DRIFTED_CDP_NOTE/' \
+  skills/story-setup/references/templates/agents/story-researcher.md \
+  > "$TMP_DIR/drift-source/story-researcher.md"
+if node "$GENERATOR" --source "$TMP_DIR/drift-source" --dest "$TMP_DIR/drift-dest" >/dev/null 2>&1; then
+  fail "generator must fail loudly when story-researcher adaptation patterns drift"
+fi
 
 mkdir -p "$TMP_DIR/safe-dest"
 printf 'keep\n' > "$TMP_DIR/safe-dest/sentinel.md"

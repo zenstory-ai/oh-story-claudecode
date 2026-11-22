@@ -77,13 +77,13 @@ node -e "require('http').get('http://127.0.0.1:'+process.argv[1]+'/json/version'
 - `CDP_AVAILABLE` → 使用 CDP 主链路
 - `CDP_UNAVAILABLE` → 不自己启动或重启浏览器（会关掉作者正在用的 Chrome，须作者同意）；直接降级到 WebSearch/webReader
 
-### 第三步：CDP 研究（主链路）
+### 第二步：CDP 研究（主链路）
 
-#### 3.1 构建搜索词
+#### 2.1 构建搜索词
 
 根据 `type` 和 `query` 构造 2-3 组搜索词：主关键词、关键词 + `详解/科普/入门`、关键词 + 权威限定词（如 `site:gov.cn`、`site:edu.cn` 或研究场景限定词）。
 
-#### 3.2 执行搜索
+#### 2.2 执行搜索
 
 ```bash
 # Google 搜索（默认）
@@ -93,7 +93,7 @@ agent-browser --cdp {cdp_port} wait 5000
 
 > eval 表达式整体用引号包裹，查询参数用 `URLSearchParams` 组装，避免 `&` 被 shell 拆开。
 
-#### 3.3 验证页面加载并获取搜索结果
+#### 2.3 验证页面加载并获取搜索结果
 
 ```bash
 # 获取 snapshot，检查搜索结果是否正常加载
@@ -104,7 +104,7 @@ agent-browser --cdp {cdp_port} snapshot 2>&1
 - Google 失败 → 切换 Bing：`eval "window.location.replace('https://www.bing.com/search?...')"` → wait 5000 → 重新 snapshot
 - Bing 也失败 → 降级到 WebSearch/webReader 兜底
 
-#### 3.4 从搜索结果中提取链接
+#### 2.4 从搜索结果中提取链接
 
 用 DOM 查询提取真实 URL，再导航到选定来源，避免猜测目标地址：
 
@@ -115,7 +115,7 @@ agent-browser --cdp {cdp_port} eval 'JSON.stringify(Array.from(document.querySel
 
 从返回的 JSON 列表中选择权威来源（学术、百科、官方、专业论坛），记录其 href。
 
-#### 3.5 导航到目标页面并提取正文
+#### 2.5 导航到目标页面并提取正文
 
 ```bash
 # 用提取到的真实 URL 导航（不要构造 URL；从搜索结果 DOM 中提取）
@@ -129,14 +129,14 @@ agent-browser --cdp {cdp_port} snapshot 2>&1 | head -20
 agent-browser --cdp {cdp_port} eval 'document.body.innerText.substring(0,8000)'
 ```
 
-#### 3.6 多源交叉
+#### 2.6 多源交叉
 
 至少访问 2 个独立来源（不同域名），对比关键信息：
 - 来源一致 → 高置信度
 - 来源冲突 → 记录分歧，标注各方说法
 - 只有一个来源 → 标记为低置信度，并列出进一步验证动作
 
-### 第四步：WebSearch/webReader（兜底）
+### 第三步：WebSearch/webReader（兜底）
 
 CDP 不可用且宿主实际提供 WebSearch/webReader 时使用；当前工具权限未授予它们时不直接调用，按下方失败协议回报主会话处理：
 
@@ -155,7 +155,7 @@ CDP 不可用且宿主实际提供 WebSearch/webReader 时使用；当前工具�
 2. 给出下一步动作：`"当前无法获取外部资料（{原因}）。下一步：稍后重试 / 将手动搜索结果放入参考资料/目录"`
 3. 不要编造任何内容作为替代
 
-### 第五步：整理输出
+### 第四步：整理输出
 
 按下方「输出格式」写入 `{project_dir}/参考资料/{topic}.md`。
 

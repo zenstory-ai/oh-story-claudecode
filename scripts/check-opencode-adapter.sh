@@ -678,7 +678,7 @@ PY
 assert_grep 'permissions:` 规则列表' "$REPO_ROOT/skills/story-review/SKILL.md" "story-review must validate OpenCode 2.x agents by their permissions: list"
 # #242: runtime behavioral test — loads plugin.ts against the deployed core layout (lib/) and
 # exercises ctx.location, the execute.before/after and compaction hooks. The core's byte identity is
-# owned by check-shared-files.sh; its net/guard semantics by test-prose-net-parity.sh.
+# owned by sync-shared-assets.py check; its net/guard semantics by test-story-hook-core.mjs.
 node --experimental-strip-types scripts/test-opencode-plugin.mjs
 assert_grep 'AGENTS\.md|OpenCode' "$ROOT/AGENTS.md.tmpl" "OpenCode AGENTS template must be present"
 assert_grep 'story-long-write|story-short-write|story-review' "$ROOT/AGENTS.md.tmpl" "OpenCode AGENTS template must mention story skill routing"

@@ -66,7 +66,7 @@ Phase 2 幂等：复制、写入与各宿主合并重复执行结果一致。受
 
 **部署前清理自嵌套残留与独占目录退役文件**：
 - 自嵌套残留：`{.claude,.codex,.zcode}/skills/story-setup/references/agent-references/` 与项目根 `skills/story-setup/references/agent-references/` 若多出 `agent-references/` 层，以及 `skills/story-setup/skills/`，整段删掉并记入报告。
-- 独占目录退役文件：覆盖各端 `agent-references/`、`.claude/hooks/` 及 ZCode / OpenClaw / Reasonix / generic 的 14 个已知 `{.zcode/skills,skills}/{skill-name}/` 前，运行 `node "{story-setup skill目录}/scripts/copy-path-safety.js" --prune-orphans <源目录> <目标目录>`（仅 `status: safe` 且目标非 symlink 时删源端已删文件与空子目录，`pruned` 记入报告；`same` 零改动；无 Node.js 时按同一安全条件手工清理）。`agents/`、`rules/`、`commands/` 与顶层 `skills/` 只按已知名字覆盖 oh-story 条目，不删同级用户文件或目录。
+- 独占目录退役文件：覆盖各端 `agent-references/`、`.claude/hooks/` 及 ZCode / OpenClaw / Reasonix / generic 的 14 个已知 `{.zcode/skills,skills}/{skill-name}/` 前，运行 `node "{story-setup skill目录}/scripts/copy-path-safety.js" --prune-orphans <源目录> <目标目录>`（仅 `status: safe` 且目标非 symlink 时删源端已删文件与空子目录，`pruned` 记入报告；`same` 零改动；无 Node.js 时按同一安全条件手工清理）。Codex 升级若磁盘残留退役的 `.codex/hooks/story_codex_hook.py` 一并删除并记入报告。`agents/`、`rules/`、`commands/` 与顶层 `skills/` 只按已知名字覆盖 oh-story 条目，不删同级用户文件或目录。
 
 ### Step 1：按宿主部署
 
