@@ -38,6 +38,7 @@ const CHAPTER_ERROR_SCHEMA = 'story-chapter-error/v1';
 const WORK_ROOT = ['.story', 'work'];
 
 const SHORT_PARAGRAPH_CHARS = 20;
+const LONG_PARAGRAPH_CHARS = 100;
 const HUMAN_SHORT_PARAGRAPH_RATIO = 0.38;
 const HUMAN_NARRATIVE_SENTENCE_MEDIAN = 23;
 const HUMAN_SHORT_PARAGRAPH_RANGE = [0.16, 0.62];
@@ -48,8 +49,9 @@ const HUMAN_BODY_ACTION_SENTENCE_RANGE = [0.03, 0.23];
 const HUMAN_THOUGHT_CAUSAL_SENTENCE_RATIO = 0.15;
 const HUMAN_THOUGHT_CAUSAL_SENTENCE_RANGE = [0.04, 0.28];
 
+const _STRUCTURAL_DIVIDER_RE = /^[-*_—─━=]{3,}$/;
+const _FRONTMATTER_KEY_RE = /^[A-Za-z_\u3400-\u9FFF][^:\n]{0,80}:/;
 const _QUOTED = /“[^”]*”|「[^」]*」|『[^』]*』|"[^"]*"/g;
-const _HTML_COMMENT = /<!--[\s\S]*?-->/g;
 const _BODY_ACTION_SENTENCE_RE =
   /指尖|指腹|手指|指节|手背|掌心|拳头|手腕|袖口|衣角|喉结|眼眶|眼底|眸光|目光|视线|眼神|眉头|嘴角|唇角|肩膀|呼吸|伸手|抬手|探手|拿起|拿过|取出|取过|掏出|摸出|抓起|攥住|攥紧|握住|握紧|捏住|按住|压住|扣住|拢住|摩挲|推开|拉开|打开|关上|放下|递给|挑开|掀开|扯开|转身|回头|抬头|低头|弯腰|俯身|走到|走向|坐下|站起|盯着|扫过|看向|望向/;
 const _THOUGHT_CAUSAL_SENTENCE_RE =
@@ -115,10 +117,49 @@ function round3(value) {
   return Number(value.toFixed(3));
 }
 
+function stripHtmlComments(text) {
+  const src = text || '';
+  let out = '';
+  let cursor = 0;
+  while (cursor < src.length) {
+    const start = src.indexOf('<!--', cursor);
+    if (start === -1) {
+      out += src.slice(cursor);
+      break;
+    }
+    out += src.slice(cursor, start);
+    const end = src.indexOf('-->', start + 4);
+    if (end === -1) {
+      out += src.slice(start);
+      break;
+    }
+    cursor = end + 3;
+  }
+  return out;
+}
+
+function _stripLeadingFrontmatter(text) {
+  const normalized = text.replace(/\r\n?/g, '\n');
+  const lines = normalized.split('\n');
+  if (!lines.length || lines[0].trim() !== '---') return normalized;
+  const limit = Math.min(lines.length, 201);
+  for (let i = 1; i < limit; i += 1) {
+    if (lines[i].trim() === '---') {
+      const block = lines.slice(1, i);
+      if (block.some((line) => _FRONTMATTER_KEY_RE.test(line.trim()))) {
+        return lines.slice(i + 1).join('\n');
+      }
+      break;
+    }
+  }
+  return normalized;
+}
+
 function _narrativeSentences(text) {
-  const cleaned = text.replace(/^\ufeff/, '').replace(_HTML_COMMENT, '');
+  const withoutFrontmatter = _stripLeadingFrontmatter(text.replace(/^\ufeff/, ''));
+  const cleaned = stripHtmlComments(withoutFrontmatter);
   const lines = cleaned.split(/\r?\n/).map((line) => line.trim());
-  const paragraphs = lines.filter((line) => line && !line.startsWith('#'));
+  const paragraphs = lines.filter((line) => line && !line.startsWith('#') && !_STRUCTURAL_DIVIDER_RE.test(line));
   const sentences = [];
   for (const line of paragraphs) {
     const stripped = line.replace(_QUOTED, '');
@@ -132,12 +173,16 @@ function _narrativeSentences(text) {
 
 function fragmentation(text) {
   const { paragraphs, sentences } = _narrativeSentences(text);
-  const short = paragraphs.filter((line) => charLen(line.replace(/\s/g, '')) < SHORT_PARAGRAPH_CHARS).length;
+  const paraLengths = paragraphs.map((line) => charLen(line.replace(/\s/g, '')));
+  const short = paraLengths.filter((len) => len < SHORT_PARAGRAPH_CHARS).length;
+  const over100 = paraLengths.filter((len) => len > LONG_PARAGRAPH_CHARS).length;
   const lengths = sentences.map((sentence) => charLen(sentence));
   return {
     paragraphs: paragraphs.length,
     short_paragraphs: short,
     short_paragraph_ratio: paragraphs.length ? round3(short / paragraphs.length) : null,
+    paragraph_median_chars: median(paraLengths),
+    paragraphs_over_100: over100,
     narrative_sentences: lengths.length,
     narrative_sentence_median: median(lengths),
     human_reference: {
@@ -344,15 +389,12 @@ function checkBlockingQuality(outline, body) {
             .map((line) => line.trim())
             .filter(Boolean)
         : [];
-      // 旁白破折号（em-dash）已由 check-ai-patterns.js 归入 review_required 走 Review-and-Ack；
-      // 未闭合 HTML 注释、非标省略号、双连字符、分隔线等确定性标点错误仍留作硬阻断。
-      const hardLines = lines.filter((line) => !/:\d+:\d+:\s*em-dash:/.test(line));
-      if (lines.length === 0 || hardLines.length > 0) {
-        blocking.push({
-          type: 'PUNCTUATION_NOT_NORMALIZED',
-          message: hardLines.length ? hardLines.join('\n') : rawOut,
-        });
-      }
+      // 标准 `——` 在 normalize-punctuation.js 中已默认保留不报错；
+      // 其余输出（未闭合 HTML 注释、非标省略号、畸形破折号 —/———/——……、双连字符、分隔线等）均属确定性标点错误，一律硬阻断。
+      blocking.push({
+        type: 'PUNCTUATION_NOT_NORMALIZED',
+        message: lines.length ? lines.join('\n') : rawOut,
+      });
     } else if (completed.status !== 0) {
       toolErrors.push({
         type: 'TOOL_ERROR',
@@ -713,13 +755,25 @@ function plainReport(result) {
   const frag = result.fragmentation || {};
   const ratio = frag.short_paragraph_ratio;
   const med = frag.narrative_sentence_median;
-  if ((ratio !== null && ratio !== undefined) || (med !== null && med !== undefined)) {
+  const paraMed = frag.paragraph_median_chars;
+  const over100 = frag.paragraphs_over_100;
+  if (
+    (ratio !== null && ratio !== undefined) ||
+    (med !== null && med !== undefined) ||
+    (paraMed !== null && paraMed !== undefined)
+  ) {
     const parts = [];
     const [low, high] = HUMAN_SHORT_PARAGRAPH_RANGE;
     if (ratio !== null && ratio !== undefined) {
       parts.push(
         `不到 ${SHORT_PARAGRAPH_CHARS} 字的短段占 ${Math.round(ratio * 100)}%` +
           `（真人平均约 ${Math.round(HUMAN_SHORT_PARAGRAPH_RATIO * 100)}%，多数章在 ${Math.round(low * 100)}%–${Math.round(high * 100)}%）`
+      );
+    }
+    if (paraMed !== null && paraMed !== undefined) {
+      parts.push(
+        `段长中位数 ${paraMed} 字` +
+          (typeof over100 === 'number' ? `，超过 ${LONG_PARAGRAPH_CHARS} 字的长段 ${over100} 段` : '')
       );
     }
     const [shortest, longest] = HUMAN_NARRATIVE_SENTENCE_RANGE;
@@ -981,7 +1035,20 @@ function wordcountCommand(args, initialAuthorRange) {
   return result.status === 'invalid' ? 2 : 0;
 }
 
+const USAGE = [
+  'Usage:',
+  '  node storyctl.js wordcount measure --file FILE [--chapter N] [--case-id ID]',
+  '  node storyctl.js wordcount check --file FILE --target N [--chapter N] [--min-chars N --max-chars N] [--case-id ID]',
+  '  node storyctl.js wordcount checkpoint --file FILE (--target N | --project DIR --chapter N) [--min-chars N --max-chars N]',
+  '  node storyctl.js chapter check --project DIR --chapter N [--min-chars N --max-chars N] [--fix-punctuation] [--plain]',
+  '  node storyctl.js chapter (commit|accept-current-length) --project DIR --chapter N --input FILE [--min-chars N --max-chars N] [--force] [--allow-gap] [--ack RULE:REASON ...] [--ack-all REASON]',
+].join('\n');
+
 function main(argv = process.argv.slice(2)) {
+  if (argv.includes('--help') || argv.includes('-h')) {
+    process.stdout.write(`${USAGE}\n`);
+    return 0;
+  }
   let args;
   let authorRange;
   try {

@@ -5,12 +5,12 @@ const fs = require('fs');
 const { loadStyleWhitelist, styleSpans } = require('./style-whitelist.js');
 const path = require('path');
 
-const USAGE = `Usage: node normalize-punctuation.js [--check] [--quote-mode keep|curly|ascii|yan] <file...>
+const USAGE = `Usage: node normalize-punctuation.js [--check] [--mode=auto|long|short] [--quote-mode keep|curly|ascii|yan] <file...>
 
 Normalize正文 punctuation deterministically:
   - keep standard ellipses (……) in dialogue, 【…】 panels, and narration; unify non-standard ellipses (..., single …, ………+, 。。。+, .……..) to ……
-  - keep em dashes inside dialogue quotes (“”「」『』 and paired ASCII "), unified as ——
-  - replace unquoted em dashes and double hyphens in narration with Chinese punctuation
+  - keep standard em dashes (——) in dialogue quotes (“”「」『』 and paired ASCII ") and narration across both long and short modes; unify non-standard dashes (single —, triple ———+, --) to —— (and numeric ranges like 10--20 outside quotes to 「到」)
+  - --mode=auto|long|short is accepted for CLI symmetry with check-ai-patterns.js (narration —— density is governed by check-ai-patterns.js)
   - remove markdown divider lines (---) from正文
   - preserve pause punctuation covered by book-local .deslop-whitelist literals
   - keep quote style by default; convert quotes only when explicitly requested (curly|ascii|yan)
@@ -18,6 +18,7 @@ Normalize正文 punctuation deterministically:
 
 const options = {
   check: false,
+  mode: 'auto',
   quoteMode: 'keep',
   files: [],
 };
@@ -26,6 +27,13 @@ for (let i = 2; i < process.argv.length; i += 1) {
   const arg = process.argv[i];
   if (arg === '--check') {
     options.check = true;
+  } else if (arg === '--mode') {
+    const value = process.argv[i + 1];
+    if (!value) die('--mode requires auto, long, or short');
+    options.mode = value;
+    i += 1;
+  } else if (arg.startsWith('--mode=')) {
+    options.mode = arg.slice('--mode='.length);
   } else if (arg === '--quote-mode') {
     const value = process.argv[i + 1];
     if (!value) die('--quote-mode requires keep, curly, ascii, or yan');
@@ -43,6 +51,9 @@ for (let i = 2; i < process.argv.length; i += 1) {
   }
 }
 
+if (!['auto', 'long', 'short'].includes(options.mode)) {
+  die(`Invalid --mode: ${options.mode}`);
+}
 if (!['keep', 'curly', 'ascii', 'yan'].includes(options.quoteMode)) {
   die(`Invalid --quote-mode: ${options.quoteMode}`);
 }
@@ -313,8 +324,22 @@ function normalizePausePunctuationPass(line, lineNo, commentSpans) {
       continue;
     }
 
-    // 对话引号内的破折号（话被打断或拖音，真人网文约 13% 章节使用）：`——` 原样保留，单 `—` / 多 `———` / `--` 统一为 `——`。
-    if (inDialogueQuote && hasDash) {
+    // 破折号（对话引号内与叙述旁白均保留标准 `——`）：长短篇网文均用 `——` 做打断、拖音、系统提示或转折揭底拍，
+    // 不再机械删改标准 `——`；仅把非标 `—` / `———` / `--` 统一为 `——`（引号外数字区间 `10--20` 仍转为「到」）。
+    if (hasDash) {
+      const before = previousNonSpace(original, match.index - 1);
+      const after = nextNonSpace(original, match.index + token.length);
+      if (!inDialogueQuote && token.startsWith('-') && /\d/.test(before) && /\d/.test(after)) {
+        output += original.slice(lastIndex, match.index) + '到';
+        findings.push({
+          line: lineNo,
+          column: match.index + 1,
+          type: getPauseType(token),
+          message: '替换为「到」。',
+        });
+        lastIndex = match.index + token.length;
+        continue;
+      }
       const merged = lastIndex === match.index && output.endsWith('——');
       const replacement = merged ? '' : '——';
       output += original.slice(lastIndex, match.index) + replacement;
@@ -324,22 +349,11 @@ function normalizePausePunctuationPass(line, lineNo, commentSpans) {
           line: lineNo,
           column: match.index + 1,
           type: getPauseType(token),
-          message: '引号内的破折号统一为「——」。',
+          message: inDialogueQuote ? '引号内的破折号统一为「——」。' : '破折号统一为「——」。',
         });
       }
       continue;
     }
-
-    output += original.slice(lastIndex, match.index);
-    const replacement = choosePauseReplacement(original, match.index, token.length);
-    output += replacement;
-    findings.push({
-      line: lineNo,
-      column: match.index + 1,
-      type: getPauseType(token),
-      message: replacement ? `替换为「${replacement}」。` : '移除重复标点。',
-    });
-    lastIndex = match.index + token.length;
   }
 
   output += original.slice(lastIndex);
@@ -416,25 +430,6 @@ function getPauseType(token) {
   return 'ellipsis';
 }
 
-function choosePauseReplacement(text, start, length) {
-  const before = previousNonSpace(text, start - 1);
-  const after = nextNonSpace(text, start + length);
-  const rest = text.slice(start + length).trimStart();
-
-  // 引号外的 ——、—、-- 全部替换为中文标点，数字区间替换为「到」。
-  if (before === '') return '';
-  // 紧跟开引号/开括号的停顿符号属于句首边界，删空即可，避免产出 `「，…」` 或 `「。」`。
-  if (isOpeningDelimiter(before)) return '';
-  if (/\d/.test(before) && /\d/.test(after)) return '到';
-  if (isClosingQuote(after)) return isSentencePunctuation(before) ? '' : '。';
-
-  if (!after) return isSentencePunctuation(before) ? '' : '。';
-  if (isSentencePunctuation(before) || isPunctuation(after)) return '';
-  if (/^(因为|原来|这是|那是|也就是|换句话|说白了|所谓|答案|原因|结果|真相|问题在于)/.test(rest)) return '：';
-  if (/(原因|答案|真相|结果|结论|问题|选择|意思)$/.test(text.slice(0, start).trim())) return '：';
-  return '，';
-}
-
 function previousNonSpace(text, index) {
   for (let i = index; i >= 0; i -= 1) {
     if (!/\s/.test(text[i])) return text[i];
@@ -447,22 +442,6 @@ function nextNonSpace(text, index) {
     if (!/\s/.test(text[i])) return text[i];
   }
   return '';
-}
-
-function isSentencePunctuation(ch) {
-  return /[，,。.!！?？;；:：…]$/.test(ch || '');
-}
-
-function isPunctuation(ch) {
-  return /[，,。.!！?？;；:：、…"“”'‘’」』）)]/.test(ch || '');
-}
-
-function isClosingQuote(ch) {
-  return /["”」』]/.test(ch || '');
-}
-
-function isOpeningDelimiter(ch) {
-  return /[「『（(“‘]/.test(ch || '');
 }
 
 function normalizeQuotes(line, quoteMode, quoteOpen, lineNo, protectedSpans = []) {

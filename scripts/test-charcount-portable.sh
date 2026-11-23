@@ -10,12 +10,12 @@
 #   bash scripts/test-charcount-portable.sh           # 常规跨平台验证
 #   bash scripts/test-charcount-portable.sh --stub    # 模拟 Store 占位程序(exit 49)
 #
-# 命令直接从 story-short-write/references/short-format.md「字数统计」节的第一个 bash 块
+# 命令直接从 story-short-write/SKILL.md「字数统计」节的第一个 bash 块
 # 抽取执行，不手抄：文档改了命令，本测试跑的就是新命令。
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DOC="$REPO_ROOT/skills/story-short-write/references/short-format.md"
+DOC="$REPO_ROOT/skills/story-short-write/SKILL.md"
 COUNT_BLOCK="$(awk '/^## 字数统计/{s=1;next} s&&/^```bash$/{b=1;next} b&&/^```$/{exit} b' "$DOC")"
 case "$COUNT_BLOCK" in
   *"node -e"*) ;;

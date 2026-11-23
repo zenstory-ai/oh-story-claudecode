@@ -36,7 +36,7 @@ const FIVE_ACT = ['起因', '发展', '转折', '高潮', '结尾']
 const PLOT_HEADER_FIRST = /^(?:#|序号)$/
 const INTENT_FIELDS = ['目标情绪', '主角目标/关键选择']
 const REF_DIR_PREFIX = /^(?:设定|大纲|追踪|正文|读者笔记|对标)\//
-const TEMPLATE_REFERENCES = ['references/outline-template.md', 'references/outline-reverse-rules.md']
+const TEMPLATE_REFERENCES = ['references/flow-outline.md', 'references/outline-reverse-rules.md']
   .filter((rel) => fs.existsSync(path.join(__dirname, '..', rel)))
 
 const parseWordcountCaliber = (text) => parseMetricField(text).ok
@@ -298,10 +298,16 @@ function parseArgs(argv) {
   return files.length ? { files, strict } : null
 }
 
+const USAGE = '用法: node scripts/check-outline-contract.js --json [--strict] <细纲路径...> | --json [--strict] --project <书目录> --chapter N\n'
+
 function main(argv) {
+  if (argv.includes('--help') || argv.includes('-h')) {
+    process.stdout.write(USAGE)
+    return 0
+  }
   const parsed = parseArgs(argv)
   if (!parsed) {
-    process.stderr.write('用法: node scripts/check-outline-contract.js --json [--strict] <细纲路径...> | --json [--strict] --project <书目录> --chapter N\n')
+    process.stderr.write(USAGE)
     return 2
   }
   let targets = parsed.files

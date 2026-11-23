@@ -470,8 +470,17 @@ class StoryctlCliTests(unittest.TestCase):
             unclosed = storyctl.check_blocking_quality(outline, body)
             self.assertEqual(unclosed["status"], "fail", unclosed)
             self.assertEqual(unclosed["blocking_findings"][0]["type"], "PUNCTUATION_NOT_NORMALIZED", unclosed)
-            # 仅旁白破折号不走标点硬拦，而归入 review_required 走 Review-and-Ack。
+            # 畸形破折号（单 — / 三 ——— / 破折号与省略号粘连）属确定性标点错误，必须触发硬阻断。
+            body.write_text("## 第1章 测试\n他回头—门已经关了。\n门开了———灯灭了。\n", encoding="utf-8")
+            malformed_dash = storyctl.check_blocking_quality(outline, body)
+            self.assertEqual(malformed_dash["status"], "fail", malformed_dash)
+            self.assertEqual(malformed_dash["blocking_findings"][0]["type"], "PUNCTUATION_NOT_NORMALIZED", malformed_dash)
+            # 单处标准旁白破折号正常放行；高密度旁白破折号（长篇 ≥10 处且 ≥2.5/千字）不走标点硬拦，而归入 review_required 走 Review-and-Ack。
             body.write_text("## 第1章 测试\n他回头——门已经关了。\n", encoding="utf-8")
+            single_em_dash = storyctl.check_blocking_quality(outline, body)
+            self.assertEqual(single_em_dash["status"], "pass", single_em_dash)
+            self.assertEqual(single_em_dash["blocking_findings"], [], single_em_dash)
+            body.write_text("## 第1章 测试\n" + "他回头——门已经关了。" * 10 + "\n", encoding="utf-8")
             em_dash_only = storyctl.check_blocking_quality(outline, body)
             self.assertEqual(em_dash_only["status"], "review_required", em_dash_only)
             self.assertEqual(em_dash_only["blocking_findings"], [], em_dash_only)
@@ -740,6 +749,16 @@ class FragmentationTests(unittest.TestCase):
         # 半角双引号与『…』台词同样剥离，无句末标点的换行按段断开不跨行粘连。
         unpunctuated = storyctl.fragmentation('## 第1章\n"别动！"他推门进来\n屋里黑漆漆的\n『快走！』她转身跑了……没回头。\n')
         self.assertEqual(unpunctuated["narrative_sentences"], 4)
+        # 完整 HTML 注释线性剥离不计入段落/句数；未闭合注释不截断后续正文。
+        closed_comment = storyctl.fragmentation(
+            "## 第1章\n<!-- 去味:跳过 -->\n他推门进来。\n<!-- 多行\n备注 -->\n屋里黑漆漆的。\n"
+        )
+        self.assertEqual(closed_comment["paragraphs"], 2)
+        self.assertEqual(closed_comment["narrative_sentences"], 2)
+        unclosed_comment = storyctl.fragmentation(
+            "## 第1章\n<!-- 去味:跳过 -->\n他推门进来。\n<!-- 未闭合备注\n屋里黑漆漆的。\n"
+        )
+        self.assertEqual(unclosed_comment["paragraphs"], 3)
 
     def test_plain_report_speaks_plainly_and_never_blocks_on_fragmentation(self) -> None:
         with tempfile.TemporaryDirectory(prefix="storyctl-plain-") as directory:
@@ -802,6 +821,64 @@ class FragmentationTests(unittest.TestCase):
             self.assertIn("动作偏密、心里账偏少", plain)
             for jargon in ("needs_decision", "blocking", "status", "advisory", "prose_balance"):
                 self.assertNotIn(jargon, plain)
+
+    def test_vertical_screen_paragraph_metrics_and_help(self) -> None:
+        # 竖屏段落指标（paragraph_median_chars / paragraphs_over_100）：剔除 frontmatter、标题、分隔线与闭合 HTML 注释，
+        # 仅统计正文段落；信息性指标永不阻断。
+        long_para = "他盯着账本核对每一笔进项，从三月的米粮采买一路翻到秋后的漕运损耗，越算心里越亮堂，原来东院这三年压根没打算把货栈交出来，只等今夜合上账册把亏空全推到他头上，好顺理成章在宗祠里逼他交出掌柜印信和库房钥匙。"
+        self.assertGreater(len(long_para), 100)
+        text = (
+            "---\n"
+            "title: 第1章 测试\n"
+            "---\n"
+            "# 第1章 测试\n"
+            "<!-- 去味:跳过 -->\n"
+            "短句。\n"
+            "---\n"
+            "他推门走进屋里，顺手反锁了门栓。\n"
+            "***\n"
+            f"{long_para}\n"
+        )
+        frag = storyctl.fragmentation(text)
+        self.assertEqual(frag["paragraphs"], 3)
+        self.assertEqual(frag["paragraph_median_chars"], 16)
+        self.assertEqual(frag["paragraphs_over_100"], 1)
+
+        # 空正文返回 null 中位数和 0 超百字段。
+        empty_frag = storyctl.fragmentation("# 第1章 空\n<!-- 注释 -->\n---\n")
+        self.assertEqual(empty_frag["paragraphs"], 0)
+        self.assertIsNone(empty_frag["paragraph_median_chars"])
+        self.assertEqual(empty_frag["paragraphs_over_100"], 0)
+
+        with tempfile.TemporaryDirectory(prefix="storyctl-vscreen-") as directory:
+            project = Path(directory)
+            (project / "大纲").mkdir()
+            (project / "正文").mkdir()
+            (project / "大纲/细纲_第001章.md").write_text(
+                "- 字数目标：200 字\n- 字数口径：visible_chars_v1\n", encoding="utf-8"
+            )
+            (project / "正文/第001章_测试.md").write_text(text, encoding="utf-8")
+            _init_tracking(project)
+            result = storyctl.chapter_check_with_pass_quality(project, 1)
+            self.assertEqual(result["fragmentation"]["paragraph_median_chars"], 16)
+            self.assertEqual(result["fragmentation"]["paragraphs_over_100"], 1)
+            plain = "\n".join(storyctl.plain_report(result))
+            self.assertIn("段长中位数 16 字，超过 100 字的长段 1 段", plain)
+            for jargon in ("paragraph_median_chars", "paragraphs_over_100"):
+                self.assertNotIn(jargon, plain)
+
+        for flag in ("--help", "-h"):
+            completed = subprocess.run(
+                [NODE, str(STORYCTL_PATH), flag],
+                cwd=ROOT,
+                text=True,
+                encoding="utf-8",
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn("storyctl.js", completed.stdout)
+            self.assertEqual(completed.stderr, "")
 
 
 if __name__ == "__main__":

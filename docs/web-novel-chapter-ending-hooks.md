@@ -164,6 +164,6 @@ Codex 里把 `/story-long-write` 写成 `$story-long-write`。
 ## 相关
 
 - 站点原文（含更多示例与相关指南）：https://zenstory.ai/zh/oh-story/chapter-ending-hooks
-- [长篇章首章尾钩子与承接](../skills/story-long-write/references/long-chapter-hooks.md)
-- [作者要求、文风与不能改的事实](../skills/story-long-write/references/writing-craft.md)
+- [长篇章首章尾钩子与承接](../skills/story-long-write/references/flow-outline.md)
+- [正文笔法、作者要求与文风优先级](../skills/story-long-write/references/flow-drafting.md)
 - 仓库地址：https://github.com/zenstory-ai/oh-story-claudecode

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * build_architect_brief.js — 把定设定、出卷纲、出一批细纲要用的流程、模板与卷纲段拼成 story-architect 任务包。
+ * build_architect_brief.js — 把定设定、出卷纲、出一批细纲要用的 flow 手册、模板、流派包与卷纲取段拼成 story-architect 任务包。
  *
  * 用法:
  *   node build_architect_brief.js --project <书目录> --task world|volume|outline [--volume N] [--chapters A-B] [--rules-only]
@@ -14,23 +14,17 @@ const { parse: parseVolume, sliceArc, stripRetired, unitChapterRange } = require
 
 const SKILL_ROOT = path.resolve(__dirname, '..');
 const REFERENCES = path.join(SKILL_ROOT, 'references');
+const GENRE_STYLE_DIR = path.join(REFERENCES, 'genre-styles');
+const FALLBACK_STYLE = path.join(GENRE_STYLE_DIR, '通用长篇.md');
 const WORK_DIR = ['.story', 'work', '排纲'];
 const FENCE_OPEN_RE = /^[ ]{0,3}(`{3,}|~{3,})([^\n]*)$/;
 const FENCE_TAG_RE = /(?:^|\s)template=(\S+)/;
 
-const CROSS_BOOK = ['cross-book-recall.md', null, '`设定/题材定位.md`「对标登记」里有 2 本及以上对标书'];
-const ROMANCE = ['character-relations.md', '感情线阶段', '本书有感情线'];
+const BENCHMARK_REF = ['benchmark-recall.md', null, '`设定/题材定位.md`「对标登记」有对标书或 ≥2 本对标'];
 const CONDITIONAL = {
-  world: [['female-audience-writing.md', null, '本书是女频'], ROMANCE, CROSS_BOOK],
-  volume: [
-    CROSS_BOOK,
-    ['outline-methods.md', '常见的八步结构', '没有主对标'],
-    ['outline-methods.md', '情绪模块公式', '卷纲里有自创的剧情段'],
-    ['outline-methods.md', '换地图', '本卷换大地图或开新地图'],
-    ['long-reversal.md', '反转类型', '本卷规划了反转'],
-    ROMANCE,
-  ],
-  outline: [ROMANCE, CROSS_BOOK],
+  world: [BENCHMARK_REF],
+  volume: [BENCHMARK_REF],
+  outline: [BENCHMARK_REF],
 };
 const TEMPLATE_TARGETS = {
   题材定位: '设定/题材定位.md',
@@ -38,15 +32,11 @@ const TEMPLATE_TARGETS = {
   关系: '设定/关系.md',
   主角卡: '设定/角色/{名}.md（主角）',
   配角卡: '设定/角色/{名}.md（配角）',
+  大纲: '大纲/大纲.md',
+  卷纲: '大纲/卷纲_第X卷.md',
+  细纲: '大纲/细纲_第XXX章.md',
+  排纲笔记: '.story/排纲笔记/{剧情段编号}.md',
 };
-const PLOT_CORE_AFTER_OPENING = [
-  '目标情绪与主角选择',
-  '爽点：六类与倒推',
-  '高潮构建公式',
-  '情节细化：情节点怎么排',
-  '留悬念与章尾',
-  '过渡章与衔接',
-];
 const NEW_ADDITION_TIERS =
   '**新增物三级**（缺东西时三种处理；只看下一章需不需要知道它存在过）：\n' +
   '- **直接写**：微连接、路人、器物、地名细部、一次性对话、现场细节；不申报。\n' +
@@ -63,18 +53,22 @@ function fail(message) {
   throw new BriefError(message);
 }
 
+function readUtf8IfFile(filePath) {
+  try {
+    if (!fs.statSync(filePath).isFile()) return null;
+    return fs.readFileSync(filePath, 'utf8').replace(/^\ufeff/, '').replace(/\r\n/g, '\n');
+  } catch {
+    return null;
+  }
+}
+
 function readReference(name) {
   const filePath = path.join(REFERENCES, name);
-  let stat;
-  try {
-    stat = fs.statSync(filePath);
-  } catch {
+  const text = readUtf8IfFile(filePath);
+  if (text === null) {
     fail(`ERROR: 缺少 reference：${filePath}`);
   }
-  if (!stat.isFile()) {
-    fail(`ERROR: 缺少 reference：${filePath}`);
-  }
-  return fs.readFileSync(filePath, 'utf8').replace(/^\ufeff/, '').replace(/\r\n/g, '\n');
+  return text;
 }
 
 function headings(text) {
@@ -124,6 +118,17 @@ function section(text, ...names) {
   return parts.join('\n\n');
 }
 
+function stripSubsection(text, name) {
+  const lines = text.split('\n');
+  const marks = headings(text);
+  const hit = marks.findIndex(([, , title]) => title.startsWith(name));
+  if (hit < 0) return text;
+  const [start, level] = marks[hit];
+  const nextMark = marks.slice(hit + 1).find(([, lv]) => lv <= level);
+  const end = nextMark ? nextMark[0] : lines.length;
+  return rstrip([...lines.slice(0, start), ...lines.slice(end)].join('\n'));
+}
+
 function escapeRegExp(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -170,27 +175,101 @@ function templates(name, ...tags) {
   return blocks.join('\n\n');
 }
 
-function dropLastColumn(text) {
-  return text
-    .split(/\r?\n/)
-    .map((line) => (line.startsWith('|') ? `${line.split('|').slice(0, -2).join('|')}|` : line))
-    .join('\n');
+function stripHtmlComments(text) {
+  const src = text || '';
+  let out = '';
+  let cursor = 0;
+  while (cursor < src.length) {
+    const start = src.indexOf('<!--', cursor);
+    if (start === -1) {
+      out += src.slice(cursor);
+      break;
+    }
+    out += src.slice(cursor, start);
+    const end = src.indexOf('-->', start + 4);
+    if (end === -1) {
+      out += src.slice(start);
+      break;
+    }
+    cursor = end + 3;
+  }
+  return out;
+}
+
+function matchPrimaryGenreStyle(project) {
+  if (!project) return null;
+  const text = stripHtmlComments(readUtf8IfFile(path.join(project, '设定', '题材定位.md')));
+  if (!text) return null;
+  const match = /^[ \t]*[-*+]?[ \t]*\**题材(?:类型)?\**[ \t]*[：:](.*)$/m.exec(text);
+  const raw = !match || match[1].includes('{') ? '' : match[1].trim().toLowerCase();
+  if (!raw) return null;
+  let entries;
+  try {
+    entries = fs.readdirSync(GENRE_STYLE_DIR).filter((n) => n.endsWith('.md')).sort();
+  } catch {
+    return null;
+  }
+  const rank = { high: 0, medium: 1, low: 2 };
+  const spans = [];
+  for (const file of entries) {
+    const full = path.join(GENRE_STYLE_DIR, file);
+    const content = readUtf8IfFile(full) || '';
+    const head = content.split('---');
+    const meta = head.length > 2 ? head[1] : '';
+    if (/^fallback:\s*true\s*$/m.test(meta)) continue;
+    const genre = /^genre:\s*(.+)$/m.exec(meta);
+    const aliases = /^aliases:\s*\[(.*)\]/m.exec(meta);
+    const confidence = /^confidence:\s*(\w+)/m.exec(meta);
+    const level = confidence ? confidence[1] : 'low';
+    const baseName = genre ? genre[1].trim() : path.basename(file, '.md');
+    const aliasList = aliases
+      ? aliases[1].split(',').map((a) => a.trim().replace(/^['"]|['"]$/g, ''))
+      : [];
+    const names = new Set([baseName, ...aliasList].filter(Boolean).map((n) => n.toLowerCase()));
+    for (const name of names) {
+      let pos = 0;
+      while (pos <= raw.length) {
+        const idx = raw.indexOf(name, pos);
+        if (idx < 0) break;
+        spans.push([idx, idx + name.length, full, level]);
+        pos = idx + name.length || idx + 1;
+      }
+    }
+  }
+  const best = new Map();
+  const compareKey = (a, b) => {
+    for (let i = 0; i < 3; i += 1) {
+      if (a[i] !== b[i]) return a[i] - b[i];
+    }
+    return a[3] < b[3] ? -1 : a[3] > b[3] ? 1 : 0;
+  };
+  for (const [start, end, card, level] of spans) {
+    const dominated = spans.some(([s, e, c]) => c !== card && s <= start && end <= e && e - s > end - start);
+    if (dominated) continue;
+    const key = [start, -(end - start), rank[level] ?? 2, path.basename(card)];
+    if (!best.has(card) || compareKey(key, best.get(card)[0]) < 0) {
+      best.set(card, [key, level]);
+    }
+  }
+  const hits = [...best.entries()]
+    .map(([card, [key]]) => ({ key, card }))
+    .sort((a, b) => compareKey(a.key, b.key));
+  if (hits.length) return hits[0].card;
+  return readUtf8IfFile(FALLBACK_STYLE) ? FALLBACK_STYLE : null;
 }
 
 function conditionalReads(task) {
   const lines = [
-    '下面几份在包外，只在条件满足时读，只读点名的那一节（没点名读整份）；条件不满足不读。' +
-      '路径按你的参考文件路径规则解析；流程提到而这里没列的参考文件不用找，对标资料缺了就停下，说清缺哪份：',
+    '下面几份在包外，只在条件满足时读；条件不满足不读。流程提到而这里没列的参考文件不用找，对标资料缺了就停下说清缺哪份：',
   ];
   for (const [name, part, when] of CONDITIONAL[task]) {
     const text = readReference(name);
     if (part) {
       section(text, part);
     }
-    lines.push(`- ${when}：读 \`agent-references/${name}\` ${part ? `「${part}」一节` : '整份'}`);
-  }
-  if (CONDITIONAL[task].includes(CROSS_BOOK)) {
-    lines.push(`读了 ${CROSS_BOOK[0]} 时：\`gaps.*\` 写进「要作者定的事」，「副对标召回摘要」不单独回。`);
+    lines.push(
+      `- ${when}：读 \`agent-references/${name}\` ${part ? `「${part}」一节` : '整份'}`
+    );
   }
   return lines.join('\n');
 }
@@ -300,43 +379,37 @@ function pad3(n) {
 }
 
 function build(task, volume, chapters, project = null, rulesOnly = false) {
-  const outside = '写作技法只读本包，外加包末「按条件可读」里条件满足的那几节。';
+  const outside = '写作技法只读本包，外加包末「按条件可读」里条件满足的项。';
+  const matchedPack = matchPrimaryGenreStyle(project);
   let head;
   let parts;
   if (task === 'world') {
     head =
       '# 任务包：出核心设定提案\n\n' +
-      '按下面 Phase 2 的流程，把核心设定写成文件：`设定/题材定位.md`（在定方向时已写的部分上补全，「题材框架」留到出卷纲补，不删作者已定的内容）、' +
-      '`设定/全书梗概.md`（故事话写主角最终要什么、最大阻碍、前几次大转折；结局一节没想好可空）、' +
-      '`设定/关系.md`、主角与关键角色的 `设定/角色/{名}.md`、影响全书的 `设定/世界观/{主题}.md`。' +
-      '作者在定方向时说过的话都在 `设定/题材定位.md`，先读它；拿不准的写成二选一的候选留给作者定，不替作者拍板，' +
-      '物价、收入、力量档位这类全书刻度按下附「新增物三级」属问作者，只给候选。' +
+      '按下面「核心设定方法」与模板，把核心设定写成文件：`设定/题材定位.md`（在定方向时已写的部分上补全，「题材框架」留到出卷纲补，不删作者已定的内容）、' +
+      '`设定/全书梗概.md`、`设定/关系.md`、主角与关键角色的 `设定/角色/{名}.md`、影响全书的 `设定/世界观/{主题}.md`。' +
+      '作者定下的话都在 `设定/题材定位.md`，先读它；物价、收入、力量档位这类全书刻度按下附「新增物三级」属问作者，只给 1–2 个候选。' +
       `不出卷纲、不写正文。${outside}交付后只回：写了哪些文件、主角与核心冲突各一句、要作者定的事（没有写「无」）。`;
-    const setup = readReference('workflow-setup.md');
+    const opening = readReference('flow-opening-plan.md');
     parts = [
-      ['workflow-setup.md（Phase 2）', section(setup, 'Phase 2：核心设定')],
-      ['workflow-setup.md（题材定位、全书梗概、关系模板）', templates('workflow-setup.md', '题材定位', '全书梗概', '关系')],
-      ['character-basics.md', readReference('character-basics.md')],
+      ['flow-opening-plan.md（核心设定方法）', section(opening, '核心设定方法')],
       [
-        'long-genre-mechanics.md（核心梗三层递进设计、金手指）',
-        section(readReference('long-genre-mechanics.md'), '核心梗三层递进设计', '金手指'),
+        'flow-opening-plan.md（设定与角色模板）',
+        templates('flow-opening-plan.md', '题材定位', '全书梗概', '关系', '主角卡', '配角卡'),
       ],
-      ['character-relations.md（人物关系类型）', section(readReference('character-relations.md'), '人物关系类型')],
-      ['reader-contract-and-progression.md', readReference('reader-contract-and-progression.md')],
     ];
   } else if (task === 'volume') {
     const label = volume ? `第${volume}卷` : '本卷';
     head =
       `# 任务包：出${label}卷纲\n\n` +
-      `只交付 \`大纲/大纲.md\` 的分卷表（已有就只补本卷那一行）、\`大纲/卷纲_第${volume || 'X'}卷.md\`，` +
-      '并补齐 `设定/题材定位.md`「题材框架」的「关键转折节点」（标题写 `## 题材框架`，去掉「（出卷纲时补）」，其余小节不动）；' +
-      '不出细纲、不写正文、不建 `追踪/`。本书方向、设定、对标登记与作者已定的事读 `设定/`（先读 `设定/题材定位.md`）。' +
-      `${outside}交付后只回：写了哪些文件、排纲自查四项的结论各一句、要作者定的事（没有写「无」）。`;
+      `只交付 \`大纲/大纲.md\` 的分卷表（已有只补本卷行）、\`大纲/卷纲_第${volume || 'X'}卷.md\`，` +
+      '并补齐 `设定/题材定位.md`「题材框架」的「关键转折节点」（标题写 `## 题材框架`，其余小节不动）；' +
+      '不出细纲、不写正文、不建 `追踪/`。本书方向、设定与作者已定的事读 `设定/`。' +
+      `${outside}交付后只回：写了哪些文件、四个排纲问题的结论、要作者定的事（没有写「无」）。`;
+    const opening = readReference('flow-opening-plan.md');
     parts = [
-      ['workflow-volume.md（排纲方法）', section(readReference('workflow-volume.md'), '排纲方法')],
-      ['artifact-protocols.md', readReference('artifact-protocols.md')],
-      ['outline-methods.md（卷纲排法）', section(readReference('outline-methods.md'), '卷纲排法')],
-      ['reader-contract-and-progression.md', readReference('reader-contract-and-progression.md')],
+      ['flow-opening-plan.md（排纲方法）', section(opening, '排纲方法（卷纲）')],
+      ['flow-opening-plan.md（大纲与卷纲模板）', templates('flow-opening-plan.md', '大纲', '卷纲')],
     ];
   } else {
     const [first, last] = chapters;
@@ -345,26 +418,28 @@ function build(task, volume, chapters, project = null, rulesOnly = false) {
       `只交付 \`大纲/细纲_第${pad3(first)}章\` 到第${pad3(last)}章，以及排纲笔记（\`.story/排纲笔记/{剧情段编号}.md\`）与必要的设定补全，` +
       '不写正文、不建 `追踪/`。本批涉及的卷纲剧情段附在包末（已按段取好），卷纲本身不整读；设定从 `设定/` 定点读；' +
       `${outside}交付后只回：写了哪些文件、每章一句核心事件、要作者定的事（没有写「无」）。`;
-    const plot = readReference('plot-core-methods.md');
-    parts = [
-      ['workflow-outline.md（排纲方法）', section(readReference('workflow-outline.md'), '排纲方法')],
-      ['outline-template.md', readReference('outline-template.md')],
-      [
-        'long-chapter-hooks.md（章尾钩子 13 式、章首钩子 7 式）',
-        dropLastColumn(section(readReference('long-chapter-hooks.md'), '章尾钩子 13 式', '章首钩子 7 式')),
-      ],
-      ['character-basics.md（主角卡、配角卡模板）', templates('character-basics.md', '主角卡', '配角卡')],
-    ];
-    if (first <= 3) {
-      parts.push(['plot-core-methods.md', plot]);
-      parts.push(['opening-design.md（开篇规划）', section(readReference('opening-design.md'), '开篇规划')]);
-    } else {
-      parts.push(['plot-core-methods.md（不含开篇噱头）', section(plot, ...PLOT_CORE_AFTER_OPENING)]);
+    const outlineDoc = readReference('flow-outline.md');
+    let methodBlock = section(outlineDoc, '排纲方法');
+    let methodLabel = 'flow-outline.md（排纲方法·含黄金三章）';
+    if (first > 3) {
+      methodBlock = stripSubsection(methodBlock, '黄金三章规划');
+      methodLabel = 'flow-outline.md（排纲方法）';
     }
+    parts = [
+      [methodLabel, methodBlock],
+      ['flow-outline.md（细纲与排纲笔记模板）', section(outlineDoc, '细纲与排纲笔记白话模板')],
+      ['flow-opening-plan.md（主角卡、配角卡模板）', templates('flow-opening-plan.md', '主角卡', '配角卡')],
+    ];
     if (!rulesOnly) {
       for (const [name, text] of unitClosures(project, first, last)) {
         parts.push([`卷纲取段：${name}`, text]);
       }
+    }
+  }
+  if (matchedPack) {
+    const packText = readUtf8IfFile(matchedPack);
+    if (packText) {
+      parts.push([`genre-styles/${path.basename(matchedPack)}`, packText]);
     }
   }
   parts.push(['SKILL.md（新增物三级）', NEW_ADDITION_TIERS]);
@@ -392,11 +467,16 @@ function parseRange(value) {
   return [first, last];
 }
 
+const USAGE =
+  'Usage: node build_architect_brief.js --project DIR --task (world|volume|outline) [--volume N] [--chapters A-B] [--rules-only]\n';
+
 function parseCliArgs(argv) {
-  const args = { project: null, task: null, volume: null, chapters: null, rulesOnly: false };
+  const args = { project: null, task: null, volume: null, chapters: null, rulesOnly: false, help: false };
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i];
-    if (token === '--project') {
+    if (token === '--help' || token === '-h') {
+      return { help: true };
+    } else if (token === '--project') {
       if (i + 1 >= argv.length) return { error: '--project requires a value' };
       args.project = argv[++i];
     } else if (token.startsWith('--project=')) {
@@ -435,6 +515,10 @@ function parseCliArgs(argv) {
 
 function main(argv = process.argv.slice(2)) {
   const args = parseCliArgs(argv);
+  if (args.help) {
+    process.stdout.write(USAGE);
+    return 0;
+  }
   if (args.error) {
     process.stderr.write(`ERROR: ${args.error}\n`);
     return 2;

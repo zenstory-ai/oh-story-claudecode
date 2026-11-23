@@ -1,129 +1,79 @@
 ---
 name: story-long-write
-version: 1.0.0
+version: 2.0.0
 description: "长篇网文规划与写作。支持只讨论结构、只写大纲或指定细纲，明确要求正文后再写章节。触发方式：/story-long-write、/写长篇、「帮我开书」「定设定」「出卷纲」「规划剧情」「写大纲」「补细纲」「日更」「续写」「继续写」「修改第X章」「回炉」「重写第X章」。"
 metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudecode"}}
 ---
 # story-long-write：长篇网文写作
 
-你是网络小说创作教练，帮用户从选题、大纲到正文写完一本长篇网络小说。
+帮作者从立项、卷纲、细纲到日更连载完成有追读力的长篇网文。
 
 ## 写前必读（强制，先读后写）
 
-创建或修改长篇故事文件前，按下表读完当前时刻的文件（这张表是唯一的读取清单）；只读本文件、`rg` 检索或摘读都不算。**按节读只允许两种**：任务包切好的节，或本表、文件内「什么时候读这份」点名的节；其余文件整份读到结尾。缺文件或没读完就停，报准确路径，**不得先写正文再补读**；每个任务、每个会话重新读。
+动笔前按下表读完当前时刻手册与命中流派包（唯一读取清单）；只读本文件、`rg` 或摘读不算。缺文件或未读完即停报路径，**不得先写再补读**；每次任务重读。
 
 | 时刻 | 必读 | 条件满足才读 |
 |---|---|---|
-| 定方向 | `workflow-setup.md` | 没方向：`long-genre-catalog.md`（特殊题材只读对应一节）；女频改读 `female-audience-writing.md`；平台、赛道、暂定书名：`genre-readers.md`；派子代理：`agent-calls.md` |
-| 定设定 | `workflow-setup.md`；自己做加 `character-basics.md`、`reader-contract-and-progression.md`、`long-genre-mechanics.md`「核心梗三层递进设计」「金手指」、`character-relations.md`「人物关系类型」 | 女频：`female-audience-writing.md`；有感情线：`character-relations.md`「感情线阶段」；对标登记 ≥2 本：`cross-book-recall.md` |
-| 出卷纲 | `workflow-volume.md`；自己排加 `artifact-protocols.md`、`outline-methods.md`「卷纲排法」、`reader-contract-and-progression.md` | 没有主对标：outline-methods「常见的八步结构」；有自创剧情段：「情绪模块公式」；换地图：「换地图」；有反转：`long-reversal.md`「反转类型」；感情线、对标同上 |
-| 出细纲、补纲 | `workflow-outline.md`；自己出加 `outline-template.md`、`plot-core-methods.md`、`character-basics.md`、`long-chapter-hooks.md`「章尾钩子 13 式」「章首钩子 7 式」 | 含前 3 章：`opening-design.md`「开篇规划」；感情线、对标同上 |
-| 写一章 | `workflow-chapter.md`；交写手加 `agent-calls.md`；自己写加 `long-format.md`、`writing-craft.md`、本章技法 | 新书第 1 章：`tracking-initialization.md`、`genre-prose-cards.md`「全书题材正文提示卡」与核对报告点名的卡；召回降档不成立：`benchmark-recall.md`；缺文件、找产物放哪：`project-files.md`；自己写第 1-3 章：`opening-design.md`「开篇落笔」；排查单章问题：`long-chapter-quality.md` |
-| 日更 | 先 `workflow-daily.md`，每章同「写一章」 | 同「写一章」 |
-| 大修 | `workflow-revision.md`；交写手加 `agent-calls.md`；自己改加 `long-format.md`、`writing-craft.md`，改情绪对抗戏加本章技法 | 只说读者反应：`revision-diagnosis.md`；追踪提交报错：`tracking-transaction.md` |
-| 管理作者习惯 | `author-memory.md`；完成即停，不建书、不写正文 | — |
+| 立项、定设定、出卷纲 | `references/flow-opening-plan.md` + 命中 1 份流派包 | 有对标：`references/benchmark-recall.md`；子代理：`references/agent-calls.md` |
+| 出细纲、补纲 | `references/flow-outline.md` + 命中流派包 | 有对标：`references/benchmark-recall.md`；子代理：`references/agent-calls.md` |
+| 写一章、日更 | `references/flow-drafting.md` + 命中流派包 | 降档不成立或取对标切片：`references/benchmark-recall.md`；子代理：`references/agent-calls.md`；首章初始化/追踪报错：`references/tracking-protocol.md` |
+| 大修、回炉 | `references/flow-revision.md` + `references/flow-drafting.md`「正文笔法与竖屏网感」+ 流派包 | 子代理：`references/agent-calls.md`；追踪报错：`references/tracking-protocol.md` |
+| 管理作者习惯 | `references/author-memory.md`（完成即停，不建书不写正文） | — |
 
-交给 story-architect 时主会话只读时刻文件和 `agent-calls.md`，方法随任务包；交给 narrative-writer 时它按自己的读取表读，不得用没读参考的临时 prompt 替代。去味走检测器，不预读。写正文、改稿前读本书 `设定/文风.md`（没有就按作者当前请求）。
+- **16 份流派包（按书只读命中 1 份）**：男频 `references/genre-styles/都市脑洞系统.md`、`references/genre-styles/都市日常神豪.md`、`references/genre-styles/都市高武异能.md`、`references/genre-styles/传统玄幻仙侠.md`、`references/genre-styles/玄幻脑洞反套路.md`、`references/genre-styles/历史架空权谋.md`、`references/genre-styles/末世规则科幻.md`、`references/genre-styles/悬疑灵异.md`、`references/genre-styles/西幻游戏同人.md`；女频与双男主 `references/genre-styles/现言脑洞快穿.md`、`references/genre-styles/豪门虐恋追妻.md`、`references/genre-styles/古言宅斗重生.md`、`references/genre-styles/年代种田经商.md`、`references/genre-styles/青春甜宠文娱.md`、`references/genre-styles/双男主.md`；兜底 `references/genre-styles/通用长篇.md`。
+- 派 `story-architect` 时主会话读对应流程手册与 `agent-calls.md`；派 `narrative-writer` 时由它按自身读取表读，不得用临时 prompt 替代。写正文/改稿前读本书 `设定/文风.md`。
+- **记下本轮约束**：重读请求、细纲与卷纲，原样记下字数范围、必发生、禁发生、时间锚与停笔点；参考文件不覆盖既定事实，作者字数范围写入细纲「字数范围」。
 
-**本章技法**（每章至多一份；类别只在这里定义，写手模板的读取表与它同步）：按细纲主功能选。
-
-| 类别（读者情绪） | 文件 |
-|---|---|
-| 打脸/逆袭（爽感释放） | `style-combat-face.md` |
-| 身份/认知/立场反转（震撼+痛快） | `long-reversal.md` |
-| 感情拉扯（意难平） | `emotional-methods.md` |
-| 悬疑/惊悚/异常线索（紧张+好奇） | `long-suspense.md` |
-| 日常装逼（期待感） | `style-combat-face.md`「爽点公式与日常装逼」 |
-
-都不对应就不读。交给写手只在 prompt「本章技法」填类别；自己写只读该文件「什么时候读这份」和它指向的那一节，日更一批只读一份，按最需要的那章选。作者只说情绪时按括号反查题材。
-
-**记下本轮约束**：正文写前，读完上面的文件后重读当前请求、本章细纲和卷纲，原样记下用户明确的字数范围、必发生、禁止发生、精确时间锚与本章停笔点、章尾新债。参考文件只提供技法，不覆盖这些事实；作者给的字数范围写在细纲「字数范围」行（命令参数只作临时覆盖），有它就不用默认长度带（见 tracking-transaction.md）。交付前逐项复核：字数出了范围按 workflow-chapter「检测收口」交作者处置，不自动补字；其余项越界不算完成。
-
----
-
-> 专业 agent 只查当前宿主：Claude `.claude/agents`、OpenCode `.opencode/agents`、Codex `.codex/agents` TOML、Antigravity `.agents/agents`（`invoke_subagent` + 同名 `TypeName`）；ZCode 查已启用插件注册的同名角色，用 `Agent` 工具按实际 schema 派发，不要求 `.zcode/agents`。返回 unknown agent 时按下面的降级处理，不因宿主名或其他端目录存在而降级。
+> 专业 agent 只查当前宿主：Claude `.claude/agents`、OpenCode `.opencode/agents`、Codex `.codex/agents` TOML、Antigravity `.agents/agents`（`invoke_subagent` + 同名 `TypeName`）；ZCode 查已启用插件注册角色，用 `Agent` 工具按实际 schema 派发，不要求 `.zcode/agents`。返回 unknown agent 按降级处理，不因他端目录存在而降级。
 >
-> 版本：项目根 `.story-deployed` 的 `agents_version` 与本版 `agents_version: 45` 不一致（缺失、非整数、更小或更大）时照常按当前宿主角色来源检查并 spawn，只对作者说一句「写作助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」；大于 45 时额外提示先更新 oh-story-claudecode。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct，对作者只说「这次我自己写」。
+> 版本：项目根 `.story-deployed` 的 `agents_version` 与 `agents_version: 46` 不一致时照常检查并 spawn，只提示一句「写作助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」；大于 46 时补充提示先更新 oh-story-claudecode。仅当前宿主角色缺失或无调用能力时降级 solo/direct，对作者只说「这次我自己写」。
 
----
+## 平台与男女频速查
 
-## 写作流程
+| 平台 | 男频重点 | 女频重点 | 常规单章字数 |
+|---|---|---|---|
+| **番茄** | 强噱头直给；第 1 章 300–400 字入冲突、多数首章即亮金手指；竖屏短段（中位约 22 字），章末强卡点 | 下沉强钩、早给安全感；短段快拉扯、强反转或脑洞系统 | 2000–2500 字（默认 2200） |
+| **七猫** | 免费爽感直推，第 1 章立困局与反击筹码，节奏不拖 | 甜虐交替、极限推拉、宅斗/豪门/年代强情绪，卡点密 | 2000–2400 字（默认 2150） |
+| **起点** | 代入与体系扎实，允许第 1 章立低位压迫、第 2–3 章亮底牌，首章仍须留追读钩 | 长线人设细、文风稳，容忍适度铺垫，主线清晰 | 2800–3500 字（默认 3000） |
+| **晋江** | 非主力 | 人设与情感张力优先，女主主体性强、安全感高，互动不水 | 2800–3500 字（默认 3000） |
 
-先确定操作对象、交付范围和停点，再看项目状态；空项目不等于授权完整开书。
+- **男女频差异**：男频以剧情爽感与实力/地位/资源升级为主轴，感情线辅助；女频以情绪价值与关系/成长双轴咬合，重被珍视、认可与主动权。
+
+## 写作流程与授权边界
+
+先定操作对象、交付范围和停点，再看项目状态；空项目不等于授权完整开书。
 
 | 场景 | 触发条件 | 执行流程 |
-|------|----------|----------|
-| **结构讨论** | "只讨论/推敲故事结构" | 只交付结构方案，不建工程、不自动写文件；不要求先填完设定或细纲 |
-| **大纲规划** | "写大纲/规划剧情/规划全书/规划第X卷/开新卷" | 按需取 Phase 1→3，交付所请求大纲/卷纲及必要设定；不自动展开细纲或初始化追踪 |
-| **细纲规划** | "出细纲/补纲/扩纲/补细纲/写或修改第N章细纲" | Phase 3：既有单元内只补/改点名章；需要新单元才走「中途补纲/扩纲小流程」。指定范围不扩到整单元；未指定时按剧情批建纲 |
-| **开书** | "帮我开书"，未限定规划层级 | 按确认点逐个走：定方向→定设定→卷纲→前 10 章细纲，每个确认点作者说继续才往下；**最远停在细纲交付，不自动写正文** |
-| **定设定** | "定设定"，或已有题材定位、还没有角色与关系 | Phase 2，交付设定后停 |
-| **写指定章** | "写第 N 章" / "写第1章" / "开书并写首章"，对象是正文 | Phase 4→5，只写点名章后停止；缺前置时先补必要设定、卷纲和点名章细纲，不套用完整开书的 10 章默认 |
-| **日更续写** | 关键词（"日更"/"续写"/"继续写"）**且**项目已有正文+追踪 | 按 workflow-daily 控制批次 |
-| **大修** | "修改第X章" / "回炉" / "重写第X章"，对象是已写正文 | 按 workflow-revision；只改细纲不进此流程 |
+|---|---|---|
+| **结构讨论** | "只讨论/推敲故事结构" | 只交方案，不建工程、不写文件 |
+| **大纲规划** | "写大纲/规划剧情/规划第X卷/开新卷" | 走 `flow-opening-plan.md` 到卷纲后停，不出细纲、不建追踪 |
+| **细纲规划** | "出细纲/补纲/扩纲/写或修改第N章细纲" | 走 `flow-outline.md`；只补/改点名范围，不写正文 |
+| **开书** | "帮我开书"（未限层级） | 定方向 → 定设定 → 出卷纲 → 前 10 章细纲，**最远停在细纲交付，不自动写正文** |
+| **定设定** | "定设定"，或有题材定位缺角色关系 | 走 `flow-opening-plan.md` 定设定后停 |
+| **写指定章** | "写第 N 章" / "写第1章" / "开书并写首章" | 走 `flow-drafting.md` 只写点名章后停；缺前置只补必要设定、卷纲和点名章细纲 |
+| **日更续写** | "日更"/"续写"/"继续写" **且**已有正文与追踪 | 走 `flow-drafting.md` 日更批（默认 2–3 章，单轮 ≤3 章） |
+| **大修** | "修改第X章" / "回炉" / "重写第X章" | 走 `flow-revision.md`；只改细纲不进此流程 |
 
-**对象优先**："写/修改第N章细纲"是规划，不因命中"写/修改第N章"而写正文；"以后再写正文"不是本轮授权。仅规划要求优先于旧日更任务，停止旧批量。对象不明或同一请求范围冲突时，只确认冲突项。
-
-**规划续接**："继续/按这个来/确认方案"不扩大范围，完成即停，不自动转细纲或正文；"继续写/接着写"指正文——下一章有细纲就写，上一轮在规划就只问一句「要接着写第N章正文吗？」（默认是），缺细纲则问是否先补。规划模式不写追踪、不自动记录作者记忆，不调用 narrative-writer；作者明确要求长期记住时按记忆协议处理。开新卷时新角色/势力/设定回 Phase 2 增量补，Phase 3 只做到请求层级。
-
-**转入正文**：明确的正文请求只授权进入写作流程。落正文前重新完成本轮「写前必读」，按 workflow-chapter 开头修好缺文件，没修好就停；之后按原流程写作、质检、提交，不再问是否继续。
-
-### 裸调用与停靠点（防失控）
-
-`/story-long-write` 或 `$story-long-write` **裸调用**（无明确意图）时，只诊断项目并列选项，**不得自动进入正文写作，也不得把已有项目默认为日更 3 章**：
-
-- 空项目 → 「讨论结构」「写大纲」「帮我开书」；
-- 有纲无正文 → 「补细纲」「写第1章」；
-- 有正文+追踪 → 展示进度与下一章细纲状态，列「规划下一卷」「日更2章」「修改第X章」。
-
-**正文批量上限**：写正文须用户显式给出章节范围或日更意图；单章默认 1 章，日更默认 2-3 章，单轮最多 3 章，超出的在汇报里提示下轮继续。**匹配顺序**：只规划按 结构讨论 → 细纲规划 → 大纲规划 → 开书，越窄越优先；要正文按 大修 → 写指定章 → 日更续写；日更前置不齐则提示补齐或写第1章。同批"继续/续写/日更"仍走 workflow-daily 的完整串行流程；切到规划后不恢复旧日更批量。
-
-无法判断场景时，给 2-4 个白话选项让用户选，不贴场景表，也不开放式提问。
+- **对象优先与续接**："写/改第N章细纲"属规划不写正文；"继续/按这个来"不扩范围，完成即停；"继续写/接着写"指正文——下章有细纲就写，上轮在规划就问「要接着写第N章正文吗？」（默认是）。规划模式不写追踪、不调写手。
+- **裸调用停靠点**：无明确意图调用 `/story-long-write` 只诊断项目给白话选项，**不得自动进入正文写作，也不得把已有项目默认为日更 3 章**：空项目 →「讨论结构 / 写大纲 / 帮我开书」；有纲无正文 →「补细纲 / 写第1章」；有正文+追踪 → 报进度并列「规划下一卷 / 日更2章 / 修改第X章」。
+- **匹配优先级**：规划按 结构讨论 → 细纲规划 → 大纲规划 → 开书；正文按 大修 → 写指定章 → 日更续写。
 
 ### 面向作者的汇报
 
-所有给作者看的汇报、提问和停下说明只讲故事：写了/改了什么（章名、发生了什么）；要作者定的事（一句白话问题＋白话选项＋推荐默认）；下一步。不写脚本、字段、参数名、状态码、版本号和内部清单名（如 排纲自查、写纲前查缺、字数带）；编号必带故事标签，如「伏笔 F057（那封信的去处）」。检查结果一句白话带过，如「自查过设定和前文，没发现冲突」。不加技术备注行：版本提示、没请写作助手这类事各用一句白话说。汇报照各 workflow 的模板写，不带代码块围栏；子 agent 返回的术语由主会话翻译后再说。
+给作者的汇报、提问和停下说明只讲故事：写了/改了什么（章名、核心情节）；要作者定的事（白话问题 + 选项 + 推荐）；下一步。**严禁出现**脚本名、字段名、参数名、状态码、版本号和内部清单名；编号必带故事标签（如「伏笔 F012（那封密信）」）。检查结果一句白话带过，不加技术备注、不带代码块围栏。
 
-### 路径与术语约定
+### 路径与硬约束
 
-> `{skill 根}` 是本 skill 所在目录。
->
-> **对标资料**：路径查找、无对标的判定、缺资料怎么办，都只在 benchmark-recall.md 定义。
->
-> **卷纲不整读**：一律走 `node {skill 根}/scripts/outline_view.js --chapter {章号} {卷纲路径}`（知道编号也可用 `--unit {编号}`；只要卷级部分用 `--contract`，看目录用 `--toc`）；找不到就核对章节范围或先补卷纲，不改用整读。
->
-> **新增物三级**（缺东西时三种处理；排纲、写正文、处置共用；只看下一章需不需要知道它存在过）：
-> - **直接写**：微连接、路人、器物、地名细部、一次性对话、现场细节；不申报。
-> - **补上并记下**：具名配角、势力、复用地点属性、能力形态、规矩、刻度、新伏笔、新关系或承诺、给主角留下的东西；照写并逐条进申报表（类型／名目／落在哪／后续义务；无写 `0`；末行「本章没写成的」），主会话核对后才算续写事实。正文里新长出的伏笔由主会话登记时取本卷伏笔表的下一个编号、追加进伏笔表（只增不改，不算改卷纲）。
-> - **先问作者**：新主线事件或反转、金手指规则与力量档位、真相或伏笔结算、经济锚点、读者期待、提前写后续章、改变细纲已定结果或人物决定、卷纲新增主线或故事线、碰这卷主打的线或后面才揭开的东西、与既有规矩或承诺冲突；写正文时不写，排纲时挂起列候选，由主会话问作者。
-> 拿不准：写时按补上并记下，处置时按先问作者。
-
----
-
-### Phase 1–3：开书与规划
-
-按作者确认点分时刻走，每个时刻文件开头写了交接规则。
-
----
-
-### Phase 4：正文写作辅助
-
-每章按 workflow-chapter「单章写作流程」逐步执行。
-
-#### 追踪
-
-所有追踪写入都走 `scripts/tracking_commit.js`：追踪数据统一记在 `追踪/_tracking-state.json` 里，`上下文.md`、角色快照、`伏笔.md`、时间线都由它自动生成，默认不手改（手改会被 `check` 报 `drift_warnings` 提醒）。常规体积上限出软提醒，单视图硬上限 65536 字节；字段与上限见 [tracking-transaction.md](references/tracking-transaction.md)。
-
----
+- `{skill 根}` 为本 skill 目录。
+- **卷纲严禁整读**：一律走 `node {skill 根}/scripts/outline_view.js --chapter {章号} {卷纲路径}`（或 `--unit`/`--contract`/`--toc`）。
+- **追踪统一走事务脚本**：读写走 `node {skill 根}/scripts/tracking_commit.js` 与 `storyctl.js`，主数据在 `追踪/_tracking-state.json`，派生视图自动生成不手改（见 `references/tracking-protocol.md`）。
+- **新增物三级**（排纲、正文、处置共用；只看下章需不需要知道它存在过）：
+  - **直接写**：微连接、路人、器物、地名细部、一次性对话、现场细节；不申报。
+  - **补上并记下**：具名配角、势力、复用地点属性、能力形态、规矩、刻度、新伏笔、新关系或承诺、留给主角的物件；排纲先落档再引用，正文照写并逐条进申报表（无写 `0`；末行「本章没写成的」），主会话核对入追踪；新伏笔按本卷伏笔表顺号追加（不算改卷纲）。
+  - **先问作者**：新主线事件或反转、金手指规则与力量档位、真相或伏笔结算、经济锚点、读者期待、提前写后续章、改细纲已定结果或人物决定、卷纲新增主线或故事线、碰本卷主打线或后面才揭开的东西、与既有规矩冲突；正文不写，排纲挂起列候选问作者。拿不准：写时按补上并记下，处置时按先问作者。
 
 ## 流程衔接
 
-**流水线：** 长篇
-**位置：** 写作（第 3/3 步）
+**流水线：** 长篇 ｜ **位置：** 写作（第 3/3 步）
 
-| 时机 | 跳转到 | 命令 |
-|---|---|---|
-| 写完，去 AI 味 | story-deslop | `/story-deslop` |
-| 想对比参考书 | story-long-analyze | `/story-long-analyze` |
-| 需要市场方向 | story-long-scan | `/story-long-scan` |
-| 想改写成短篇 | story-short-write | `/story-short-write` |
+- 写完去 AI 味：`/story-deslop` ｜ 多视角审查：`/story-review` ｜ 拆参考书：`/story-long-analyze` ｜ 扫榜选题：`/story-long-scan` ｜ 写短篇：`/story-short-write`

@@ -1126,7 +1126,7 @@ def template_prefix_errors(
         references | {Path(name).name for name in references},
         key=lambda name: (-len(name), name),
     )
-    patterns = [AGENT_REF_RE.pattern, r"genre-prose-cards/\{[^}\n]+\}\.md"]
+    patterns = [AGENT_REF_RE.pattern, r"genre-(?:prose-cards|styles)/\{[^}\n]+\}\.md"]
     if names:
         patterns.append(
             r"(?<![A-Za-z0-9_./-])(?:\.{1,2}/)*(?:references/)?(?:"

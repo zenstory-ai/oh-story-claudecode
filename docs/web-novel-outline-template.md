@@ -88,8 +88,7 @@
 ## 相关
 
 - 站点原文（含更多示例与相关指南）：https://zenstory.ai/zh/oh-story/novel-outline-template
-- [本文方法来源](../skills/story-long-write/references/outline-methods.md)
-- [已定事实与后续规划](../skills/story-long-write/references/workflow-volume.md)
-- [作者选择与默认方法](../skills/story-long-write/references/writing-craft.md)
-- [正文前补齐并检查本章细纲](../skills/story-long-write/references/workflow-chapter.md)
+- [立项设定与卷纲排法](../skills/story-long-write/references/flow-opening-plan.md)
+- [细纲规划与钩子节奏](../skills/story-long-write/references/flow-outline.md)
+- [正文笔法与作者文风优先级](../skills/story-long-write/references/flow-drafting.md)
 - 仓库地址：https://github.com/zenstory-ai/oh-story-claudecode

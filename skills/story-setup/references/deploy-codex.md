@@ -11,7 +11,7 @@
 | `skills/story-setup/references/codex/hooks/hooks.json` | `.codex/hooks.json` | user+managed | replace managed registrations by stable hook identity | hook JSON valid; all stale direct/launcher registrations removed, current 6 registrations present exactly once |
 | `skills/story-setup/references/codex/hooks/{story_codex_hook.js,story_hook_core.js,run-story-hook.sh,run-story-hook.cmd}` | `.codex/hooks/` 同名文件 | story-setup managed | replace（升级删退役 `story_codex_hook.py`） | 适配器、共享核与 launcher 齐全且无退役 `story_codex_hook.py`；`story_hook_core.js` 与 Claude/OpenCode/ZCode/Antigravity 副本字节一致 |
 | `skills/story-setup/scripts/merge-hooks.js` | 部署时执行，不复制到项目 | story-setup helper | execute (`--host codex`) | 替换已知管理注册、保留用户 hooks 与未知顶层字段，结果幂等 |
-| `skills/story-setup/references/agent-references/` | `.codex/skills/story-setup/references/agent-references/` | story-setup managed | replace | every reference resolves |
+| `skills/story-setup/references/agent-references/` | `.codex/skills/story-setup/references/agent-references/` | story-setup managed | recursive replace (`--prune-orphans`) | all refs resolve |
 
 ## 部署 Codex Agents
 
@@ -20,7 +20,7 @@
 - 校验每个 TOML 都能解析，且包含 Codex 必需字段：`name`、`description`、`developer_instructions`
 - 只读职责 agent（`consistency-checker`、`story-explorer`）必须保留 `sandbox_mode = "read-only"`；`chapter-extractor` 要写批次输入文件，不设只读沙箱
 - **部署后必须 trust + 新开 Codex 会话**（报告文案与 fallback 规则见下方「安装报告必须提示」）；hooks 未在 `/hooks` 信任前会被 Codex 直接跳过（不报错也不提示），包括写正文前的大纲守卫；若运行时返回 `unknown agent_type`，调用方必须降级 solo/direct 并报告 fallback。
-- 将 `skills/story-setup/references/agent-references/` 同步复制到 `.codex/skills/story-setup/references/agent-references/`，作为 Codex agent 的项目内参考资料主路径。Codex 只使用当前规范前缀 `.codex/skills/`，不在运行时遍历历史备选路径。
+- 先运行 `copy-path-safety.js --prune-orphans` 清理退役文件与空子目录，再递归复制 `skills/story-setup/references/agent-references/`（含子目录）到 `.codex/skills/story-setup/references/agent-references/`；只用 `.codex/skills/`，不遍历历史路径。
 
 ## Codex hooks.json 合并算法
 

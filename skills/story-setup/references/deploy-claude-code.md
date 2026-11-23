@@ -10,7 +10,7 @@
 | `skills/story-setup/references/templates/hooks/` | `.claude/hooks/` | story-setup managed | recursive replace | `run-story-hook.sh`, `story_hook_cli.js`, `story_hook_core.js` exist；`node --check` 语法有效；`story_hook_core.js` 与 Codex/OpenCode/ZCode/Antigravity 副本字节一致 |
 | `skills/story-setup/references/templates/rules/*.md` | `.claude/rules/*.md` | story-setup managed | replace | every rule contains `paths` frontmatter |
 | `skills/story-setup/references/templates/agents/*.md` | `.claude/agents/*.md` | story-setup managed | replace | 7 agent files exist |
-| `skills/story-setup/references/agent-references/*.md` | `.claude/skills/story-setup/references/agent-references/*.md` | story-setup managed | replace | every `story-setup/references/agent-references/*.md` reference resolves |
+| `skills/story-setup/references/agent-references/` | `.claude/skills/story-setup/references/agent-references/` | story-setup managed | recursive replace (`--prune-orphans`) | all `agent-references/` refs resolve |
 | `skills/story-setup/references/templates/settings-hooks.json` | `.claude/settings.local.json` | user+managed | replace managed registrations by stable hook identity | hook JSON valid；旧 matcher 注册已迁移、当前模板命令各一份、用户 hook 保留 |
 | `skills/story-setup/scripts/merge-hooks.js` | 部署时执行，不复制到项目 | story-setup helper | execute (`--host claude`) | 替换已知 story hook 注册、保留用户 hooks/顶层字段，v24→v25 迁移与重复执行幂等 |
 | `skills/story-setup/scripts/copy-path-safety.js` | 每个递归复制步骤前执行，不复制到项目专用目录 | story-setup helper | execute | JSON 仅 `copy_allowed: true` 时允许复制；symlink 同对象 no-op；target 位于 source 内时停止 |
@@ -43,9 +43,9 @@
 
 ### 部署 Agent References
 
-- 递归复制 `skills/story-setup/references/agent-references/` 的全部 `.md`（含子目录）到项目内 `.claude/skills/story-setup/references/agent-references/`
-- 校验：凡 agent 或 reference 中出现 `story-setup/references/agent-references/<file>.md`，源包与目标包都必须存在 `<file>.md`
-- 部署到项目后，agent 内引用的参考资料必须走 `story-setup/references/agent-references/*.md` 这一本 skill 内复制路径；不要跨 skill 引用其他 skill 的 references。Claude Code 只使用当前规范前缀 `.claude/skills/`，不在运行时遍历历史备选路径。
+- 先运行 `copy-path-safety.js --prune-orphans` 清理退役文件与空子目录，再递归复制 `skills/story-setup/references/agent-references/`（含子目录）到 `.claude/skills/story-setup/references/agent-references/`
+- 校验：agent/reference 中所有 `story-setup/references/agent-references/<file>.md` 在源与目标均存在
+- 部署后 agent 仅读本 skill 的 `.claude/skills/story-setup/references/agent-references/`，禁止跨 skill 引用或遍历历史路径。
 
 ## 合并 Hooks 注册到 settings.local.json
 

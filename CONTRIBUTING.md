@@ -155,7 +155,7 @@ REASONIX_REAL_CHECK=1 bash scripts/check-reasonix-adapter.sh
 
 ## 共享文件规范
 
-部分文件跨 skill 共享（如 banned-words.md、expression.md），修改时必须同步所有副本。
+部分文件跨 skill 共享（如 banned-words.md、deslop-guide.md），修改时必须同步所有副本。
 
 - runtime 脚本的唯一源/目标定义在 `scripts/shared-assets.json`；先改 `source`，再运行 `python3 scripts/sync-shared-assets.py sync`。
 - 同名 runtime 脚本只能属于一个 canonical group，且每个 target 必须保留 source basename；禁止用改名 target 绕过单一 owner。

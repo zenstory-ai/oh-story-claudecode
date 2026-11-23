@@ -240,6 +240,33 @@ test("Codex pre-tool-prose-guard, commit advisory, session-start, compact, and s
     const stopClean = JSON.parse(invoke("stop", { hook_event_name: "Stop" }))
     assert.deepEqual(stopClean, { continue: true })
 
+    // Short-story 正文.md Stop parity: mid-draft (<6000c, 5 not-is + trailer) silent;
+    // 6 not-is emits soft advisory wording (not hard blocking header); hard degeneration keeps hard header.
+    const shortFive = [
+      "他不是心软，而是怕曝光。",
+      "那不是巧合，而是设局。",
+      "她不是不懂，而是装傻。",
+      "这不是意外，而是预谋。",
+      "是真账本，不是假流水。",
+    ].join("\n")
+    write(path.join(root, "short/正文.md"), `# 试写\n\n${pad}\n${shortFive}\n没人知道真相，一切才刚刚开始。\n复仇大戏拉开序幕。\n她关上了门。\n`)
+    const shortStopSilent = JSON.parse(invoke("stop", { hook_event_name: "Stop" }))
+    assert.deepEqual(shortStopSilent, { continue: true })
+
+    write(path.join(root, "short/正文.md"), `# 试写\n\n${pad}\n${shortFive}\n我不是求和，而是来清算。\n她关上了门。\n`)
+    const shortStopSoft = JSON.parse(invoke("stop", { hook_event_name: "Stop" }))
+    assert.equal(shortStopSoft.continue, true)
+    assert.match(shortStopSoft.systemMessage, /短篇软提醒，非阻断/)
+    assert.ok(!shortStopSoft.systemMessage.includes("硬信号命中即回正文改掉"))
+
+    write(path.join(root, "short/正文.md"), `# 试写\n\n${pad}\n她冲过去一把扯住`)
+    const shortStopHard = JSON.parse(invoke("stop", { hook_event_name: "Stop" }))
+    assert.equal(shortStopHard.continue, true)
+    assert.match(shortStopHard.systemMessage, /硬信号命中即回正文改掉/)
+    assert.match(shortStopHard.systemMessage, /截断/)
+    execFileSync("git", ["-C", root, "add", "-A"])
+    execFileSync("git", ["-C", root, "commit", "-qm", "wip-short"])
+
     // SessionStart continuity (staleness + duplicate titles)
     writeCleanState(path.join(root, "contbook"))
     const ctxFile = path.join(root, "contbook/追踪/上下文.md")

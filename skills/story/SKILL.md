@@ -15,7 +15,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 |---|---|---|
 | 长篇规划/写作 | 讨论长篇结构、规划剧情、开书、写大纲、补细纲、长篇、连载 | `/story-long-write` |
 | 发布准备 | 发布资料、建书表单、平台书名简介标签、建书资料 | `/story-publish` |
-| 写短篇 | 短篇、盐言、一万字 | `/story-short-write` |
+| 写短篇 | 短篇、盐言、七猫短篇、点众、一万字 | `/story-short-write` |
 | 长篇拆文 | 拆文、分析这本书、黄金三章 | `/story-long-analyze` |
 | 短篇拆文 | 拆短篇、分析这个故事 | `/story-short-analyze` |
 | 长篇扫榜 | 长篇排行、什么火、新书在冒什么、起点/番茄/晋江/七猫长篇 | `/story-long-scan` |
@@ -102,7 +102,7 @@ cdp_port：{可选：Chrome 调试端口不是 9222 时写}
 
 ### 能不能用助手
 
-> 版本：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 45` 不一致时（标记缺失、字段缺失/非整数、小于或大于 45）**照常按当前宿主角色来源检查并 spawn**，只用一句白话提示作者「查资料助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」；大于 45 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct，按下方一句白话告知作者，不另加技术备注行。
+> 版本：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 46` 不一致时（标记缺失、字段缺失/非整数、小于或大于 46）**照常按当前宿主角色来源检查并 spawn**，只用一句白话提示作者「查资料助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」；大于 46 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct，按下方一句白话告知作者，不另加技术备注行。
 
 走助手前只做本端可用性检查：当前不在子代理内、有本端调用工具，且对应角色可用（Claude `.claude/agents/*.md`、OpenCode `.opencode/agents/*.md`、Codex `.codex/agents/*.toml`、Antigravity `.agents/agents/agent-name/agent.md`；ZCode 查插件注册的同名角色，不要求 `.zcode/agents`）→ 可尝试 spawn。Antigravity 用 `invoke_subagent` + 同名 `TypeName`，ZCode 用 `Agent` 按实际 schema 派发，不跨端误判。任一不满足或返回 unknown agent，则降级处理：
 

@@ -3,7 +3,7 @@
 > 谁读：定方向时主会话按需读（平台、赛道、暂定书名）；story-architect 题材定位读副本。
 
 > **用途**：定方向时确认读者要什么、选赛道、定平台写法、起暂定书名、选对标。平台读者差异写在本文件「平台与频道」表里。
-> **配合**：长篇男频题材框架见 `long-genre-catalog.md`，女频见 `female-audience-writing.md`，核心梗和金手指见 `long-genre-mechanics.md`；短篇结构见 `short-genre-formulas.md`。
+> **配合**：长篇立项、核心梗、金手指与人设见 `flow-opening-plan.md`；短篇质量与卖点见 `short-quality.md` 与 `short-deslop.md`。
 
 ---
 

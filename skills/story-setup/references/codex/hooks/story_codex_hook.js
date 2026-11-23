@@ -257,23 +257,40 @@ function findChangedProseFiles(root) {
 
 function stopEvent() {
   // Codex 无 PostToolUse，正文内容网在回合结束的 Stop 事件兜底：对本回合 git 改动过的正文
-  // 复扫硬信号。非阻塞、无发现静默；解析失败一律 {continue:true}。
+  // 复扫硬信号与毒句式（短篇 正文.md 按 short 模式放宽并区分为软提醒，对齐其余四端 proseAfterWrite）。
+  // 非阻塞、无发现静默；解析失败一律 {continue:true}。
   try {
-    const { proseNetFindings, loadStyleWhitelist, toxicRescanHint, safeRelative } = loadCore()
+    const {
+      proseDegenerationFindings,
+      proseNetFindings,
+      loadStyleWhitelist,
+      toxicRescanHint,
+      safeRelative,
+    } = loadCore()
     const root = projectRoot()
     const blocks = []
+    let hasHardOrLong = false
     for (const abs of findChangedProseFiles(root)) {
       let text
       try { text = fs.readFileSync(abs, "utf8") } catch { continue }
-      const findings = proseNetFindings(text, loadStyleWhitelist(abs), toxicRescanHint(abs))
+      const isShort = path.basename(abs) === "正文.md"
+      const findings = proseNetFindings(text, loadStyleWhitelist(abs), toxicRescanHint(abs), {
+        mode: isShort ? "short" : "long",
+      })
       if (findings.length) {
+        if (!isShort || proseDegenerationFindings(text).length > 0) {
+          hasHardOrLong = true
+        }
         blocks.push(`=== ${safeRelative(root, abs)} ===\n${findings.join("\n")}`)
       }
     }
     if (blocks.length) {
+      const lead = hasHardOrLong
+        ? "=== 正文兜底检测（回合结束复扫，模型无关）===\n硬信号命中即回正文改掉、复扫到净：\n"
+        : "=== 正文兜底检测（回合结束复扫，短篇软提醒，非阻断）===\n确属情绪、反转或节奏需要可保留，其余精修时一并处理：\n"
       emit({
         continue: true,
-        systemMessage: "=== 正文兜底检测（回合结束复扫，模型无关）===\n硬信号命中即回正文改掉、复扫到净：\n" + blocks.join("\n"),
+        systemMessage: lead + blocks.join("\n"),
       })
       return
     }
