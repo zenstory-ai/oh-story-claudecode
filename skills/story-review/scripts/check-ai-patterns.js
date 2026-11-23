@@ -627,7 +627,7 @@ function scanProsePatterns(proseLines, mode = 'long', scale = 1) {
 
     const dashScanText = maskQuotedWithUnclosed(text);
     const dashPattern = /——|—|--+/g;
-    dashNarrativeChars += visibleLength(stripQuoted(trimmed).replace(/[“「『"][^”」』"]*$/, ''));
+    dashNarrativeChars += visibleLength(stripQuotedWithUnclosed(trimmed));
     let dash;
     while ((dash = dashPattern.exec(dashScanText)) !== null) {
       dashHits += 1;
@@ -1018,7 +1018,7 @@ function findEllipsisDensityTic(proseLines) {
   for (const { text, lineNo } of proseLines) {
     const trimmed = text.trim();
     if (!trimmed || isDivider(trimmed) || isStructural(trimmed)) continue;
-    const narrative = stripQuoted(trimmed).replace(/[“「『"][^”」』"]*$/, '');
+    const narrative = stripQuotedWithUnclosed(trimmed);
     narrativeChars += visibleLength(narrative);
     ELLIPSIS_DENSITY_PATTERN.lastIndex = 0;
     let match;
@@ -1545,6 +1545,12 @@ function stripQuoted(text) {
   let out = text;
   for (const src of QUOTE_SOURCES) out = out.replace(new RegExp(src, 'g'), '');
   return out;
+}
+
+function stripQuotedWithUnclosed(text) {
+  const out = stripQuoted(text);
+  const unclosed = /[“「『"]/.exec(out);
+  return unclosed ? out.slice(0, unclosed.index) : out;
 }
 
 // 把成对引号片段（含引号）替换为等长问号占位：既豁免引号内台词/播报，又保住原文

@@ -41,6 +41,6 @@ Short profile 禁止读取 `long-*`、`flow-*`、`benchmark-recall.md` 或 `genr
 
 ## 长篇流派包索引（Long profile 按书只读命中 1 份）
 
-- 男频：[都市脑洞系统](genre-styles/都市脑洞系统.md)、[都市日常神豪](genre-styles/都市日常神豪.md)、[都市高武异能](genre-styles/都市高武异能.md)、[传统玄幻仙侠](genre-styles/传统玄幻仙侠.md)、[玄幻脑洞反套路](genre-styles/玄幻脑洞反套路.md)、[历史架空权谋](genre-styles/历史架空权谋.md)、[末世规则科幻](genre-styles/末世规则科幻.md)、[悬疑灵异](genre-styles/悬疑灵异.md)
-- 女频与泛题材：[现言脑洞快穿](genre-styles/现言脑洞快穿.md)、[豪门虐恋追妻](genre-styles/豪门虐恋追妻.md)、[古言宅斗重生](genre-styles/古言宅斗重生.md)、[年代种田经商](genre-styles/年代种田经商.md)、[青春甜宠文娱](genre-styles/青春甜宠文娱.md)、[双男主](genre-styles/双男主.md)、[西幻游戏同人](genre-styles/西幻游戏同人.md)
+- 男频：[都市脑洞系统](genre-styles/都市脑洞系统.md)、[都市日常神豪](genre-styles/都市日常神豪.md)、[都市高武异能](genre-styles/都市高武异能.md)、[传统玄幻仙侠](genre-styles/传统玄幻仙侠.md)、[玄幻脑洞反套路](genre-styles/玄幻脑洞反套路.md)、[历史架空权谋](genre-styles/历史架空权谋.md)、[末世规则科幻](genre-styles/末世规则科幻.md)、[悬疑灵异](genre-styles/悬疑灵异.md)、[西幻游戏同人](genre-styles/西幻游戏同人.md)
+- 女频与双男主：[现言脑洞快穿](genre-styles/现言脑洞快穿.md)、[豪门虐恋追妻](genre-styles/豪门虐恋追妻.md)、[古言宅斗重生](genre-styles/古言宅斗重生.md)、[年代种田经商](genre-styles/年代种田经商.md)、[青春甜宠文娱](genre-styles/青春甜宠文娱.md)、[双男主](genre-styles/双男主.md)
 - 冷门兜底：[通用长篇](genre-styles/通用长篇.md)

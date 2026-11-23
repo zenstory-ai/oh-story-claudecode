@@ -553,7 +553,7 @@ function extractProseSlices(text, chapter = 1, maxSlices = 2) {
 }
 
 function authorDecided(project) {
-  const text = readText(path.join(project, '设定', '题材定位.md')) || '';
+  const text = stripHtmlComments(readText(path.join(project, '设定', '题材定位.md')));
   const match = /^##[ \t]*作者已定[^\n]*\n([\s\S]*?)(?=^#{1,2}[ \t]|$(?![\r\n]))/m.exec(text);
   if (!match) return { decided: null, cut: false };
   const lines = match[1]

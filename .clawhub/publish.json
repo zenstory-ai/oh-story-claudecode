@@ -136,7 +136,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "38b4937a9a05034110d00c080dfcb6512cd68c7be942832ac9e487cda8dccf13",
+      "packageDigest": "d2f6cc29d889090dc37683d1e01e89ea3e274496d51bfe3ec90dd2d89d8354ca",
       "path": "skills/story-deslop",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -206,7 +206,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "39b48067e23384bba666290a695393a1ff4185844778f1b6d14d18a7c2acc18b",
+      "packageDigest": "9e40a43bf01cbb7218549ecd6083151a0e38356f11db2c2b8abbc439e907a0f1",
       "path": "skills/story-long-analyze",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -278,7 +278,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "e2cd65a9b73d3cd26a6f3aa9c30c33909f176445794ae8fc7b830c9494dbebe3",
+      "packageDigest": "ca391ef946ef442686e9b973696665327bc2ec987973d5acb6dc8b4c116a6957",
       "path": "skills/story-long-write",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -313,7 +313,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "f27382888216aaebbe75efa40c36f47a225a1426d743326ca18f6e4bac7443a6",
+      "packageDigest": "a800f3030008ed030856c1764280277cf4253f97dc9c19067942a9ea88265419",
       "path": "skills/story-review",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -348,7 +348,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "b8ad2eec3c00d075e82938e953ef6c6c1acd62ddafc599e63b2e9e7c97d7dcc9",
+      "packageDigest": "b93d02af7fb4556d25995b859008f3fb56fdfd4e4167b776d9cbb6ce0a47abb3",
       "path": "skills/story-setup",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -383,7 +383,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "72070a85ee9f070d4bb9cff7f8af30ff293e51e97b72ed573ba9e0125cb55da1",
+      "packageDigest": "041037e06ebd7b268a4f0495616a50278d218290449001830af4724a575b890d",
       "path": "skills/story-short-analyze",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -452,7 +452,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "93652bace20023fef21079e16c819516f8c8b59c4ba719794e8b43acd65f0cf4",
+      "packageDigest": "84212bdfe494b96c20aad5491831a68191bd6cd151e7d9318b9fee05c32fa0bb",
       "path": "skills/story-short-write",
       "publisher": "worldwonderer",
       "rebuildOn": [],
