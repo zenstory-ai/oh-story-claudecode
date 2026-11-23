@@ -55,8 +55,8 @@ function probePage(port) {
 /**
  * 提取晋江榜单数据（频道分组 + 书名/作者交替），并从书名 anchor 附上 novelid。
  */
-function extractRankData(port) {
-  const js =
+function extractRankDataJS() {
+  return (
     "JSON.stringify((function(){" +
     "var result={channels:[]};" +
     "var text=document.body.innerText||'';" +
@@ -66,7 +66,7 @@ function extractRankData(port) {
     "Array.from(document.querySelectorAll('a')).forEach(function(a){" +
     "  var hm=(a.getAttribute('href')||'').match(/novelid=([0-9]+)/);if(!hm)return;" +
     "  var t=(a.innerText||a.textContent||'').trim();" +
-    "  if(!t||t.indexOf('向《')>-1||t.indexOf('投')>-1||t.length>30)return;" +
+    "  if(!t||t.indexOf('向《')>-1||t.length>30)return;" +
     "  if(!idMap[t])idMap[t]=hm[1];" +
     "});" +
     "var channels=['古代言情','现代言情','古代穿越','现代都市纯爱','现代幻想纯爱','古代纯爱','衍生纯爱','幻想现言','奇幻言情','未来游戏悬疑','百合','无CP','二次元言情','衍生言情','衍生无cp','未来幻想纯爱','原创轻小说','多元'];" +
@@ -78,7 +78,7 @@ function extractRankData(port) {
     "for(var i=0;i<lines.length;i++){" +
     "  var line=lines[i];" +
     "  if(/上榜天数记录|榜单说明/.test(line)){break}" +
-    "  if(/^(免费强推|vip强推|新晋作者|月榜|季榜|半年榜|长生殿|总分榜|字数榜|收入金榜|霸王票|霸王总榜|勤奋指数|完结金榜|新手金榜|栽培月榜|驻站|完结高分|千字金榜|完结全订榜)$/.test(line)){continue}" +
+    "  if(/^(免费强推|vip强推|新晋作者|月榜|季榜|半年榜|长生殿|总分榜|字数榜|收入金榜|霸王票|霸王总榜|勤奋指数|完结金榜|新手金榜|栽培月榜|驻站|完结高分|千字金榜|完结全订榜)$/.test(line)){curChannel='';expectTitle=true;pendingTitle='';continue}" +
     "  if(line.length>30&&line.indexOf('·')>0)continue;" +
     "  if(channelSet[line]){" +
     "    if(curChannel&&channelBooks[curChannel])channelBooks[curChannel]._finished=true;" +
@@ -88,10 +88,13 @@ function extractRankData(port) {
     "  }" +
     "  if(!curChannel)continue;" +
     "  if(expectTitle){" +
+    // 顶部筛选栏里的「古代言情」「多元」后面紧跟「-范围-」「全站」「-视角-」「男主」等 UI 项，
+    // 都没有 novelid 锚点；只有真正挂了 novelid 的书名行才进入 title→author 配对。
+    "    if(!idMap[line])continue;" +
     "    pendingTitle=line;expectTitle=false" +
     "  }else{" +
-    "    if(pendingTitle){" +
-    "      channelBooks[curChannel].books.push({title:pendingTitle,author:line,novelid:idMap[pendingTitle]||''})" +
+    "    if(pendingTitle&&idMap[pendingTitle]){" +
+    "      channelBooks[curChannel].books.push({title:pendingTitle,author:line,novelid:idMap[pendingTitle]})" +
     "    }" +
     "    expectTitle=true;pendingTitle=''" +
     "  }" +
@@ -102,8 +105,12 @@ function extractRankData(port) {
     "  }" +
     "}" +
     "return result" +
-    "})())";
-  return evalJSONBase64(port, js);
+    "})())"
+  );
+}
+
+function extractRankData(port) {
+  return evalJSONBase64(port, extractRankDataJS());
 }
 
 // ---------------------------------------------------------------------------
@@ -398,3 +405,9 @@ function main() {
 if (require.main === module) {
   runCli(main, "晋江采集");
 }
+
+module.exports = {
+  extractRankDataJS,
+  extractRankData,
+  fmtWan,
+};

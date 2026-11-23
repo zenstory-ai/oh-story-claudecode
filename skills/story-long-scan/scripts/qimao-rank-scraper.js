@@ -117,8 +117,8 @@ function extractBookUrls(port) {
  * 从页面 innerText 解析结构化书籍数据。
  * 七猫页面文本结构固定：排名→书名→作者→题材→子分类→状态→字数→简介→更新→热度
  */
-function extractBooksFromText(port) {
-  const js =
+function extractBooksFromTextJS() {
+  return (
     "JSON.stringify((()=>{" +
     "var text=document.body.innerText||'';" +
     // 找到榜单数据起始位置
@@ -142,8 +142,8 @@ function extractBooksFromText(port) {
     "  if(!cur)continue;" +
     // 跳过 UI 文字
     "  if(/^(加入书架|立即阅读|蝉联|榜首)/.test(line))continue;" +
-    // 热度（兼容「12.3万 热度」与新书榜「8500 热度」）
-    "  var hm=line.match(/^([\\d.]+(?:\\s*万)?)\\s*热度$/);" +
+    // 热度（兼容「12.3万 热度」、新书榜「8500 热度」以及页面尾部图标字体 PUA 字符如「109.0 万 热度 \uE64B」）
+    "  var hm=line.match(/^([\\d.]+(?:\\s*万)?)\\s*热度(?:\\s*[\\uE000-\\uF8FF]+)?$/);" +
     "  if(hm){cur.heat=hm[1].replace(/\\s+/g,'');continue}" +
     // 最新更新
     "  if(line.indexOf('最近更新')===0){cur.update=line.replace(/^最近更新\\s*/,'');continue}" +
@@ -161,8 +161,12 @@ function extractBooksFromText(port) {
     "}" +
     "if(cur&&cur.title)books.push(cur);" +
     "return books" +
-    "})())";
-  return evalJSONBase64(port, js) || [];
+    "})())"
+  );
+}
+
+function extractBooksFromText(port) {
+  return evalJSONBase64(port, extractBooksFromTextJS()) || [];
 }
 
 /**
@@ -864,6 +868,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  extractBooksFromTextJS,
   extractBooksFromText,
   isUsableBook,
   cleanDesc,

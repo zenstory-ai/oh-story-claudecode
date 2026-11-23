@@ -984,6 +984,44 @@ class PipelineTests(unittest.TestCase):
         self.assertNotIn('副标专属泄漏文本绝不能进主对标', res_b.stdout)
         self.assertNotIn('对标/副标权谋/文风.md', res_b.stdout)
 
+    def test_range_outline_and_hybrid_genre_routing(self):
+        # Polish #1: 范围细纲 细纲_第1-10章.md 按目标章切片读取；缺目标章小节时明确中止。
+        for existing in (self.book / '大纲').glob('细纲_*.md'):
+            existing.unlink()
+        self.put(
+            '大纲/细纲_第1-10章.md',
+            '# 第1-10章细纲\n\n'
+            '### 第 1 章：雾起\n'
+            '- 单元ID/位置：L1-01\n'
+            '- 目标情绪：悬念\n'
+            '- 主角目标与关键选择：进城摸底。\n\n'
+            '### 第 2 章：夜审\n'
+            '- 单元ID/位置：L1-01\n'
+            '- 目标情绪：紧绷→反杀\n'
+            '- 主角目标与关键选择：借假密电反扣内鬼。\n',
+        )
+        self.put('正文/第001章_雾起.md', '# 第001章 雾起\n\n雨夜电报机滴滴作响，他把密码本塞进炉灰里。\n')
+        self.put('设定/题材定位.md', '- 题材类型：民国谍战 / 悬疑\n## 对标登记\n- 主对标书：无\n')
+        res_ch2 = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 2)
+        self.assertEqual(res_ch2.returncode, 0, res_ch2.stderr)
+        self.assertIn('第002章_夜审.md', res_ch2.stdout)
+        self.assertIn('细纲_第1-10章.md', res_ch2.stdout)
+        self.assertIn('紧绷→反杀', res_ch2.stdout)
+        # Polish #3: 混合标签「民国谍战 / 悬疑」以 通用长篇.md 为主流派包，不落入古代历史权谋。
+        self.assertIn('主流派包：agent-references/genre-styles/通用长篇.md', res_ch2.stdout)
+        self.assertIn('辅流派包：agent-references/genre-styles/悬疑灵异.md', res_ch2.stdout)
+        self.assertNotIn('历史架空权谋.md', res_ch2.stdout)
+
+        res_missing = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 3)
+        self.assertEqual(res_missing.returncode, 2)
+        self.assertIn('未找到第 3 章小节', res_missing.stderr)
+
+        # Polish #3: 规则怪谈可直达 悬疑灵异.md（含悬疑规则怪谈混合标签）。
+        self.put('设定/题材定位.md', '- 题材类型：悬疑灵异 / 规则怪谈\n## 对标登记\n- 主对标书：无\n')
+        res_rule = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 2)
+        self.assertEqual(res_rule.returncode, 0, res_rule.stderr)
+        self.assertIn('主流派包：agent-references/genre-styles/悬疑灵异.md', res_rule.stdout)
+
     def test_all_writing_deslop_review_cli_scripts_support_help(self):
         # 系统性回归：长篇/短篇/去味/审稿全部 CLI 脚本都必须干净支持 --help 与 -h（exit 0、stdout 非空、stderr 为空）。
         library_only = {'wordcount_core.js', 'style-whitelist.js'}

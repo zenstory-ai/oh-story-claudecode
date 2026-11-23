@@ -925,6 +925,62 @@ def test_ciweimao_manual_and_sparse(tmp: Path) -> None:
           "explicit --sparse applies to every platform")
 
 
+def test_jjwxc_partial_detail_keeps_collect_metric(tmp: Path) -> None:
+    """LIVE-BUG-03: 晋江全站榜 ~432 本但默认抽样补采 100 本详情（23.1% < 30%）；
+    按文件头「详情采集：100 / 100」折算门槛分母后应保留「收藏」口径；若详情本身大面积失败（10 / 100）则仍退回名次。"""
+    ok_case = tmp / "jj-partial-detail-ok"
+    ok_case.mkdir()
+    lines = [
+        "# 晋江 · 收入金榜", "", "- 来源：https://www.jjwxc.net/topten.php?orderstr=12&t=0",
+        "- 抓取时间：2026-10-17T02:00:00.000Z", "- 频道数：18", "- 总条目数：432",
+        "- 详情采集：100 / 100（每频道前 10，上限 100）", "- 数据质量：[OK]", "", "---", "",
+    ]
+    detailed = 0
+    for ch in range(18):
+        lines += [f"## 频道{ch + 1:02d} — 24 本", ""]
+        for rank in range(1, 25):
+            idx = ch * 24 + rank
+            lines.append(f"### #{rank} 晋江样书{idx}")
+            if rank <= 10 and detailed < 100:
+                detailed += 1
+                lines.append(f"*作者{idx} · 收藏 {20.0 - rank * 0.5:.1f}万 · 字数 30.0万字 · 连载*")
+            else:
+                lines.append(f"*作者{idx}*")
+            lines += [f"[作品页](https://www.jjwxc.net/onebook.php?novelid={idx})", ""]
+        lines += ["---", ""]
+    (ok_case / "晋江收入金榜_全站_20261017.md").write_text("\n".join(lines), encoding="utf-8")
+    res_ok = json.loads(run(LONG, str(ok_case), "--json").stdout)
+    jj_ok = platform(res_ok, "晋江")
+    check(jj_ok["metric"] == "收藏", f"晋江默认 100/100 抽样详情应保留收藏口径: {jj_ok['metric']!r}")
+    md_ok = run(LONG, str(ok_case)).stdout
+    check("## 晋江（432 本，热度口径：收藏）" in md_ok, f"晋江聚合标题应显示收藏口径: {md_ok[:300]}")
+
+    fail_case = tmp / "jj-partial-detail-broken"
+    fail_case.mkdir()
+    broken_lines = [
+        "# 晋江 · 收入金榜", "", "- 来源：https://www.jjwxc.net/topten.php?orderstr=12&t=0",
+        "- 抓取时间：2026-10-17T02:00:00.000Z", "- 频道数：18", "- 总条目数：432",
+        "- 详情采集：10 / 100（每频道前 10，上限 100）", "- 数据质量：[部分详情缺失]", "", "---", "",
+    ]
+    detailed = 0
+    for ch in range(18):
+        broken_lines += [f"## 频道{ch + 1:02d} — 24 本", ""]
+        for rank in range(1, 25):
+            idx = ch * 24 + rank
+            broken_lines.append(f"### #{rank} 晋江坏书{idx}")
+            if rank <= 10 and detailed < 10:
+                detailed += 1
+                broken_lines.append(f"*作者{idx} · 收藏 {15.0 - rank * 0.2:.1f}万 · 字数 30.0万字 · 连载*")
+            else:
+                broken_lines.append(f"*作者{idx}*")
+            broken_lines.append("")
+        broken_lines += ["---", ""]
+    (fail_case / "晋江收入金榜_全站_20261017.md").write_text("\n".join(broken_lines), encoding="utf-8")
+    res_fail = json.loads(run(LONG, str(fail_case), "--json").stdout)
+    jj_fail = platform(res_fail, "晋江")
+    check(jj_fail["metric"] == "", f"晋江详情仅命中 10/100（<30%）必须退回名次: {jj_fail['metric']!r}")
+
+
 def test_short_copy_identical() -> None:
     check(SHORT.read_bytes() == LONG.read_bytes(), "short-scan copy must stay byte-identical (shared-assets)")
 
@@ -968,6 +1024,7 @@ def main() -> int:
         test_new_list_names(tmp)
         test_ciweimao_manual_and_sparse(tmp)
         test_collect_date_is_local(tmp)
+        test_jjwxc_partial_detail_keeps_collect_metric(tmp)
         test_short_copy_identical()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

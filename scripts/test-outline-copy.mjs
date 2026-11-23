@@ -315,4 +315,25 @@ fs.readFileSync = function (file, ...args) {
       assert.ok(r.output.includes(`22 字「${COPIED}」`), `${label}: ${r.output}`);
     }
   });
+
+  test("32. range-outline-autodiscover: slices chapter from 细纲_第1-10章.md", () => {
+    const ch1Only = "他在城门楼下听见马蹄声由远及近一直没有停歇";
+    writeFile(
+      "范围/大纲/细纲_第1-10章.md",
+      `# 细纲\n\n### 第 1 章：雾起\n- 点1：${ch1Only}。\n\n### 第 2 章：夜审\n- 点1：${COPIED}。\n`
+    );
+    const ch2Hit = writeFile("范围/正文/第002章_夜审.md", `# 第002章 夜审\n\n${COPIED}。\n`);
+    const rHit = runDetector([ch2Hit]);
+    assert.equal(rHit.status, 1, rHit.output);
+    assert.ok(rHit.output.includes(`22 字「${COPIED}」`), rHit.output);
+
+    const ch2NoCross = writeFile("范围/正文/第002章_无跨章.md", `# 第002章 无跨章\n\n${ch1Only}。\n`);
+    const rClean = runDetector([ch2NoCross]);
+    assert.equal(rClean.status, 0, rClean.output);
+
+    const ch3Missing = writeFile("范围/正文/第003章_缺节.md", `# 第003章 缺节\n\n${COPIED}。\n`);
+    const rSkip = runDetector([ch3Missing]);
+    assert.equal(rSkip.status, 0, rSkip.output);
+    assert.ok(rSkip.output.includes("未找到第 3 章小节"), rSkip.output);
+  });
 });

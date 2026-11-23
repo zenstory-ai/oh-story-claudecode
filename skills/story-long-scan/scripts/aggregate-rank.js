@@ -386,12 +386,25 @@ function isNewList(list) {
   return /新书|新人|新手|新作|潜力/.test(list);
 }
 
-// 门槛的分母只算上过带热度数字的榜的书（inMetricList）。只有名次的榜（如书库按页序排）
-// 本来就没有热度，算进分母的话，书库页取得多，同平台大热榜的真实热度会被挤成「按榜单名次」。
-function pickMetric(books) {
+// 文件头显式声明了抽样补采详情上限（如晋江「详情采集：100 / 100（每频道前 10，上限 100）」）时，
+// 返回本次计划采详情的条目数；其余未计划补详情的列表项不计入热度口径门槛分母。
+function detailPlannedCount(file) {
+  const raw = file && file.header ? file.header["详情采集"] : "";
+  if (!raw) return null;
+  const m = String(raw).match(/^\d+\s*\/\s*(\d+)/);
+  if (!m) return null;
+  const planned = parseInt(m[1], 10);
+  return Number.isFinite(planned) && planned > 0 ? planned : null;
+}
+
+// 门槛的分母只算上过带热度数字的榜的书（inMetricList）；对显式抽样补详情的榜（如晋江默认
+// --detail-limit 100 / 全站 ~432 本），按计划补详情本数折算分母，避免把未采详情的列表项当缺失。
+function pickMetric(books, expectedCap = null) {
   const counts = new Map();
   for (const b of books) for (const k of Object.keys(b.metrics)) counts.set(k, (counts.get(k) || 0) + 1);
-  const threshold = Math.max(1, Math.ceil(books.filter((b) => b.inMetricList).length * 0.3));
+  const inMetric = books.filter((b) => b.inMetricList).length;
+  const denom = expectedCap !== null && expectedCap > 0 ? Math.min(inMetric, expectedCap) : inMetric;
+  const threshold = Math.max(1, Math.ceil(denom * 0.3));
   for (const k of METRIC_PRIORITY) if ((counts.get(k) || 0) >= threshold) return k;
   return "";
 }
@@ -480,7 +493,15 @@ function aggregate(parsedFiles, opts) {
       if (!rankOnlyEntries.has(e)) book.inMetricList = true;
     }
     const uniq = Array.from(books.values());
-    const metric = pickMetric(uniq);
+    const metricFiles = files.filter((f) => !rankOnlyFiles.includes(f));
+    const expectedMetricCap =
+      metricFiles.length && metricFiles.some((f) => detailPlannedCount(f) !== null)
+        ? metricFiles.reduce((sum, f) => {
+            const planned = detailPlannedCount(f);
+            return sum + (planned !== null ? Math.min(planned, f.entries.length) : f.entries.length);
+          }, 0)
+        : null;
+    const metric = pickMetric(uniq, expectedMetricCap);
     const hasNew = entries.some((e) => isNewList(e.list));
     const hasOther = entries.some((e) => !isNewList(e.list));
     const sortKey = (b) => (metric && typeof b.metrics[metric] === "number" ? -b.metrics[metric] : 0);

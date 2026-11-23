@@ -148,6 +148,42 @@ function findChapterFile(directory, chapter, prefix) {
   return null;
 }
 
+const RANGE_OUTLINE_RE = /^细纲_第(\d+)[-–—~～至到]第?(\d+)章.*\.md$/;
+
+function extractChapterSlice(text, chapter) {
+  const lines = text.split(/\r?\n/);
+  const targetRe = new RegExp(`^#{2,3}\\s*第\\s*0*${chapter}\\s*章(?:[：:\\s]|$)`);
+  const anyChapterRe = /^#{2,3}\s*第\s*\d+\s*章(?:[：:\s]|$)/;
+  const start = lines.findIndex((line) => targetRe.test(line));
+  if (start === -1) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (anyChapterRe.test(lines[i])) {
+      end = i;
+      break;
+    }
+  }
+  return lines.slice(start, end).join('\n');
+}
+
+function findOutlineFile(outlineDir, chapter) {
+  const direct = findChapterFile(outlineDir, chapter, '细纲_');
+  if (direct) return { file: direct, fromRangeFile: false };
+  if (!isDir(outlineDir)) return null;
+  for (const name of fs.readdirSync(outlineDir).sort()) {
+    const full = path.join(outlineDir, name);
+    if (!isFile(full) || name.includes('_原稿_')) continue;
+    const match = RANGE_OUTLINE_RE.exec(name);
+    if (!match) continue;
+    const start = Number(match[1]);
+    const end = Number(match[2]);
+    if (Number.isInteger(start) && Number.isInteger(end) && start <= chapter && chapter <= end) {
+      return { file: full, fromRangeFile: true };
+    }
+  }
+  return null;
+}
+
 function extractField(outlineText, field) {
   const lines = outlineText.split(/\r?\n/);
   const pattern = new RegExp(`^([ \\t]*)[-*+]\\s+\\*{0,2}${escapeRegExp(field)}\\*{0,2}[ \\t]*[：:][ \\t]*(.*)$`);
@@ -394,7 +430,6 @@ function matchGenreCards(project) {
   for (const card of cards) {
     const head = (readText(card) || '').split('---');
     const meta = head.length > 2 ? head[1] : '';
-    if (/^fallback:\s*true\s*$/m.test(meta)) continue;
     const genre = /^genre:\s*(.+)$/m.exec(meta);
     const aliases = /^aliases:\s*\[(.*)\]/m.exec(meta);
     const confidence = /^confidence:\s*(\w+)/m.exec(meta);
@@ -743,13 +778,22 @@ function learnHeadingForm(project, chapter, title) {
 function build(project, chapter, report) {
   const errors = [];
   const outlineDir = path.join(project, '大纲');
-  const outlineFile = findChapterFile(outlineDir, chapter, '细纲_');
-  if (outlineFile === null) {
+  const outlineHit = findOutlineFile(outlineDir, chapter);
+  if (outlineHit === null) {
     return { prompt: null, errors: [`必在块缺失：${outlineDir} 下没有第 ${chapter} 章细纲`] };
   }
-  const outlineText = readText(outlineFile);
-  if (!outlineText || !outlineText.trim()) {
+  const outlineFile = outlineHit.file;
+  const rawOutlineText = readText(outlineFile);
+  if (!rawOutlineText || !rawOutlineText.trim()) {
     return { prompt: null, errors: [`必在块缺失：${outlineFile} 为空`] };
+  }
+  let outlineText = rawOutlineText;
+  if (outlineHit.fromRangeFile) {
+    const slice = extractChapterSlice(rawOutlineText, chapter);
+    if (slice === null) {
+      return { prompt: null, errors: [`必在块缺失：范围细纲 ${outlineFile} 中未找到第 ${chapter} 章小节`] };
+    }
+    outlineText = slice;
   }
 
   const title = extractTitle(outlineText, chapter);
@@ -1097,8 +1141,10 @@ function main(argv = process.argv.slice(2)) {
     return 2;
   }
 
-  const outlineFile = findChapterFile(path.join(project, '大纲'), args.chapter, '细纲_');
-  const title = outlineFile ? extractTitle(readText(outlineFile) || '', args.chapter) : null;
+  const outlineHit = findOutlineFile(path.join(project, '大纲'), args.chapter);
+  const rawOutline = outlineHit ? readText(outlineHit.file) || '' : '';
+  const slicedOutline = outlineHit && outlineHit.fromRangeFile ? extractChapterSlice(rawOutline, args.chapter) || '' : rawOutline;
+  const title = outlineHit ? extractTitle(slicedOutline, args.chapter) : null;
   if (title) {
     const proseDir = path.join(project, '正文');
     const ownChapterRe = new RegExp(`^第0*${args.chapter}章`);
