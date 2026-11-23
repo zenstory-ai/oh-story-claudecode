@@ -219,13 +219,18 @@ function checkOne(proseFile, explicitOutline) {
   const prose = proseResult.text
 
   const outlineFile = explicitOutline || findOutline(proseFile)
+  const isShortContext =
+    (outlineFile && path.basename(outlineFile) === '小节大纲.md') ||
+    path.basename(proseFile) === '正文.md'
+  const detectLabel = isShortContext ? '小节大纲照搬检测' : '细纲照搬检测'
   if (!outlineFile) {
-    process.stdout.write(`细纲照搬检测：跳过 "${proseFile}"（未自动发现细纲）。\n`)
+    process.stdout.write(`${detectLabel}：跳过 "${proseFile}"（未自动发现${isShortContext ? '小节大纲' : '细纲'}）。\n`)
     return 0
   }
   const outlineResult = readTextFile(outlineFile)
   if (!outlineResult.ok) {
-    reportInputError(explicitOutline ? '显式细纲' : '自动发现的细纲', outlineFile, outlineResult.reason)
+    const kindName = isShortContext ? '小节大纲' : '细纲'
+    reportInputError(explicitOutline ? `显式${kindName}` : `自动发现的${kindName}`, outlineFile, outlineResult.reason)
     return 2
   }
   const outline = outlineResult.text
@@ -279,7 +284,7 @@ function checkOne(proseFile, explicitOutline) {
     // 全部命中都是锚句豁免：静默放行，但把豁免量报出来供人工复核滥用
     if (anchoredCount) {
       process.stdout.write(
-        `细纲照搬检测（${path.basename(proseFile)}）：无未授权誊抄；` +
+        `${detectLabel}（${path.basename(proseFile)}）：无未授权誊抄；` +
           `另有 ${anchoredCount} 处 ${anchored} 字为登记原话的逐字落地。\n`
       )
     }

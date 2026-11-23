@@ -325,11 +325,11 @@ function normalizePausePunctuationPass(line, lineNo, commentSpans) {
     }
 
     // 破折号（对话引号内与叙述旁白均保留标准 `——`）：长短篇网文均用 `——` 做打断、拖音、系统提示或转折揭底拍，
-    // 不再机械删改标准 `——`；仅把非标 `—` / `———` / `--` 统一为 `——`（引号外数字区间 `10--20` 仍转为「到」）。
+    // 不再机械删改标准 `——`；仅把非标 `—` / `———` / `--` 统一为 `——`（数字区间 `10--20` 无论引号内外均转为「到」）。
     if (hasDash) {
       const before = previousNonSpace(original, match.index - 1);
       const after = nextNonSpace(original, match.index + token.length);
-      if (!inDialogueQuote && token.startsWith('-') && /\d/.test(before) && /\d/.test(after)) {
+      if (token.startsWith('-') && /\d/.test(before) && /\d/.test(after)) {
         output += original.slice(lastIndex, match.index) + '到';
         findings.push({
           line: lineNo,

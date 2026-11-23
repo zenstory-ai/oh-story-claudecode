@@ -12,7 +12,7 @@
 
 分两级：`{工作区}/.story/作者记忆/` 存 global / genre / workflow 条目（编号 `AP`）；`{书}/.story/作者记忆/` 存本书 book 条目（编号 `BP`）。每级的 `作者画像.md` 和 `变更记录.md` 由 state 自动生成，默认不手改（手改会被 `check` 报 `drift_warnings`）。
 
-- `--workspace` 必传（承载多本书、`.active-book`、`长篇/`、`短篇/` 或 `拆文库/` 的目录，不得传书目录或用户主目录）；写某本书时必传 `--book-root`。
+- `--workspace` 必传（承载多本书、`.active-book`、`长篇/`、`短篇/` 或 `拆文库/` 的目录，不得传用户主目录；单篇独立短篇工程未套外层工作区目录时，可直接将短篇目录作为 `--workspace` 传入）；写某本书时必传 `--book-root`。
 - `forget` 按 `item_id` 路由，`remember` / `replace` 按 `scope.level` 路由。`replace` 不跨级：本书例外直接 `remember` 为 book 条目；全局改本书拆成 `forget` + `remember`。
 
 ## 查询

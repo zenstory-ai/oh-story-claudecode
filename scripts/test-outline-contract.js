@@ -346,6 +346,16 @@ try {
   assert.strictEqual(missingFile.status, 2)
   assert.match(missingFile.stderr, /没有第 21 章细纲/)
 
+  // 范围细纲文件（细纲_第1-5章.md）在 --project --chapter N 下应按章切出并校验通过。
+  const rangeProject = path.join(tmpRoot, 'range-outline-file')
+  fs.mkdirSync(path.join(rangeProject, '大纲'), { recursive: true })
+  const ch1Body = outline({ fieldValues: { 字数目标: '2200 字' } }).replace('### 第 21 章：', '### 第 1 章：')
+  const ch2Body = outline({ fieldValues: { 字数目标: '2400 字' } }).replace('### 第 21 章：', '### 第 2 章：')
+  fs.writeFileSync(path.join(rangeProject, '大纲', '细纲_第1-5章.md'), `${ch1Body}\n\n${ch2Body}\n`, 'utf8')
+  const rangeCh2 = run(rangeProject, '2', ['--strict'])
+  assert.strictEqual(rangeCh2.status, 0, rangeCh2.stdout + rangeCh2.stderr)
+  assert.strictEqual(rangeCh2.report.wordcount.target, 2400)
+
   const invalid = spawnSync(process.execPath, [verifier, '--unknown'], { cwd: repoRoot, encoding: 'utf8' })
   assert.strictEqual(invalid.status, 2)
   assert.match(invalid.stderr, /用法/)

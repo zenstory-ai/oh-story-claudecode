@@ -912,6 +912,38 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(prompt2.count('【切片 A】'), 1)
         self.assertEqual(prompt2.count('【切片 B】'), 1)
 
+    def test_comma_benchmark_title_injects_style_slices_under_downgrade_and_espionage_routes_to_general(self):
+        # BUG-01: 含逗号的对标书名在召回降档下不能被截断，必须精准命中 对标/{全书名}/文风.md 注入切片。
+        full_title = '全球僵尸降临，你说道士序列没用'
+        self.put(
+            '设定/题材定位.md',
+            f'- 题材类型：都市高武异能\n## 对标登记\n- 主对标书：{full_title}\n'
+            f'| 书名 | 题材类型 | 引用强度 | 用途 |\n|---|---|---|---|\n'
+            f'| {full_title} | 都市高武异能 | 主 | 文风主对标 |\n',
+        )
+        self.put('设定/文风.md', '# 本书文风\n竖屏短段，口语直给。\n')
+        self.put(
+            f'对标/{full_title}/文风.md',
+            '# 对标文风\n'
+            '### 片段 A — 开篇\n```text\n铜铃一响，整条长街的僵尸齐刷刷跪了一地。\n```\n'
+            '### 片段 B — 打脸\n```text\n测力柱嗡的一声裂开三道缝，台下鸦雀无声。\n```\n',
+        )
+        self.put('大纲/细纲_第001章.md', '### 第 1 章：破局\n- 单元ID/位置：L1-01\n- 目标情绪：憋屈→爽\n')
+        res = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 1)
+        self.assertEqual(res.returncode, 0, res.stderr)
+        prompt_body, report_body = res.stdout.split('以下不进 prompt', 1)
+        self.assertIn('铜铃一响，整条长街的僵尸齐刷刷跪了一地。', prompt_body)
+        self.assertIn('测力柱嗡的一声裂开三道缝，台下鸦雀无声。', prompt_body)
+        self.assertIn(f'对标/{full_title}/文风.md', report_body)
+        self.assertIn('召回降档', report_body)
+
+        # BUG-06: 抗战谍战/民国谍战不再命中带古代圣旨切片的 历史架空权谋.md，改落 通用长篇.md。
+        self.put('设定/题材定位.md', '- 题材类型：民国谍战\n## 对标登记\n- 主对标书：无\n')
+        res_spy = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 1)
+        self.assertEqual(res_spy.returncode, 0, res_spy.stderr)
+        self.assertIn('通用长篇.md', res_spy.stdout)
+        self.assertNotIn('历史架空权谋.md', res_spy.stdout)
+
     def test_all_writing_deslop_review_cli_scripts_support_help(self):
         # 系统性回归：长篇/短篇/去味/审稿全部 CLI 脚本都必须干净支持 --help 与 -h（exit 0、stdout 非空、stderr 为空）。
         library_only = {'wordcount_core.js', 'style-whitelist.js'}

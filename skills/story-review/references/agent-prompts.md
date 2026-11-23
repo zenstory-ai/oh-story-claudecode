@@ -4,7 +4,7 @@
 
 用当前宿主 Agent 工具并行派发（Claude `subagent_type`、OpenCode `subagent` 的 `agent`、Codex `agent_type`、Antigravity `invoke_subagent` + `TypeName`、ZCode `Agent` 派注册角色）。子 Agent 不继承父上下文，prompt 须自包含路径、范围与 Schema，不写本 Skill 资料路径（各 reviewer 按自身模板读取表加载）。所有 reviewer 只读，不改任何文件。
 
-**追踪修订号**：长篇工程（有 `追踪/_tracking-state.json`）派 consistency-checker 前，先跑 `scripts/tracking_commit.js check --project {项目根}`，将 `last_committed_chapter`、`state_revision` 填入其 prompt；返回 `drift_warnings` 注明以 `_tracking-state.json` 为准，check 报 exit 2 时写「check 失败，追踪文件不可信：{报错首行}」并在报告「没法判断的地方」白话说明。短篇不填。
+**追踪修订号**：长篇工程（有 `追踪/_tracking-state.json`）派 consistency-checker 前，先跑 `scripts/tracking_commit.js check --project {项目根}`，将 `last_committed_chapter`、`state_revision` 填入其 prompt；返回 `drift_warnings` 注明以 `_tracking-state.json` 为准，check 报 exit 2 时写「check 失败，追踪文件不可信：{报错首行}」并在报告「没法判断的地方」白话说明。短篇两项均写「无追踪」。
 
 **story-explorer 预查询（可选）**：仅 `Effective Mode` 为 `full`/`lean`、非子代理递归且当前宿主确认 `story-explorer` 可用时才可派发（传 `项目目录`、`查询类型: setting_appearances`、`查询参数`）；`solo` 或降级场景下直接检索。
 
@@ -83,7 +83,7 @@ Rubric Source: file | embedded fallback
   审查范围：{文件路径/章节/必要摘录}
   已知角色：{从设定文件提取角色列表}
   last_committed_chapter：{check 输出；短篇写「无追踪」}
-  state_revision：{check 输出；check 失败写「check 失败，追踪文件不可信：{报错首行}」}
+  state_revision：{check 输出；短篇写「无追踪」；check 失败写「check 失败，追踪文件不可信：{报错首行}」}
   继承的开放项（分批审查必填，无则写「无」）：{追踪/伏笔.md 预计回收章 ≤ 本批末章的未回收伏笔 + 上批未解决 findings}
   检查项：
   1. 角色属性、术语、身份、地点、能力边界是否前后一致？

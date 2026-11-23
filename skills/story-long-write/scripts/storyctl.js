@@ -657,6 +657,7 @@ function chapterCommit(
   );
   document.wordcount = buildProjectWordcountRecord(project, chapter, { resolution, authorRange });
   const state = trackingCall(tracking.applyTransaction, project, document, { allowGap });
+  checked.state_revision = state.state_revision;
   checked.tracking_committed = state.last_committed_chapter >= chapter;
   checked.next_chapter_started = state.last_committed_chapter > chapter;
   checked.wordcount = state.wordcount_records[String(chapter)] || null;
@@ -742,8 +743,13 @@ function plainReport(result) {
   }
   const advisories = quality.advisories || [];
   if (advisories.length) {
-    const semantic = quality.semantic_advisories || 0;
-    lines.push(`建议看看的 ${advisories.length} 处（其中像 AI 腔、要读原文判断的 ${semantic} 处；确属问题才改）：`);
+    const outlineCopyCount = advisories.filter((row) => row.source === 'outline-copy').length;
+    const aiSemanticCount = advisories.filter((row) => row.source !== 'outline-copy' && row.review === 'semantic').length;
+    const detailParts = [];
+    if (aiSemanticCount) detailParts.push(`像 AI 腔、要读原文判断的 ${aiSemanticCount} 处`);
+    if (outlineCopyCount) detailParts.push(`与细纲重合待复核的 ${outlineCopyCount} 处`);
+    const detailText = detailParts.length ? `（其中${detailParts.join('，')}；确属问题才改）` : '（确属问题才改）';
+    lines.push(`建议看看的 ${advisories.length} 处${detailText}：`);
     for (const row of advisories.slice(0, PLAIN_SHOWN)) lines.push(findingLine(row));
     if (advisories.length > PLAIN_SHOWN) {
       lines.push(`- 另有 ${advisories.length - PLAIN_SHOWN} 处，见 chapter check 的完整结果`);

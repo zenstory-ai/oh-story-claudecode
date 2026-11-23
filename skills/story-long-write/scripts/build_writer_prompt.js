@@ -449,22 +449,31 @@ function benchmarkSearchRoots(project) {
   return roots;
 }
 
-function findPrimaryBenchmarkName(project) {
+function benchmarkNameCandidates(raw) {
+  const full = String(raw || '')
+    .replace(/[（(][^）)]*[）)]/g, '')
+    .trim()
+    .replace(/^《+|》+$/g, '')
+    .trim();
+  const candidates = [];
+  if (full) candidates.push(full);
+  const splitFirst = full
+    .split(/[、,，/｜|]/)[0]
+    .trim()
+    .replace(/^《+|》+$/g, '')
+    .trim();
+  if (splitFirst && splitFirst !== full) candidates.push(splitFirst);
+  return candidates;
+}
+
+function rawPrimaryBenchmarkValues(project) {
   const text = stripHtmlComments(readText(path.join(project, '设定', '题材定位.md')));
-  const mine = ownNames(project);
-  const cleanName = (raw) =>
-    raw
-      .replace(/[（(][^）)]*[）)]/g, '')
-      .split(/[、,，/｜|]/)[0]
-      .trim()
-      .replace(/^《+|》+$/g, '')
-      .trim();
+  const values = [];
   const explicit = /^[ \t>]*(?:[-*+][ \t]*)?\**主对标书\**[ \t]*[：:][ \t]*(.*)$/m.exec(text);
   if (explicit) {
     const v = explicit[1].trim();
     if (v && !v.startsWith('{') && !v.startsWith('｛') && !/^(无|不对标|都不用|没有)/.test(v)) {
-      const name = cleanName(v);
-      if (name && !mine.has(name)) return name;
+      values.push(v);
     }
   }
   const secMatch = /^##[ \t]*对标登记[^\n]*\n([\s\S]*?)(?=^##[ \t]|$(?![\r\n]))/m.exec(text);
@@ -480,20 +489,41 @@ function findPrimaryBenchmarkName(project) {
         !/^[-:\s]+$/.test(cells[0]) &&
         !cells[0].startsWith('{')
       ) {
-        const name = cleanName(cells[0]);
-        if (name && !mine.has(name)) return name;
+        values.push(cells[0]);
       }
     }
   }
-  return null;
+  return values;
+}
+
+function findPrimaryBenchmarkName(project) {
+  const mine = ownNames(project);
+  const roots = benchmarkSearchRoots(project);
+  let fallbackName = null;
+  for (const raw of rawPrimaryBenchmarkValues(project)) {
+    const candidates = benchmarkNameCandidates(raw).filter((name) => name && !mine.has(name));
+    if (!candidates.length) continue;
+    for (const name of candidates) {
+      if (roots.some((root) => isDir(path.join(root, name)))) {
+        return name;
+      }
+    }
+    if (!fallbackName) fallbackName = candidates[0];
+  }
+  return fallbackName;
 }
 
 function findBenchmarkStyleFile(project) {
-  const name = findPrimaryBenchmarkName(project);
-  if (!name) return null;
-  for (const root of benchmarkSearchRoots(project)) {
-    const file = path.join(root, name, '文风.md');
-    if (isFile(file)) return { file, name };
+  const mine = ownNames(project);
+  const roots = benchmarkSearchRoots(project);
+  for (const raw of rawPrimaryBenchmarkValues(project)) {
+    const candidates = benchmarkNameCandidates(raw).filter((name) => name && !mine.has(name));
+    for (const name of candidates) {
+      for (const root of roots) {
+        const file = path.join(root, name, '文风.md');
+        if (isFile(file)) return { file, name };
+      }
+    }
   }
   return null;
 }

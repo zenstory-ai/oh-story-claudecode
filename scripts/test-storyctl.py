@@ -658,6 +658,16 @@ class ToolFailureTests(unittest.TestCase):
         self.assertEqual(overlap["status"], "pass", overlap)
         self.assertEqual(overlap["tool_errors"], [], overlap)
         self.assertEqual(overlap["advisories"][0]["type"], "OUTLINE_COPY_REVIEW", overlap)
+        # BUG-04: --plain 不能把 OUTLINE_COPY_REVIEW 误标成「像 AI 腔」。
+        plain_text = "\n".join(storyctl.plain_report({
+            "chapter": 1,
+            "status": "ready",
+            "length": {"actual": 2200, "status": "internal_pass", "user_band": {"min": 1870, "max": 2530}},
+            "quality": overlap,
+            "fragmentation": {},
+        }))
+        self.assertIn("与细纲重合待复核的 1 处", plain_text)
+        self.assertNotIn("像 AI 腔", plain_text)
 
 
 class OutlineRangeOverrideTests(unittest.TestCase):

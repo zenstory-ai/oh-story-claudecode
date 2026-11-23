@@ -117,8 +117,25 @@ function checkSettingRefs(text, name, file, projectRoot) {
   )
 }
 
+function extractChapterSlice(text, chapter) {
+  const lines = text.split(/\r?\n/)
+  const targetRe = new RegExp(`^#{2,3}\\s*第\\s*0*${chapter}\\s*章(?:[：:\\s]|$)`)
+  const anyChapterRe = /^#{2,3}\s*第\s*\d+\s*章(?:[：:\s]|$)/
+  const start = lines.findIndex((line) => targetRe.test(line))
+  if (start === -1) return null
+  let end = lines.length
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (anyChapterRe.test(lines[i])) {
+      end = i
+      break
+    }
+  }
+  return lines.slice(start, end).join('\n')
+}
+
 function verify(file, projectRoot = null, options = {}) {
   const strict = Boolean(options && options.strict)
+  const chapter = options && options.chapter ? Number(options.chapter) : null
   const name = path.basename(file)
   const read = readUtf8(file)
   const checks = [makeCheck(
@@ -128,7 +145,7 @@ function verify(file, projectRoot = null, options = {}) {
     'blocking'
   )]
   if (!read.ok) return report(file, checks, {}, { strict })
-  const text = read.text
+  const text = (chapter && options.fromRangeFile ? extractChapterSlice(read.text, chapter) : null) || read.text
 
   const missingSoftFields = SOFT_FIELD_NAMES.filter((names) => !names.some((f) => fieldPattern(f).test(text))).map((names) => names[0])
   checks.push(makeCheck(
@@ -270,7 +287,17 @@ function resolveChapter(project, chapter) {
     const match = entry.match(/^细纲_第0*(\d+)章.*\.md$/)
     return match && Number(match[1]) === wanted
   })
-  return hit ? { file: path.join(dir, hit) } : { error: `${dir} 下没有第 ${wanted} 章细纲` }
+  if (hit) return { file: path.join(dir, hit), fromRangeFile: false }
+  const rangeHit = entries.find((entry) => {
+    const match = entry.match(/^细纲_第0*(\d+)[-–—~～至到]第?0*(\d+)章.*\.md$/)
+    if (!match) return false
+    const start = Number(match[1])
+    const end = Number(match[2])
+    return Number.isInteger(start) && Number.isInteger(end) && start <= wanted && wanted <= end
+  })
+  return rangeHit
+    ? { file: path.join(dir, rangeHit), fromRangeFile: true }
+    : { error: `${dir} 下没有第 ${wanted} 章细纲` }
 }
 
 function parseArgs(argv) {
@@ -311,12 +338,16 @@ function main(argv) {
     return 2
   }
   let targets = parsed.files
+  let fromRangeFile = false
   if (!targets) {
     const resolved = resolveChapter(parsed.project, parsed.chapter)
     if (resolved.error) { process.stderr.write(`${resolved.error}\n`); return 2 }
     targets = [resolved.file]
+    fromRangeFile = Boolean(resolved.fromRangeFile)
   }
-  const reports = targets.map((file) => verify(file, parsed.project || null, { strict: parsed.strict }))
+  const reports = targets.map((file) =>
+    verify(file, parsed.project || null, { strict: parsed.strict, chapter: parsed.chapter, fromRangeFile })
+  )
   process.stdout.write(`${JSON.stringify(reports.length === 1 ? reports[0] : reports, null, 2)}\n`)
   return reports.every((entry) => entry.ok) ? 0 : 1
 }
