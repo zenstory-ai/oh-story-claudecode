@@ -969,11 +969,11 @@ assert_grep 'missing_primary_contract' "$REPO_ROOT/skills/story-long-write/refer
 assert_grep '这章怎么走|情节安排（多线）|人物关系和出场顺序|结尾设定和钩子' "$SKILL_DIR/references/templates/agents/story-architect.md" "story-architect must output v13 chapter blueprint fields"
 assert_grep '逻辑线|人物关系变化|行动成本（可无）/收益归属|结尾设定' "$SKILL_DIR/references/templates/agents/consistency-checker.md" "consistency-checker must consume current outline blueprint fields"
 assert_grep '语气标点谱系' "$SKILL_DIR/references/templates/agents/narrative-writer.md" "narrative-writer must enforce v13 tone punctuation"
-assert_grep '不用.*……|不使用.*……|不保留.*……|不残留.*……' "$SKILL_DIR/references/templates/agents/narrative-writer.md" "narrative-writer must reject ellipsis pause punctuation"
-assert_grep '不用.*——|不使用.*——|不保留.*——|不残留.*——' "$SKILL_DIR/references/templates/agents/narrative-writer.md" "narrative-writer must reject dialogue dash exception"
+assert_grep '…….*禁刷屏|不用.*……|不使用.*……|不保留.*……|不残留.*……' "$SKILL_DIR/references/templates/agents/narrative-writer.md" "narrative-writer must guard ellipsis punctuation"
+assert_grep '畸形破折号|——.*禁刷屏|不用.*——|不使用.*——|不保留.*——|不残留.*——' "$SKILL_DIR/references/templates/agents/narrative-writer.md" "narrative-writer must guard em-dash punctuation"
 assert_grep '语气标点谱系' "$AGENT_REFS_DIR/format-and-structure.md" "agent references must include v13 tone punctuation format rules"
-assert_grep '不用.*……|不使用.*……|不保留.*……|不残留.*……' "$AGENT_REFS_DIR/format-and-structure.md" "agent references must forbid ellipsis pause punctuation"
-assert_grep '不用.*——|不使用.*——|不保留.*——|不残留.*——|正文和对话都禁止.*——' "$AGENT_REFS_DIR/format-and-structure.md" "agent references must forbid dialogue dash exception"
+assert_grep '旁白禁连刷省略号|不在旁白连刷|不用.*……|不使用.*……|不保留.*……|不残留.*……' "$AGENT_REFS_DIR/format-and-structure.md" "agent references must guard ellipsis pause punctuation"
+assert_grep '畸形破折号|避免刷屏|禁刷屏|不用.*——|不使用.*——' "$AGENT_REFS_DIR/format-and-structure.md" "agent references must guard em-dash punctuation"
 # 去味方法合并为 deslop-guide.md（表达/用笔/故事三层）+ short-deslop.md（短篇覆盖矩阵）同源发布；
 # 行为判据由方法与真实改稿测评检查，部署守卫只验可读取的接口与同源一致。
 for deslop_method in deslop-guide short-deslop; do
