@@ -4,7 +4,7 @@ const fs = require("node:fs")
 const path = require("node:path")
 const { spawnSync } = require("node:child_process")
 
-const CURRENT_AGENTS_VERSION = 45
+const CURRENT_AGENTS_VERSION = 46
 
 function readSentinel(root) {
   const file = path.join(root, ".story-deployed")
@@ -906,7 +906,7 @@ function formatPreWriteAdvisory(warnings) {
 }
 
 // 收尾标点集与深扫 oracle check-degeneration.js 的 findTruncation 对齐（[。！？!?…”"』」）)】]）：
-// 】 是章尾系统播报模板的收束符（agent-references/long-chapter-hooks.md 章尾实战模板一/四），ASCII "
+// 】 是章尾系统播报/面板的收束符（见 flow-drafting.md / genre-styles/），ASCII "
 // 是 normalize-punctuation.js --quote-mode ascii 的合法收引号，两者都不该被判「疑似截断」。
 const TERMINAL = new Set(Array.from("。！？…”』」）)!?.~—】\""))
 // 保留导出以兼容 adapter。
@@ -1479,7 +1479,7 @@ function isGitCommitCommand(command) {
   return false
 }
 
-// 设定/ 直属的项目级设定件：artifact-protocols.md 规定的 关系.md（正文是「# 角色关系图」）、
+// 设定/ 直属的项目级设定件：flow-opening-plan.md 规定的 关系.md（正文是「# 角色关系图」）、
 // 题材定位.md，以及 文风.md、题材正文提示卡.md 等，它们本来就没有 名字/姓名 字段。
 const SETTING_NON_CHARACTER_FILES = new Set(["关系.md", "题材定位.md", "题材正文提示卡.md", "文风.md", "世界规则.md", "世界观.md", "金手指.md", "背景设定.md"])
 

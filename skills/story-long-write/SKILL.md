@@ -26,7 +26,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > 专业 agent 只查当前宿主：Claude `.claude/agents`、OpenCode `.opencode/agents`、Codex `.codex/agents` TOML、Antigravity `.agents/agents`（`invoke_subagent` + 同名 `TypeName`）；ZCode 查已启用插件注册角色，用 `Agent` 工具按实际 schema 派发，不要求 `.zcode/agents`。返回 unknown agent 按降级处理，不因他端目录存在而降级。
 >
-> 版本：项目根 `.story-deployed` 的 `agents_version` 与 `agents_version: 45` 不一致时照常检查并 spawn，只提示一句「写作助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」；大于 45 时补充提示先更新 oh-story-claudecode。仅当前宿主角色缺失或无调用能力时降级 solo/direct，对作者只说「这次我自己写」。
+> 版本：项目根 `.story-deployed` 的 `agents_version` 与 `agents_version: 46` 不一致时照常检查并 spawn，只提示一句「写作助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」；大于 46 时补充提示先更新 oh-story-claudecode。仅当前宿主角色缺失或无调用能力时降级 solo/direct，对作者只说「这次我自己写」。
 
 ## 平台与男女频速查
 

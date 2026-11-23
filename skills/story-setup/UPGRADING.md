@@ -2,12 +2,12 @@
 
 ## 当前版本
 
-助手版本 45（v0.11.0）。已有项目更新技能包后，在项目根重跑 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或直接点名），再新开会话。
+助手版本 46（v0.11.0 后续重构）。已有项目更新技能包后，在项目根重跑 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或直接点名），再新开会话。
 
 - `setup_skill_version: 1.3.13`
-- `agents_version: 45`
+- `agents_version: 46`
 
-`.story-deployed` 字段不全，或 `agents_version` 不是整数、低于 45，都算待更新，重跑 story-setup 即可。项目里的 `agents_version` 大于 45，说明本机技能包比项目旧：先更新 oh-story-claudecode，不要用旧包覆盖。各版本改了什么见仓库根目录 `CHANGELOG.md`。
+`.story-deployed` 字段不全，或 `agents_version` 不是整数、低于 46，都算待更新，重跑 story-setup 即可。项目里的 `agents_version` 大于 46，说明本机技能包比项目旧：先更新 oh-story-claudecode，不要用旧包覆盖。各版本改了什么见仓库根目录 `CHANGELOG.md`。
 
 ## 升级步骤
 
@@ -16,6 +16,11 @@
 3. 新开会话，让新的助手和 hook 生效；Codex 提示要信任 hook 时，在 `/hooks` 里信任一下。
 4. 正在写的长篇：确认每本书有 `追踪/_tracking-state.json`。没有就按下方「追踪模型迁移」重建，否则写下一章会被拦。
 5. 拆文成果或细纲不满足当前格式时，按检查提示定点补齐，不因单项缺口整本重拆。
+
+## 助手版本 46 升级说明（更新后必须重跑 story-setup）
+
+- **长短篇写作流程核、流派包与参考资料清理**：写作/去味/审稿参考资料收口为流程手册（`flow-opening-plan.md`、`flow-outline.md`、`flow-drafting.md`）、`deslop-guide.md`、`short-deslop.md` 与 16 份长篇流派包（`agent-references/genre-styles/`），同步更新写手、架构师、角色设计助手模板；重跑 `/story-setup` 会自动清理旧版 `agent-references/` 中的退役文件（如旧 33 张题材卡与已合并参考）并刷新五端短篇模式 Hook。
+- 书稿、设定、大纲和追踪不用迁移。
 
 ## v0.11.0 的改动（助手版本 45，更新后必须重跑 story-setup）
 

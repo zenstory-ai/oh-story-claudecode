@@ -749,6 +749,16 @@ class FragmentationTests(unittest.TestCase):
         # 半角双引号与『…』台词同样剥离，无句末标点的换行按段断开不跨行粘连。
         unpunctuated = storyctl.fragmentation('## 第1章\n"别动！"他推门进来\n屋里黑漆漆的\n『快走！』她转身跑了……没回头。\n')
         self.assertEqual(unpunctuated["narrative_sentences"], 4)
+        # 完整 HTML 注释线性剥离不计入段落/句数；未闭合注释不截断后续正文。
+        closed_comment = storyctl.fragmentation(
+            "## 第1章\n<!-- 去味:跳过 -->\n他推门进来。\n<!-- 多行\n备注 -->\n屋里黑漆漆的。\n"
+        )
+        self.assertEqual(closed_comment["paragraphs"], 2)
+        self.assertEqual(closed_comment["narrative_sentences"], 2)
+        unclosed_comment = storyctl.fragmentation(
+            "## 第1章\n<!-- 去味:跳过 -->\n他推门进来。\n<!-- 未闭合备注\n屋里黑漆漆的。\n"
+        )
+        self.assertEqual(unclosed_comment["paragraphs"], 3)
 
     def test_plain_report_speaks_plainly_and_never_blocks_on_fragmentation(self) -> None:
         with tempfile.TemporaryDirectory(prefix="storyctl-plain-") as directory:

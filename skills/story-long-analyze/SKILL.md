@@ -10,7 +10,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > Agent 兼容性：只查当前宿主 agent（ZCode 查插件注册同名角色，用 `Agent` 按实际 schema 派发，不要求 `.zcode/agents`）。仅角色/工具缺失或调用失败时降级 solo/direct，用一句白话告知作者，不加技术尾注，不扫描其他 CLI 目录或按宿主名固定降级。
 >
-> Spawn 版本提示（不阻断 spawn）：读项目根 `.story-deployed` 的 `agents_version`。与 `agents_version: 45` 不一致时照常检查并 spawn，仅一句白话提示「分析助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」（>45 另提示先更新 oh-story-claudecode，勿用旧版降级覆盖）。
+> Spawn 版本提示（不阻断 spawn）：读项目根 `.story-deployed` 的 `agents_version`。与 `agents_version: 46` 不一致时照常检查并 spawn，仅一句白话提示「分析助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」（>46 另提示先更新 oh-story-claudecode，勿用旧版降级覆盖）。
 
 ## 分析边界与运行约定
 

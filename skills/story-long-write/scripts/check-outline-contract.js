@@ -36,7 +36,7 @@ const FIVE_ACT = ['起因', '发展', '转折', '高潮', '结尾']
 const PLOT_HEADER_FIRST = /^(?:#|序号)$/
 const INTENT_FIELDS = ['目标情绪', '主角目标/关键选择']
 const REF_DIR_PREFIX = /^(?:设定|大纲|追踪|正文|读者笔记|对标)\//
-const TEMPLATE_REFERENCES = ['references/flow-outline.md', 'references/outline-template.md', 'references/outline-reverse-rules.md']
+const TEMPLATE_REFERENCES = ['references/flow-outline.md', 'references/outline-reverse-rules.md']
   .filter((rel) => fs.existsSync(path.join(__dirname, '..', rel)))
 
 const parseWordcountCaliber = (text) => parseMetricField(text).ok

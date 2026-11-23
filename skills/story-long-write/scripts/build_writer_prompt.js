@@ -854,9 +854,12 @@ function build(project, chapter, report) {
 
   const genrePackLines = matchedCards.length
     ? matchedCards
-        .map(([card, level], i) => `${i === 0 ? '主' : '辅'}流派包：${card}（置信度 ${level}）`)
+        .map(
+          ([card, level], i) =>
+            `${i === 0 ? '主' : '辅'}流派包：agent-references/genre-styles/${path.basename(card)}（置信度 ${level}）`
+        )
         .join('\n')
-    : `${SLOT_MARK} 未匹配到流派包，请检查 references/genre-styles/`;
+    : `${SLOT_MARK} 未匹配到流派包，请检查 agent-references/genre-styles/`;
 
   let proseSliceText = null;
   let proseSliceSource = null;

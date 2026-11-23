@@ -58,4 +58,4 @@ Related: [非长篇写作 13 个 Skill 平台与节奏校准](2026-11-12-non-lon
   - **示范切片直通正文**：拆文与流派包均提供连续原文示范切片，写作任务包在降档路径下也能保留语感锚点。
 - **代价与兼容边界**：
   - 仓库文档或外部脚本若直接引用已删除的内部参考文件名（如 `short-format.md`、`workflow-design.md`、`workflow-chapter.md`、`expression.md`、`genre-prose-cards/`），须同步改指新的 `SKILL.md` / `flow-*.md` / `deslop-guide.md` / `genre-styles/`；老项目已生成的 `设定.md`、`小节大纲.md`、`细纲_*.md`、`卷纲_*.md` 及旧字段名在脚本解析层保持向后兼容。
-  - 变更了共享参考、共享运行时脚本与写手/架构师/角色师模板，须同步提交 `sync-shared-assets.py`、`shared-references.py` 与各端生成产物，并在后续发版提升 `agents_version` 后提示已有用户通过 `/story-setup` 清理旧的 `agent-references/` 残留文件。
+  - 变更了共享参考、共享运行时脚本与写手/架构师/角色师模板，已同步提交 `sync-shared-assets.py`、`shared-references.py` 与各端生成产物，并将 `agents_version` 提升至 `46`，提示已有用户通过 `/story-setup` 刷新助手与 Hook 并清理旧的 `agent-references/` 残留文件。

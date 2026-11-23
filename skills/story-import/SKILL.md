@@ -10,7 +10,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > Agent 兼容性：只查当前宿主——Claude `.claude/agents/{agent}.md`（`subagent_type`）、OpenCode `.opencode/agents/{agent}.md`（`subagent` 的 `agent`）、Codex `.codex/agents/{agent}.toml`（`agent_type`）、Antigravity `.agents/agents/agent-name/agent.md`（`invoke_subagent` + `TypeName`）、ZCode 插件注册角色（`Agent` 按实际 schema 派发）。仅角色/工具不可用或返回未知 agent 时降级 solo/direct。
 >
-> 版本：读 `.story-deployed` 的 `agents_version`；与本版 `agents_version: 45` 不一致时照常检查并 spawn，只用一句白话提示「分析助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」（大于 45 时另提示先更新 oh-story-claudecode）。仅角色缺失或无调用能力时降级 solo/direct 并一句白话告知。
+> 版本：读 `.story-deployed` 的 `agents_version`；与本版 `agents_version: 46` 不一致时照常检查并 spawn，只用一句白话提示「分析助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」（大于 46 时另提示先更新 oh-story-claudecode）。仅角色缺失或无调用能力时降级 solo/direct 并一句白话告知。
 
 ## 名词与目录边界（硬约束）
 

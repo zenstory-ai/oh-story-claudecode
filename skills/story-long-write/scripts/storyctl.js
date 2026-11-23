@@ -49,7 +49,6 @@ const HUMAN_THOUGHT_CAUSAL_SENTENCE_RATIO = 0.15;
 const HUMAN_THOUGHT_CAUSAL_SENTENCE_RANGE = [0.04, 0.28];
 
 const _QUOTED = /“[^”]*”|「[^」]*」|『[^』]*』|"[^"]*"/g;
-const _HTML_COMMENT = /<!--[\s\S]*?-->/g;
 const _BODY_ACTION_SENTENCE_RE =
   /指尖|指腹|手指|指节|手背|掌心|拳头|手腕|袖口|衣角|喉结|眼眶|眼底|眸光|目光|视线|眼神|眉头|嘴角|唇角|肩膀|呼吸|伸手|抬手|探手|拿起|拿过|取出|取过|掏出|摸出|抓起|攥住|攥紧|握住|握紧|捏住|按住|压住|扣住|拢住|摩挲|推开|拉开|打开|关上|放下|递给|挑开|掀开|扯开|转身|回头|抬头|低头|弯腰|俯身|走到|走向|坐下|站起|盯着|扫过|看向|望向/;
 const _THOUGHT_CAUSAL_SENTENCE_RE =
@@ -115,8 +114,29 @@ function round3(value) {
   return Number(value.toFixed(3));
 }
 
+function stripHtmlComments(text) {
+  const src = text || '';
+  let out = '';
+  let cursor = 0;
+  while (cursor < src.length) {
+    const start = src.indexOf('<!--', cursor);
+    if (start === -1) {
+      out += src.slice(cursor);
+      break;
+    }
+    out += src.slice(cursor, start);
+    const end = src.indexOf('-->', start + 4);
+    if (end === -1) {
+      out += src.slice(start);
+      break;
+    }
+    cursor = end + 3;
+  }
+  return out;
+}
+
 function _narrativeSentences(text) {
-  const cleaned = text.replace(/^\ufeff/, '').replace(_HTML_COMMENT, '');
+  const cleaned = stripHtmlComments(text.replace(/^\ufeff/, ''));
   const lines = cleaned.split(/\r?\n/).map((line) => line.trim());
   const paragraphs = lines.filter((line) => line && !line.startsWith('#'));
   const sentences = [];

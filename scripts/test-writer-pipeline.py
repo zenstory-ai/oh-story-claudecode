@@ -433,7 +433,13 @@ class PipelineTests(unittest.TestCase):
         result = self.build()
         self.assertEqual(result.returncode, 0, result.stderr)
         cards = SCRIPTS.parent / 'references' / 'genre-styles'
-        self.assertIn(f"主题材 {cards / '都市日常神豪.md'}（置信度 high）；辅题材 {cards / '豪门虐恋追妻.md'}", result.stdout)
+        prompt_body, report_body = result.stdout.split('以下不进 prompt', 1)
+        # prompt 正文给写手用已部署 agent-references/genre-styles/ 路径，不得泄漏跨 skill 源码路径；
+        # 核对报告保留已解析源路径供主会话诊断。
+        self.assertIn('主流派包：agent-references/genre-styles/都市日常神豪.md（置信度 high）', prompt_body)
+        self.assertIn('辅流派包：agent-references/genre-styles/豪门虐恋追妻.md（置信度 high）', prompt_body)
+        self.assertNotIn('story-long-write/references/genre-styles', prompt_body)
+        self.assertIn(f"主题材 {cards / '都市日常神豪.md'}（置信度 high）；辅题材 {cards / '豪门虐恋追妻.md'}", report_body)
         self.assertIn('召回降档：成立', result.stdout)
         self.assertNotIn('题材正文提示卡（genre_prose_card', result.stdout)
         self.assertIn('——— 语感锚点切片', result.stdout)

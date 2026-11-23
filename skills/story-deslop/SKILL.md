@@ -55,7 +55,7 @@ node scripts/check-ai-patterns.js --check --fail-on=review_required --mode=auto 
 
 ### Phase 3：按授权改稿
 
-> 宿主与版本：只查当前宿主的 `narrative-writer`：Claude `.claude/agents/{agent}.md`（`subagent_type`）、OpenCode `.opencode/agents/{agent}.md`（`subagent` 的 `agent`）、Codex `.codex/agents/{agent}.toml`（`agent_type`）、Antigravity `.agents/agents/agent-name/agent.md`（`invoke_subagent` + `TypeName`）、ZCode 插件注册角色（`Agent` 按当前 schema）。先读项目根 `.story-deployed` 的 `agents_version`：与 `agents_version: 45` 不一致时照常检查并 spawn，用一句白话提示更新（小于 45 提示跑 `/story-setup` 后新开会话，大于 45 提示先更新插件/仓库、勿旧版降级覆盖）。仅当前宿主角色缺失或不可调用时降级直接改，白话告诉作者「这次由我直接改」，不加技术备注行。
+> 宿主与版本：只查当前宿主的 `narrative-writer`：Claude `.claude/agents/{agent}.md`（`subagent_type`）、OpenCode `.opencode/agents/{agent}.md`（`subagent` 的 `agent`）、Codex `.codex/agents/{agent}.toml`（`agent_type`）、Antigravity `.agents/agents/agent-name/agent.md`（`invoke_subagent` + `TypeName`）、ZCode 插件注册角色（`Agent` 按当前 schema）。先读项目根 `.story-deployed` 的 `agents_version`：与 `agents_version: 46` 不一致时照常检查并 spawn，用一句白话提示更新（小于 46 提示跑 `/story-setup` 后新开会话，大于 46 提示先更新插件/仓库、勿旧版降级覆盖）。仅当前宿主角色缺失或不可调用时降级直接改，白话告诉作者「这次由我直接改」，不加技术备注行。
 
 改文件前先备份原文到书内 `.story/work/去味原稿/{YYYYMMDD}_{原文件名}`，供 Phase 4 对照与作者撤回。已在 `narrative-writer` 内或宿主无可用角色时直接改；否则派当前宿主 `narrative-writer` 执行（方法由写手按自身读取表加载，不抄规则正文）：
 

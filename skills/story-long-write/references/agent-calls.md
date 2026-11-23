@@ -26,7 +26,7 @@ Prompt：
 
 ## 2. narrative-writer：写一章
 
-先跑 `node {skill 根}/scripts/build_writer_prompt.js --project {书目录} --chapter {N} --out`，`====` 以上即为 prompt 骨架（已自动附带匹配到的 `references/genre-styles/{流派}.md` 路径与原文语感切片提示）。补齐全部 `［主会话填］` 后原样派发，不手拼替代。脚本报错先修数据，修不好则由主会话自写。
+先跑 `node {skill 根}/scripts/build_writer_prompt.js --project {书目录} --chapter {N} --out`，`====` 以上即为 prompt 骨架（已自动附带匹配到的 `agent-references/genre-styles/{流派}.md` 路径与原文语感切片提示）。补齐全部 `［主会话填］` 后原样派发，不手拼替代。脚本报错先修数据，修不好则由主会话自写。
 
 ## 3. narrative-writer：审查去味 / 超字净删 / 改写一章
 
@@ -35,7 +35,7 @@ Prompt：
   项目目录：{书目录}
   任务描述：审查+去AI味
   检查范围：第 {N} 章
-  流派包：{匹配到的 references/genre-styles/{流派}.md}
+  流派包：{匹配到的 agent-references/genre-styles/{流派}.md}
   文风路径：{设定/文风.md 路径，无写「无」}
   作者偏好：{prose_style 查询 lines，无写「无」}
   触发项：{chapter check 报出的 blocking / review_required 行号与类别}
@@ -52,7 +52,7 @@ Prompt：
   ```text
   项目目录：{书目录}
   任务描述：改写已写章节
-  正文：{正文路径}（原稿已备份） ｜ 细纲：{细纲路径} ｜ 流派包：{流派包路径}
+  正文：{正文路径}（原稿已备份） ｜ 细纲：{细纲路径} ｜ 流派包：{匹配到的 agent-references/genre-styles/{流派}.md}
   改动范围：{局部哪几段 / 整章按细纲重写} ｜ 作者本轮要求：{原话要点}
   衔接：{前章结尾与后章开头各一两句} ｜ 文风路径：{路径或「无」}
   不借改稿新增细纲外剧情；交付后回：改了哪些段、新增申报（无写 0）。

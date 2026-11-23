@@ -6,7 +6,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 ---
 # story-review：多视角对抗式审查
 
-> 版本：先读项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 45` 不一致时（缺失/非整数/小于或大于 45）**照常按当前宿主角色来源检查并 spawn**，只在「这次怎么审的」用一句白话提示更新（小于 45 提示跑 `/story-setup` 后新开会话，ZCode 先更新插件；大于 45 额外提示先更新 oh-story-claudecode，勿旧版降级覆盖）。版本提示不触发降级。
+> 版本：先读项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 46` 不一致时（缺失/非整数/小于或大于 46）**照常按当前宿主角色来源检查并 spawn**，只在「这次怎么审的」用一句白话提示更新（小于 46 提示跑 `/story-setup` 后新开会话，ZCode 先更新插件；大于 46 额外提示先更新 oh-story-claudecode，勿旧版降级覆盖）。版本提示不触发降级。
 
 **执行铁律：审查只管挑毛病，不为原稿背书。**
 
