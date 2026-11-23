@@ -142,8 +142,7 @@ Codex 里把 `/story-long-write` 写成 `$story-long-write`。
 ## 相关
 
 - 站点原文（含更多示例与相关指南）：https://zenstory.ai/zh/oh-story/novel-opening
-- [开篇三要素与几种开头写法](../skills/story-long-write/references/opening-design.md)
-- [读者期待与分阶段兑现](../skills/story-long-write/references/reader-contract-and-progression.md)
-- [作者要求、文风与不能改的事实](../skills/story-long-write/references/writing-craft.md)
-- [把定好的结果写成完整场景](../skills/story-long-write/references/writing-craft.md)
+- [黄金三章规划与钩子节奏](../skills/story-long-write/references/flow-outline.md)
+- [立项设定与读者期待](../skills/story-long-write/references/flow-opening-plan.md)
+- [作者要求、文风优先级与场景写法](../skills/story-long-write/references/flow-drafting.md)
 - 仓库地址：https://github.com/zenstory-ai/oh-story-claudecode

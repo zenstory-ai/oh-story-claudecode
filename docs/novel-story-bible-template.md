@@ -75,7 +75,7 @@
 ## 相关
 
 - 站点原文（含更多示例与相关指南）：https://zenstory.ai/zh/oh-story/story-bible-template
-- [追踪状态更新说明](../skills/story-long-write/references/tracking-transaction.md)
-- [改稿后从改动处往后核对状态](../skills/story-long-write/references/workflow-revision.md)
-- [把已定的变化写成连贯场景](../skills/story-long-write/references/writing-craft.md)
+- [追踪状态更新说明](../skills/story-long-write/references/tracking-protocol.md)
+- [改稿后从改动处往后核对状态](../skills/story-long-write/references/flow-revision.md)
+- [把已定的变化写成连贯场景](../skills/story-long-write/references/flow-drafting.md)
 - 仓库地址：https://github.com/zenstory-ai/oh-story-claudecode

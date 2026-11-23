@@ -121,8 +121,8 @@ Oh Story 悬疑灵异题材卡给的每章顺序是：异常出现，试探规�
 ## 相关
 
 - 站点原文（含更多示例与相关指南）：https://zenstory.ai/zh/oh-story/rules-horror
-- [副本规划与结构参考](../skills/story-long-write/references/long-genre-catalog.md)
-- [有限视角、线索与危险推进](../skills/story-long-write/references/genre-prose-cards/悬疑灵异.md)
-- [把定好的情节写成场景](../skills/story-long-write/references/writing-craft.md)
+- [立项、设定与副本结构参考](../skills/story-long-write/references/flow-opening-plan.md)
+- [有限视角、线索与危险推进](../skills/story-long-write/references/genre-styles/悬疑灵异.md)
+- [把定好的情节写成场景](../skills/story-long-write/references/flow-drafting.md)
 - [作者文风优先于题材默认写法](../skills/story-setup/references/agent-references/style-resolution.md)
 - 仓库地址：https://github.com/zenstory-ai/oh-story-claudecode

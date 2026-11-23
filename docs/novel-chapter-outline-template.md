@@ -24,7 +24,7 @@
 
 ## 网文细纲模板（可复制）
 
-下面是供作者手填的细纲卡片，整理自本仓库的[出细纲流程说明](../skills/story-long-write/references/workflow-outline.md)。平时手写可以删掉用不上的栏目；在 Oh Story 项目里，直接让 skill 按自带模板和字数规则保存即可。
+下面是供作者手填的细纲卡片，整理自本仓库的[细纲规划与钩子节奏](../skills/story-long-write/references/flow-outline.md)。平时手写可以删掉用不上的栏目；在 Oh Story 项目里，直接让 skill 按自带模板和字数规则保存即可。
 
 ### 一、本章定位
 
@@ -142,9 +142,8 @@
 ## 相关
 
 - 站点原文（含更多示例与相关指南）：https://zenstory.ai/zh/oh-story/chapter-outline-template
-- [细纲模板与可选字段](../skills/story-long-write/references/outline-template.md)
-- [大纲层级与倒推方法](../skills/story-long-write/references/outline-methods.md)
-- [作者文风与通用写法](../skills/story-long-write/references/writing-craft.md)
-- [出细纲流程说明](../skills/story-long-write/references/workflow-outline.md)
+- [细纲规划、模板与钩子节奏](../skills/story-long-write/references/flow-outline.md)
+- [立项、设定与卷纲排法](../skills/story-long-write/references/flow-opening-plan.md)
+- [正文笔法与竖屏网感](../skills/story-long-write/references/flow-drafting.md)
 - [长篇写作入口说明](../skills/story-long-write/SKILL.md)
 - 仓库地址：https://github.com/zenstory-ai/oh-story-claudecode
