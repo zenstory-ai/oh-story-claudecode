@@ -121,4 +121,4 @@ Stage 6 内容写完后、将 `6` 追加到 `stages_completed[]` 前，依次跑
 
 ## 版本约定
 
-`_meta.json.version` 现行 `"2.1"`：字段改名、类型或必填变更升 major，新增可选字段（如 `voice_metrics`）升 minor，旧 `2.0` 产出下游继续兼容。
+`_meta.json.version` 现行 `"2.1"`：字段改名、类型或历史必填变更升 major；新增字段 `voice_metrics` 在新版 `2.1` 拆文中为必填阻断项，下游读取旧 `2.0` 产出时视为可选并保持向后兼容，故升 minor。
