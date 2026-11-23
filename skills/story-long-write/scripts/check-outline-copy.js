@@ -185,6 +185,9 @@ function main() {
     const arg = argv[k]
     if (!positionalOnly && arg === '--') {
       positionalOnly = true
+    } else if (!positionalOnly && (arg === '--help' || arg === '-h')) {
+      process.stdout.write('用法: node check-outline-copy.js [--outline <细纲路径>] <正文路径...>\n')
+      return 0
     } else if (!positionalOnly && arg === '--outline') {
       if (explicitOutline !== null) return reportUsageError('--outline 不能重复指定')
       const value = argv[k + 1]

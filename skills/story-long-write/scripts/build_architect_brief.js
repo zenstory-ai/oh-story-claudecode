@@ -467,11 +467,16 @@ function parseRange(value) {
   return [first, last];
 }
 
+const USAGE =
+  'Usage: node build_architect_brief.js --project DIR --task (world|volume|outline) [--volume N] [--chapters A-B] [--rules-only]\n';
+
 function parseCliArgs(argv) {
-  const args = { project: null, task: null, volume: null, chapters: null, rulesOnly: false };
+  const args = { project: null, task: null, volume: null, chapters: null, rulesOnly: false, help: false };
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i];
-    if (token === '--project') {
+    if (token === '--help' || token === '-h') {
+      return { help: true };
+    } else if (token === '--project') {
       if (i + 1 >= argv.length) return { error: '--project requires a value' };
       args.project = argv[++i];
     } else if (token.startsWith('--project=')) {
@@ -510,6 +515,10 @@ function parseCliArgs(argv) {
 
 function main(argv = process.argv.slice(2)) {
   const args = parseCliArgs(argv);
+  if (args.help) {
+    process.stdout.write(USAGE);
+    return 0;
+  }
   if (args.error) {
     process.stderr.write(`ERROR: ${args.error}\n`);
     return 2;

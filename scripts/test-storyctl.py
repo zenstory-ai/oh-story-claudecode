@@ -822,6 +822,64 @@ class FragmentationTests(unittest.TestCase):
             for jargon in ("needs_decision", "blocking", "status", "advisory", "prose_balance"):
                 self.assertNotIn(jargon, plain)
 
+    def test_vertical_screen_paragraph_metrics_and_help(self) -> None:
+        # 竖屏段落指标（paragraph_median_chars / paragraphs_over_100）：剔除 frontmatter、标题、分隔线与闭合 HTML 注释，
+        # 仅统计正文段落；信息性指标永不阻断。
+        long_para = "他盯着账本核对每一笔进项，从三月的米粮采买一路翻到秋后的漕运损耗，越算心里越亮堂，原来东院这三年压根没打算把货栈交出来，只等今夜合上账册把亏空全推到他头上，好顺理成章在宗祠里逼他交出掌柜印信和库房钥匙。"
+        self.assertGreater(len(long_para), 100)
+        text = (
+            "---\n"
+            "title: 第1章 测试\n"
+            "---\n"
+            "# 第1章 测试\n"
+            "<!-- 去味:跳过 -->\n"
+            "短句。\n"
+            "---\n"
+            "他推门走进屋里，顺手反锁了门栓。\n"
+            "***\n"
+            f"{long_para}\n"
+        )
+        frag = storyctl.fragmentation(text)
+        self.assertEqual(frag["paragraphs"], 3)
+        self.assertEqual(frag["paragraph_median_chars"], 16)
+        self.assertEqual(frag["paragraphs_over_100"], 1)
+
+        # 空正文返回 null 中位数和 0 超百字段。
+        empty_frag = storyctl.fragmentation("# 第1章 空\n<!-- 注释 -->\n---\n")
+        self.assertEqual(empty_frag["paragraphs"], 0)
+        self.assertIsNone(empty_frag["paragraph_median_chars"])
+        self.assertEqual(empty_frag["paragraphs_over_100"], 0)
+
+        with tempfile.TemporaryDirectory(prefix="storyctl-vscreen-") as directory:
+            project = Path(directory)
+            (project / "大纲").mkdir()
+            (project / "正文").mkdir()
+            (project / "大纲/细纲_第001章.md").write_text(
+                "- 字数目标：200 字\n- 字数口径：visible_chars_v1\n", encoding="utf-8"
+            )
+            (project / "正文/第001章_测试.md").write_text(text, encoding="utf-8")
+            _init_tracking(project)
+            result = storyctl.chapter_check_with_pass_quality(project, 1)
+            self.assertEqual(result["fragmentation"]["paragraph_median_chars"], 16)
+            self.assertEqual(result["fragmentation"]["paragraphs_over_100"], 1)
+            plain = "\n".join(storyctl.plain_report(result))
+            self.assertIn("段长中位数 16 字，超过 100 字的长段 1 段", plain)
+            for jargon in ("paragraph_median_chars", "paragraphs_over_100"):
+                self.assertNotIn(jargon, plain)
+
+        for flag in ("--help", "-h"):
+            completed = subprocess.run(
+                [NODE, str(STORYCTL_PATH), flag],
+                cwd=ROOT,
+                text=True,
+                encoding="utf-8",
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn("storyctl.js", completed.stdout)
+            self.assertEqual(completed.stderr, "")
+
 
 if __name__ == "__main__":
     unittest.main()

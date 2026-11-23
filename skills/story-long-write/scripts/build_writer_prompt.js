@@ -544,10 +544,14 @@ function extractProseSlices(text, chapter = 1, maxSlices = 2) {
   }
   if (!slices.length) return null;
   let picked;
-  if (slices.length > maxSlices && chapter > 3) {
-    picked = slices.slice(slices.length - maxSlices);
+  if (slices.length <= maxSlices) {
+    picked = slices;
   } else {
-    picked = slices.slice(0, maxSlices);
+    const start = (Math.max(1, Number(chapter) || 1) - 1) % slices.length;
+    picked = [];
+    for (let k = 0; k < maxSlices; k += 1) {
+      picked.push(slices[(start + k) % slices.length]);
+    }
   }
   return picked.map((s) => `【${s.title}】\n${s.body}`).join('\n\n');
 }
@@ -974,11 +978,15 @@ function build(project, chapter, report) {
   return { prompt: `${parts.join('\n\n')}\n`, errors: [] };
 }
 
+const USAGE = 'Usage: node build_writer_prompt.js --project DIR --chapter N [--out [FILE]]\n';
+
 function parseCliArgs(argv) {
-  const args = { project: null, chapter: null, out: null };
+  const args = { project: null, chapter: null, out: null, help: false };
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i];
-    if (token === '--project') {
+    if (token === '--help' || token === '-h') {
+      return { help: true };
+    } else if (token === '--project') {
       if (i + 1 >= argv.length) return { error: '--project requires a value' };
       args.project = argv[++i];
     } else if (token.startsWith('--project=')) {
@@ -1011,6 +1019,10 @@ function parseCliArgs(argv) {
 
 function main(argv = process.argv.slice(2)) {
   const args = parseCliArgs(argv);
+  if (args.help) {
+    process.stdout.write(USAGE);
+    return 0;
+  }
   if (args.error) {
     process.stderr.write(`error: ${args.error}\n`);
     return 2;

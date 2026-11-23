@@ -298,10 +298,16 @@ function parseArgs(argv) {
   return files.length ? { files, strict } : null
 }
 
+const USAGE = '用法: node scripts/check-outline-contract.js --json [--strict] <细纲路径...> | --json [--strict] --project <书目录> --chapter N\n'
+
 function main(argv) {
+  if (argv.includes('--help') || argv.includes('-h')) {
+    process.stdout.write(USAGE)
+    return 0
+  }
   const parsed = parseArgs(argv)
   if (!parsed) {
-    process.stderr.write('用法: node scripts/check-outline-contract.js --json [--strict] <细纲路径...> | --json [--strict] --project <书目录> --chapter N\n')
+    process.stderr.write(USAGE)
     return 2
   }
   let targets = parsed.files

@@ -869,6 +869,83 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('悬疑灵异', brief_text)
         self.assertNotIn('豪门虐恋追妻', brief_text)
 
+    def test_genre_slice_rotation_cycles_across_chapters(self):
+        # 3 个及以上语感切片按章号循环轮换（Ch1: A+B → Ch2: B+C → Ch3: C+A → Ch4: A+B），
+        # 1–2 个切片保持原样全选不重复。
+        self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：都市脑洞\n- 主对标书：轮换测试书\n')
+        self.put(
+            '对标/轮换测试书/文风.md',
+            '# 文风\n'
+            '### 切片 A\n```text\n第一段切片甲内容。\n```\n'
+            '### 切片 B\n```text\n第二段切片乙内容。\n```\n'
+            '### 切片 C\n```text\n第三段切片丙内容。\n```\n',
+        )
+        for ch in range(1, 5):
+            self.put(f'大纲/细纲_第{ch:03d}章.md', f'### 第 {ch} 章：测试章{ch}\n- 单元ID/位置：L1-01\n- 目标情绪：推进\n')
+            if ch > 1:
+                self.put(f'正文/第{ch - 1:03d}章_测试章{ch - 1}.md', f'# 第{ch - 1}章 测试章{ch - 1}\n上章收尾。\n')
+
+        expected = {
+            1: (['切片 A', '切片 B'], ['切片 C']),
+            2: (['切片 B', '切片 C'], ['切片 A']),
+            3: (['切片 C', '切片 A'], ['切片 B']),
+            4: (['切片 A', '切片 B'], ['切片 C']),
+        }
+        for ch, (present, absent) in expected.items():
+            with self.subTest(chapter=ch):
+                res = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', ch)
+                self.assertEqual(res.returncode, 0, res.stderr)
+                prompt_body = res.stdout.split('以下不进 prompt', 1)[0]
+                for item in present:
+                    self.assertIn(f'【{item}】', prompt_body)
+                for item in absent:
+                    self.assertNotIn(f'【{item}】', prompt_body)
+
+        # 只有 2 个切片时，任何章号都保留全部 2 个切片且不重复。
+        self.put(
+            '对标/轮换测试书/文风.md',
+            '# 文风\n### 切片 A\n```text\n切片甲。\n```\n### 切片 B\n```text\n切片乙。\n```\n',
+        )
+        res2 = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 3)
+        self.assertEqual(res2.returncode, 0, res2.stderr)
+        prompt2 = res2.stdout.split('以下不进 prompt', 1)[0]
+        self.assertEqual(prompt2.count('【切片 A】'), 1)
+        self.assertEqual(prompt2.count('【切片 B】'), 1)
+
+    def test_all_writing_deslop_review_cli_scripts_support_help(self):
+        # 系统性回归：长篇/短篇/去味/审稿全部 CLI 脚本都必须干净支持 --help 与 -h（exit 0、stdout 非空、stderr 为空）。
+        library_only = {'wordcount_core.js', 'style-whitelist.js'}
+        skill_dirs = [
+            ROOT / 'skills/story-long-write/scripts',
+            ROOT / 'skills/story-short-write/scripts',
+            ROOT / 'skills/story-deslop/scripts',
+            ROOT / 'skills/story-review/scripts',
+        ]
+        cli_scripts = []
+        for directory in skill_dirs:
+            for script in sorted(directory.glob('*.js')):
+                if script.name in library_only:
+                    continue
+                cli_scripts.append(script)
+        self.assertGreaterEqual(len(cli_scripts), 20, f'unexpectedly few CLI scripts: {cli_scripts}')
+        for script in cli_scripts:
+            rel = script.relative_to(ROOT).as_posix()
+            for flag in ('--help', '-h'):
+                with self.subTest(script=rel, flag=flag):
+                    completed = subprocess.run(
+                        [NODE, str(script), flag],
+                        cwd=ROOT,
+                        capture_output=True,
+                        encoding='utf-8',
+                    )
+                    self.assertEqual(
+                        completed.returncode,
+                        0,
+                        f'{rel} {flag} exited {completed.returncode}: stdout={completed.stdout!r} stderr={completed.stderr!r}',
+                    )
+                    self.assertTrue(completed.stdout.strip(), f'{rel} {flag} produced empty stdout')
+                    self.assertEqual(completed.stderr.strip(), '', f'{rel} {flag} wrote to stderr: {completed.stderr!r}')
+
 
 class ImportOutlineBriefTests(unittest.TestCase):
     """导入逐批反推细纲：任务包只带本批规则、抽好的摘要要点、测好的长度与重叠的剧情单元卡。"""

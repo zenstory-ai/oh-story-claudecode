@@ -525,7 +525,13 @@ function report(project, checks, options = {}) {
   }
 }
 
+const USAGE = '用法: node scripts/check-phase2-contract.js --json [--strict] [project-dir]\n'
+
 function main(argv) {
+  if (argv.includes('--help') || argv.includes('-h')) {
+    process.stdout.write(USAGE)
+    return 0
+  }
   let strict = false
   const args = []
   for (const arg of argv) {
@@ -534,7 +540,7 @@ function main(argv) {
     args.push(arg)
   }
   if (args.length > 1 || args.some((arg) => arg.startsWith('--'))) {
-    process.stderr.write('用法: node scripts/check-phase2-contract.js --json [--strict] [project-dir]\n')
+    process.stderr.write(USAGE)
     return 2
   }
   const result = verify(args[0] || '.', { strict })

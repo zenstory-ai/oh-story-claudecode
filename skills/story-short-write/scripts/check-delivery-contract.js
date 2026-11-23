@@ -391,10 +391,16 @@ function parseArgs(argv) {
   }
 }
 
+const USAGE = '用法: node scripts/check-delivery-contract.js --json [--strict] --min-chars N --max-chars N --sections N [--min-section-chars N] [--check-contract] [project-dir]\n'
+
 function main(argv) {
+  if (argv.includes('--help') || argv.includes('-h')) {
+    process.stdout.write(USAGE)
+    return 0
+  }
   const parsed = parseArgs(argv)
   if (!parsed) {
-    process.stderr.write('参数缺失或范围不可同时满足。用法: node scripts/check-delivery-contract.js --json [--strict] --min-chars N --max-chars N --sections N [--min-section-chars N] [--check-contract] [project-dir]\n')
+    process.stderr.write(`参数缺失或范围不可同时满足。${USAGE}`)
     return 2
   }
   const result = argv.includes('--check-contract')
