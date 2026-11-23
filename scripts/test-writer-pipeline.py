@@ -840,6 +840,29 @@ class PipelineTests(unittest.TestCase):
         info = json.loads(brief.stdout)
         self.assertTrue(any('剧情段 L1-01' in name for name in info['includes']), info['includes'])
 
+    def test_fenced_headings_in_slices_and_html_comments_in_positioning(self):
+        # 1) extractProseSlices 遇到围栏代码块内部的 `# ` 标题不应提前截断切片提取。
+        self.put('对标/热书甲/文风.md',
+                 '# 文风\n\n### 切片 1\n```text\n第一段开场。\n# 代码块里的伪标题\n继续往下写的正文切片。\n```\n')
+        # 2) 题材定位.md 中的注释不应污染 ownNames、genreLine 或 build_architect_brief 的 matchPrimaryGenreStyle。
+        self.put('设定/题材定位.md',
+                 '# 题材定位\n'
+                 '<!--\n- 书名：热书甲\n- 题材类型：豪门虐恋\n-->\n'
+                 '- 书名：真书名\n'
+                 '- 题材类型：悬疑灵异\n'
+                 '- 主对标书：热书甲\n')
+        res = self.build()
+        self.assertEqual(res.returncode, 0, res.stderr)
+        prompt = res.stdout
+        self.assertIn('继续往下写的正文切片。', prompt)
+        self.assertIn('悬疑灵异.md', prompt)
+        self.assertNotIn('豪门虐恋追妻.md', prompt)
+        brief = self.call('build_architect_brief.py', '--project', self.book, '--task', 'world')
+        self.assertEqual(brief.returncode, 0, brief.stderr)
+        brief_text = Path(json.loads(brief.stdout)['brief']).read_text(encoding='utf-8')
+        self.assertIn('悬疑灵异', brief_text)
+        self.assertNotIn('豪门虐恋追妻', brief_text)
+
 
 class ImportOutlineBriefTests(unittest.TestCase):
     """导入逐批反推细纲：任务包只带本批规则、抽好的摘要要点、测好的长度与重叠的剧情单元卡。"""

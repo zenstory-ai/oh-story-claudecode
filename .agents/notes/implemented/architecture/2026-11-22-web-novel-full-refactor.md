@@ -30,19 +30,19 @@ Related: [非长篇写作 13 个 Skill 平台与节奏校准](2026-11-12-non-lon
    - 流派包重构为 **12 份**（升级 8 份 + `沙雕脑洞`→`脑洞设定流` + 合并 `民俗怪谈` 进唯一保留公平推理/留白的 `悬疑.md` + 新增 `年代重生打脸`、`男频都市反杀`、`通用短篇` 兜底），每包均附 2–3 段 150–250 字竖屏示范切片。
 2. **长篇写作流程化重构（`skills/story-long-write/`：71 → 25 文件）**：
    - 将原分散参考按写作时刻收口为 4 份流程手册（`flow-opening-plan.md`、`flow-outline.md`、`flow-drafting.md`、`flow-revision.md`）+ `benchmark-recall.md`、`agent-calls.md`、`tracking-protocol.md`、`author-memory.md`；
-   - 将 33 张 `genre-prose-cards/` 整合为 **16 份** `references/genre-styles/*.md`（8 男频 + 7 女频/泛题材 + `通用长篇.md` 兜底，含示范切片）；
+   - 将 33 张 `genre-prose-cards/` 整合为 **16 份** `references/genre-styles/*.md`（9 男频 + 6 女频与双男主 + `通用长篇.md` 兜底，含示范切片）；
    - 更新 `build_writer_prompt.js` 与 `build_architect_brief.js`：切换至 `genre-styles/` 与 `flow-*.md`，并确保即使在「召回降档」路径下也保留 1–2 段原文语感切片注入（对标 `文风.md` 优先，无对标取流派包切片）。
-3. **检测器、标点清洗、写后钩子与契约脚本统一长短篇策略（`--mode=auto|long|short`）**：
-   - `check-ai-patterns.js`、`normalize-punctuation.js`（及 4 份共享副本）与 `story_hook_core.js`（及 5 端共享副本）支持 `--mode=auto|long|short`（`正文.md` 自动识别为 `short`，`正文/第*章*.md` 为 `long`）：
+3. **检测器、标点清洗、写后钩子与契约脚本统一长短篇策略**：
+   - `check-ai-patterns.js`（共 4 份共享副本）支持 `--mode=auto|long|short`（`正文.md` 附同目录 `设定.md`/`小节大纲.md` 自动识别为 `short`，`正文/第*章*.md` 为 `long`）；`normalize-punctuation.js`（共 4 份共享副本）为 CLI 对称接受 `--mode=auto|long|short`，长短篇统一保留标准 `——`；`story_hook_core.js`（共 5 端共享副本，无 `--mode` CLI 参数）按目标文件名 `正文.md` 内部切换短篇模式（含 Codex Stop Hook 对齐）：
      - **标点清洗统一契约**：`normalize-punctuation.js` 在长短篇模式下均保留标准破折号 `——`（拦截并修复 `—`/`———`/`——……` 等畸形破折号与独立分隔线），旁白 `——` 过密统一由 `check-ai-patterns.js` 做密度语义复核；
      - **短篇模式校准**：旁白 `——` 降为密度 `advisory`（`≥6` 且 `≥1.5/k`）；拆分 `trailer-ending` 豁免具体信息差剧透（`他不知道的是/殊不知/没人知道/谁也没想到` 降 `advisory`），写后钩子在 `<6,000` 字分批草稿上跳过 `trailer-ending` 并改软提示措辞；`not-is`、`quote-emphasis-tic`、`negation-pair-tic` 按篇幅缩放；跳过 `overcompressed-prose-tic` 与 `low-connective-density-tic`；放宽 `period-stutter` 与 `stock-reaction-tic`；收紧 `long-paragraph` 至 `100` 字以捕捉长段文字墙；
      - **长篇模式校准**：同步校准旁白 `——` 与短效反应密度阈值，降低正常快节奏网文的误报。
    - `check-phase2-contract.js` 新增 `advisory` 级导语与 20%–55% 付费点位置检查并更新模板路径至 `SKILL.md`；`check-delivery-contract.js` 新增 3 项纯结构 `advisory`（段长、对话占比、导语存在），不设情绪词或标点硬门禁。
 4. **周边技能与七端部署同步收口**：
-   - **`story-deslop`（10 → 5 文件）**：合并 `expression/narrative-focus/story-logic/deslop-gates` → `deslop-guide.md`，分层重写 `banned-words.md`（Tier 1 明显 AI 腔 vs Tier 2 语境词），将 `agent-calls.md` 折入 `SKILL.md`，强化 `short-deslop.md` 为显式覆盖矩阵并同步至 `story-review` 与 `story-setup/agent-references/`；
-   - **`story-review`（19 → 14 文件）**：拆分短篇平台表为 `rubrics/zhihu.md`（盐言）与新建 `rubrics/short-shuang.md`（番茄/七猫/黑岩/点众/小程序/未定），长篇 `fanqie.md` 同步覆盖七猫长篇，校准 `quality-rubric.md` 豁免有具体冲突与钩子的商业经典开局范式，将修订追踪折入 `review-tracking.md`；
+   - **`story-deslop`（9 → 5 文件）**：合并 `expression/narrative-focus/story-logic/deslop-gates` → `deslop-guide.md`，分层重写 `banned-words.md`（Tier 1 明显 AI 腔 vs Tier 2 语境词），将 `agent-calls.md` 折入 `SKILL.md`，强化 `short-deslop.md` 为显式覆盖矩阵并同步至 `story-review` 与 `story-setup/agent-references/`；
+   - **`story-review`（16 → 14 文件）**：拆分短篇平台表为 `rubrics/zhihu.md`（盐言）与新建 `rubrics/short-shuang.md`（番茄/七猫/黑岩/点众/小程序/未定），长篇 `fanqie.md` 同步覆盖七猫长篇，校准 `quality-rubric.md` 豁免有具体冲突与钩子的商业经典开局范式，将修订追踪折入 `review-tracking.md`；
    - **`story-short-analyze` / `story-long-analyze` / `story-import` / `story-short-scan`**：短篇拆文清除纸媒赏析口径，改为网感五维评分并抽取量化网感体检表与 3 段 150–250 字原文语感切片；长篇拆文（12 → 10 文件）在 Stage 1/6 加入黄金三章体检与原文切片、Stage 3 收拢为 `RH/TR` + `EM` 双索引；导入（13 → 8 文件）折叠零散参考并同步新版长短篇模板；短篇扫榜对齐新题材分类；
-   - **`story-setup` 与中央注册表**：清理 `agent-references/` 中过时文件与 33 张旧卡，接入 `deslop-guide.md`、`short-deslop.md`、`flow-opening-plan.md`、`flow-outline.md`、`flow-drafting.md`、`benchmark-recall.md` 与 16 份长篇 `genre-styles/`；更新 `templates/agents/{narrative-writer,character-designer,story-architect}.md`、`agent-reference-profiles.md`、`scripts/shared-references.json`、`scripts/doc-budget.json` 及 OpenCode / Codex / ZCode 适配产物。
+   - **`story-setup` 与中央注册表**：清理 `agent-references/` 中过时文件与 33 张旧卡，接入 `deslop-guide.md`、`short-deslop.md`、`flow-opening-plan.md`、`flow-outline.md`、`flow-drafting.md`、`benchmark-recall.md` 与 16 份长篇 `genre-styles/`；更新 `templates/agents/{narrative-writer,character-designer,story-architect}.md`、`agent-reference-profiles.md`、`scripts/shared-references.json`、`scripts/doc-budget.json` 及 OpenCode / Codex / ZCode 角色模板与五端 Hook。
 
 ## Alternatives considered
 
@@ -53,7 +53,7 @@ Related: [非长篇写作 13 个 Skill 平台与节奏校准](2026-11-12-non-lon
 ## Consequences
 
 - **收益**：
-  - **上下文显著瘦身**：短篇全流程从需拆两次对话收敛为单会话完成，热路径体积大幅下降；长篇 71 → 25 文件、去味 10 → 5 文件、审稿 19 → 14 文件，所有调用路径均远低于 35K `path_ceiling` 上限。
+  - **上下文显著瘦身**：短篇全流程从需拆两次对话收敛为单会话完成，热路径体积大幅下降；长篇 71 → 25 文件、去味 9 → 5 文件、审稿 16 → 14 文件，所有调用路径均远低于 35K `path_ceiling` 上限。
   - **规则自洽且误报显著下降**：消除短篇跨文件冲突与长短篇混用口径；检测器与审稿标准对正常网文竖屏短段、直给情绪与功能性旁白破折号更加友好，同时维持退化硬底线与明显 AI 腔拦截力。
   - **示范切片直通正文**：拆文与流派包均提供连续原文示范切片，写作任务包在降档路径下也能保留语感锚点。
 - **代价与兼容边界**：

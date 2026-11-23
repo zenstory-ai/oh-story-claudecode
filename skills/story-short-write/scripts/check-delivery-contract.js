@@ -188,56 +188,42 @@ function verify(projectDir, contract, options = {}) {
   const isStructuralNonProse = (trimmed) =>
     /^#{1,6}\s/.test(trimmed) || /^-{3,}$/.test(trimmed) || /^[*_]{3,}$/.test(trimmed)
   const stripHtmlCommentsFromLines = (rawLines) => {
-    const out = []
-    let open = false
-    for (const raw of rawLines) {
-      let text = ''
-      let cursor = 0
-      while (cursor < raw.length) {
-        if (open) {
-          const close = raw.indexOf('-->', cursor)
-          if (close === -1) {
-            cursor = raw.length
-            break
-          }
-          cursor = close + 3
-          open = false
-          continue
-        }
-        const start = raw.indexOf('<!--', cursor)
-        if (start === -1) {
-          text += raw.slice(cursor)
-          break
-        }
-        text += raw.slice(cursor, start)
-        const close = raw.indexOf('-->', start + 4)
-        if (close === -1) {
-          // 仅在后续行确实存在闭合 `-->` 时按跨行注释跳过，避免未闭合 `<!--` 吞掉全文。
-          open = true
-          cursor = raw.length
-          break
-        }
-        cursor = close + 3
-      }
-      out.push(text)
-    }
-    if (open) {
-      // 未闭合注释不吞后续正文：退回仅剔除已闭合注释片段。
-      return rawLines.map((raw) => {
+    const unclosed = new Set()
+    for (;;) {
+      const out = []
+      let open = false
+      let openedAt = null
+      rawLines.forEach((raw, index) => {
         let text = ''
         let cursor = 0
         while (cursor < raw.length) {
+          if (open) {
+            const close = raw.indexOf('-->', cursor)
+            if (close === -1) {
+              cursor = raw.length
+              break
+            }
+            cursor = close + 3
+            open = false
+            continue
+          }
           const start = raw.indexOf('<!--', cursor)
-          if (start === -1) { text += raw.slice(cursor); break }
+          if (start === -1) {
+            text += raw.slice(cursor)
+            break
+          }
           text += raw.slice(cursor, start)
-          const close = raw.indexOf('-->', start + 4)
-          if (close === -1) { text += raw.slice(start + 4); break }
-          cursor = close + 3
+          cursor = start + 4
+          const key = `${index}:${start}`
+          if (unclosed.has(key)) continue
+          open = true
+          openedAt = key
         }
-        return text
+        out.push(text)
       })
+      if (!(open && openedAt !== null)) return out
+      unclosed.add(openedAt)
     }
-    return out
   }
   const cleanLines = stripHtmlCommentsFromLines(lines)
   const bodyLines = cleanLines

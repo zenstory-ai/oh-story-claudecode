@@ -173,7 +173,7 @@ for (const [name, body] of out) {
 
 1. **网感与一致快检**：首百字见冲突/对白且零纯景物？单句短段（~20 字中位、无 >80 字砖块）？对话密且带刺？付费点后立刻连环反击？结尾清算落地（悬疑除外，禁「灯火万丈/化开春雪/敬新生」样板尾句）？并做**前后一致检查**（宿主可用派 `consistency-checker`，否则自查动机、时间线设定与伏笔回收）。
 2. **短篇去味**：只砍①论文公文腔②空洞哲理与样板尾句③无冲突纯景物④车轱辘复述⑤工程元信息词。**明确放行**直写情绪体感（`脸色一变/心口一沉/瞳孔一缩`）、剧透审判（`他不知道/演得真好`）、围观震惊、第一人称吐槽、单句成段与自然 `！`/`？`/`——`（旁白 `——` 全篇 `≤5` 处）。`.deslop-whitelist`（一行一句，上方 `# 来源：…`）**只记作者明确采用的写法，严禁为过脚本自行放行或登泛词**。
-3. **短篇模式验收**（位于 `{skill 根}/scripts/`，前四项传 `{短篇目录}/正文.md`）：依次跑 `normalize-punctuation.js --mode=short`（留标准 `——`，规整畸形 `—`/`———`/`——……`）、`check-ai-patterns.js --mode=short --check --fail-on=review_required`、`check-degeneration.js --check`、`check-outline-copy.js`（功能复沓记大纲末尾 `- 原样出现的原话：`）与 `check-delivery-contract.js --json --min-chars {MIN} --max-chars {MAX} --sections {N} {短篇目录}`。硬错（exit 1）最多修 2 轮，仍不过停告作者；exit 2 或未跑成不得声称通过；正文禁留 `<!-- 自检 -->` 标记。
+3. **短篇模式验收**（位于 `{skill 根}/scripts/`，前四项传 `{短篇目录}/正文.md`）：依次跑 `normalize-punctuation.js --mode=short`（留 `——`，修畸形破折号）、`check-ai-patterns.js --mode=short --check --fail-on=review_required`、`check-degeneration.js --check --fail-on=blocking`、`check-outline-copy.js`（功能复沓记大纲末尾 `原样出现的原话：`）与 `check-delivery-contract.js --json --min-chars {MIN} --max-chars {MAX} --sections {N} {短篇目录}`。硬错（exit 1）最多修 2 轮，仍不过停告作者；exit 2 或未跑成不得声称通过；正文禁留 `<!-- 自检 -->` 标记。
 4. **白话交付**：只报字数、节数、核心亮点（导语/卡点/清算）和下一步建议，不报脚本名与检查编号。
 
 ## 流程衔接

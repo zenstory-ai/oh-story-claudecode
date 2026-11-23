@@ -175,9 +175,30 @@ function templates(name, ...tags) {
   return blocks.join('\n\n');
 }
 
+function stripHtmlComments(text) {
+  const src = text || '';
+  let out = '';
+  let cursor = 0;
+  while (cursor < src.length) {
+    const start = src.indexOf('<!--', cursor);
+    if (start === -1) {
+      out += src.slice(cursor);
+      break;
+    }
+    out += src.slice(cursor, start);
+    const end = src.indexOf('-->', start + 4);
+    if (end === -1) {
+      out += src.slice(start);
+      break;
+    }
+    cursor = end + 3;
+  }
+  return out;
+}
+
 function matchPrimaryGenreStyle(project) {
   if (!project) return null;
-  const text = readUtf8IfFile(path.join(project, '设定', '题材定位.md'));
+  const text = stripHtmlComments(readUtf8IfFile(path.join(project, '设定', '题材定位.md')));
   if (!text) return null;
   const match = /^[ \t]*[-*+]?[ \t]*\**题材(?:类型)?\**[ \t]*[：:](.*)$/m.exec(text);
   const raw = !match || match[1].includes('{') ? '' : match[1].trim().toLowerCase();

@@ -194,7 +194,7 @@ function unitIdFrom(field) {
 
 function ownNames(project) {
   const names = new Set([path.basename(project)]);
-  const text = readText(path.join(project, '设定', '题材定位.md')) || '';
+  const text = stripHtmlComments(readText(path.join(project, '设定', '题材定位.md')));
   const match = /^[ \t]*[-*+]?[ \t]*\**书名\**[ \t]*[：:][ \t]*(.+)$/m.exec(text);
   if (match && !match[1].includes('{')) {
     const cleaned = match[1].replace(/[（(][^）)]*[）)]/g, '').trim().replace(/^《+|》+$/g, '');
@@ -366,7 +366,7 @@ function findWorkspace(project) {
 }
 
 function genreLine(project) {
-  const text = readText(path.join(project, '设定', '题材定位.md')) || '';
+  const text = stripHtmlComments(readText(path.join(project, '设定', '题材定位.md')));
   const match = /^[ \t]*[-*+]?[ \t]*\**题材(?:类型)?\**[ \t]*[：:](.*)$/m.exec(text);
   return !match || match[1].includes('{') ? '' : match[1].trim();
 }
@@ -512,7 +512,7 @@ function extractProseSlices(text, chapter = 1, maxSlices = 2) {
       const plainLines = [];
       let inFence = false;
       let sawFence = false;
-      while (j < lines.length && !/^#{1,3}\s+/.test(lines[j])) {
+      while (j < lines.length && (inFence || !/^#{1,3}\s+/.test(lines[j]))) {
         const ln = lines[j];
         if (/^\s*```/.test(ln)) {
           inFence = !inFence;

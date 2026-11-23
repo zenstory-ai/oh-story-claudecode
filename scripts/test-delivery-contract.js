@@ -217,6 +217,21 @@ try {
   const commentLeadPass = run(writeCase('short-comment-plus-lead', commentWithLead), ['6000', '8000', '6'], undefined, false, ['--strict'])
   assert.strictEqual(commentLeadPass.status, 0, commentLeadPass.stdout + commentLeadPass.stderr)
 
+  // 前文已闭合的多行 HTML 注释即使后文出现未闭合 `<!--`，也不应重新暴露为导语或超长段落。
+  const closedMultiPlusUnclosed = [
+    '# 婚宴反杀',
+    '<!-- 跨行注释第一行',
+    '跨行注释第二行 -->',
+    body(1000, 6, 'numeric', { includeLead: false }).trimEnd(),
+    '<!-- 末尾忘记闭合的注释',
+  ].join('\n') + '\n'
+  const multiCommentWarn = assertSoftOnly(
+    writeCase('short-closed-multiline-plus-unclosed', closedMultiPlusUnclosed),
+    'delivery.short-lead-present'
+  )
+  assert.deepStrictEqual(softIds(multiCommentWarn.normal), ['delivery.short-lead-present'])
+  assert.match(multiCommentWarn.normal.report.soft_warnings[0].evidence, /缺少导语（0 字）/)
+
   // HARD: missing 正文.md → exit 1 + hard_failures.
   const missing = run(writeCase('missing', null))
   assert.strictEqual(missing.status, 1)
