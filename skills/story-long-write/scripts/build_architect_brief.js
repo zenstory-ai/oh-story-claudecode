@@ -201,7 +201,9 @@ function matchPrimaryGenreStyle(project) {
     const confidence = /^confidence:\s*(\w+)/m.exec(meta);
     const level = confidence ? confidence[1] : 'low';
     const baseName = genre ? genre[1].trim() : path.basename(file, '.md');
-    const aliasList = aliases ? aliases[1].split(',').map((a) => a.trim()) : [];
+    const aliasList = aliases
+      ? aliases[1].split(',').map((a) => a.trim().replace(/^['"]|['"]$/g, ''))
+      : [];
     const names = new Set([baseName, ...aliasList].filter(Boolean).map((n) => n.toLowerCase()));
     for (const name of names) {
       let pos = 0;
@@ -244,7 +246,9 @@ function conditionalReads(task) {
     if (part) {
       section(text, part);
     }
-    lines.push(`- ${when}：读 \`references/${name}\` ${part ? `「${part}」一节` : '整份'}`);
+    lines.push(
+      `- ${when}：读 \`agent-references/${name}\` ${part ? `「${part}」一节` : '整份'}`
+    );
   }
   return lines.join('\n');
 }

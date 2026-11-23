@@ -426,18 +426,22 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('作者已定：题材定位里没有或为空，未注入', self.build().stdout)
 
     def test_builder_matches_genre_cards_when_the_book_has_none(self):
-        # 新书第 1 章还没有题材正文提示卡：脚本按「题材类型」匹配 references/genre-styles/ 流派包。
+        # 新书没有旧版题材正文提示卡时：脚本按「题材类型」匹配 references/genre-styles/ 流派包，
+        # 召回降档按流派包命中判定（不再要求 设定/题材正文提示卡.md），也不再输出冗余手动提示卡槽位。
         (self.book / '设定/题材正文提示卡.md').unlink()
         self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：都市日常 · 豪门总裁\n')
         result = self.build()
         self.assertEqual(result.returncode, 0, result.stderr)
         cards = SCRIPTS.parent / 'references' / 'genre-styles'
         self.assertIn(f"主题材 {cards / '都市日常神豪.md'}（置信度 high）；辅题材 {cards / '豪门虐恋追妻.md'}", result.stdout)
-        self.assertIn('召回降档：不成立（题材正文提示卡缺有效内容）', result.stdout)
+        self.assertIn('召回降档：成立', result.stdout)
+        self.assertNotIn('题材正文提示卡（genre_prose_card', result.stdout)
         self.assertIn('——— 语感锚点切片', result.stdout)
-        # 最长匹配优先：「玄幻言情」「仙侠言情」里的「玄幻」「仙侠」是别的包的短别名，不能抢走主包。
+        # 最长匹配优先：「玄幻言情」「仙侠言情」里的「玄幻」「仙侠」是别的包的短别名，不能抢走主包；
+        # 「都市种田」也应命中都市日常神豪而非被短别名「种田」抢走。
         for line, main, loser in [('玄幻言情', '古言宅斗重生.md', '传统玄幻仙侠.md'),
                                   ('仙侠言情', '古言宅斗重生.md', '传统玄幻仙侠.md'),
+                                  ('都市种田', '都市日常神豪.md', '年代种田经商.md'),
                                   ('传统玄幻 · 玄幻言情', '传统玄幻仙侠.md', None)]:
             with self.subTest(genre=line):
                 self.put('设定/题材定位.md', f'# 题材定位\n- 题材类型：{line}\n')
@@ -447,10 +451,17 @@ class PipelineTests(unittest.TestCase):
                     self.assertNotIn(str(cards / loser), out)
                 else:
                     self.assertIn(f"辅题材 {cards / '古言宅斗重生.md'}", out)
+        # 高频细分别名可命中对应流派包。
+        for alias, expected in [('异能', '都市高武异能.md'), ('虐恋', '豪门虐恋追妻.md'),
+                                ('商战', '都市日常神豪.md'), ('种田', '年代种田经商.md'),
+                                ('校园', '青春甜宠文娱.md'), ('轻小说', '西幻游戏同人.md')]:
+            with self.subTest(alias=alias):
+                self.put('设定/题材定位.md', f'# 题材定位\n- 题材类型：{alias}\n')
+                self.assertIn(f"主题材 {cards / expected}", self.build().stdout)
         # 匹配不到时给通用长篇兜底包，和命中走同一条路（同一行点名包的路径）。
         self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：蒸汽朋克考古\n')
         out = self.build().stdout
-        self.assertIn('题材卡无匹配', out)
+        self.assertIn('流派无匹配', out)
         self.assertIn(f"主题材 {cards / '通用长篇.md'}（置信度 low）", out)
         # 兜底包不参与按名匹配：命中真实题材时不会出现通用长篇。
         self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：都市日常\n')
@@ -459,20 +470,50 @@ class PipelineTests(unittest.TestCase):
     def test_prose_anchor_injected_even_under_recall_downgrade(self):
         # 召回降档成立时，仍必须注入语感锚点切片（优先主对标文风原文锚点，否则流派包内置切片）。
         self.set_inputs_for_downgrade(self.volume.read_text(encoding='utf-8'))
+        (self.book / '设定/题材正文提示卡.md').unlink()
         self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：都市脑洞\n- 主对标书：无\n')
         downgraded = self.build()
         self.assertEqual(downgraded.returncode, 0, downgraded.stderr)
         self.assertIn('召回降档：成立', downgraded.stdout)
         self.assertIn('——— 语感锚点切片', downgraded.stdout)
         self.assertIn('流派包「都市脑洞系统」内置原文切片', downgraded.stdout)
-        # 有主对标文风原文锚点时优先注入对标切片
-        self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：都市脑洞\n- 主对标书：测试热书\n')
-        self.put('对标/测试热书/文风.md', '# 文风\n## 原文锚点片段\n### 片段 1：开篇抓手\n```text\n“把合同撕了。”\n他把黑卡甩在桌上。\n```\n')
+        # 有主对标文风原文锚点时优先注入对标切片，且不把围栏前的 **出处**/**示范点** 元数据混入切片。
+        self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：都市脑洞\n- 主对标书：《测试热书》、《副对标》\n')
+        self.put(
+            '对标/测试热书/文风.md',
+            '# 文风\n## 原文锚点片段\n### 片段 A — 基调：开篇钩子\n'
+            '**出处**：第 1 章 第 1 段（行 1-10）\n'
+            '**示范点**：竖屏短段开篇\n'
+            '```text\n“把合同撕了。”\n他把黑卡甩在桌上。\n```\n',
+        )
         with_bench = self.build()
         self.assertEqual(with_bench.returncode, 0, with_bench.stderr)
         self.assertIn('召回降档：成立', with_bench.stdout)
         self.assertIn('主对标「测试热书」文风原文锚点', with_bench.stdout)
         self.assertIn('把合同撕了', with_bench.stdout)
+        self.assertNotIn('**出处**', with_bench.stdout)
+        self.assertNotIn('**示范点**', with_bench.stdout)
+
+    def test_workspace_library_benchmark_found_under_long_dir_and_unclosed_comment_safe(self):
+        # 标准 长篇/{书名} 布局下，主对标在 {workspace}/拆文库/{对标书名}/文风.md 时应命中对标原文锚点；
+        # 题材定位.md 出现未闭合 HTML 注释时不得截断至 EOF 导致后续对标登记失效。
+        book = self.move_book('工作区甲', '长篇', '雾港 来信')
+        workspace = book.parent.parent
+        bench_style = workspace / '拆文库' / '工作区对标书' / '文风.md'
+        bench_style.parent.mkdir(parents=True, exist_ok=True)
+        bench_style.write_text(
+            '# 文风\n## 原文锚点片段\n### 片段 1：开篇\n'
+            '```text\n“退婚书签了吧。”\n林默把玉佩拍在案上。\n```\n',
+            encoding='utf-8',
+        )
+        self.put(
+            '设定/题材定位.md',
+            '# 题材定位\n<!-- 未闭合草稿备注\n- 题材类型：都市脑洞\n- 主对标书：《工作区对标书》、《第二本》\n',
+        )
+        res = self.build()
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertIn('主对标「工作区对标书」文风原文锚点', res.stdout)
+        self.assertIn('退婚书签了吧', res.stdout)
 
     def test_bare_out_archives_into_book_work_dir(self):
         result = self.call('build_writer_prompt.py', '--project', self.book, '--chapter', 1, '--out')
@@ -489,12 +530,9 @@ class PipelineTests(unittest.TestCase):
 
     def test_incomplete_replacements_keep_full_recall(self):
         original = self.volume.read_text(encoding='utf-8')
-        for broken in ['missing-card', 'empty-card', 'placeholder-emotion', 'missing-unit', 'missing-engine', 'missing-tempo']:
+        for broken in ['placeholder-emotion', 'missing-unit', 'missing-engine', 'missing-tempo']:
             with self.subTest(broken=broken):
                 self.set_inputs_for_downgrade(original)
-                card = self.book / '设定/题材正文提示卡.md'
-                if broken == 'missing-card': card.unlink()
-                if broken == 'empty-card': card.write_text('# 题材卡\n[待补充]', encoding='utf-8')
                 if broken == 'placeholder-emotion':
                     self.outline.write_text(self.outline.read_text(encoding='utf-8').replace('犹疑→决定替朋友保管信件', '[待补充][待补充][待补充]'), encoding='utf-8')
                 if broken == 'missing-unit': self.volume.unlink()
@@ -669,11 +707,13 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(Path(info['brief']).parent, self.book / '.story' / 'work' / '排纲')
         self.assertEqual(info['includes'], ['flow-opening-plan.md（排纲方法）', 'flow-opening-plan.md（大纲与卷纲模板）',
                                             'SKILL.md（新增物三级）', '按条件可读（包外）'])
-        # 包外读不到 SKILL.md：新增物三级判据随包；条件参考指向包外 benchmark-recall.md。
+        # 包外读不到 SKILL.md：新增物三级判据随包；条件参考指向 agent-references/benchmark-recall.md。
+        bundle = SCRIPTS.parents[1] / 'story-setup' / 'references' / 'agent-references'
         self.assertIn('**先问作者**：新主线事件或反转', text)
-        self.assertIn('references/benchmark-recall.md` 整份', text)
-        # 卷纲任务包带排纲方法与大纲/卷纲模板，主会话调度与细纲模板不进包。
+        self.assertIn('agent-references/benchmark-recall.md` 整份', text)
+        # 卷纲任务包带排纲方法（含四个排纲问题）与大纲/卷纲模板，主会话调度与细纲模板不进包。
         self.assertIn('## 排纲方法（卷纲）', text)
+        self.assertIn('四个排纲问题', text)
         self.assertIn('排纲刻度与松紧', text)
         self.assertIn('并补齐 `设定/题材定位.md`「题材框架」的「关键转折节点」', text)
         self.assertNotIn('<!-- author-report -->', text)
@@ -743,6 +783,11 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('「题材框架」留到出卷纲补', world_text)
         self.assertIn('## 核心设定\n', world_text)
         self.assertIn('## 题材框架\n', world_text)
+        for brief_text in (text, outline_text, world_text):
+            refs = re.findall(r'`agent-references/([\w-]+\.md)`', brief_text)
+            self.assertTrue(refs)
+            for name in refs:
+                self.assertTrue((bundle / name).is_file(), name)
         # 细纲模板是新写法：「这章怎么走」、默认三列情节点表，「这章不能说破」挪进可选块，不再写字数口径。
         self.assertIn('#### 这章怎么走', outline_text)
         self.assertIn('| # | 情节点（谁做了什么） | 作用 |\n', outline_text)
