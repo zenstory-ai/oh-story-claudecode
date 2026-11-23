@@ -12,6 +12,27 @@ compare 链接；小节名使用 Keep a Changelog 的六个英文类别（`Added
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-23
+
+> 本版 `agents_version: 46`、`setup_skill_version: 1.3.14`。更新技能包后，在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`；ZCode 先在插件面板更新 `oh-story`），再新开会话，让新版流程手册、流派包、助手模板与五端短篇模式写后钩子生效，并自动清理旧版 `agent-references/` 残留文件。书稿、设定、大纲和追踪不用迁移。
+
+围绕「精简流程核 + 按题材加载的流派包 + 区分长短篇的检测与审稿标准」系统收口长短篇写作流程、检测器、周边技能与七端适配：短篇写作收敛为自包含单主干流程与 12 份流派包，长篇写作按时刻整合为 4 份流程手册与 16 份流派包并增强写作任务包语感注入；去味检测、标点清洗与五端 Hook 全面支持长短篇分流与统一 `——` 标点契约；同步升级去味、审稿、拆文、逆向导入、短篇扫榜与七端角色模板，存量项目完全向后兼容。
+
+### Added
+
+- **新增短篇与长篇多题材流派包，补齐高频网文题材与兜底覆盖。** 短篇重构为 12 份流派包，新增 `年代重生打脸`、`男频都市反杀`、`脑洞设定流`（由原沙雕脑洞扩展）与 `通用短篇` 兜底，每份均附校准示范切片；长篇整合为 16 份流派包（覆盖男频、女频、双男主及 `通用长篇` 兜底），供写作与排纲按题材按需加载。（#566）
+- **检测器、标点整理与五端 Hook 支持长短篇分流，补充结构软提醒与可读性指标。** `check-ai-patterns.js` 与 `normalize-punctuation.js`（四端共享副本）新增 `--mode=auto|long|short`，按长短篇自动校准短段、情绪表达与旁白破折号阈值，长短篇统一保留标准 `——` 并拦截修复畸形破折号；五端共享 `story_hook_core.js`（含 Codex Stop Hook）按 `正文.md` 自动启用短篇软提醒模式，保留退化与明显 AI 腔硬拦截；`check-phase2-contract.js` 与 `check-delivery-contract.js` 新增导语、付费卡点区间、段长与对话占比等纯结构 `advisory` 软提醒；`storyctl.js` 补齐竖屏段长可读性指标；写作、审稿与去味全部 CLI 脚本统一支持 `--help`。（#566）
+
+### Changed
+
+- **收口短篇写作主流程与热路径，支持单对话连贯成稿。** 重写自包含的 `story-short-write/SKILL.md`（内置竖屏排版、多平台规格速查、导语冷开场、付费卡点、中后段推进、明账清算与 Phase 1–4 模板），大幅精简热路径加载体积，仅保留 `benchmark-recall.md`（支持原文语感切片注入）、`author-memory.md`、`agent-calls.md` 三个按需冷路径，单对话即可连贯完成构思到成稿；原 `民俗怪谈` 归并入 `悬疑`。（#566）
+- **收口长篇写作流程为 4 份按时刻加载的手册，升级写作任务包语感注入。** 将原分散的长篇规范按阶段整合为 `flow-opening-plan.md`、`flow-outline.md`、`flow-drafting.md`、`flow-revision.md`，搭配按需参考加载；升级 `build_writer_prompt.js` 与 `build_architect_brief.js`，支持流派包路径解析与 `agent-references/` 路径隔离、召回降档按流派包生效并按章轮换语感切片。（#566）
+- **校准去味、审稿、拆文、逆向导入与短篇扫榜，并全量重生成七端适配层。** `story-deslop` 合并三层去味说明为 `deslop-guide.md`，分层重写 `banned-words.md`（区分优先改写的明显 AI 腔与按语境判断的常用词句），升级 `short-deslop.md` 为显式规则覆盖表并同步至 `story-review` 与 `story-setup/agent-references/`；`story-review` 将短篇审查拆分为知乎盐言（`rubrics/zhihu.md`）与商业短篇（`rubrics/short-shuang.md`），长篇 `fanqie.md` 覆盖番茄与七猫等快节奏平台，校准 `quality-rubric.md` 经典开局判定并收拢修订追踪至 `review-tracking.md`；短/长篇拆文、逆向导入与短篇扫榜同步对齐新版模板、语感切片抽取与题材分类；更新 `narrative-writer`、`character-designer`、`story-architect` 模板及七端适配产物，升级 `agents_version` 至 46。（#566）
+
+### Removed
+
+- **退役旧版分散题材卡与已合并参考文件。** 移除原 33 份 `genre-prose-cards/` 及已被流程手册与流派包吸收的重复参考资料，重跑 `/story-setup` 时自动清理项目内 `agent-references/` 下的旧文件残留。（#566）
+
 ## [0.11.0] - 2026-11-22
 
 > 本版 `agents_version: 45`、`setup_skill_version: 1.3.13`。更新技能包后，在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`），再新开会话，让零依赖 Node.js 运行时、五端统一写后钩子与分层写作门禁生效。书稿、设定和追踪不用迁移。
@@ -1473,7 +1494,8 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 - 初始版本：长篇/短篇写作、拆文、扫榜、去 AI 味、浏览器操控
 - 用 52000+ 本真实数据增强知识库
 
-[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.5...v0.11.0
 [0.10.5]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.4...v0.10.5
 [0.10.4]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.3...v0.10.4
