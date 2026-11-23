@@ -2,9 +2,9 @@
 
 ## 当前版本
 
-助手版本 46（v0.11.0 后续重构）。已有项目更新技能包后，在项目根重跑 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或直接点名），再新开会话。
+助手版本 46（v0.12.0）。已有项目更新技能包后，在项目根重跑 `/story-setup`（Codex 用 `$story-setup`，Antigravity 用 `/skills` 或直接点名），再新开会话。
 
-- `setup_skill_version: 1.3.13`
+- `setup_skill_version: 1.3.14`
 - `agents_version: 46`
 
 `.story-deployed` 字段不全，或 `agents_version` 不是整数、低于 46，都算待更新，重跑 story-setup 即可。项目里的 `agents_version` 大于 46，说明本机技能包比项目旧：先更新 oh-story-claudecode，不要用旧包覆盖。各版本改了什么见仓库根目录 `CHANGELOG.md`。
@@ -17,10 +17,11 @@
 4. 正在写的长篇：确认每本书有 `追踪/_tracking-state.json`。没有就按下方「追踪模型迁移」重建，否则写下一章会被拦。
 5. 拆文成果或细纲不满足当前格式时，按检查提示定点补齐，不因单项缺口整本重拆。
 
-## 助手版本 46 升级说明（更新后必须重跑 story-setup）
+## v0.12.0 的改动（助手版本 46，更新后必须重跑 story-setup）
 
-- **长短篇写作流程核、流派包与参考资料清理**：写作/去味/审稿参考资料收口为流程手册（`flow-opening-plan.md`、`flow-outline.md`、`flow-drafting.md`）、`deslop-guide.md`、`short-deslop.md` 与 16 份长篇流派包（`agent-references/genre-styles/`），同步更新写手、架构师、角色设计助手模板；重跑 `/story-setup` 会自动清理旧版 `agent-references/` 中的退役文件（如旧 33 张题材卡与已合并参考）并刷新五端短篇模式 Hook。
-- 书稿、设定、大纲和追踪不用迁移。
+- **长短篇写作流程收口与流派包重构**：短篇写作收口为自包含 `SKILL.md` 与 12 份流派包（新增 `年代重生打脸`、`男频都市反杀`、`脑洞设定流`、`通用短篇`）；长篇写作收口为 4 份按时刻加载的流程手册（`flow-opening-plan.md`、`flow-outline.md`、`flow-drafting.md`、`flow-revision.md`）与 16 份流派包（`agent-references/genre-styles/`），同步升级写手、架构师与角色设计助手模板。
+- **检测器长短篇分流、标点契约与五端 Hook 升级**：`check-ai-patterns.js` 与 `normalize-punctuation.js` 支持 `--mode=auto|long|short`，长短篇统一保留标准 `——`；五端共享 `story_hook_core.js`（含 Codex Stop Hook）支持短篇软提醒模式；去味与审稿参考同步升级（`deslop-guide.md`、`short-deslop.md`、知乎盐言与商业短篇分流及七猫长篇覆盖）。
+- **自动清理旧残留且无需迁移数据**：重跑 `/story-setup`（ZCode 先更新插件）会自动清理旧版 `agent-references/` 中的退役文件（如旧 33 张题材卡与已合并参考）并刷新七端模板与五端 Hook；既有书稿、设定、大纲和追踪数据均向后兼容，不用迁移。
 
 ## v0.11.0 的改动（助手版本 45，更新后必须重跑 story-setup）
 
