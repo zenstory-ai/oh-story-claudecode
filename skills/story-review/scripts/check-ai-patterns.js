@@ -34,7 +34,7 @@ Detect high-risk AI-flavor prose patterns that need human rewrite:
   - 叙述省略号过密 (引号与面板外 …… 高密度刷屏，advisory)
 
 Book-local .deslop-whitelist literal spans are excluded from style scanning (no regex or ancestor inheritance).
-Each finding carries severity: review_required for high-risk stylistic patterns (not-is-comparison / em-dash / voice-contrast / negation-parade / reverse-not-is / trailer-ending / trailer-summary), where single/low-count hits of rhetorical patterns downgrade to semantic advisory and high-density clusters (or narration em-dash / trailer-summary) require explicit review-and-ack. This is a local style/readability soft-gate, not an AIGC detector score; functional human text can be kept with explicit acknowledgement instead of hard-blocked.
+Each finding carries severity: review_required for high-risk stylistic patterns (not-is-comparison / em-dash / voice-contrast / negation-parade / reverse-not-is / trailer-ending / trailer-summary), where single/low-count hits of rhetorical patterns (or moderate narration em-dash density, and all short-mode narration em-dash density) downgrade to semantic advisory and high-density clusters (or long-mode dense narration em-dash / trailer-summary) require explicit review-and-ack. This is a local style/readability soft-gate, not an AIGC detector score; functional human text can be kept with explicit acknowledgement instead of hard-blocked.
 或 advisory (period-stutter / long-paragraph / micro-action-tic / negation-pair-tic / stock-reaction-tic / action-list-tic / abstract-summary-tic / cliche-density-tic / metaphor-density-tic / reasoning-chain-tic / system-notice-formality-tic / overcompressed-prose-tic / low-connective-density-tic / quote-emphasis-tic / formulaic-parallelism / ellipsis-density-tic，是提示，justified 的长推理/氛围段可保留)。
 --fail-on=blocking 只在出现 hard blocking finding 时退出 1（当前风格规则均为 review_required/advisory，故返回 0）；--fail-on=review_required 在出现 blocking 或 review_required finding 时退出 1；默认 --fail-on=all 有任何 finding 即退出 1。
 Each finding also carries review: mechanical（表面形态确定、就地改写或确认保留即可）或 semantic（可能承担叙事功能，需读上下文判断是否保留）；review_required / blocking 一律 mechanical。--list-review-classes 输出完整分类表（JSON）。
@@ -64,7 +64,7 @@ const EM_DASH_ADVISORY_MIN_HITS = 6;
 const EM_DASH_ADVISORY_PER_KILO = 1.5;
 const LONG_EM_DASH_REVIEW_MIN_HITS = 10;
 const LONG_EM_DASH_REVIEW_PER_KILO = 2.5;
-// 短篇套式反应细节门槛：实测真人网文短篇 74% 含常规情绪/生理速记，短篇抬高到 8 处且 3.0/千字。
+// 短篇套式反应细节门槛：短篇情绪与生理速记频率高于长篇，抬高到 8 处且 3.0/千字。
 const SHORT_STOCK_REACTION_MIN_HITS = 8;
 const SHORT_STOCK_REACTION_PER_KILO = 3.0;
 
@@ -287,9 +287,8 @@ const TRAILER_SUMMARY_PATTERN = /这一(?:夜|天|刻|战|年|局|役)[，,]?[^�
 // 叙述里短词加引号强调（他是被请来"把关"的）。只数叙述层 1-4 字成对引号片段；
 // 排除项：【】系统面板载体、引语动词（说|道|问|喊|答|念|叫|回|吼|嘀咕，加细 骂|写|读|唱）
 // 前 6 字/后 3 字邻接的极短台词、引号内含句读的台词、引号外无叙述的行（独立台词/
-// 弹幕流/拟声词连发）、引号套引号（台词内强调）。全文 ≥3 处报一条——单处强调是
-// 正常修辞，密度高才是模板腔。
-// 校准：真人网文单章常有 4-6 处设定词/称号/系统名词引号（如“系统”“废材”），按篇幅比例抬高到
+// 弹幕流/拟声词连发）、引号套引号（台词内强调）。单处强调是正常修辞，高密度聚集才报。
+// 校准：网文单章常有设定词/称号/系统名词引号（如“系统”“废材”），按篇幅比例取
 // Math.max(8, Math.round(4 * scale))，只抓高频泛滥强调。
 const QUOTE_EMPHASIS_MIN_HITS = 8;
 const QUOTE_EMPHASIS_MAX_VISIBLE = 4;
@@ -321,7 +320,7 @@ const TRAILER_ENDING_BLOCKING_MIN_HITS = 2;
 //   reverse-not-is               mechanical  固定反序对比模板「是A，不是B」，blocking
 //   trailer-ending               mechanical  文末窗口固定预告短语，blocking
 //   trailer-summary              mechanical  文末窗口固定总结短语，blocking
-//   em-dash                      mechanical  标点，blocking
+//   em-dash                      mechanical  标点密度过密（低中密度与短篇按 semantic advisory）
 //   long-paragraph               mechanical  段长阈值，断段即可
 //   period-stutter               mechanical  连续短句计数，合句即可
 //   micro-action-tic             mechanical  固定补语「了下/了一下」密度
@@ -548,7 +547,7 @@ function scanDocument(input, unclosedOpenings = new Set(), mode = 'long') {
     if (masked.text !== line && !masked.text.trim()) continue;
 
     block.push({ text: masked.text, lineNo: index + 1 });
-    proseLines.push({ text: masked.text, lineNo: index + 1 });
+    proseLines.push({ text: masked.text, stripped: masked.stripped, lineNo: index + 1 });
   }
 
   if (commentOpen && commentStart !== null) {
@@ -622,13 +621,13 @@ function scanProsePatterns(proseLines, mode = 'long', scale = 1) {
   let dashFirstCol = 1;
   const dashSamples = [];
 
-  for (const { text, lineNo } of proseLines) {
+  for (const { text, stripped, lineNo } of proseLines) {
     const trimmed = text.trim();
     if (!trimmed || isDivider(trimmed) || isStructural(trimmed)) continue;
 
     const dashScanText = maskQuotedWithUnclosed(text);
     const dashPattern = /——|—|--+/g;
-    dashNarrativeChars += visibleLength(stripQuoted(trimmed));
+    dashNarrativeChars += visibleLength(stripQuoted(trimmed).replace(/[“「『"][^”」』"]*$/, ''));
     let dash;
     while ((dash = dashPattern.exec(dashScanText)) !== null) {
       dashHits += 1;
@@ -640,20 +639,22 @@ function scanProsePatterns(proseLines, mode = 'long', scale = 1) {
       if (dashSamples.length < 5 && ex && !dashSamples.includes(ex)) dashSamples.push(ex);
     }
 
-    if (trimmed.length > longParaLimit) {
+    const effectivePara = (stripped !== undefined ? stripped : text).trim();
+    if (effectivePara.length > longParaLimit) {
       findings.push({
         line: lineNo,
         column: 1,
         type: 'long-paragraph',
         severity: 'advisory',
-        message: `段落过长（${trimmed.length} 字）：按镜头/新动作/新线索/视线切换断段，别一段到底。`,
-        excerpt: compact(trimmed.slice(0, 40)),
+        message: `段落过长（${effectivePara.length} 字）：按镜头/新动作/新线索/视线切换断段，别一段到底。`,
+        excerpt: compact(effectivePara.slice(0, 40)),
       });
     }
   }
 
-  if (dashHits >= EM_DASH_ADVISORY_MIN_HITS && dashNarrativeChars > 0) {
-    const perKilo = (dashHits / dashNarrativeChars) * 1000;
+  if (dashHits >= EM_DASH_ADVISORY_MIN_HITS) {
+    const perKilo = dashNarrativeChars > 0 ? (dashHits / dashNarrativeChars) * 1000 : Infinity;
+    const rateLabel = Number.isFinite(perKilo) ? `（${perKilo.toFixed(1)}/千字）` : '';
     if (mode !== 'short' && dashHits >= LONG_EM_DASH_REVIEW_MIN_HITS && perKilo >= LONG_EM_DASH_REVIEW_PER_KILO) {
       findings.push({
         line: dashFirstLine,
@@ -661,7 +662,7 @@ function scanProsePatterns(proseLines, mode = 'long', scale = 1) {
         type: 'em-dash',
         severity: 'review_required',
         review: 'mechanical',
-        message: `叙述旁白破折号过密：${dashHits} 处（${perKilo.toFixed(1)}/千字）；保留关键系统提示、拖音或转折揭底拍，其余按功能改为逗号、冒号或动作，勿高频刷屏。`,
+        message: `叙述旁白破折号过密：${dashHits} 处${rateLabel}；保留关键系统提示、拖音或转折揭底拍，其余按功能改为逗号、冒号或动作，勿高频刷屏。`,
         excerpt: compact(dashSamples.join(' | ')),
       });
     } else if (perKilo >= EM_DASH_ADVISORY_PER_KILO) {
@@ -671,7 +672,7 @@ function scanProsePatterns(proseLines, mode = 'long', scale = 1) {
         type: 'em-dash',
         severity: 'advisory',
         review: 'semantic',
-        message: `${mode === 'short' ? '短篇' : ''}旁白破折号偏密：${dashHits} 处（${perKilo.toFixed(1)}/千字）；保留关键反转、系统提示或情绪揭底拍，其余按功能改逗号或冒号。`,
+        message: `${mode === 'short' ? '短篇' : ''}旁白破折号偏密：${dashHits} 处${rateLabel}；保留关键反转、系统提示或情绪揭底拍，其余按功能改逗号或冒号。`,
         excerpt: compact(dashSamples.join(' | ')),
       });
     }
@@ -1532,9 +1533,9 @@ function isDivider(trimmed) {
   return /^-{3,}$/.test(trimmed) || /^[*_]{3,}$/.test(trimmed);
 }
 
-// markdown 结构行（标题/列表/引用/表格）不是叙述正文，长段落/碎句号/破折号检测都跳过。
+// markdown 结构行（标题/列表/引用/表格/短篇纯数字小节标 `1.`）不是叙述正文，长段落/碎句号/破折号检测都跳过。
 function isStructural(trimmed) {
-  return /^(#{1,6}(?:\s|\d)|>\s?|[-*+]\s|\d+[.)]\s|\|)/.test(trimmed)
+  return /^(#{1,6}(?:\s|\d)|>\s?|[-*+]\s|\d+[.)](?:\s|$)|\|)/.test(trimmed)
     || /^第[零〇一二三四五六七八九十百千万两\d]+[章节回](?:$|[\s_：:——\-]+[^\n。；;]{0,28}$)/.test(trimmed);
 }
 
@@ -1621,6 +1622,7 @@ function countTerms(text, terms) {
 // openedAt 是本行最后一个开始注释的 `<!--` 位置（"行号:列号"），没有则为 null。
 function maskHtmlComments(line, openBefore, lineIndex = 0, unclosedOpenings = new Set()) {
   let out = '';
+  let stripped = '';
   let open = openBefore;
   let cursor = 0;
   let openedAt = null;
@@ -1635,17 +1637,21 @@ function maskHtmlComments(line, openBefore, lineIndex = 0, unclosedOpenings = ne
     }
     const start = line.indexOf('<!--', cursor);
     if (start === -1) {
-      out += line.slice(cursor);
+      const rest = line.slice(cursor);
+      out += rest;
+      stripped += rest;
       break;
     }
-    out += line.slice(cursor, start) + '    ';
+    const before = line.slice(cursor, start);
+    out += before + '    ';
+    stripped += before;
     cursor = start + 4;
     const key = `${lineIndex}:${start}`;
     if (unclosedOpenings.has(key)) continue;
     open = true;
     openedAt = key;
   }
-  return { text: out, open, openedAt };
+  return { text: out, stripped, open, openedAt };
 }
 
 function parseFenceMarker(trimmedLine) {

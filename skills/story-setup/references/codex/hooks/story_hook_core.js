@@ -954,9 +954,9 @@ const TOXIC_NOT_IS_MIN_HITS = 3
 const TOXIC_VOICE_MIN_HITS = 2
 const TOXIC_PARADE_MIN_HITS = 2
 const TOXIC_TRAILER_MIN_HITS = 2
-// 不收 em-dash（check-ai-patterns.js 里旁白破折号为 blocking）是有意的：破折号是标点，长篇 chapter check
-// --fix-punctuation / normalize-punctuation.js 会确定性整理，短篇收尾同样先跑标点整理；这张网只推回
-// 需要模型动笔改写的句式，且单章计数门槛与 check-ai-patterns.js 的 blocking 线逐项一致。
+// 不收 em-dash（check-ai-patterns.js 里旁白破折号按密度触发，长短篇均允许适量标准 ——）是有意的：
+// 畸形破折号由 normalize-punctuation.js 确定性统一为 ——；这张网只推回需要模型动笔改写的句式，
+// 且单章计数门槛与 check-ai-patterns.js 的 review_required 线逐项一致。
 const TOXIC_SENTENCE_PATTERNS = [
   [/声音(?:并)?不[大高响亮][^。！？!?\n]{0,16}[却但偏]/g, "voice-contrast", "删「不X…却Y」反差腔，直接写台词分量、利害后果或在场反应。"],
   [/(?:没有[^。！？!?\n，,]{1,12}[，,]){2}/g, "negation-parade", "「没有…，没有…」排比删到只剩一个或全删，改写正面在场的细节。"],
@@ -965,7 +965,7 @@ const TOXIC_SENTENCE_PATTERNS = [
 ]
 // 「正式拉开序幕/帷幕」是场内事件的报幕式陈述，不是叙述者预告，lookbehind 排除（同 check-ai-patterns.js）。
 const TOXIC_TRAILER_CLICHE_PATTERN = /(?:这)?才刚刚开(?:始|头)|正(?:朝着|向着)[^。！？!?\n]{0,24}(?:压|涌|袭|逼)(?:了?过去|了?过来|来)|(?<!正式)拉开(?:序幕|帷幕)|即将(?:开始|来临|降临)/
-const TOXIC_TRAILER_PATTERN = new RegExp(`没人知道|谁也不知道|谁也没想到|殊不知|${TOXIC_TRAILER_CLICHE_PATTERN.source}`)
+const TOXIC_TRAILER_PATTERN = new RegExp(`没人知道|谁也不知道|谁也没想到|[他她它]们?不知道的是|殊不知|${TOXIC_TRAILER_CLICHE_PATTERN.source}`)
 const TOXIC_SHORT_TRAILER_MIN_CHARS = 6000
 // 章尾状态总结体：与 trailer-ending 共用文末窗口，盖章过去而非预告将来（同 check-ai-patterns.js）。
 // 收的都是 banned-words 已按名禁掉的形态；不收「(这|那)一刻…终于明白」——真人叙述里那是正常认知

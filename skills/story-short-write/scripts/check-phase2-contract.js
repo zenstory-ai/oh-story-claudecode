@@ -146,14 +146,14 @@ function verify(projectDir, options = {}) {
   } else if (genreValue) {
     const named = genreNames.filter((name) => genreValue.startsWith(name)).sort((a, b) => b.length - a.length)[0]
     genreOk = Boolean(named)
-    genreEvidence = named ? `题材：${named}` : `题材「${genreValue}」不是现有题材包（${genreNames.join(' / ')}），冷门题材写「冷门：公式名」`
+    genreEvidence = named ? `题材：${named}` : `题材「${genreValue}」不是现有题材包（${genreNames.join(' / ')}），未命中细分流派请选「通用短篇」`
   }
   checks.push(makeCheck(
     'phase2.genre-reference-declared',
     genreOk,
     '设定.md',
     genreEvidence,
-    `建议在「构思要点」写「题材：题材包名」（${genreNames.join(' / ')} 之一）；冷门题材写「题材：冷门：所用公式名」`,
+    `建议在「构思要点」写「题材：题材包名」（${genreNames.join(' / ')} 之一；未命中细分流派选「通用短篇」）`,
     ['SKILL.md', 'references/genre-styles/*.md'],
     '复核题材名：若确属自定义或复合题材可保留；需要对齐题材包时修正「题材：」一行。',
     'advisory'
@@ -436,7 +436,10 @@ function verify(projectDir, options = {}) {
         }
         out += src.slice(cursor, start)
         const end = src.indexOf('-->', start + 4)
-        if (end === -1) break
+        if (end === -1) {
+          out += src.slice(start + 4)
+          break
+        }
         cursor = end + 3
       }
       return out

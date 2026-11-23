@@ -185,9 +185,64 @@ function verify(projectDir, contract, options = {}) {
   ))
 
   // 短篇竖屏结构健康度（全部仅 advisory，不设标点/情绪词计数门禁）。
-  const bodyLines = lines
+  const isStructuralNonProse = (trimmed) =>
+    /^#{1,6}\s/.test(trimmed) || /^-{3,}$/.test(trimmed) || /^[*_]{3,}$/.test(trimmed)
+  const stripHtmlCommentsFromLines = (rawLines) => {
+    const out = []
+    let open = false
+    for (const raw of rawLines) {
+      let text = ''
+      let cursor = 0
+      while (cursor < raw.length) {
+        if (open) {
+          const close = raw.indexOf('-->', cursor)
+          if (close === -1) {
+            cursor = raw.length
+            break
+          }
+          cursor = close + 3
+          open = false
+          continue
+        }
+        const start = raw.indexOf('<!--', cursor)
+        if (start === -1) {
+          text += raw.slice(cursor)
+          break
+        }
+        text += raw.slice(cursor, start)
+        const close = raw.indexOf('-->', start + 4)
+        if (close === -1) {
+          // 仅在后续行确实存在闭合 `-->` 时按跨行注释跳过，避免未闭合 `<!--` 吞掉全文。
+          open = true
+          cursor = raw.length
+          break
+        }
+        cursor = close + 3
+      }
+      out.push(text)
+    }
+    if (open) {
+      // 未闭合注释不吞后续正文：退回仅剔除已闭合注释片段。
+      return rawLines.map((raw) => {
+        let text = ''
+        let cursor = 0
+        while (cursor < raw.length) {
+          const start = raw.indexOf('<!--', cursor)
+          if (start === -1) { text += raw.slice(cursor); break }
+          text += raw.slice(cursor, start)
+          const close = raw.indexOf('-->', start + 4)
+          if (close === -1) { text += raw.slice(start + 4); break }
+          cursor = close + 3
+        }
+        return text
+      })
+    }
+    return out
+  }
+  const cleanLines = stripHtmlCommentsFromLines(lines)
+  const bodyLines = cleanLines
     .map((line, index) => ({ line: line.trim(), index }))
-    .filter(({ line, index }) => line !== '' && !markerLines.has(index) && !/^#{1,6}\s/.test(line))
+    .filter(({ line, index }) => line !== '' && !markerLines.has(index) && !isStructuralNonProse(line))
   const paraLengths = bodyLines.map(({ line }) => visibleChars(line)).filter((len) => len > 0)
   const bodyChars = paraLengths.reduce((sum, len) => sum + len, 0)
 
@@ -239,7 +294,11 @@ function verify(projectDir, contract, options = {}) {
   let leadOk = true
   let leadEvidence = '节数不足 2 节或无正文内容，跳过导语检查'
   if (markers.length >= 2 && bodyChars > 0) {
-    const leadChars = visibleChars(lines.slice(0, markers[0].line - 1).join('\n'))
+    const leadLines = cleanLines
+      .slice(0, markers[0].line - 1)
+      .map((line) => line.trim())
+      .filter((line) => line !== '' && !isStructuralNonProse(line))
+    const leadChars = visibleChars(leadLines.join('\n'))
     leadOk = leadChars > 0 && leadChars <= 500
     leadEvidence = leadChars === 0
       ? '首个小节标记前缺少导语（0 字）'

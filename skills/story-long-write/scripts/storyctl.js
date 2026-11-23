@@ -344,15 +344,12 @@ function checkBlockingQuality(outline, body) {
             .map((line) => line.trim())
             .filter(Boolean)
         : [];
-      // 旁白破折号（em-dash）已由 check-ai-patterns.js 归入 review_required 走 Review-and-Ack；
-      // 未闭合 HTML 注释、非标省略号、双连字符、分隔线等确定性标点错误仍留作硬阻断。
-      const hardLines = lines.filter((line) => !/:\d+:\d+:\s*em-dash:/.test(line));
-      if (lines.length === 0 || hardLines.length > 0) {
-        blocking.push({
-          type: 'PUNCTUATION_NOT_NORMALIZED',
-          message: hardLines.length ? hardLines.join('\n') : rawOut,
-        });
-      }
+      // 标准 `——` 在 normalize-punctuation.js 中已默认保留不报错；
+      // 其余输出（未闭合 HTML 注释、非标省略号、畸形破折号 —/———/——……、双连字符、分隔线等）均属确定性标点错误，一律硬阻断。
+      blocking.push({
+        type: 'PUNCTUATION_NOT_NORMALIZED',
+        message: lines.length ? lines.join('\n') : rawOut,
+      });
     } else if (completed.status !== 0) {
       toolErrors.push({
         type: 'TOOL_ERROR',

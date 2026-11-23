@@ -470,7 +470,12 @@ class StoryctlCliTests(unittest.TestCase):
             unclosed = storyctl.check_blocking_quality(outline, body)
             self.assertEqual(unclosed["status"], "fail", unclosed)
             self.assertEqual(unclosed["blocking_findings"][0]["type"], "PUNCTUATION_NOT_NORMALIZED", unclosed)
-            # 单处旁白破折号在语料校准后正常放行；高密度旁白破折号（长篇 ≥10 处且 ≥2.5/千字）不走标点硬拦，而归入 review_required 走 Review-and-Ack。
+            # 畸形破折号（单 — / 三 ——— / 破折号与省略号粘连）属确定性标点错误，必须触发硬阻断。
+            body.write_text("## 第1章 测试\n他回头—门已经关了。\n门开了———灯灭了。\n", encoding="utf-8")
+            malformed_dash = storyctl.check_blocking_quality(outline, body)
+            self.assertEqual(malformed_dash["status"], "fail", malformed_dash)
+            self.assertEqual(malformed_dash["blocking_findings"][0]["type"], "PUNCTUATION_NOT_NORMALIZED", malformed_dash)
+            # 单处标准旁白破折号正常放行；高密度旁白破折号（长篇 ≥10 处且 ≥2.5/千字）不走标点硬拦，而归入 review_required 走 Review-and-Ack。
             body.write_text("## 第1章 测试\n他回头——门已经关了。\n", encoding="utf-8")
             single_em_dash = storyctl.check_blocking_quality(outline, body)
             self.assertEqual(single_em_dash["status"], "pass", single_em_dash)

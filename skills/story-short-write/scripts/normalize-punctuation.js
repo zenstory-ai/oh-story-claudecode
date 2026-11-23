@@ -9,9 +9,8 @@ const USAGE = `Usage: node normalize-punctuation.js [--check] [--mode=auto|long|
 
 Normalize正文 punctuation deterministically:
   - keep standard ellipses (……) in dialogue, 【…】 panels, and narration; unify non-standard ellipses (..., single …, ………+, 。。。+, .……..) to ……
-  - keep em dashes inside dialogue quotes (“”「」『』 and paired ASCII "), unified as ——
-  - in long mode (default for non-short files): replace unquoted em dashes and double hyphens in narration with Chinese punctuation
-  - in short mode (--mode=short or auto-detected 正文.md with sibling 设定.md/小节大纲.md): preserve narration —— and unify single — / -- to ——
+  - keep standard em dashes (——) in dialogue quotes (“”「」『』 and paired ASCII ") and narration across both long and short modes; unify non-standard dashes (single —, triple ———+, --) to —— (and numeric ranges like 10--20 outside quotes to 「到」)
+  - --mode=auto|long|short is accepted for CLI symmetry with check-ai-patterns.js (narration —— density is governed by check-ai-patterns.js)
   - remove markdown divider lines (---) from正文
   - preserve pause punctuation covered by book-local .deslop-whitelist literals
   - keep quote style by default; convert quotes only when explicitly requested (curly|ascii|yan)
@@ -62,17 +61,6 @@ if (options.files.length === 0) {
   die('No files provided');
 }
 
-function resolveMode(fullPath, requestedMode) {
-  if (requestedMode === 'short' || requestedMode === 'long') return requestedMode;
-  if (path.basename(fullPath) === '正文.md') {
-    const dir = path.dirname(fullPath);
-    if (fs.existsSync(path.join(dir, '设定.md')) || fs.existsSync(path.join(dir, '小节大纲.md'))) {
-      return 'short';
-    }
-  }
-  return 'long';
-}
-
 let totalFindings = 0;
 let changedFiles = 0;
 let failed = false;
@@ -91,8 +79,7 @@ for (const file of options.files) {
   let whitelist;
   try { whitelist = loadStyleWhitelist(fullPath); }
   catch (error) { die(`${file}: unable to read .deslop-whitelist (${error.message})`); }
-  const effectiveMode = resolveMode(fullPath, options.mode);
-  const result = normalizeDocument(input, options.quoteMode, whitelist, effectiveMode);
+  const result = normalizeDocument(input, options.quoteMode, whitelist);
   totalFindings += result.findings.length;
 
   if (options.check) {
@@ -125,7 +112,7 @@ function die(message) {
   process.exit(2);
 }
 
-function normalizeDocument(input, quoteMode, whitelist, mode = 'long') {
+function normalizeDocument(input, quoteMode, whitelist) {
   const { lines, endings } = splitLinesKeepingEndings(input);
 
   const findings = [];
@@ -190,7 +177,7 @@ function normalizeDocument(input, quoteMode, whitelist, mode = 'long') {
     }
 
     const commentOpenBefore = commentOpen;
-    const punctuationResult = normalizePausePunctuation(line, lineNo, commentOpen, whitelist, mode);
+    const punctuationResult = normalizePausePunctuation(line, lineNo, commentOpen, whitelist);
     findings.push(...punctuationResult.findings);
     line = punctuationResult.line;
     commentOpen = punctuationResult.commentOpen;
@@ -270,7 +257,7 @@ function isClosingFence(line, fence) {
 // 引号外每遍至少把一个 `…/./—/-` 换成非停顿字符，字符数严格递减；引号内的省略号
 // 一遍就落成 `……`，之后不再变，所以仍必然收敛。
 // findings 只留第一遍：同一处不重复计数，column 也仍然是原行的偏移。
-function normalizePausePunctuation(line, lineNo, commentOpen, whitelist, mode = 'long') {
+function normalizePausePunctuation(line, lineNo, commentOpen, whitelist) {
   let current = line;
   let findings = null;
   let commentOpenAfter = commentOpen;
@@ -278,7 +265,7 @@ function normalizePausePunctuation(line, lineNo, commentOpen, whitelist, mode = 
   for (;;) {
     const comments = htmlCommentSpans(current, commentOpen);
     commentOpenAfter = comments.open;
-    const pass = normalizePausePunctuationPass(current, lineNo, comments.spans.concat(styleSpans(current, whitelist)), mode);
+    const pass = normalizePausePunctuationPass(current, lineNo, comments.spans.concat(styleSpans(current, whitelist)));
     if (findings === null) findings = pass.findings;
     if (pass.line === current) break;
     current = pass.line;
@@ -287,7 +274,7 @@ function normalizePausePunctuation(line, lineNo, commentOpen, whitelist, mode = 
   return { line: current, findings, commentOpen: commentOpenAfter };
 }
 
-function normalizePausePunctuationPass(line, lineNo, commentSpans, mode = 'long') {
+function normalizePausePunctuationPass(line, lineNo, commentSpans) {
   const findings = [];
   const original = line;
   // 匹配：破折号+省略号粘连、省略号+破折号粘连、各类非标/标准省略号（含 .…….. 与 。。。）、破折号（含 -— 混粘）、双连字符。
@@ -367,17 +354,6 @@ function normalizePausePunctuationPass(line, lineNo, commentSpans, mode = 'long'
       }
       continue;
     }
-
-    output += original.slice(lastIndex, match.index);
-    const replacement = choosePauseReplacement(original, match.index, token.length);
-    output += replacement;
-    findings.push({
-      line: lineNo,
-      column: match.index + 1,
-      type: getPauseType(token),
-      message: replacement ? `替换为「${replacement}」。` : '移除重复标点。',
-    });
-    lastIndex = match.index + token.length;
   }
 
   output += original.slice(lastIndex);
@@ -454,25 +430,6 @@ function getPauseType(token) {
   return 'ellipsis';
 }
 
-function choosePauseReplacement(text, start, length) {
-  const before = previousNonSpace(text, start - 1);
-  const after = nextNonSpace(text, start + length);
-  const rest = text.slice(start + length).trimStart();
-
-  // 引号外的 ——、—、-- 全部替换为中文标点，数字区间替换为「到」。
-  if (before === '') return '';
-  // 紧跟开引号/开括号的停顿符号属于句首边界，删空即可，避免产出 `「，…」` 或 `「。」`。
-  if (isOpeningDelimiter(before)) return '';
-  if (/\d/.test(before) && /\d/.test(after)) return '到';
-  if (isClosingQuote(after)) return isSentencePunctuation(before) ? '' : '。';
-
-  if (!after) return isSentencePunctuation(before) ? '' : '。';
-  if (isSentencePunctuation(before) || isPunctuation(after)) return '';
-  if (/^(因为|原来|这是|那是|也就是|换句话|说白了|所谓|答案|原因|结果|真相|问题在于)/.test(rest)) return '：';
-  if (/(原因|答案|真相|结果|结论|问题|选择|意思)$/.test(text.slice(0, start).trim())) return '：';
-  return '，';
-}
-
 function previousNonSpace(text, index) {
   for (let i = index; i >= 0; i -= 1) {
     if (!/\s/.test(text[i])) return text[i];
@@ -485,22 +442,6 @@ function nextNonSpace(text, index) {
     if (!/\s/.test(text[i])) return text[i];
   }
   return '';
-}
-
-function isSentencePunctuation(ch) {
-  return /[，,。.!！?？;；:：…]$/.test(ch || '');
-}
-
-function isPunctuation(ch) {
-  return /[，,。.!！?？;；:：、…"“”'‘’」』）)]/.test(ch || '');
-}
-
-function isClosingQuote(ch) {
-  return /["”」』]/.test(ch || '');
-}
-
-function isOpeningDelimiter(ch) {
-  return /[「『（(“‘]/.test(ch || '');
 }
 
 function normalizeQuotes(line, quoteMode, quoteOpen, lineNo, protectedSpans = []) {

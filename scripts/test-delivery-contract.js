@@ -204,6 +204,19 @@ try {
   )
   assert.deepStrictEqual(softIds(longLeadWarn.normal), ['delivery.short-lead-present'])
 
+  // 4) 仅标题/HTML 注释/分隔线放在首个小节标记前不能伪装成导语；HTML 注释也不计入正文段长。
+  const titleOnlyBeforeMarker = `# 婚宴反杀\n<!-- 去味:跳过 -->\n---\n${body(1000, 6, 'numeric', { includeLead: false })}`
+  const titleOnlyWarn = assertSoftOnly(
+    writeCase('short-title-only-no-lead', titleOnlyBeforeMarker),
+    'delivery.short-lead-present'
+  )
+  assert.deepStrictEqual(softIds(titleOnlyWarn.normal), ['delivery.short-lead-present'])
+  assert.match(titleOnlyWarn.normal.report.soft_warnings[0].evidence, /缺少导语（0 字）/)
+
+  const commentWithLead = `# 婚宴反杀\n<!-- ${'备注'.repeat(60)} -->\n${DEFAULT_LEAD}\n${body(1000, 6, 'numeric', { includeLead: false })}`
+  const commentLeadPass = run(writeCase('short-comment-plus-lead', commentWithLead), ['6000', '8000', '6'], undefined, false, ['--strict'])
+  assert.strictEqual(commentLeadPass.status, 0, commentLeadPass.stdout + commentLeadPass.stderr)
+
   // HARD: missing 正文.md → exit 1 + hard_failures.
   const missing = run(writeCase('missing', null))
   assert.strictEqual(missing.status, 1)

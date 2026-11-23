@@ -582,6 +582,7 @@ def test_agent_reference_reachability() -> None:
             ("Read('details/detail.md')", 2),
             ("```text\nindex.md\n```", 3),
             ("读 genre-prose-cards/{题材}.md", 2),
+            ("读 genre-styles/{题材}.md", 2),
             ("[索引](index.md)", 2),
         ]:
             write(writer, "# Writer\n" + snippet + "\n")

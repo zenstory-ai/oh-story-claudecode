@@ -833,6 +833,15 @@ test("proseBlockReason, outlineIsEmpty, debt gate, trackingCheckpointIssue, and 
     )
     const longWarn = core.proseAfterWrite(root, longChapter)
     assert.match(longWarn, /本章须清零后再继续/)
+
+    // Long-mode trailer-ending parity: `[他她它]们?不知道的是` must be caught by story_hook_core.js too
+    const longSpoiler = path.join(shortBook, "正文/第002章_预告对照.md")
+    write(
+      longSpoiler,
+      `# 第2章\n\n${pad}\n他不知道的是，账本早已复印。\n她不知道的是，证人已经到场。\n`
+    )
+    const longSpoilerWarn = core.proseAfterWrite(root, longSpoiler)
+    assert.match(longSpoilerWarn, /trailer-ending/)
   } finally {
     fs.rmSync(root, { recursive: true, force: true })
   }

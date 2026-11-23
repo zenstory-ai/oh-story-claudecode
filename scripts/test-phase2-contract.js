@@ -432,6 +432,13 @@ try {
     validOutline()
   ), ['--strict'])
   assert.strictEqual(importedNoLead.status, 0, importedNoLead.stdout + importedNoLead.stderr)
+  // 未闭合 HTML 注释不应吞掉后续导语正文
+  const unclosedCommentLead = run(writeCase(
+    'unclosed-comment-lead',
+    validSettings({ lead: '<!-- 忘记闭合的注释\n结婚三周年纪念日，我收到一份签好字的离婚协议。' }),
+    validOutline()
+  ), ['--strict'])
+  assert.strictEqual(unclosedCommentLead.status, 0, unclosedCommentLead.stdout + unclosedCommentLead.stderr)
 
   // SOFT: 付费点位置比例（≥5 节时建议落在 20%–55%）：过晚（7/8）或过早（1/8）给 advisory，<5 节跳过。
   const lateOutline = validOutline({ includePaywall: false })

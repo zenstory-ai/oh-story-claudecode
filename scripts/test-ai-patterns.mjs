@@ -1358,7 +1358,41 @@ describe("check-ai-patterns.js", () => {
     assert.equal(lpShort.length, 1);
     assert.equal(lpShort[0].severity, "advisory");
 
-    // 10) invalid --mode exits 2
+    // 10) inline HTML comment must not inflate long-paragraph length; Zhihu bare `1.` marker is structural;
+    //     narration dashes between dialogue lines with 0 narrative chars still trigger em-dash density.
+    const fInlineComment = writeFixture("short-inline-comment.md", [
+      `她推开门。<!-- ${"注释".repeat(55)} -->他回头。`,
+    ]);
+    assert.equal(
+      runDetector(["--mode=short", "--json", fInlineComment]).json().findings.filter((f) => f.type === "long-paragraph").length,
+      0
+    );
+
+    const fZhihuMarker = writeFixture("short-zhihu-marker.md", [
+      "他站起。",
+      "风进来。",
+      "他回头。",
+      "灯灭了。",
+      "1.",
+      "门开了。",
+      "心一沉。",
+      "他停住。",
+      "她冷笑。",
+    ]);
+    assert.equal(
+      runDetector(["--mode=short", "--json", fZhihuMarker]).json().findings.filter((f) => f.type === "period-stutter").length,
+      0
+    );
+
+    const fQuoteDash = writeFixture(
+      "long-quote-dash-zero-narration.md",
+      Array.from({ length: 10 }, () => "“快走。”——“别回头！”")
+    );
+    const qdFindings = runDetector(["--mode=long", "--json", fQuoteDash]).json().findings.filter((f) => f.type === "em-dash");
+    assert.equal(qdFindings.length, 1);
+    assert.equal(qdFindings[0].severity, "review_required");
+
+    // 11) invalid --mode exits 2
     assert.equal(runDetector(["--mode=bogus", fPara120]).status, 2);
   });
 });
