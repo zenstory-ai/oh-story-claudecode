@@ -944,6 +944,46 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('通用长篇.md', res_spy.stdout)
         self.assertNotIn('历史架空权谋.md', res_spy.stdout)
 
+    def test_secondary_benchmark_style_never_leaks_when_primary_lacks_style_file(self):
+        # NEW-BUG-02: 主对标缺 文风.md 时，绝不滑落加载副/参考对标的 文风.md 并错标成主对标。
+        self.put('对标/主标神瞳/剧情/节奏.md', '# 主标节奏\n')
+        self.put(
+            '对标/副标权谋/文风.md',
+            '# 副标文风\n### 切片 1\n```text\n副标专属泄漏文本绝不能进主对标。\n```\n',
+        )
+        self.put('大纲/细纲_第001章.md', '### 第 1 章：破局\n- 单元ID/位置：L1-01\n- 目标情绪：憋屈→爽\n')
+
+        # 情形 A：显式写了「主对标书：主标神瞳」+ 对标登记表含副标权谋（辅）
+        self.put(
+            '设定/题材定位.md',
+            '- 题材类型：都市脑洞\n'
+            '## 对标登记\n'
+            '- 主对标书：主标神瞳\n'
+            '| 书名 | 题材类型 | 引用强度 | 用途 |\n'
+            '|---|---|---|---|\n'
+            '| 主标神瞳 | 都市脑洞 | 主 | 主对标 |\n'
+            '| 副标权谋 | 历史架空 | 辅 | 只看权谋结构 |\n',
+        )
+        res_a = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 1)
+        self.assertEqual(res_a.returncode, 0, res_a.stderr)
+        self.assertNotIn('副标专属泄漏文本绝不能进主对标', res_a.stdout)
+        self.assertNotIn('对标/副标权谋/文风.md', res_a.stdout)
+
+        # 情形 B：未写「主对标书：」行，仅靠「对标登记」表的「引用强度」列区分主/辅/参考
+        self.put(
+            '设定/题材定位.md',
+            '- 题材类型：都市脑洞\n'
+            '## 对标登记\n'
+            '| 书名 | 题材类型 | 引用强度 | 用途 |\n'
+            '|---|---|---|---|\n'
+            '| 主标神瞳 | 都市脑洞 | 主 | 主对标 |\n'
+            '| 副标权谋 | 历史架空 | 参考 | 仅参考配角 |\n',
+        )
+        res_b = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 1)
+        self.assertEqual(res_b.returncode, 0, res_b.stderr)
+        self.assertNotIn('副标专属泄漏文本绝不能进主对标', res_b.stdout)
+        self.assertNotIn('对标/副标权谋/文风.md', res_b.stdout)
+
     def test_all_writing_deslop_review_cli_scripts_support_help(self):
         # 系统性回归：长篇/短篇/去味/审稿全部 CLI 脚本都必须干净支持 --help 与 -h（exit 0、stdout 非空、stderr 为空）。
         library_only = {'wordcount_core.js', 'style-whitelist.js'}

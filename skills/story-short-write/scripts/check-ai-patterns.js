@@ -5,7 +5,7 @@ const fs = require('fs');
 const { loadStyleWhitelist, maskStyleText } = require('./style-whitelist.js');
 const path = require('path');
 
-const USAGE = `Usage: node check-ai-patterns.js [--check] [--json] [--mode=auto|long|short] [--fail-on=blocking|review_required|all] <file...>
+const USAGE = `Usage: node check-ai-patterns.js [--check] [--json] [--mode=auto|long|short] [--fail-on=blocking|review_required|all] [--respect-skip] <file...>
        node check-ai-patterns.js --list-review-classes
 
 Detect high-risk AI-flavor prose patterns that need human rewrite:
@@ -362,17 +362,29 @@ const REVIEW_CLASSES = Object.freeze({
   'ellipsis-density-tic': 'semantic',
 });
 
+// 与 hooks / storyctl 同一语法：文件前 6 行含 `<!-- 去味:跳过 -->` 时，仅在传入 `--respect-skip` 时将
+// blocking/review_required 降为 advisory（带 exempted: '去味:跳过'）；默认不降级，供显式 /story-deslop 扫描并清理标记。
+const DESLOP_SKIP_PATTERN = /<!--[ \t]*去味[ \t]*(：|:)[ \t]*跳过[ \t]*-->/;
+
+function hasDeslopSkip(input) {
+  const head = String(input || '').replace(/^\ufeff/, '').split(/\r?\n/).slice(0, 6).join('\n');
+  return DESLOP_SKIP_PATTERN.test(head);
+}
+
 const options = {
   json: false,
   files: [],
   failOn: 'all',
   mode: 'auto',
+  respectSkip: false,
 };
 
 for (let i = 2; i < process.argv.length; i += 1) {
   const arg = process.argv[i];
   if (arg === '--check') {
     // Accepted for symmetry with normalize-punctuation.js; detection is always check-only.
+  } else if (arg === '--respect-skip') {
+    options.respectSkip = true;
   } else if (arg === '--list-review-classes') {
     process.stdout.write(`${JSON.stringify(REVIEW_CLASSES, null, 2)}\n`);
     process.exit(0);
@@ -440,9 +452,14 @@ for (const file of options.files) {
   try { whitelist = loadStyleWhitelist(fullPath); }
   catch (error) { die(`${file}: unable to read .deslop-whitelist (${error.message})`); }
   const effectiveMode = resolveMode(fullPath, options.mode);
+  const exempt = options.respectSkip && hasDeslopSkip(input);
   const findings = scanDocument(maskStyleText(input, whitelist), new Set(), effectiveMode).map((finding) => {
     const baseReview = reviewClass(finding.type);
-    return { file, ...finding, review: finding.review || baseReview };
+    const row = { file, ...finding, review: finding.review || baseReview };
+    if (exempt && (row.severity === 'blocking' || row.severity === 'review_required')) {
+      return { ...row, severity: 'advisory', exempted: '去味:跳过' };
+    }
+    return row;
   });
   allFindings.push(...findings);
 }

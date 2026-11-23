@@ -145,7 +145,21 @@ function verify(file, projectRoot = null, options = {}) {
     'blocking'
   )]
   if (!read.ok) return report(file, checks, {}, { strict })
-  const text = (chapter && options.fromRangeFile ? extractChapterSlice(read.text, chapter) : null) || read.text
+  let text = read.text
+  if (chapter && options.fromRangeFile) {
+    const slice = extractChapterSlice(read.text, chapter)
+    if (slice === null) {
+      checks.push(makeCheck(
+        'outline.chapter-slice-found', false, name,
+        `范围细纲 ${name} 中未找到第 ${chapter} 章小节`,
+        `范围细纲须包含「## 第 ${chapter} 章」或「### 第 ${chapter} 章」小节`,
+        `在 ${name} 中补齐第 ${chapter} 章小节，或改建单章文件 细纲_第${String(chapter).padStart(3, '0')}章.md。`,
+        'blocking'
+      ))
+      return report(file, checks, {}, { strict })
+    }
+    text = slice
+  }
 
   const missingSoftFields = SOFT_FIELD_NAMES.filter((names) => !names.some((f) => fieldPattern(f).test(text))).map((names) => names[0])
   checks.push(makeCheck(

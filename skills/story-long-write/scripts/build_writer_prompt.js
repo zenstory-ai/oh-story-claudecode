@@ -468,29 +468,40 @@ function benchmarkNameCandidates(raw) {
 
 function rawPrimaryBenchmarkValues(project) {
   const text = stripHtmlComments(readText(path.join(project, '设定', '题材定位.md')));
-  const values = [];
   const explicit = /^[ \t>]*(?:[-*+][ \t]*)?\**主对标书\**[ \t]*[：:][ \t]*(.*)$/m.exec(text);
   if (explicit) {
     const v = explicit[1].trim();
-    if (v && !v.startsWith('{') && !v.startsWith('｛') && !/^(无|不对标|都不用|没有)/.test(v)) {
-      values.push(v);
+    if (/^(无|不对标|都不用|没有)/.test(v)) {
+      return [];
+    }
+    if (v && !v.startsWith('{') && !v.startsWith('｛')) {
+      return [v];
     }
   }
+  const values = [];
   const secMatch = /^##[ \t]*对标登记[^\n]*\n([\s\S]*?)(?=^##[ \t]|$(?![\r\n]))/m.exec(text);
   if (secMatch) {
+    let strengthCol = -1;
+    let sawHeader = false;
     for (const line of secMatch[1].split(/\r?\n/)) {
       const trimmed = line.trim();
       if (!trimmed.startsWith('|')) continue;
       const cells = trimmed.replace(/^\|+|\|+$/g, '').split('|').map((c) => c.trim());
-      if (
-        cells.length &&
-        cells[0] &&
-        cells[0] !== '书名' &&
-        !/^[-:\s]+$/.test(cells[0]) &&
-        !cells[0].startsWith('{')
-      ) {
-        values.push(cells[0]);
+      if (!cells.length || !cells[0] || /^[-:\s]+$/.test(cells[0])) continue;
+      if (!sawHeader && (cells[0] === '书名' || cells.some((c) => /强度/.test(c)))) {
+        sawHeader = true;
+        strengthCol = cells.findIndex((c) => /强度/.test(c));
+        continue;
       }
+      if (cells[0] === '书名' || cells[0].startsWith('{')) continue;
+      if (strengthCol >= 0) {
+        const strength = cells[strengthCol] || '';
+        if (!/^主/.test(strength)) continue;
+      } else if (cells.length >= 3) {
+        const fallbackStrength = cells[2] || '';
+        if (/^(?:辅|副|参考)/.test(fallbackStrength)) continue;
+      }
+      values.push(cells[0]);
     }
   }
   return values;

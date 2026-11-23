@@ -50,7 +50,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ### Phase 1：定核心钩子、平台与流派
 
-项目根及上一级往下 3 层有 `短篇扫榜结论.md`（取最新）时，先读其「选题匹配」，把排第一的方向带目标情绪推荐给作者；过复扫日期提醒可能过期。
+项目根及往上 2–3 级（含多书工作区 `扫榜/`）往下 3 层有 `短篇扫榜结论.md`（取最新）时，先读其「选题匹配」，把排第一的方向带目标情绪推荐给作者；过复扫日期提醒可能过期。
 
 一句话问清：「核心矛盾或脑洞是什么？投哪个平台（盐言/七猫/番茄/黑岩/小程序/未定）？想让读者最爽、最虐还是笑出声？」方向明确直接选流派进 Phase 2；模糊时用下表定情绪：
 
@@ -173,7 +173,7 @@ for (const [name, body] of out) {
 
 1. **网感与一致快检**：自查首百字见冲突零纯景物、短段无 >80 字砖块、对白密、付费点后连环反击、清算落地（非悬疑禁样板尾句），并做**前后一致检查**（可用派 `consistency-checker`，否则自查动机、时间线与伏笔）。
 2. **短篇去味**：只砍①论文公文腔②空洞哲理/样板尾句③无冲突纯景物④车轱辘复述⑤工程词。**放行**直写体感（`脸色一变/心口一沉`）、剧透审判、围观震惊、第一人称吐槽、单句成段与自然 `！`/`？`/`——`（旁白 `≤5` 处）。`.deslop-whitelist`（一行一句，上行 `# 来源：…`）**只记作者明确写法，禁自行放行或登泛词**。
-3. **短篇模式验收**（脚本位于 `{skill 根}/scripts/`）：依次跑 `node …/normalize-punctuation.js --mode=short {短篇目录}/正文.md`、`node …/check-ai-patterns.js --mode=short --check --fail-on=review_required {短篇目录}/正文.md`、`node …/check-degeneration.js --check --fail-on=blocking {短篇目录}/正文.md`、`node …/check-outline-copy.js --outline {短篇目录}/小节大纲.md {短篇目录}/正文.md`（功能复沓记大纲末 `原样出现的原话：`）与 `node …/check-delivery-contract.js --json --min-chars {MIN} --max-chars {MAX} --sections {N} {短篇目录}`。硬错（exit 1）最多修 2 轮，仍不过停告作者；exit 2 或未跑成不得声称通过；正文禁留 `<!-- 自检 -->`。
+3. **短篇模式验收**（脚本位于 `{skill 根}/scripts/`）：依次跑 `node …/normalize-punctuation.js --mode=short {短篇目录}/正文.md`、`node …/check-ai-patterns.js --mode=short --check --fail-on=review_required {短篇目录}/正文.md`、`node …/check-degeneration.js --check --fail-on=blocking {短篇目录}/正文.md`、`node …/check-outline-copy.js --outline {短篇目录}/小节大纲.md {短篇目录}/正文.md`（功能复沓记大纲末 `原样出现的原话：`，逐行缩进写）与 `node …/check-delivery-contract.js --json --min-chars {MIN} --max-chars {MAX} --sections {N} {短篇目录}`。硬错（exit 1）最多修 2 轮，仍不过停告作者；exit 2 或未跑成不得声称通过；正文禁留 `<!-- 自检 -->`。
 4. **白话交付**：只报字数、节数、核心亮点（导语/卡点/清算）和下一步建议，不报脚本名与检查编号。
 
 ## 流程衔接

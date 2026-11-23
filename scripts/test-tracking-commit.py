@@ -1399,6 +1399,25 @@ class TrackingCommitTests(unittest.TestCase):
         self.assertEqual(json.loads(backfill.stdout)["last_committed_chapter"], 3)
         self.run_tool("check", extra=["--strict"])
 
+    def test_init_archives_all_legacy_unmanaged_tracking_files_without_overwriting(self) -> None:
+        # NEW-BUG-01: legacy hand-written 追踪/上下文.md, 追踪/伏笔.md, 追踪/角色状态/*.md (even without 角色状态.md)
+        # must be archived into 追踪/_旧追踪存档/ before init writes new managed views.
+        tracking = self.project / "追踪"
+        (tracking / "角色状态").mkdir(parents=True)
+        (tracking / "上下文.md").write_text("# 手写旧上下文\n绝不能被覆盖丢失\n", encoding="utf-8")
+        (tracking / "伏笔.md").write_text("# 手写旧伏笔\n老伏笔线索\n", encoding="utf-8")
+        (tracking / "角色状态" / "旧主角.md").write_text("# 旧主角手写卡\n", encoding="utf-8")
+
+        result = self.run_tool("init", initial_document())
+        self.assertIn("_旧追踪存档", result.stderr)
+        archive = tracking / "_旧追踪存档"
+        self.assertEqual((archive / "上下文.md").read_text(encoding="utf-8"), "# 手写旧上下文\n绝不能被覆盖丢失\n")
+        self.assertEqual((archive / "伏笔.md").read_text(encoding="utf-8"), "# 手写旧伏笔\n老伏笔线索\n")
+        self.assertEqual((archive / "角色状态" / "旧主角.md").read_text(encoding="utf-8"), "# 旧主角手写卡\n")
+        self.assertNotIn("绝不能被覆盖丢失", (tracking / "上下文.md").read_text(encoding="utf-8"))
+        self.assertFalse((archive / ".tracking-commit.lock").exists())
+        self.run_tool("check", extra=["--strict"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

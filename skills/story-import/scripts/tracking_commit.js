@@ -465,22 +465,30 @@ function requireNoRetiredTrackingPaths(tracking) {
   requireCondition(found.length === 0, `retired tracking files are not supported: ${found.join(', ')}`);
 }
 
+function findPreexistingTrackingEntries(tracking) {
+  if (!isDir(tracking)) return [];
+  return fs
+    .readdirSync(tracking)
+    .filter((name) => name !== RETIRED_ARCHIVE_DIR && name !== '.tracking-commit.lock' && !name.endsWith('.lock'))
+    .sort();
+}
+
 function archiveRetiredTrackingPaths(tracking) {
-  const retired = findRetiredTrackingPaths(tracking);
-  if (!retired.length) return [];
+  const preexisting = findPreexistingTrackingEntries(tracking);
+  if (!preexisting.length) return [];
   const archive = path.join(tracking, RETIRED_ARCHIVE_DIR);
-  for (const relative of retired) {
+  for (const relative of preexisting) {
     requireCondition(
       !exists(path.join(archive, relative)),
       `追踪/${RETIRED_ARCHIVE_DIR}/${relative} already exists; move it away before initializing`
     );
   }
-  for (const relative of retired) {
+  for (const relative of preexisting) {
     const target = path.join(archive, relative);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.renameSync(path.join(tracking, relative), target);
   }
-  return retired;
+  return preexisting;
 }
 
 function bothBlank(position) {

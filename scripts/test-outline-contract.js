@@ -356,6 +356,12 @@ try {
   assert.strictEqual(rangeCh2.status, 0, rangeCh2.stdout + rangeCh2.stderr)
   assert.strictEqual(rangeCh2.report.wordcount.target, 2400)
 
+  // NEW-BUG-03: 范围细纲文件缺失目标章节小节时必须阻断（exit 1），绝不能回落校验整份文件返回假 PASS。
+  const rangeMissingCh3 = run(rangeProject, '3')
+  assert.strictEqual(rangeMissingCh3.status, 1, rangeMissingCh3.stdout + rangeMissingCh3.stderr)
+  assert.strictEqual(rangeMissingCh3.report.ok, false)
+  assert.deepStrictEqual(hardIds(rangeMissingCh3), ['outline.chapter-slice-found'])
+
   const invalid = spawnSync(process.execPath, [verifier, '--unknown'], { cwd: repoRoot, encoding: 'utf8' })
   assert.strictEqual(invalid.status, 2)
   assert.match(invalid.stderr, /用法/)

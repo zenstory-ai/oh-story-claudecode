@@ -79,7 +79,7 @@ description: story-short-analyze 输出契约。定义 Stage → 文件映射、
 
 ### Resume 协议
 
-- `last_stage_in_progress` 非空 → 该 Stage 上次中断，**从头**重跑，不复用半成品；Stage 6 内容已齐、仅验收未过时只重跑验收。
+- `last_stage_in_progress` 非空 → 该 Stage 上次中断，**从头**重跑，不复用半成品（若 `拆文报告.md` 已追加该 Stage 半截小节，先截断/替换该小节再重写，避免重复段）；Stage 6 内容已齐、仅验收未过时只重跑验收。
 - `last_stage_in_progress` 为空且 `stages_completed` 不含 `6` → 从 `max(stages_completed) + 1` 开始；尚无完成阶段时从 Stage 2 开始。
 - `stages_completed` 含 6 → 已完成，只询问用户覆盖或取消。
 

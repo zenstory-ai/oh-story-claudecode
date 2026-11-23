@@ -9,7 +9,7 @@ const USAGE = `Usage: node normalize-punctuation.js [--check] [--mode=auto|long|
 
 Normalize正文 punctuation deterministically:
   - keep standard ellipses (……) in dialogue, 【…】 panels, and narration; unify non-standard ellipses (..., single …, ………+, 。。。+, .……..) to ……
-  - keep standard em dashes (——) in dialogue quotes (“”「」『』 and paired ASCII ") and narration across both long and short modes; unify non-standard dashes (single —, triple ———+, --) to —— (and numeric ranges like 10--20 outside quotes to 「到」)
+  - keep standard em dashes (——) in dialogue quotes (“”「」『』 and paired ASCII ") and narration across both long and short modes; unify non-standard dashes (single —, triple ———+, --) to —— (and numeric ranges like 10--20 to 「到」 both inside and outside quotes)
   - --mode=auto|long|short is accepted for CLI symmetry with check-ai-patterns.js (narration —— density is governed by check-ai-patterns.js)
   - remove markdown divider lines (---) from正文
   - preserve pause punctuation covered by book-local .deslop-whitelist literals
