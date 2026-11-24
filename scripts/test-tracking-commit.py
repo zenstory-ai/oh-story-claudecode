@@ -1001,19 +1001,33 @@ class TrackingCommitTests(unittest.TestCase):
         self.assertNotIn("江晨", self.read_state()["characters"])
         self.run_tool("check")
 
-    def test_retirement_is_rejected_in_a_revision(self) -> None:
+    def test_retirement_rules_in_a_revision(self) -> None:
         self.init(last_chapter=20)
+        # retired_characters 仍仅限 append，revision 必须拒绝
         retire = transaction(10, mode="revision")
         retire["delta"]["retired_characters"] = ["江晨"]
         result = self.run_tool("commit", retire, expect=2)
         self.assertIn("append transaction", result.stderr)
 
+        # 未在 retired_context_items 声明的静默删除仍被拒绝
+        silent_drop = transaction(10, mode="revision")
+        silent_drop["context"]["long_term_constraints"] = []
+        result = self.run_tool("commit", silent_drop, expect=2)
+        self.assertIn("retired_context_items", result.stderr)
+        self.assertEqual(self.read_state()["state_revision"], 0)
+
+        # 修订中显式通过 delta.retired_context_items 退役已兑现的长期约束：正常通过并写入退役登记
+        constraint = "军方培养江晨的后续安排尚未向读者揭示。"
         drop = transaction(10, mode="revision")
         drop["context"]["long_term_constraints"] = []
-        drop["delta"]["retired_context_items"] = ["军方培养江晨的后续安排尚未向读者揭示。"]
-        result = self.run_tool("commit", drop, expect=2)
-        self.assertIn("append transaction", result.stderr)
-        self.assertEqual(self.read_state()["state_revision"], 0)
+        drop["delta"]["retired_context_items"] = [constraint]
+        self.run_tool("commit", drop, expect=0)
+        self.assertEqual(self.read_state()["state_revision"], 1)
+        self.assertEqual(self.read_state()["context"]["long_term_constraints"], [])
+        record_text = (self.project / "追踪/逐章记录/第010章.md").read_text(encoding="utf-8")
+        self.assertIn("## 本章退役登记", record_text)
+        self.assertIn(constraint, record_text)
+        self.run_tool("check", extra=["--strict"])
 
     def test_retiring_a_still_active_character_is_rejected(self) -> None:
         self.init()
@@ -1351,22 +1365,103 @@ class TrackingCommitTests(unittest.TestCase):
         leftovers = list(draft_path.parent.glob("*.tmp"))
         self.assertEqual(leftovers, [], f"atomic draft write left temp files: {leftovers}")
 
-    def test_delta_soft_warns_above_3kb_and_hard_rejects_above_64kb(self) -> None:
+    def test_delta_soft_warns_above_2kb_and_3584b_and_hard_rejects_above_64kb(self) -> None:
         self.init()
-        over_3k = transaction(1)
-        over_3k["delta"]["result"] = "江" * 1200  # ~3600 bytes > 3072B
-        res = self.run_tool("commit", over_3k, expect=0)
+        # 1800B (<2048B) -> no delta size warning
+        under_2k = transaction(1)
+        under_2k["delta"]["result"] = "江" * 450  # ~1350B + headers ~1600B < 2048B
+        res_ok = self.run_tool("commit", under_2k, expect=0)
+        self.assertFalse(any("chapter delta is" in w for w in json.loads(res_ok.stdout)["warnings"]))
+
+        # ~2600B (2048B < size <= 3584B) -> warns target 2048B without hitting 3584B cap
+        mid_2k = transaction(2)
+        mid_2k["delta"]["result"] = "江" * 800  # ~2400B + headers ~2650B
+        res_mid = self.run_tool("commit", mid_2k, expect=0)
+        mid_warnings = json.loads(res_mid.stdout)["warnings"]
+        self.assertTrue(any("2048 bytes" in w and "软上限 3584" in w for w in mid_warnings), mid_warnings)
+
+        # >3584B -> warns recommended cap 3584B
+        over_cap = transaction(3)
+        over_cap["delta"]["result"] = "江" * 1200  # ~3600B + headers ~3850B > 3584B
+        res = self.run_tool("commit", over_cap, expect=0)
         payload = json.loads(res.stdout)
-        self.assertTrue(any("3072 bytes" in w for w in payload["warnings"]))
+        self.assertTrue(any("3584 bytes" in w for w in payload["warnings"]), payload["warnings"])
         self.assertIn("WARNING: chapter delta is", res.stderr)
         self.run_tool("check", extra=["--strict"])
 
-        over_64k = transaction(2)
+        over_64k = transaction(4)
         over_64k["delta"]["result"] = "江" * 23000  # ~69000 bytes > 65536B
         before = self.read_state()
         rejected = self.run_tool("commit", over_64k, expect=2)
         self.assertIn("exceeds hard cap of 65536 bytes", rejected.stderr)
         self.assertEqual(self.read_state(), before)
+
+    def test_check_emits_soft_stale_snapshot_warning_for_active_char_in_two_timeline_chapters(self) -> None:
+        self.init()
+        # Ch1: 江晨 & 钟嘉嘉 both initialized with snapshots
+        ch1 = transaction(1, character=True)
+        ch1["delta"]["character_changes"].append({"name": "钟嘉嘉", "change": "接手军宣编导协调"})
+        ch1["context"]["active_character_names"] = ["江晨", "钟嘉嘉"]
+        ch1["character_snapshots"]["钟嘉嘉"] = snapshot(state="初步介入项目")
+        self.run_tool("commit", ch1)
+
+        # Ch2: 钟嘉嘉 appears in timeline E011 without snapshot update -> only 1 chapter, no stale warning yet
+        ch2 = transaction(2)
+        ch2["context"]["active_character_names"] = ["江晨", "钟嘉嘉"]
+        ch2["delta"]["timeline_events"] = [{
+            "action": "upsert", "id": "E011", "story_time": "第二天上午",
+            "objective_fact": "钟嘉嘉核对播放数据", "reader_knowledge": "钟嘉嘉在机房盯数据",
+            "reveal_status": "已揭示", "reveal_chapter": 2, "characters": ["钟嘉嘉"],
+        }]
+        self.run_tool("commit", ch2)
+        chk2 = json.loads(self.run_tool("check", extra=["--strict"]).stdout)
+        self.assertFalse(any("stale character snapshot" in w for w in chk2["warnings"]), chk2["warnings"])
+
+        # Ch3: 钟嘉嘉 appears in timeline E012 without snapshot update -> >=2 chapters -> soft stale warning (still exit 0 even --strict)
+        ch3 = transaction(3)
+        ch3["context"]["active_character_names"] = ["江晨", "钟嘉嘉"]
+        ch3["delta"]["timeline_events"] = [{
+            "action": "upsert", "id": "E012", "story_time": "第三天下午",
+            "objective_fact": "钟嘉嘉参与高层复盘", "reader_knowledge": "钟嘉嘉在会上发言",
+            "reveal_status": "已揭示", "reveal_chapter": 3, "characters": ["钟嘉嘉"],
+        }]
+        self.run_tool("commit", ch3)
+        chk3_res = self.run_tool("check", extra=["--strict"], expect=0)
+        chk3 = json.loads(chk3_res.stdout)
+        self.assertTrue(
+            any("stale character snapshot" in w and "钟嘉嘉" in w for w in chk3["warnings"]),
+            chk3["warnings"],
+        )
+
+        # Ch4: Updating 钟嘉嘉's snapshot clears the stale warning
+        ch4 = transaction(4)
+        ch4["context"]["active_character_names"] = ["江晨", "钟嘉嘉"]
+        ch4["delta"]["character_changes"] = [{"name": "钟嘉嘉", "change": "晋升统筹组长"}]
+        ch4["character_snapshots"] = {"钟嘉嘉": snapshot(state="统筹全组进度")}
+        self.run_tool("commit", ch4)
+        chk4 = json.loads(self.run_tool("check", extra=["--strict"]).stdout)
+        self.assertFalse(any("stale character snapshot" in w for w in chk4["warnings"]), chk4["warnings"])
+
+    def test_draft_and_revision_support_range_outline_files(self) -> None:
+        self.init()
+        (self.project / "大纲").mkdir(exist_ok=True)
+        (self.project / "正文").mkdir(exist_ok=True)
+        (self.project / "大纲/细纲_第1-5章.md").write_text(
+            "### 第 1 章：雾夜来客\n- 字数目标：1000 字\n\n### 第 2 章：暗潮涌动\n- 字数目标：1200 字\n",
+            encoding="utf-8",
+        )
+        (self.project / "正文/第001章_雾夜来客.md").write_text(
+            "# 第1章 雾夜来客\n" + "字" * 999 + "。\n", encoding="utf-8"
+        )
+        _, draft1_path = self.draft(1)
+        draft1 = json.loads(draft1_path.read_text(encoding="utf-8"))
+        self.assertEqual(draft1["chapter_title"], "雾夜来客")
+        draft1["delta"]["result"] = "江晨在雾夜接下任务。"
+        draft1["context"]["position"].update({"story_time": "雾夜", "scene": "门岗"})
+        self.run_tool("commit", self.bind_wordcount(draft1, resolution="within_user_band"))
+        # Mode=revision recount via wordcountRecordDrift works cleanly against range-outline file
+        self.run_tool("commit", transaction(1, mode="revision"))
+        self.run_tool("check", extra=["--strict"])
 
     def test_allow_gap_permits_intentional_out_of_order_append_while_default_guards_typos(self) -> None:
         self.init()

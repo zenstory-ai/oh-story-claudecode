@@ -32,6 +32,8 @@ const UNIT_FIELD_NAMES = [...CHAPTER_UNIT_FIELDS, '单元ID／位置', '所属�
 const ENGINE_FIELD_NAMES = UNIT_CARD_FIELDS['单元情绪引擎'];
 const TEMPO_FIELD_NAMES = [...UNIT_CARD_FIELDS['单元节拍/章功能分配'], '单元节拍'];
 const TAIL_CHARS = 400;
+const TIMELINE_ANCHOR_MAX_EVENTS = 5;
+const TIMELINE_ANCHOR_MAX_CHARS = 150;
 const STATE_SECTIONS = ['当前位置', '长期约束', '核心角色状态', '活跃伏笔', '近三章速记', '下一章承诺', '连贯性风险'];
 const SLOT_MARK = '［主会话填］';
 const AUTHOR_DECIDED_CHARS = 600;
@@ -302,6 +304,90 @@ function extractStateSections(stateText) {
     }
   }
   return found;
+}
+
+function truncateChars(text, maxChars) {
+  const chars = Array.from(String(text || '').trim().replace(/\s+/g, ' '));
+  if (chars.length <= maxChars) return chars.join('');
+  return maxChars > 1 ? `${chars.slice(0, maxChars - 1).join('')}…` : chars.slice(0, maxChars).join('');
+}
+
+function recentTimelineAnchors(project) {
+  const raw = readText(path.join(project, '追踪', '_tracking-state.json'));
+  if (!raw) return null;
+  let state;
+  try {
+    state = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!state || typeof state !== 'object' || Array.isArray(state)) return null;
+  let events = [];
+  if (state.timeline && typeof state.timeline === 'object' && !Array.isArray(state.timeline)) {
+    events = Object.values(state.timeline);
+  } else if (Array.isArray(state.timeline_events)) {
+    events = state.timeline_events;
+  }
+  const valid = events
+    .filter((ev) => ev && typeof ev === 'object' && typeof ev.story_time === 'string' && ev.story_time.trim())
+    .map((ev) => {
+      const ch = Number.isInteger(ev.first_recorded_chapter)
+        ? ev.first_recorded_chapter
+        : Number.isInteger(ev.updated_chapter)
+          ? ev.updated_chapter
+          : 0;
+      const id = typeof ev.id === 'string' ? ev.id.trim() : '';
+      const storyTime = ev.story_time.trim().replace(/\s+/g, ' ');
+      const unrevealed = ev.reveal_status === '未揭示';
+      const rawFact = unrevealed
+        ? (typeof ev.reader_knowledge === 'string' ? ev.reader_knowledge : '')
+        : (typeof ev.objective_fact === 'string' && ev.objective_fact.trim()
+            ? ev.objective_fact
+            : (typeof ev.reader_knowledge === 'string' ? ev.reader_knowledge : ''));
+      return { id, ch, storyTime, fact: rawFact.trim().replace(/\s+/g, ' ') };
+    })
+    .sort((a, b) => (a.ch !== b.ch ? a.ch - b.ch : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  if (!valid.length) return null;
+
+  const recent = valid.slice(-TIMELINE_ANCHOR_MAX_EVENTS);
+  const posTime =
+    state.context &&
+    state.context.position &&
+    typeof state.context.position.story_time === 'string'
+      ? state.context.position.story_time.trim().replace(/\s+/g, ' ')
+      : '';
+  const lastCh = Number.isInteger(state.last_committed_chapter) ? state.last_committed_chapter : 0;
+  const headerPrefix = posTime
+    ? `当前(${lastCh > 0 ? `第${lastCh}章末` : '起点'})：${truncateChars(posTime, 24)}`
+    : '';
+
+  const picked = [];
+  let used = Array.from(headerPrefix).length;
+  for (let i = recent.length - 1; i >= 0; i -= 1) {
+    const ev = recent[i];
+    const baseTag = `${ev.id ? `${ev.id}` : ''}(${ev.ch > 0 ? `第${ev.ch}章·` : ''}${truncateChars(ev.storyTime, 14)})`;
+    const sepLen = used > 0 ? 1 : 0;
+    const withFact = ev.fact ? `${baseTag}${truncateChars(ev.fact, 10)}` : baseTag;
+    const withFactLen = Array.from(withFact).length;
+    const baseLen = Array.from(baseTag).length;
+    if (used + sepLen + withFactLen <= TIMELINE_ANCHOR_MAX_CHARS) {
+      picked.push(withFact);
+      used += sepLen + withFactLen;
+    } else if (used + sepLen + baseLen <= TIMELINE_ANCHOR_MAX_CHARS) {
+      picked.push(baseTag);
+      used += sepLen + baseLen;
+    } else if (picked.length === 0) {
+      const budget = Math.max(8, TIMELINE_ANCHOR_MAX_CHARS - used - sepLen);
+      picked.push(truncateChars(baseTag, budget));
+      used = TIMELINE_ANCHOR_MAX_CHARS;
+      break;
+    } else {
+      break;
+    }
+  }
+  picked.reverse();
+  const body = headerPrefix ? `${headerPrefix}\n${picked.join('；')}` : picked.join('；');
+  return { text: body, count: picked.length };
 }
 
 function previousChapterTail(project, chapter) {
@@ -976,6 +1062,11 @@ function build(project, chapter, report) {
     report.push('语感锚点：未抽到可用原文切片（请按 benchmark-recall.md 手动补 1-2 段 200-300 字原文锚点）');
   }
 
+  const timelineAnchor = recentTimelineAnchors(project);
+  if (timelineAnchor) {
+    report.push(`近期时间锚点：已注入 ${timelineAnchor.count} 条（≤${TIMELINE_ANCHOR_MAX_CHARS} 字，防相对时间跨日漂移）`);
+  }
+
   parts.push(
     `——— 本章意图（一句话）———\n${SLOT_MARK}`,
     `——— 作者本轮要求 ———\n${SLOT_MARK} 本轮字数范围、必发生、禁发生、停笔点与章尾要求；无写「无」。`,
@@ -984,6 +1075,11 @@ function build(project, chapter, report) {
     ...(proseSliceText
       ? [
           `——— 语感锚点切片（只学断行、句长、口语节奏与标点力度，严禁照抄人名/台词/桥段）———\n${proseSliceText}`,
+        ]
+      : []),
+    ...(timelineAnchor
+      ? [
+          `——— 近期时间锚点（相对时间如「昨晚/昨天」须对照此表与当前故事时间）———\n${timelineAnchor.text}`,
         ]
       : []),
     `——— 本节速记 ———\n${SLOT_MARK} 筛自 \`追踪/上下文.md\`：在场角色状态、下章承诺、连贯性风险、活跃伏笔（只给禁令，不下放作者侧真相）、本章相关卷级禁忌、久别角色是否补读快照。`,

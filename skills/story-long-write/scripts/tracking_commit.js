@@ -19,8 +19,8 @@ const wordcountCore = require('./wordcount_core.js');
 const INPUT_SCHEMA_VERSION = 1;
 const TRACKING_SCHEMA_VERSION = 4;
 const VIEW_HARD_CAP_BYTES = 65536;
-const DELTA_TARGET_BYTES = 1536;
-const DELTA_MAX_BYTES = 3072;
+const DELTA_TARGET_BYTES = 2048;
+const DELTA_MAX_BYTES = 3584;
 const CONTEXT_TARGET_BYTES = 8192;
 const CONTEXT_MAX_BYTES = 12288;
 const SNAPSHOT_TARGET_BYTES = 16384;
@@ -102,8 +102,8 @@ const DRAFT_LIMITS = {
   'character_snapshots.*.goal / state': 100,
   'character_snapshots.*.四个列表单项': 200,
   角色快照单文件: 21500,
-  逐章记录目标字数: 512,
-  逐章记录总量: 1024,
+  逐章记录目标字数: 682,
+  逐章记录总量: 1194,
 };
 
 const RECORD_SECTIONS = {
@@ -1454,11 +1454,6 @@ function mergeTransaction(state, transaction) {
     ...nextContext.continuity_risks,
   ]);
   const dropped = [...previousItems].filter((item) => !kept.has(item)).sort();
-  requireCondition(
-    !(isRevision && dropped.length > 0),
-    'a revision must resubmit every current context item; retire them in an append transaction instead: ' +
-      dropped.join('；')
-  );
   const stillListed = [...new Set(transaction.delta.retired_context_items)].filter((item) => kept.has(item)).sort();
   requireCondition(
     stillListed.length === 0,
@@ -1554,12 +1549,12 @@ function warnSizes(views, deltaPayload = null, warningsOut = null) {
     const deltaSize = byteSize(deltaPayload);
     if (deltaSize > DELTA_MAX_BYTES) {
       emitWarning(
-        `chapter delta is ${deltaSize} bytes; target is <= ${DELTA_TARGET_BYTES} bytes（约 512 字），recommended cap is <= ${DELTA_MAX_BYTES} bytes（约 1024 字，不影响本次提交，建议后续精简）`,
+        `chapter delta is ${deltaSize} bytes; target is <= ${DELTA_TARGET_BYTES} bytes（约 682 字），recommended cap is <= ${DELTA_MAX_BYTES} bytes（约 1194 字，不影响本次提交，建议后续精简）`,
         warningsOut
       );
     } else if (deltaSize > DELTA_TARGET_BYTES) {
       emitWarning(
-        `chapter delta is ${deltaSize} bytes; target is <= ${DELTA_TARGET_BYTES} bytes（约 512 字，软上限 ${DELTA_MAX_BYTES} 字节 / 约 1024 字）`,
+        `chapter delta is ${deltaSize} bytes; target is <= ${DELTA_TARGET_BYTES} bytes（约 682 字，软上限 ${DELTA_MAX_BYTES} 字节 / 约 1194 字）`,
         warningsOut
       );
     }
@@ -1731,7 +1726,11 @@ function applyTransactionLocked(project, document, { allowGap = false, warningsO
   const filePath = deltaPath(tracking, transaction.chapter);
   const previousRecord = transaction.mode === 'revision' ? parseChapterRecord(filePath) : null;
   if (previousRecord !== null) {
-    transaction.delta.retired_context_items = previousRecord.retired;
+    const mergedRetired = [...previousRecord.retired];
+    for (const item of transaction.delta.retired_context_items) {
+      if (!mergedRetired.includes(item)) mergedRetired.push(item);
+    }
+    transaction.delta.retired_context_items = mergedRetired;
   }
   const coreNames = new Set([
     ...Object.keys(nextState.characters),
@@ -1785,6 +1784,10 @@ function checkProject(project, { strict = false, warningsOut = null, driftWarnin
       emit(`WARNING: ${message}`, { error: true });
     }
   }
+  const lastSnapshotUpdateByChar = new Map();
+  for (const name of state.context.active_character_names) {
+    lastSnapshotUpdateByChar.set(name, state.imported_through_chapter);
+  }
   const deltaDir = path.join(tracking, '逐章记录');
   if (isDir(deltaDir)) {
     for (const name of fs.readdirSync(deltaDir).sort()) {
@@ -1809,6 +1812,39 @@ function checkProject(project, { strict = false, warningsOut = null, driftWarnin
           warningsOut
         );
       }
+      const parsedRecord = parseChapterRecord(fullPath);
+      if (parsedRecord && parsedRecord.character_changes.length) {
+        for (const changeLine of parsedRecord.character_changes) {
+          const idx1 = changeLine.indexOf('｜');
+          if (idx1 <= 0) continue;
+          const idx2 = changeLine.indexOf('｜', idx1 + 1);
+          const charName = changeLine.slice(0, idx1);
+          const role = idx2 > idx1 ? changeLine.slice(idx1 + 1, idx2) : '';
+          if (role === '核心' && lastSnapshotUpdateByChar.has(charName)) {
+            lastSnapshotUpdateByChar.set(charName, Math.max(lastSnapshotUpdateByChar.get(charName), chapter));
+          }
+        }
+      }
+    }
+  }
+  for (const name of state.context.active_character_names) {
+    const lastUpdated = lastSnapshotUpdateByChar.get(name) ?? state.imported_through_chapter;
+    const staleChapters = new Set();
+    for (const ev of Object.values(state.timeline)) {
+      if (!ev || !Array.isArray(ev.characters) || !ev.characters.includes(name)) continue;
+      if (Number.isInteger(ev.first_recorded_chapter) && ev.first_recorded_chapter > lastUpdated) {
+        staleChapters.add(ev.first_recorded_chapter);
+      }
+      if (Number.isInteger(ev.updated_chapter) && ev.updated_chapter > lastUpdated) {
+        staleChapters.add(ev.updated_chapter);
+      }
+    }
+    if (staleChapters.size >= 2) {
+      const chaptersList = [...staleChapters].sort((a, b) => a - b).map((c) => `第${c}章`).join('、');
+      emitWarning(
+        `stale character snapshot: active character ${name} appeared in timeline_events across ${staleChapters.size} chapters (${chaptersList}) without a snapshot update（上次更新：第${lastUpdated}章）`,
+        warningsOut
+      );
     }
   }
   const expectedViews = renderViews(state);
@@ -1926,6 +1962,7 @@ function recordPrefill(state, record) {
     timeline_events: rows(record.timeline_events, state.timeline, '时间线事件'),
     constraints: [...record.constraints],
     next_chapter_commitments: [...record.next_chapter_commitments],
+    retired_context_items: [],
   };
   return { delta, snapshots, notes };
 }
@@ -1976,19 +2013,28 @@ function draftTransaction(project, chapter, { state = null, allowGap = false } =
       ? 'append'
       : 'revision';
   let title = '';
-  const outlineDir = path.join(String(project), '大纲');
-  if (isDir(outlineDir)) {
-    const outlineRe = new RegExp(`^细纲_第0*${chapter}章`);
-    const candidates = fs
-      .readdirSync(outlineDir)
-      .filter((n) => outlineRe.test(n) && n.endsWith('.md'))
-      .sort();
-    const titleRe = new RegExp(`^#{1,4}\\s*第\\s*0*${chapter}\\s*章\\s*[：:]\\s*(.+?)\\s*$`, 'm');
-    for (const name of candidates) {
-      const match = titleRe.exec(fs.readFileSync(path.join(outlineDir, name), 'utf8'));
-      if (match) {
-        title = match[1].trim();
-        break;
+  const titleRe = new RegExp(`^#{1,4}\\s*第\\s*0*${chapter}\\s*章\\s*[：:]\\s*(.+?)\\s*$`, 'm');
+  try {
+    const { outline } = wordcountCore.readChapterOutline(project, chapter);
+    const match = titleRe.exec(outline);
+    if (match) title = match[1].trim();
+  } catch {
+    const outlineDir = path.join(String(project), '大纲');
+    if (isDir(outlineDir)) {
+      const outlineRe = /^细纲_第(\d+)章/;
+      const candidates = fs
+        .readdirSync(outlineDir)
+        .filter((n) => {
+          const m = outlineRe.exec(n);
+          return m && Number(m[1]) === chapter && n.endsWith('.md');
+        })
+        .sort();
+      for (const name of candidates) {
+        const match = titleRe.exec(fs.readFileSync(path.join(outlineDir, name), 'utf8'));
+        if (match) {
+          title = match[1].trim();
+          break;
+        }
       }
     }
   }
@@ -2001,12 +2047,12 @@ function draftTransaction(project, chapter, { state = null, allowGap = false } =
     timeline_events: [],
     constraints: [],
     next_chapter_commitments: [],
+    retired_context_items: [],
   };
   let snapshotsPrefill = {};
   let notes = [];
   let prefilled = false;
   if (mode === 'append') {
-    delta.retired_context_items = [];
     delta.retired_characters = [];
     context.position.story_time = '';
     context.position.scene = '';
@@ -2078,6 +2124,7 @@ function rebuildStaleDraft(document, existing, append, currentCharacters = []) {
     if (append) {
       context[key] = [...context[key].filter((item) => !retired.has(norm(item))), ...extra];
     } else {
+      context[key] = context[key].filter((item) => !retired.has(norm(item)));
       leftOut.push(...extra);
     }
   }
@@ -2294,7 +2341,7 @@ function main(argv = process.argv.slice(2)) {
         fill =
           `这是修订，但本章逐章记录缺失或读不了（追踪/逐章记录/第${padChapter(args.chapter)}章.md），delta 没有预填：` +
           '按修订后正文把本章完整记录整份写上（结果、承诺、角色变化、伏笔、时间线、约束），没写的项不会进记录。' +
-          '角色快照、伏笔、时间线写截至最新已写章的当前值（已有核心角色的当前快照见 snapshot_files）；context 原样保留全部当前条目（修订不能退役）。' +
+          '角色快照、伏笔、时间线写截至最新已写章的当前值（已有核心角色的当前快照见 snapshot_files）；已兑现的长期约束/连贯性风险可从 context 删掉并把原文放进 delta.retired_context_items（角色退役仍仅限 append）。' +
           '正文改过就用 story-long-write 的 storyctl.js chapter commit 提交（重新计数并清理本章工作目录）。' +
           '不要从脚本源码或 state 文件里另找格式。';
       } else if (document.mode === 'revision') {
@@ -2302,7 +2349,7 @@ function main(argv = process.argv.slice(2)) {
           '这是修订：delta 是修订后本章的完整记录，已按本章现有逐章记录预填（伏笔与时间线取当前值，' +
           '记录里的核心角色快照已放进 character_snapshots，其他核心角色当前快照见 snapshot_files）。对照修订后正文逐项改：仍成立的原样保留，' +
           '被推翻的删掉或改写，新增的补上；不要清空后只写改动，没写的项会从本章记录里消失。' +
-          '角色快照、伏笔、时间线改成截至最新已写章的当前值；context 原样保留全部当前条目（修订不能退役）。' +
+          '角色快照、伏笔、时间线改成截至最新已写章的当前值；已兑现的长期约束/连贯性风险可从 context 删掉并把原文放进 delta.retired_context_items（角色退役仍仅限 append）。' +
           '正文改过就用 story-long-write 的 storyctl.js chapter commit 提交（重新计数并清理本章工作目录）。' +
           '不要从脚本源码或 state 文件里另找格式。';
         if (prefillNotes.length) {
@@ -2311,7 +2358,7 @@ function main(argv = process.argv.slice(2)) {
       } else {
         fill =
           '只填 delta 里本章的变化；context 其余字段已是当前值，要撤下的长期约束或连贯性风险从 context 删掉并把原文放进 ' +
-          'delta.retired_context_items（仅 append）；本章有变化的核心角色从 current_snapshots（未内联的大快照或久别回归角色读 snapshot_files 对应 JSON）' +
+          'delta.retired_context_items；本章有变化的核心角色从 current_snapshots（未内联的大快照或久别回归角色读 snapshot_files 对应 JSON）' +
           '取当前快照整份改好放进 character_snapshots，并在 character_changes 写一句变化。每类条目照 shapes 的形状写，不要从脚本源码或 state 文件里另找格式。';
       }
       if (omittedSnapshots.length) {

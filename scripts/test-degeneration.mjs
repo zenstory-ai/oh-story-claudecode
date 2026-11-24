@@ -217,6 +217,22 @@ describe("check-degeneration.js", () => {
     assert.equal(blkRes.status, 0);
   });
 
+  test("flags 主角/男主/女主/反派 as tier2 advisory (never tier1 blocking, preserving 穿书/快穿)", () => {
+    const chuanshu = writeFixture("chuanshu-tier2.md", [
+      "他冷笑一声，打算先把主角除掉。",
+      "穿进这本书后，她决定离男主远一点。",
+      "原书女主此刻正站在走廊尽头。",
+      "这一世，她绝不替反派背锅。",
+    ]);
+    const allRes = runDetector(["--json", chuanshu]);
+    const blkRes = runDetector(["--json", "--fail-on=blocking", chuanshu]);
+    assert.equal(allRes.status, 1);
+    assert.equal(blkRes.status, 0, "穿书/快穿主角/男主/女主/反派 must NEVER block");
+    const meta = allRes.json().findings.filter((f) => f.type === "meta-leak");
+    assert.equal(meta.length, 4, JSON.stringify(meta));
+    assert.ok(meta.every((f) => f.severity === "advisory"));
+  });
+
   test("classifies tier1 meta-leaks by quote scope and includes v0.10 field names", () => {
     const tier1 = writeFixture("tier1-dialogue.md", [
       "“今天的字数目标是六千字。”他盯着屏幕，烟一根接一根。",

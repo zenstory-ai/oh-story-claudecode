@@ -172,7 +172,7 @@ try {
   assert.strictEqual(trailingBlank.report.ok, true)
 
   // SOFT: 短篇结构健康度（全部仅 advisory，不设标点/情绪词计数门禁）。
-  // 1) delivery.short-para-rhythm：段长中位 >45 字或 >80 字段落占比 >10%
+  // 1) delivery.short-para-rhythm：段长中位 >30 字或 >80 字段落占比 >3%
   const longParaChunk = Array.from({ length: 10 }, () => `“${'对白内容测试长句'.repeat(5)}”${'叙述补足长度凑够百字'.repeat(6)}`).join('\n')
   const longParaBody = [
     DEFAULT_LEAD,
@@ -181,7 +181,29 @@ try {
   const paraWarn = assertSoftOnly(writeCase('short-long-paras', longParaBody), 'delivery.short-para-rhythm', ['5500', '8000', '6'])
   assert.deepStrictEqual(softIds(paraWarn.normal), ['delivery.short-para-rhythm'])
 
-  // 2) delivery.short-dialogue-share：对话占比 <15%
+  // 收紧边界：段长中位 35 字（>30）即触发 advisory
+  const mid35Chunk = Array.from({ length: 30 }, () => '“你现在把合同签了，别再拖。”她把印章推过桌面，目光一动不动盯着他。').join('\n') // 34 visible chars
+  const mid35Body = [
+    DEFAULT_LEAD,
+    ...Array.from({ length: 6 }, (_, index) => `###${index + 1}.\n${mid35Chunk}`),
+  ].join('\n') + '\n'
+  const mid35Warn = assertSoftOnly(writeCase('short-median-35', mid35Body), 'delivery.short-para-rhythm', ['5500', '8000', '6'])
+  assert.deepStrictEqual(softIds(mid35Warn.normal), ['delivery.short-para-rhythm'])
+
+  // 收紧边界：>80 字段落占比 5%（>3%）即触发 advisory
+  const brickLine = `“${'别再跟我装无辜了。'.repeat(2)}”${'她把那叠流水账单和录音笔一并推到长桌中央，满屋子亲戚顿时鸦雀无声，二婶手里的茶杯停在半空半晌没敢落下去。'.repeat(2)}`
+  const over3PctChunk = [
+    ...Array.from({ length: 19 }, (_, idx) => (idx % 2 === 0 ? '“这事没完，你别想躲。”' : '她把协议拍在桌上没再看他一眼字')),
+    brickLine,
+  ].join('\n') // 1/20 = 5% > 3%
+  const over3PctBody = [
+    DEFAULT_LEAD,
+    ...Array.from({ length: 6 }, (_, index) => `###${index + 1}.\n${over3PctChunk}`),
+  ].join('\n') + '\n'
+  const over3PctWarn = assertSoftOnly(writeCase('short-over80-5pct', over3PctBody), 'delivery.short-para-rhythm', ['2000', '8000', '6'])
+  assert.deepStrictEqual(softIds(over3PctWarn.normal), ['delivery.short-para-rhythm'])
+
+  // 2) delivery.short-dialogue-share：对话/心声弹幕占比 <15%
   const noDialogueChunk = Array.from({ length: 50 }, () => '她走进屋里把门反锁又把灯关掉了。字').join('\n')
   const noDialogueBody = [
     '结婚三周年纪念日，我收到一份离婚协议。',
@@ -189,6 +211,30 @@ try {
   ].join('\n') + '\n'
   const dialWarn = assertSoftOnly(writeCase('short-low-dialogue', noDialogueBody), 'delivery.short-dialogue-share', ['5000', '8000', '6'])
   assert.deepStrictEqual(softIds(dialWarn.normal), ['delivery.short-dialogue-share'])
+
+  // 【】心声/弹幕应并入 short-dialogue-share 并透明报告，且引号内嵌套【】不重复计字
+  const danmuChunk = Array.from({ length: 40 }, () => [
+    '【弹幕：快跑！他手里那份根本是假遗嘱！】',
+    '她低头翻过账本最后一页，没露声色。',
+  ].join('\n')).join('\n')
+  const danmuBody = [
+    '我抬头看见头顶飘过一行弹幕。',
+    '“怎么不说话了？”',
+    ...Array.from({ length: 6 }, (_, index) => `###${index + 1}.\n${danmuChunk}`),
+  ].join('\n') + '\n'
+  const danmuPass = run(writeCase('short-danmu-dialogue', danmuBody), ['6000', '10000', '6'], undefined, false, ['--strict'])
+  assert.strictEqual(danmuPass.status, 0, danmuPass.stdout + danmuPass.stderr)
+  const danmuCheck = danmuPass.report.checks.find((c) => c.id === 'delivery.short-dialogue-share')
+  assert.match(danmuCheck.evidence, /【】心声\/弹幕/)
+
+  const nestedBracketBody = [
+    DEFAULT_LEAD,
+    '###1.',
+    ...Array.from({ length: 20 }, () => '“【系统提示】别动！”她看着眼前空荡荡的房间，把门反锁后坐回椅中，慢慢核对着昨晚记下的那几笔账目明细。'),
+  ].join('\n') + '\n'
+  const nestedRes = run(writeCase('short-nested-bracket', nestedBracketBody), ['500', '3000', '1'])
+  const nestedCheck = nestedRes.report.checks.find((c) => c.id === 'delivery.short-dialogue-share')
+  assert.doesNotMatch(nestedCheck.evidence, /【】心声\/弹幕/, 'nested 【】 inside quotes must not double-count as separate bracket chars')
 
   // 3) delivery.short-lead-present：缺少导语或导语 >500 字
   const noLeadWarn = assertSoftOnly(

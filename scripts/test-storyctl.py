@@ -890,6 +890,60 @@ class FragmentationTests(unittest.TestCase):
             self.assertIn("storyctl.js", completed.stdout)
             self.assertEqual(completed.stderr, "")
 
+    def test_range_outline_files_slice_target_and_pass_chapter_check(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="storyctl-range-outline-") as directory:
+            project = Path(directory)
+            (project / "大纲").mkdir()
+            (project / "正文").mkdir()
+            range_outline = (
+                "## 第 1-5 章细纲\n\n"
+                "### 第 1 章：初入京城\n"
+                "- 字数目标：2200 字\n"
+                "- 字数范围：2000-2500\n\n"
+                "### 第 2 章：夜探库房\n"
+                "- 字数目标：2400 字\n\n"
+                "### 第 003 章：对簿公堂\n"
+                "- 字数目标：2600 字\n"
+            )
+            (project / "大纲/细纲_第001-005章.md").write_text(range_outline, encoding="utf-8")
+            (project / "正文/第002章_夜探库房.md").write_text(
+                "# 第2章 夜探库房\n" + "他推门走进库房查验粮册。" * 200 + "\n", encoding="utf-8"
+            )
+            _init_tracking(project)
+
+            completed, result = run_cli("chapter", "check", "--project", str(project), "--chapter", "2")
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            self.assertEqual(result["length"]["target"], 2400)
+            self.assertEqual(result["length"]["band_source"], "default")
+
+            # wordcount checkpoint also resolves target and author range from range outline
+            segment = project / "前组.md"
+            segment.write_text("# 前组\n" + "字" * 900, encoding="utf-8")
+            cp_proc, cp_res = run_cli(
+                "wordcount", "checkpoint", "--file", str(segment), "--project", str(project), "--chapter", "1"
+            )
+            self.assertEqual(cp_proc.returncode, 0, cp_proc.stdout + cp_proc.stderr)
+            self.assertEqual(cp_res["target"], 2200)
+            self.assertEqual(cp_res["band_source"], "author")
+            self.assertEqual(cp_res["user_band"], {"min": 2000, "max": 2500})
+
+            # Missing chapter section inside range outline fails cleanly (never reads whole file!)
+            miss_proc, miss_res = run_cli(
+                "wordcount", "checkpoint", "--file", str(segment), "--project", str(project), "--chapter", "4"
+            )
+            self.assertEqual(miss_proc.returncode, 2)
+            self.assertEqual(miss_res["invalid_reason"], "INVALID_OUTLINE")
+
+            # Single-chapter outline file takes precedence over range outline covering the same chapter
+            (project / "大纲/细纲_第002章.md").write_text(
+                "### 第 2 章：夜探库房\n- 字数目标：2350 字\n", encoding="utf-8"
+            )
+            cp2_proc, cp2_res = run_cli(
+                "wordcount", "checkpoint", "--file", str(segment), "--project", str(project), "--chapter", "2"
+            )
+            self.assertEqual(cp2_proc.returncode, 0, cp2_proc.stdout + cp2_proc.stderr)
+            self.assertEqual(cp2_res["target"], 2350)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1056,6 +1056,66 @@ class PipelineTests(unittest.TestCase):
                     self.assertTrue(completed.stdout.strip(), f'{rel} {flag} produced empty stdout')
                     self.assertEqual(completed.stderr.strip(), '', f'{rel} {flag} wrote to stderr: {completed.stderr!r}')
 
+    def test_builder_injects_compact_recent_timeline_anchors_without_leaking_unrevealed_facts(self):
+        # 追踪/_tracking-state.json 存在时间线事件时，注入 ≤5 条、≤150 字的近期时间锚点，
+        # 展示当前 position.story_time 对照，且未揭示事件绝不泄露作者侧 objective_fact。
+        timeline = {}
+        for idx in range(1, 8):
+            timeline[f'E{idx:03d}'] = {
+                'id': f'E{idx:03d}',
+                'story_time': f'第{idx}天傍晚',
+                'objective_fact': f'秘密真相第{idx}号不可下放' if idx == 7 else f'事件{idx}落定',
+                'reader_knowledge': f'读者只知第{idx}天雨夜有异动' if idx == 7 else f'已知事件{idx}',
+                'reveal_status': '未揭示' if idx == 7 else '已揭示',
+                'reveal_chapter': None if idx == 7 else idx,
+                'characters': ['主角'],
+                'first_recorded_chapter': idx,
+                'updated_chapter': idx,
+            }
+        state = {
+            'schema_version': 4,
+            'book_title': '雾港 来信',
+            'last_committed_chapter': 7,
+            'imported_through_chapter': 0,
+            'state_revision': 7,
+            'context': {
+                'position': {
+                    'volume': '第一卷',
+                    'volume_start_chapter': 1,
+                    'story_time': '第8天清晨',
+                    'scene': '码头仓库',
+                },
+                'long_term_constraints': [],
+                'active_character_names': [],
+                'continuity_risks': [],
+                'recent_chapters': [],
+                'next_chapter_commitments': [],
+            },
+            'characters': {},
+            'foreshadow': {},
+            'timeline': timeline,
+            'wordcount_records': {},
+        }
+        self.put('追踪/_tracking-state.json', json.dumps(state, ensure_ascii=False))
+        result = self.build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        prompt_body, report_body = result.stdout.split('以下不进 prompt', 1)
+        self.assertIn('——— 近期时间锚点', prompt_body)
+        self.assertIn('第8天清晨', prompt_body)
+        self.assertIn('E007', prompt_body)
+        self.assertNotIn('E001', prompt_body)  # 只取最近 ≤5 条
+        self.assertNotIn('E002', prompt_body)
+        self.assertNotIn('秘密真相第7号不可下放', prompt_body)  # 未揭示事件禁泄作者侧真相
+        self.assertIn('近期时间锚点：已注入', report_body)
+        anchor_section = prompt_body.split('——— 近期时间锚点', 1)[1].split('\n\n——— ', 1)[0]
+        anchor_body = anchor_section.split('\n', 1)[1].strip()
+        self.assertLessEqual(len(anchor_body.replace('\n', '')), 150, anchor_body)
+
+    def test_builder_omits_timeline_anchors_when_state_empty_or_absent(self):
+        result = self.build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn('——— 近期时间锚点', result.stdout)
+
 
 class ImportOutlineBriefTests(unittest.TestCase):
     """导入逐批反推细纲：任务包只带本批规则、抽好的摘要要点、测好的长度与重叠的剧情单元卡。"""
