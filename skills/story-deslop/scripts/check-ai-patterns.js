@@ -144,6 +144,7 @@ const CLICHE_DENSITY_PER_KILO = 12;
 // 容易变成 AI 式修辞堆叠。只做 advisory，修法是删到必要数量并回到具体画面，
 // 不是把“像”换成另一组比喻词。
 const METAPHOR_MARKER_PATTERN = /好像|像是|仿佛|宛如|如同|犹如|(?<![不头图画影录摄肖])像(?![头像素])/g;
+const METAPHOR_COMPOUND_NOUN_PATTERN = /遗像|炭精像|画像|雕像|铜像|佛像|塑像|神像|头像|人像|肖像|蜡像|录像|影像|偶像|假像|表像|现象|印象|迹象|气象|星象|万象/g;
 const METAPHOR_LIKE_PHRASE_PATTERN = /(?:死|水|冰|火|潮水|石头|木头|机器|纸|铁|鬼|死人|刀|针|网|墙)一样/g;
 const METAPHOR_DENSITY_MIN_HITS = 7;
 const METAPHOR_DENSITY_PER_KILO = 3;
@@ -299,6 +300,7 @@ const QUOTE_EMPHASIS_SPEECH_VERB_PATTERN = /[说道问喊答念叫回吼骂写�
 // 历史/世情专名与印信匾额豁免（如“江宁崔氏”“仁和堂”或 刻着/写着/印着/挂着/贴着“……”）
 const QUOTE_EMPHASIS_PROPER_SUFFIX_PATTERN = /[氏府堂号铺庄坊印匾]$/;
 const QUOTE_EMPHASIS_INSCRIPTION_BEFORE_PATTERN = /刻着|写着|印着|挂着|贴着/;
+const QUOTE_EMPHASIS_ONOMATOPOEIA_PATTERN = /^(?:啪|噼啪|咔哒|咔嚓|咣当|砰|咚|哗啦|哗|哇|嗡|嘶|滴答|叮|叮咚|哐当|轰隆|呼啦|嘎吱)$/;
 
 // 叙述旁白省略号密度：真人网文（尤其番茄男频/女频）常用旁白 `……` 表达停顿/心理吐槽，
 // 少量留白正常保留；全章引号与面板外 ≥10 处且 ≥6.0/千字才报 advisory。
@@ -1007,6 +1009,7 @@ function findQuoteEmphasisTic(proseLines, mode = 'long', scale = 1) {
       if (visible < 1 || visible > QUOTE_EMPHASIS_MAX_VISIBLE) continue;
       if (/[。！？!?…，,；;：:—]|\.{2,}/.test(inner)) continue; // 含句读/省略/破折的是台词或播报，不是强调
       if (QUOTE_EMPHASIS_PROPER_SUFFIX_PATTERN.test(inner)) continue; // 宗族/商号/府邸/印信匾额专名（如“江宁崔氏”“仁和堂”）
+      if (QUOTE_EMPHASIS_ONOMATOPOEIA_PATTERN.test(inner)) continue; // 常见拟声词引号（如“啪”“咣当”）
       const before = text.slice(Math.max(0, start - 8), start);
       const after = text.slice(end, end + 6);
       if (QUOTE_EMPHASIS_INSCRIPTION_BEFORE_PATTERN.test(before)) continue; // 刻着/写着/印着/挂着/贴着“……”类碑匾印文
@@ -1370,10 +1373,11 @@ function findMetaphorDensityTic(proseLines) {
     if (!trimmed || isDivider(trimmed) || isStructural(trimmed)) continue;
     const narrative = stripQuoted(trimmed);
     narrativeChars += visibleLength(narrative);
+    const metaphorScanText = narrative.replace(METAPHOR_COMPOUND_NOUN_PATTERN, (seg) => ' '.repeat(seg.length));
 
     METAPHOR_MARKER_PATTERN.lastIndex = 0;
     let match;
-    while ((match = METAPHOR_MARKER_PATTERN.exec(narrative)) !== null) {
+    while ((match = METAPHOR_MARKER_PATTERN.exec(metaphorScanText)) !== null) {
       hits += 1;
       if (firstLine === null) firstLine = lineNo;
       const sample = sentenceAround(narrative, match.index);

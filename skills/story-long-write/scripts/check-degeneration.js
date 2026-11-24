@@ -317,7 +317,9 @@ function findMetaLeak(content) {
       });
       continue; // tier1 命中即可，不再叠 tier2
     }
-    m = META_TIER2_RE.exec(trimmed);
+    // 弹幕/心声/系统播报【…】内讨论「主角/男主/女主/反派」属穿书/脑洞常态，跳过 tier2 扫描
+    const outsideDanmu = trimmed.replace(/【[^】\n]*】/g, (seg) => ' '.repeat(seg.length));
+    m = META_TIER2_RE.exec(outsideDanmu);
     if (m) {
       findings.push({
         line: lineNo,

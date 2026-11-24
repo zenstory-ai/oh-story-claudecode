@@ -231,6 +231,17 @@ describe("check-degeneration.js", () => {
     const meta = allRes.json().findings.filter((f) => f.type === "meta-leak");
     assert.equal(meta.length, 4, JSON.stringify(meta));
     assert.ok(meta.every((f) => f.severity === "advisory"));
+
+    // 【】弹幕/心声/系统播报里的「主角/男主/女主/反派」跳过 tier2，叙述层照常提示
+    const danmu = writeFixture("danmu-tier2.md", [
+      "【快跑啊！原书女主和反派马上就要联手坑男主了！】",
+      "她端起茶盏，看着走廊尽头的原书主角，没出声。",
+    ]);
+    const danmuRes = runDetector(["--json", danmu]);
+    const danmuMeta = danmuRes.json().findings.filter((f) => f.type === "meta-leak");
+    assert.equal(danmuMeta.length, 1, JSON.stringify(danmuMeta));
+    assert.equal(danmuMeta[0].line, 2);
+    assert.equal(danmuMeta[0].severity, "advisory");
   });
 
   test("classifies tier1 meta-leaks by quote scope and includes v0.10 field names", () => {

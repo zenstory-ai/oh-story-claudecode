@@ -72,7 +72,7 @@ node {skill 根}/scripts/storyctl.js chapter accept-current-length --project {�
 }
 ```
 
-- `draft` 自动预填 `expected_state_revision` 并导出角色快照到 `work/第NNN章/snapshots/`；`append` 填 `delta` 与变化快照，`revision` 在预填记录上修订（禁交退役项）。
+- `draft` 自动预填 `expected_state_revision` 并导出角色快照到 `work/第NNN章/snapshots/`；`append` 填 `delta` 与变化快照，`revision` 在预填记录上修订（禁交 `retired_characters`）。
 - `context`：`init` 收 6 项；`commit` 只收前 4 项（`recent_chapters`、`next_chapter_commitments` 由脚本算，手填 exit 2）。
-- `character_snapshots` 角色须同时在 `character_changes`；`active_character_names` 仅列已有快照者（建议 ≤20）。移除旧约束写 `delta.retired_context_items`，退场角色写 `delta.retired_characters`（仅 `append`）。
+- `character_snapshots` 角色须同时在 `character_changes`；`active_character_names` 仅列已有快照者（建议 ≤20）。移除或改写旧约束/风险写 `delta.retired_context_items`（`append`/`revision` 均支持），退场角色写 `delta.retired_characters`（仅 `append`）。
 - `timeline_events` 未揭示时 `reveal_chapter` 必须为 `null`；未来计划留大纲不入追踪。单视图硬上限 65536 字节（`上下文.md` 自动生成 7 栏：`当前位置 / 长期约束 / 核心角色状态 / 活跃伏笔 / 近三章速记 / 下一章承诺 / 连贯性风险`）。

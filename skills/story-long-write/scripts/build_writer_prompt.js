@@ -33,7 +33,7 @@ const ENGINE_FIELD_NAMES = UNIT_CARD_FIELDS['单元情绪引擎'];
 const TEMPO_FIELD_NAMES = [...UNIT_CARD_FIELDS['单元节拍/章功能分配'], '单元节拍'];
 const TAIL_CHARS = 400;
 const TIMELINE_ANCHOR_MAX_EVENTS = 5;
-const TIMELINE_ANCHOR_MAX_CHARS = 150;
+const TIMELINE_ANCHOR_MAX_CHARS = 180;
 const STATE_SECTIONS = ['当前位置', '长期约束', '核心角色状态', '活跃伏笔', '近三章速记', '下一章承诺', '连贯性风险'];
 const SLOT_MARK = '［主会话填］';
 const AUTHOR_DECIDED_CHARS = 600;
@@ -365,7 +365,7 @@ function recentTimelineAnchors(project) {
   let used = Array.from(headerPrefix).length;
   for (let i = recent.length - 1; i >= 0; i -= 1) {
     const ev = recent[i];
-    const baseTag = `${ev.id ? `${ev.id}` : ''}(${ev.ch > 0 ? `第${ev.ch}章·` : ''}${truncateChars(ev.storyTime, 14)})`;
+    const baseTag = `${ev.id ? `${ev.id}` : ''}(${ev.ch > 0 ? `第${ev.ch}章·` : ''}${truncateChars(ev.storyTime, 22)})`;
     const sepLen = used > 0 ? 1 : 0;
     const withFact = ev.fact ? `${baseTag}${truncateChars(ev.fact, 10)}` : baseTag;
     const withFactLen = Array.from(withFact).length;

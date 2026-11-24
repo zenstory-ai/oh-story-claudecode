@@ -1553,5 +1553,28 @@ describe("check-ai-patterns.js", () => {
       0,
       "historical proper nouns, seals, and signboards must be excluded from quote-emphasis-tic"
     );
+
+    // 5) metaphor-density-tic compound 像 nouns & quote-emphasis-tic onomatopoeia exemption
+    const fCompoundXiang = writeFixture("metaphor-compound-xiang.md", [
+      "堂屋正中挂着奶奶的遗像，旁边摆着一张炭精像和老画像。",
+      "院里石雕像与佛像落满灰，铜像与塑像前香炉冰冷。",
+      "神像、人像、肖像、蜡像全蒙着白布，录像与影像里没有半点异常现象与迹象，留下的只有奇怪印象。",
+    ]);
+    assert.equal(
+      runDetector(["--mode=long", "--json", fCompoundXiang]).json().findings.filter((f) => f.type === "metaphor-density-tic").length,
+      0,
+      "compound nouns ending in 像 (遗像/炭精像/雕像/录像/印象 etc.) must not trigger metaphor-density-tic"
+    );
+
+    const fOno = writeFixture("quote-emphasis-onomatopoeia.md", [
+      "门栓“咔哒”落锁，屋顶瓦片“啪”砸进天井，“咣当”滚过门槛。",
+      "铜壶“砰”倒在青砖上，雨水“哗啦”灌进来，“滴答”敲着窗纸。",
+      "铜铃“叮咚”乱震，窗框“嘎吱”作响，门环“咚”震得手麻，“轰隆”雷声滚过屋脊。",
+    ]);
+    assert.equal(
+      runDetector(["--mode=short", "--json", fOno]).json().findings.filter((f) => f.type === "quote-emphasis-tic").length,
+      0,
+      "standard quoted onomatopoeia must not trigger quote-emphasis-tic"
+    );
   });
 });

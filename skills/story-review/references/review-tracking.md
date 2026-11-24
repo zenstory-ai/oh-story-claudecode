@@ -13,7 +13,7 @@
 ## `mode=revision` 事务字段与约束
 
 - 顶层必填：`schema_version`（1）、`mode`（`"revision"`）、`chapter`、`chapter_title`、`expected_state_revision`（取当前 `state_revision`，`draft` 自动预填）、`delta`、`context`、`character_snapshots`。不写 `wordcount`。
-- `delta`：`result`、`character_changes`、`foreshadow_changes`（同 ID `upsert` 当前状态，不增重复行）、`timeline_events`（`action` 为 `upsert/delete`，`未揭示` 的 `reveal_chapter` 必须为 `null`）、`constraints`、`next_chapter_commitments`。**revision 事务不可提交 `retired_characters` 或 `retired_context_items`。**
+- `delta`：`result`、`character_changes`、`foreshadow_changes`（同 ID `upsert` 当前状态，不增重复行）、`timeline_events`（`action` 为 `upsert/delete`，`未揭示` 的 `reveal_chapter` 必须为 `null`）、`constraints`、`next_chapter_commitments`。**revision 事务不可提交 `retired_characters`（仅 `append`）；移除或改写既有 `long_term_constraints` / `continuity_risks` 时须在 `delta.retired_context_items` 声明。**
 - `context`：只交 4 项——`position`、`long_term_constraints`（建议 ≤6 条）、`active_character_names`（建议 ≤20 人，须已有快照）、`continuity_risks`（建议 ≤5 条）；不手填 `recent_chapters` 或 `next_chapter_commitments`（工具自动算出，手填报 exit 2）。
 - `character_snapshots`：核心复用角色须同时出现在 `character_changes`，并在既有快照上交完整新快照；临时角色只写 `character_changes`。
 
