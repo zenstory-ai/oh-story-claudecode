@@ -12,6 +12,22 @@ compare 链接；小节名使用 Keep a Changelog 的六个英文类别（`Added
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-11-24
+
+> 本版 `agents_version: 46`、`setup_skill_version: 1.3.14`。更新技能包后即可直接使用；如需同步无 hook 宿主模板的 `--respect-skip` 参数与流派别名微调，可在写作项目根重跑一次 `/story-setup`（Codex 用 `$story-setup`）。书稿、设定、大纲和追踪不用迁移。
+
+围绕 `v0.12.0` 发布后的边界兼容与外部页面解析健壮性进行补丁完善：收紧区间细纲切分与主/副对标强度过滤，补全无状态文件旧追踪目录初始化归档与无章标题单章索引选项，并适配七猫、晋江排行页面解析口径与少量流派示例格式。
+
+### Changed
+
+- **收紧区间细纲校验与对标强度过滤，并补充可选控制参数。** `check-outline-contract.js` 在区间细纲文件（`细纲_第A-B章.md`）缺少目标章节小节时现直接返回失败，不再回落整文件校验；`build_writer_prompt.js` 解析 `## 对标登记` 时按「引用强度」严格区分主对标与辅/参考对标，避免副对标文风替代主对标注入；`check-ai-patterns.js` 新增 `--respect-skip` 选项供无 hook 宿主模板调用（默认扫描行为保持不变）；`build_chapter_index.js` 新增 `--allow-single-chapter` 选项支持无章标题文本按单章建表。（#568）
+
+### Fixed
+
+- **完善主对标书名匹配、区间细纲切分与短篇半成品校验兼容。** `build_writer_prompt.js` 支持含中文逗号等标点的主对标书名精确匹配，并与 `check-outline-copy.js`（长短篇副本）同步补齐区间细纲按章切分能力；`check-phase2-contract.js` 兼容逆向导入短篇半成品阶段的阶段二校验；`storyctl.js` 提交后同步返回最新 `state_revision`，并在 `--plain` 输出中区分大纲誊抄复核与行文提示。（#568）
+- **补全旧追踪目录初始化归档、拆文序章判定与标点规范化细节。** 无 `_tracking-state.json` 的旧追踪目录执行 `tracking_commit.js init` 时，统一将既有文件与子目录归档至 `追踪/_旧追踪存档/`；对齐逐章记录的字数与字节容量提示口径；`build_chapter_index.js` 优化 `--rebuild` 场景下的序章折叠判定并完善选题回填缺栏目的白话提示；`normalize-punctuation.js` 统一处理引号内外数字范围标点（如 `10--20`）。（#568）
+- **适配七猫与晋江排行页面解析，微调流派别名与示例格式。** `qimao-rank-scraper.js` 适配热度字段尾部的图标字体字符；`jjwxc-rank-scraper.js` 基于 `novelid` 链接过滤顶部筛选栏文本，`aggregate-rank.js`（长短篇副本）按文件头声明的抽样详情上限折算热度覆盖分母；将谍战相关别名归入 `通用长篇.md`、为 `悬疑灵异.md` 补充 `规则怪谈` 别名，并统一非盐言短篇流派示例切片的双引号格式及少量文档细节。（#568）
+
 ## [0.12.0] - 2026-11-23
 
 > 本版 `agents_version: 46`、`setup_skill_version: 1.3.14`。更新技能包后，在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`；ZCode 先在插件面板更新 `oh-story`），再新开会话，让新版流程手册、流派包、助手模板与五端短篇模式写后钩子生效，并自动清理旧版 `agent-references/` 残留文件。书稿、设定、大纲和追踪不用迁移。
@@ -1494,7 +1510,8 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 - 初始版本：长篇/短篇写作、拆文、扫榜、去 AI 味、浏览器操控
 - 用 52000+ 本真实数据增强知识库
 
-[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.5...v0.11.0
 [0.10.5]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.4...v0.10.5
