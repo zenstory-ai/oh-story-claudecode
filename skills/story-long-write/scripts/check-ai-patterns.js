@@ -32,10 +32,12 @@ Detect high-risk AI-flavor prose patterns that need human rewrite:
   - 章尾状态总结体 (文末窗口 这一夜注定/这一切都结束了/新的人生才刚刚开始/命运的齿轮)
   - 引号强调滥用 (叙述里 1-4 字短词加引号强调，密度型)
   - 叙述省略号过密 (引号与面板外 …… 高密度刷屏，advisory)
+  - 感叹号过密 (叙述旁白或全文 ！ 高密度咆哮标点，advisory)
+  - 戏剧套词刷屏 (死寂同章重复或死寂/轰然/骤然/猛地/瞬间高密度聚集，advisory)
 
 Book-local .deslop-whitelist literal spans are excluded from style scanning (no regex or ancestor inheritance).
 Each finding carries severity: review_required for high-risk stylistic patterns (not-is-comparison / em-dash / voice-contrast / negation-parade / reverse-not-is / trailer-ending / trailer-summary), where single/low-count hits of rhetorical patterns (or moderate narration em-dash density, and all short-mode narration em-dash density) downgrade to semantic advisory and high-density clusters (or long-mode dense narration em-dash / trailer-summary) require explicit review-and-ack. This is a local style/readability soft-gate, not an AIGC detector score; functional human text can be kept with explicit acknowledgement instead of hard-blocked.
-或 advisory (period-stutter / long-paragraph / micro-action-tic / negation-pair-tic / stock-reaction-tic / action-list-tic / abstract-summary-tic / cliche-density-tic / metaphor-density-tic / reasoning-chain-tic / system-notice-formality-tic / overcompressed-prose-tic / low-connective-density-tic / quote-emphasis-tic / formulaic-parallelism / ellipsis-density-tic，是提示，justified 的长推理/氛围段可保留)。
+或 advisory (period-stutter / long-paragraph / micro-action-tic / negation-pair-tic / stock-reaction-tic / action-list-tic / abstract-summary-tic / cliche-density-tic / metaphor-density-tic / reasoning-chain-tic / system-notice-formality-tic / overcompressed-prose-tic / low-connective-density-tic / quote-emphasis-tic / formulaic-parallelism / ellipsis-density-tic / exclamation-density-tic / dramatic-cliche-tic，是提示，justified 的长推理/氛围段可保留)。
 --fail-on=blocking 只在出现 hard blocking finding 时退出 1（当前风格规则均为 review_required/advisory，故返回 0）；--fail-on=review_required 在出现 blocking 或 review_required finding 时退出 1；默认 --fail-on=all 有任何 finding 即退出 1。
 Each finding also carries review: mechanical（表面形态确定、就地改写或确认保留即可）或 semantic（可能承担叙事功能，需读上下文判断是否保留）；review_required / blocking 一律 mechanical。--list-review-classes 输出完整分类表（JSON）。
 HTML comments (<!-- ... -->, e.g. the 去味:跳过 exemption marker) are metadata, not prose, and are never scanned.
@@ -59,7 +61,8 @@ const STUTTER_MAX_SENTENCE = 5;
 const LONG_PARAGRAPH_CHARS = 200;
 const SHORT_LONG_PARAGRAPH_CHARS = 100;
 // 旁白破折号密度门槛（真人网文长篇/短篇均常用 —— 做系统提示、拖音与转折揭底拍）：
-// 全文 ≥6 处且 ≥1.5/千字给 advisory；长篇 ≥10 处且 ≥2.5/千字升为 review_required（短篇始终 advisory）。
+// 长篇 ≥4 处且 ≥1.5/千字给 advisory（短篇 ≥6 处且 ≥1.5/千字）；长篇 ≥10 处且 ≥2.5/千字升为 review_required（短篇始终 advisory）。
+const LONG_EM_DASH_ADVISORY_MIN_HITS = 4;
 const EM_DASH_ADVISORY_MIN_HITS = 6;
 const EM_DASH_ADVISORY_PER_KILO = 1.5;
 const LONG_EM_DASH_REVIEW_MIN_HITS = 10;
@@ -141,6 +144,7 @@ const CLICHE_DENSITY_PER_KILO = 12;
 // 容易变成 AI 式修辞堆叠。只做 advisory，修法是删到必要数量并回到具体画面，
 // 不是把“像”换成另一组比喻词。
 const METAPHOR_MARKER_PATTERN = /好像|像是|仿佛|宛如|如同|犹如|(?<![不头图画影录摄肖])像(?![头像素])/g;
+const METAPHOR_COMPOUND_NOUN_PATTERN = /遗像|炭精像|画像|雕像|铜像|佛像|塑像|神像|头像|人像|肖像|蜡像|录像|影像|偶像|假像|表像|现象|印象|迹象|气象|星象|万象/g;
 const METAPHOR_LIKE_PHRASE_PATTERN = /(?:死|水|冰|火|潮水|石头|木头|机器|纸|铁|鬼|死人|刀|针|网|墙)一样/g;
 const METAPHOR_DENSITY_MIN_HITS = 7;
 const METAPHOR_DENSITY_PER_KILO = 3;
@@ -293,12 +297,37 @@ const TRAILER_SUMMARY_PATTERN = /这一(?:夜|天|刻|战|年|局|役)[，,]?[^�
 const QUOTE_EMPHASIS_MIN_HITS = 8;
 const QUOTE_EMPHASIS_MAX_VISIBLE = 4;
 const QUOTE_EMPHASIS_SPEECH_VERB_PATTERN = /[说道问喊答念叫回吼骂写读唱笑叹应哼嗤啐呸嘀咕]|开口|摇头|点头|出声|冷笑|苦笑|轻声|低声|沉声/;
+// 历史/世情专名与印信匾额豁免（如“江宁崔氏”“仁和堂”或 刻着/写着/印着/挂着/贴着“……”）
+const QUOTE_EMPHASIS_PROPER_SUFFIX_PATTERN = /[氏府堂号铺庄坊印匾]$/;
+const QUOTE_EMPHASIS_INSCRIPTION_BEFORE_PATTERN = /刻着|写着|印着|挂着|贴着/;
+const QUOTE_EMPHASIS_ONOMATOPOEIA_PATTERN = /^(?:啪|噼啪|咔哒|咔嚓|咣当|砰|咚|哗啦|哗|哇|嗡|嘶|滴答|叮|叮咚|哐当|轰隆|呼啦|嘎吱)$/;
 
 // 叙述旁白省略号密度：真人网文（尤其番茄男频/女频）常用旁白 `……` 表达停顿/心理吐槽，
 // 少量留白正常保留；全章引号与面板外 ≥10 处且 ≥6.0/千字才报 advisory。
 const ELLIPSIS_DENSITY_PATTERN = /…+|\.{3,}|。{3,}/g;
 const ELLIPSIS_DENSITY_MIN_HITS = 10;
 const ELLIPSIS_DENSITY_PER_KILO = 6.0;
+
+// 感叹号过密（advisory only）：反文学腔后模型常出现叙述咆哮标点过矫正。
+// 引号与面板外叙述 ！ ≥12 处且 ≥10.0/千字，或全文（含对白）！ ≥25 处且 ≥18.0/千字（短篇 ≥28 处且 ≥21.0/千字）给 advisory。
+const EXCLAMATION_PATTERN = /[！!]/g;
+const EXCLAMATION_NARRATION_MIN_HITS = 12;
+const EXCLAMATION_NARRATION_PER_KILO = 10.0;
+const EXCLAMATION_TOTAL_MIN_HITS = 25;
+const EXCLAMATION_TOTAL_PER_KILO = 18.0;
+const SHORT_EXCLAMATION_TOTAL_MIN_HITS = 28;
+const SHORT_EXCLAMATION_TOTAL_PER_KILO = 21.0;
+
+// 戏剧套词刷屏（advisory only）：死寂同章重复（长篇 ≥2 处，短篇按篇幅缩放 ≥3 处）
+// 或引号外叙述中 死寂/轰然/骤然/猛地/瞬间 高密度聚集。
+const DRAMATIC_SIJI_PATTERN = /死寂/g;
+const DRAMATIC_CLUSTER_PATTERN = /死寂|轰然|骤然|猛地|瞬间/g;
+const LONG_DRAMATIC_SIJI_MIN_HITS = 2;
+const SHORT_DRAMATIC_SIJI_MIN_HITS = 3;
+const LONG_DRAMATIC_CLUSTER_MIN_HITS = 6;
+const LONG_DRAMATIC_CLUSTER_PER_KILO = 3.5;
+const SHORT_DRAMATIC_CLUSTER_MIN_HITS = 10;
+const SHORT_DRAMATIC_CLUSTER_PER_KILO = 4.2;
 
 // 单章密度分级门槛（800 章真人长篇 + 500 篇真人短篇误报校准）：偶发 1 处（not-is 族 1-2 处）常承担正常纠错、转折或章末钩子，
 // 降为 advisory + semantic 交上下文判断；同章高频连刷升为 blocking + mechanical 强制清零。
@@ -360,6 +389,8 @@ const REVIEW_CLASSES = Object.freeze({
   'quote-emphasis-tic': 'semantic',
   'formulaic-parallelism': 'semantic',
   'ellipsis-density-tic': 'semantic',
+  'exclamation-density-tic': 'semantic',
+  'dramatic-cliche-tic': 'semantic',
 });
 
 // 与 hooks / storyctl 同一语法：文件前 6 行含 `<!-- 去味:跳过 -->` 时，仅在传入 `--respect-skip` 时将
@@ -669,7 +700,8 @@ function scanProsePatterns(proseLines, mode = 'long', scale = 1) {
     }
   }
 
-  if (dashHits >= EM_DASH_ADVISORY_MIN_HITS) {
+  const emDashAdvisoryMinHits = mode === 'short' ? EM_DASH_ADVISORY_MIN_HITS : LONG_EM_DASH_ADVISORY_MIN_HITS;
+  if (dashHits >= emDashAdvisoryMinHits) {
     const perKilo = dashNarrativeChars > 0 ? (dashHits / dashNarrativeChars) * 1000 : Infinity;
     const rateLabel = Number.isFinite(perKilo) ? `（${perKilo.toFixed(1)}/千字）` : '';
     if (mode !== 'short' && dashHits >= LONG_EM_DASH_REVIEW_MIN_HITS && perKilo >= LONG_EM_DASH_REVIEW_PER_KILO) {
@@ -716,6 +748,8 @@ function scanProsePatterns(proseLines, mode = 'long', scale = 1) {
     findings.push(...findLowConnectiveDensityTic(proseLines));
   }
   findings.push(...findEllipsisDensityTic(proseLines));
+  findings.push(...findExclamationDensityTic(proseLines, mode));
+  findings.push(...findDramaticClicheTic(proseLines, mode, scale));
   return findings;
 }
 
@@ -974,8 +1008,11 @@ function findQuoteEmphasisTic(proseLines, mode = 'long', scale = 1) {
       const visible = visibleLength(inner);
       if (visible < 1 || visible > QUOTE_EMPHASIS_MAX_VISIBLE) continue;
       if (/[。！？!?…，,；;：:—]|\.{2,}/.test(inner)) continue; // 含句读/省略/破折的是台词或播报，不是强调
+      if (QUOTE_EMPHASIS_PROPER_SUFFIX_PATTERN.test(inner)) continue; // 宗族/商号/府邸/印信匾额专名（如“江宁崔氏”“仁和堂”）
+      if (QUOTE_EMPHASIS_ONOMATOPOEIA_PATTERN.test(inner)) continue; // 常见拟声词引号（如“啪”“咣当”）
       const before = text.slice(Math.max(0, start - 8), start);
       const after = text.slice(end, end + 6);
+      if (QUOTE_EMPHASIS_INSCRIPTION_BEFORE_PATTERN.test(before)) continue; // 刻着/写着/印着/挂着/贴着“……”类碑匾印文
       if (QUOTE_EMPHASIS_SPEECH_VERB_PATTERN.test(before) || QUOTE_EMPHASIS_SPEECH_VERB_PATTERN.test(after)) continue; // 引语动词邻接=极短台词
       if (/^(?:的|地)?一?[声下响]/.test(after)) continue; // 「“唰”的一声」类拟声词不是强调滥用
       hits += 1;
@@ -1058,6 +1095,117 @@ function findEllipsisDensityTic(proseLines) {
     severity: 'advisory',
     message: `叙述省略号过密：引号与面板外省略号 ${hits} 处（${perKilo.toFixed(1)}/千字）；保留关键思绪留白，其余改成逗号承接、直白判断或具体动作，别几句一刷。`,
     excerpt: compact(samples.join(' | ')),
+  }];
+}
+
+function findExclamationDensityTic(proseLines, mode = 'long') {
+  let narHits = 0;
+  let narChars = 0;
+  let totalHits = 0;
+  let totalChars = 0;
+  let firstNarLine = null;
+  let firstTotalLine = null;
+  const narSamples = [];
+  const totalSamples = [];
+
+  for (const { text, lineNo } of proseLines) {
+    const trimmed = text.trim();
+    if (!trimmed || isDivider(trimmed) || isStructural(trimmed)) continue;
+    totalChars += visibleLength(trimmed);
+    const narrative = stripQuotedWithUnclosed(trimmed);
+    narChars += visibleLength(narrative);
+
+    EXCLAMATION_PATTERN.lastIndex = 0;
+    let m;
+    while ((m = EXCLAMATION_PATTERN.exec(narrative)) !== null) {
+      narHits += 1;
+      if (firstNarLine === null) firstNarLine = lineNo;
+      const sample = sentenceAround(narrative, m.index);
+      if (narSamples.length < 4 && sample && !narSamples.includes(sample)) narSamples.push(sample);
+    }
+
+    EXCLAMATION_PATTERN.lastIndex = 0;
+    while ((m = EXCLAMATION_PATTERN.exec(trimmed)) !== null) {
+      totalHits += 1;
+      if (firstTotalLine === null) firstTotalLine = lineNo;
+      const sample = sentenceAround(trimmed, m.index);
+      if (totalSamples.length < 4 && sample && !totalSamples.includes(sample)) totalSamples.push(sample);
+    }
+  }
+
+  const narPerKilo = narChars > 0 ? (narHits / narChars) * 1000 : 0;
+  const totalPerKilo = totalChars > 0 ? (totalHits / totalChars) * 1000 : 0;
+  const totalMinHits = mode === 'short' ? SHORT_EXCLAMATION_TOTAL_MIN_HITS : EXCLAMATION_TOTAL_MIN_HITS;
+  const totalPerKiloLimit = mode === 'short' ? SHORT_EXCLAMATION_TOTAL_PER_KILO : EXCLAMATION_TOTAL_PER_KILO;
+
+  const narTriggered = narChars > 0 && narHits >= EXCLAMATION_NARRATION_MIN_HITS && narPerKilo >= EXCLAMATION_NARRATION_PER_KILO;
+  const totalTriggered = totalChars > 0 && totalHits >= totalMinHits && totalPerKilo >= totalPerKiloLimit;
+  if (!narTriggered && !totalTriggered) return [];
+
+  const reasons = [];
+  if (narTriggered) reasons.push(`叙述旁白 ${narHits} 处（${narPerKilo.toFixed(1)}/千字）`);
+  if (totalTriggered) reasons.push(`全文 ${totalHits} 处（${totalPerKilo.toFixed(1)}/千字）`);
+  const samples = narTriggered ? narSamples : totalSamples;
+
+  return [{
+    line: narTriggered ? firstNarLine : firstTotalLine,
+    column: 1,
+    type: 'exclamation-density-tic',
+    severity: 'advisory',
+    message: `感叹号过密：${reasons.join('、')}；旁白默认用句号，只把感叹号留给真正的高点震撼与当面爆喝，其余改回句号让情绪落稳。`,
+    excerpt: compact(samples.join(' | ')),
+  }];
+}
+
+function findDramaticClicheTic(proseLines, mode = 'long', scale = 1) {
+  let sijiHits = 0;
+  let clusterHits = 0;
+  let narrativeChars = 0;
+  let firstSijiLine = null;
+  let firstClusterLine = null;
+  const samples = [];
+
+  for (const { text, lineNo } of proseLines) {
+    const trimmed = text.trim();
+    if (!trimmed || isDivider(trimmed) || isStructural(trimmed)) continue;
+    const narrative = stripQuoted(trimmed);
+    narrativeChars += visibleLength(narrative);
+
+    DRAMATIC_SIJI_PATTERN.lastIndex = 0;
+    let m;
+    while ((m = DRAMATIC_SIJI_PATTERN.exec(narrative)) !== null) {
+      sijiHits += 1;
+      if (firstSijiLine === null) firstSijiLine = lineNo;
+    }
+
+    DRAMATIC_CLUSTER_PATTERN.lastIndex = 0;
+    while ((m = DRAMATIC_CLUSTER_PATTERN.exec(narrative)) !== null) {
+      clusterHits += 1;
+      if (firstClusterLine === null) firstClusterLine = lineNo;
+      if (samples.length < 6) samples.push(m[0]);
+    }
+  }
+
+  const sijiMinHits = mode === 'short' ? Math.max(SHORT_DRAMATIC_SIJI_MIN_HITS, Math.round(1.5 * scale)) : LONG_DRAMATIC_SIJI_MIN_HITS;
+  const clusterMinHits = mode === 'short' ? SHORT_DRAMATIC_CLUSTER_MIN_HITS : LONG_DRAMATIC_CLUSTER_MIN_HITS;
+  const clusterPerKiloLimit = mode === 'short' ? SHORT_DRAMATIC_CLUSTER_PER_KILO : LONG_DRAMATIC_CLUSTER_PER_KILO;
+  const clusterPerKilo = narrativeChars > 0 ? (clusterHits / narrativeChars) * 1000 : 0;
+
+  const sijiTriggered = sijiHits >= sijiMinHits;
+  const clusterTriggered = narrativeChars > 0 && clusterHits >= clusterMinHits && clusterPerKilo >= clusterPerKiloLimit;
+  if (!sijiTriggered && !clusterTriggered) return [];
+
+  const reasons = [];
+  if (sijiTriggered) reasons.push(`「死寂」重复 ${sijiHits} 次`);
+  if (clusterTriggered) reasons.push(`死寂/轰然/骤然/猛地/瞬间 聚集 ${clusterHits} 处（${clusterPerKilo.toFixed(1)}/千字）`);
+
+  return [{
+    line: sijiTriggered ? firstSijiLine : firstClusterLine,
+    column: 1,
+    type: 'dramatic-cliche-tic',
+    severity: 'advisory',
+    message: `戏剧套词刷屏：${reasons.join('、')}；保留最有冲击力的一处，其余改写为具体环境声响、人物失态动作或利害反应，避免强行拉满惊愕感。`,
+    excerpt: compact([...new Set(samples)].join(' ')),
   }];
 }
 
@@ -1225,10 +1373,11 @@ function findMetaphorDensityTic(proseLines) {
     if (!trimmed || isDivider(trimmed) || isStructural(trimmed)) continue;
     const narrative = stripQuoted(trimmed);
     narrativeChars += visibleLength(narrative);
+    const metaphorScanText = narrative.replace(METAPHOR_COMPOUND_NOUN_PATTERN, (seg) => ' '.repeat(seg.length));
 
     METAPHOR_MARKER_PATTERN.lastIndex = 0;
     let match;
-    while ((match = METAPHOR_MARKER_PATTERN.exec(narrative)) !== null) {
+    while ((match = METAPHOR_MARKER_PATTERN.exec(metaphorScanText)) !== null) {
       hits += 1;
       if (firstLine === null) firstLine = lineNo;
       const sample = sentenceAround(narrative, match.index);

@@ -422,15 +422,55 @@ function rangeFromOutline(value) {
   return parsed.value;
 }
 
+const _SINGLE_OUTLINE_RE = /^细纲_第(\d+)章.*\.md$/;
+const _RANGE_OUTLINE_RE = /^细纲_第(\d+)[-–—~～至到]第?(\d+)章.*\.md$/;
+const _BODY_CHAPTER_RE = /^第(\d+)章(?:[_\- 　].*)?\.md$/;
+const _CHAPTER_SLICE_HEADING_RE = /^#{2,3}[ \t]*第[ \t]*(\d+)[ \t]*章(?:[：:\s]|$)/;
+
 function _chapterNumberFromName(name, { outline }) {
-  if (!outline && name.includes('_原稿_')) {
+  if (name.includes('_原稿_')) {
     return null;
   }
-  const pattern = outline
-    ? /^细纲_第0*(\d+)章.*\.md$/
-    : /^第0*(\d+)章(?:[_\- 　].*)?\.md$/;
+  const pattern = outline ? _SINGLE_OUTLINE_RE : _BODY_CHAPTER_RE;
   const match = pattern.exec(name);
-  return match ? Number(match[1]) : null;
+  if (!match) return null;
+  const num = Number(match[1]);
+  return Number.isInteger(num) && num >= 1 ? num : null;
+}
+
+function _outlineRangeFromName(name) {
+  if (name.includes('_原稿_')) {
+    return null;
+  }
+  const match = _RANGE_OUTLINE_RE.exec(name);
+  if (!match) return null;
+  const start = Number(match[1]);
+  const end = Number(match[2]);
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || start > end) {
+    return null;
+  }
+  return { start, end };
+}
+
+function extractChapterSlice(text, chapter) {
+  const lines = stripBom(normalizeNewlines(text)).split('\n');
+  let start = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    const match = _CHAPTER_SLICE_HEADING_RE.exec(lines[i]);
+    if (match && Number(match[1]) === chapter) {
+      start = i;
+      break;
+    }
+  }
+  if (start === -1) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (_CHAPTER_SLICE_HEADING_RE.test(lines[i])) {
+      end = i;
+      break;
+    }
+  }
+  return lines.slice(start, end).join('\n');
 }
 
 function findChapterFile(directory, chapter, { outline }) {
@@ -445,8 +485,23 @@ function findChapterFile(directory, chapter, { outline }) {
     }
   }
   const label = outline ? 'outline' : 'body';
-  requireCondition(matches.length === 1, `chapter ${chapter} must have exactly one ${label} file`);
-  return matches[0];
+  if (matches.length === 1) {
+    return matches[0];
+  }
+  if (outline && matches.length === 0) {
+    const rangeMatches = [];
+    for (const name of entries) {
+      const fullPath = path.join(directory, name);
+      if (!_isFile(fullPath)) continue;
+      const range = _outlineRangeFromName(name);
+      if (range && range.start <= chapter && chapter <= range.end) {
+        rangeMatches.push(fullPath);
+      }
+    }
+    requireCondition(rangeMatches.length === 1, `chapter ${chapter} must have exactly one ${label} file`);
+    return rangeMatches[0];
+  }
+  requireCondition(false, `chapter ${chapter} must have exactly one ${label} file`);
 }
 
 function readUtf8Strict(filePath) {
@@ -457,12 +512,24 @@ function readUtf8Strict(filePath) {
 
 function readChapterOutline(project, chapter) {
   const outlinePath = findChapterFile(path.join(path.resolve(String(project)), '大纲'), chapter, { outline: true });
+  let text;
   try {
-    const { text } = readUtf8Strict(outlinePath);
-    return { outlinePath, outline: text };
+    ({ text } = readUtf8Strict(outlinePath));
   } catch (err) {
     throw new WordcountError(`unable to read outline: ${err.message}`);
   }
+  const baseName = path.basename(outlinePath);
+  const isRangeFile =
+    _chapterNumberFromName(baseName, { outline: true }) === null && _outlineRangeFromName(baseName) !== null;
+  if (isRangeFile) {
+    const slice = extractChapterSlice(text, chapter);
+    requireCondition(
+      slice !== null,
+      `range outline ${baseName} does not contain chapter ${chapter} section`
+    );
+    return { outlinePath, outline: slice, fromRangeFile: true };
+  }
+  return { outlinePath, outline: text, fromRangeFile: false };
 }
 
 function effectiveAuthorRange(outline, authorRange = null) {
@@ -556,12 +623,10 @@ function normalizeWordcountRecord(value) {
 function wordcountRecordDrift(project, chapter, value) {
   const record = normalizeWordcountRecord(value);
   const root = path.resolve(String(project));
-  const outlinePath = findChapterFile(path.join(root, '大纲'), chapter, { outline: true });
+  const { outline } = readChapterOutline(root, chapter);
   const bodyPath = findChapterFile(path.join(root, '正文'), chapter, { outline: false });
-  let outline;
   let bodyBytes;
   try {
-    ({ text: outline } = readUtf8Strict(outlinePath));
     bodyBytes = fs.readFileSync(bodyPath);
   } catch (err) {
     throw new WordcountError(`unable to read chapter files: ${err.message}`);
@@ -631,6 +696,7 @@ module.exports = {
   rangeFromOutline,
   effectiveAuthorRange,
   resolveBookDir,
+  extractChapterSlice,
   findChapterFile,
   readChapterOutline,
   readProjectChapter,

@@ -1430,4 +1430,151 @@ describe("check-ai-patterns.js", () => {
     assert.equal(lateRun.status, 1);
     assert.ok(lateRun.json().review_required > 0);
   });
+
+  test("v0.12.2 guards: long em-dash >=4 advisory, exclamation-density-tic, dramatic-cliche-tic, quote-emphasis historical exemption", () => {
+    // 1) Long-mode em-dash advisory floor lowered to >=4 & >=1.5/1k (3 silent; 4 advisory in long, silent in short)
+    const fDash3 = writeFixture(
+      "long-emdash-3.md",
+      Array.from({ length: 3 }, (_, i) => `第${i + 1}次停顿——门外传来响动。`)
+    );
+    assert.equal(
+      runDetector(["--mode=long", "--json", fDash3]).json().findings.filter((f) => f.type === "em-dash").length,
+      0
+    );
+    const fDash4 = writeFixture(
+      "long-emdash-4.md",
+      Array.from({ length: 4 }, (_, i) => `第${i + 1}次停顿——门外传来响动。`)
+    );
+    const rDash4Long = runDetector(["--mode=long", "--json", "--fail-on=review_required", fDash4]);
+    assert.equal(rDash4Long.status, 0, "4 narration em-dashes in long mode must stay advisory");
+    const d4Long = rDash4Long.json().findings.filter((f) => f.type === "em-dash");
+    assert.equal(d4Long.length, 1);
+    assert.equal(d4Long[0].severity, "advisory");
+    assert.equal(d4Long[0].review, "semantic");
+    assert.equal(
+      runDetector(["--mode=short", "--json", fDash4]).json().findings.filter((f) => f.type === "em-dash").length,
+      0,
+      "4 narration em-dashes in short mode stay silent (floor=6)"
+    );
+
+    // 2) exclamation-density-tic (advisory-only): narration >=12 & >=10/k OR total >=25 & >=18/k (short >=28 & >=21/k)
+    const fExclNar = writeFixture(
+      "exclamation-narration.md",
+      Array.from({ length: 14 }, (_, i) => `第${i + 1}步刚落稳，铁门就被撞开了！`)
+    );
+    const rExclNar = runDetector(["--mode=long", "--json", "--fail-on=review_required", fExclNar]);
+    assert.equal(rExclNar.status, 0, "exclamation-density-tic must be advisory-only");
+    const exNar = rExclNar.json().findings.filter((f) => f.type === "exclamation-density-tic");
+    assert.equal(exNar.length, 1);
+    assert.equal(exNar[0].severity, "advisory");
+    assert.equal(exNar[0].review, "semantic");
+
+    const fExclTotal = writeFixture(
+      "exclamation-total-dialogue.md",
+      Array.from({ length: 28 }, (_, i) => `“第${i + 1}笔账立刻结清！”她把单据拍在桌上。`)
+    );
+    const exTot = runDetector(["--mode=long", "--json", fExclTotal])
+      .json()
+      .findings.filter((f) => f.type === "exclamation-density-tic");
+    assert.equal(exTot.length, 1);
+    assert.equal(exTot[0].severity, "advisory");
+
+    const fExclNormal = writeFixture(
+      "exclamation-normal.md",
+      Array.from(
+        { length: 20 },
+        (_, i) => `第${i + 1}段，他把茶盏放回案角，听完管事汇报后把账簿合上，又核对了一遍入库清单。`
+      ).concat(["“住手！”他喝了一声。", "屋里静了下来。"])
+    );
+    assert.equal(
+      runDetector(["--mode=long", "--json", fExclNormal]).json().findings.filter((f) => f.type === "exclamation-density-tic").length,
+      0
+    );
+
+    // 3) dramatic-cliche-tic (advisory-only): 死寂 >=2 in long (>=3 in short) OR cluster density
+    const fSiji2 = writeFixture("dramatic-siji-2.md", [
+      "大堂里顿时陷入死寂，连茶盏磕碰声都没了。",
+      "账本摊开那一瞬，满堂再次死寂。",
+    ]);
+    const rSiji2Long = runDetector(["--mode=long", "--json", "--fail-on=review_required", fSiji2]);
+    assert.equal(rSiji2Long.status, 0, "dramatic-cliche-tic must be advisory-only");
+    const dcLong = rSiji2Long.json().findings.filter((f) => f.type === "dramatic-cliche-tic");
+    assert.equal(dcLong.length, 1);
+    assert.equal(dcLong[0].severity, "advisory");
+    assert.equal(dcLong[0].review, "semantic");
+    assert.equal(
+      runDetector(["--mode=short", "--json", fSiji2]).json().findings.filter((f) => f.type === "dramatic-cliche-tic").length,
+      0,
+      "2 死寂 in short mode stays silent (short floor=3)"
+    );
+
+    const fSiji3 = writeFixture("dramatic-siji-3.md", [
+      "大堂里陷入死寂。",
+      "人群再次陷入死寂。",
+      "走廊尽头一片死寂。",
+    ]);
+    assert.equal(
+      runDetector(["--mode=short", "--json", fSiji3]).json().findings.filter((f) => f.type === "dramatic-cliche-tic").length,
+      1
+    );
+
+    const fCluster = writeFixture("dramatic-cluster.md", [
+      "石门轰然洞开，他骤然停步，猛地拔刀，刀光瞬间划过廊柱。",
+      "屋瓦轰然塌落，她骤然回头，猛地扑向前方。",
+    ]);
+    const dcCluster = runDetector(["--mode=long", "--json", fCluster])
+      .json()
+      .findings.filter((f) => f.type === "dramatic-cliche-tic");
+    assert.equal(dcCluster.length, 1);
+    assert.equal(dcCluster[0].severity, "advisory");
+
+    // Quoted dialogue containing 死寂 must be exempt
+    const fSijiQuoted = writeFixture("dramatic-siji-quoted.md", [
+      "“这屋里怎么一片死寂？”他问。",
+      "“别提死寂这两个字了。”她摇头。",
+    ]);
+    assert.equal(
+      runDetector(["--mode=long", "--json", fSijiQuoted]).json().findings.filter((f) => f.type === "dramatic-cliche-tic").length,
+      0
+    );
+
+    // 4) quote-emphasis-tic historical proper-noun / seal / signboard exemption
+    const fHist = writeFixture("quote-emphasis-historical.md", [
+      "朱漆大门上悬着“江宁崔氏”的旧牌，檐角已被雨水洗得发灰。",
+      "东街转角便是“仁和堂”，药香隔着半条巷子都能闻见。",
+      "他停在“太尉府”侧门外，把名帖递给门房。",
+      "货栈账册盖着“聚宝号”和“王记铺”两枚旧戳。",
+      "城南“李家庄”与城西“醉仙坊”今夜都早早落了闩。",
+      "匣子里躺着半枚“官署印”和一块“清正匾”。",
+      "玉佩背面刻着“忠义”，箱盖内侧印着“官造”，门楣挂着“德馨”，墙角贴着“封条”。",
+    ]);
+    assert.equal(
+      runDetector(["--mode=long", "--json", fHist]).json().findings.filter((f) => f.type === "quote-emphasis-tic").length,
+      0,
+      "historical proper nouns, seals, and signboards must be excluded from quote-emphasis-tic"
+    );
+
+    // 5) metaphor-density-tic compound 像 nouns & quote-emphasis-tic onomatopoeia exemption
+    const fCompoundXiang = writeFixture("metaphor-compound-xiang.md", [
+      "堂屋正中挂着奶奶的遗像，旁边摆着一张炭精像和老画像。",
+      "院里石雕像与佛像落满灰，铜像与塑像前香炉冰冷。",
+      "神像、人像、肖像、蜡像全蒙着白布，录像与影像里没有半点异常现象与迹象，留下的只有奇怪印象。",
+    ]);
+    assert.equal(
+      runDetector(["--mode=long", "--json", fCompoundXiang]).json().findings.filter((f) => f.type === "metaphor-density-tic").length,
+      0,
+      "compound nouns ending in 像 (遗像/炭精像/雕像/录像/印象 etc.) must not trigger metaphor-density-tic"
+    );
+
+    const fOno = writeFixture("quote-emphasis-onomatopoeia.md", [
+      "门栓“咔哒”落锁，屋顶瓦片“啪”砸进天井，“咣当”滚过门槛。",
+      "铜壶“砰”倒在青砖上，雨水“哗啦”灌进来，“滴答”敲着窗纸。",
+      "铜铃“叮咚”乱震，窗框“嘎吱”作响，门环“咚”震得手麻，“轰隆”雷声滚过屋脊。",
+    ]);
+    assert.equal(
+      runDetector(["--mode=short", "--json", fOno]).json().findings.filter((f) => f.type === "quote-emphasis-tic").length,
+      0,
+      "standard quoted onomatopoeia must not trigger quote-emphasis-tic"
+    );
+  });
 });

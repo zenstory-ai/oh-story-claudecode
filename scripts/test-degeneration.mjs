@@ -217,6 +217,33 @@ describe("check-degeneration.js", () => {
     assert.equal(blkRes.status, 0);
   });
 
+  test("flags 主角/男主/女主/反派 as tier2 advisory (never tier1 blocking, preserving 穿书/快穿)", () => {
+    const chuanshu = writeFixture("chuanshu-tier2.md", [
+      "他冷笑一声，打算先把主角除掉。",
+      "穿进这本书后，她决定离男主远一点。",
+      "原书女主此刻正站在走廊尽头。",
+      "这一世，她绝不替反派背锅。",
+    ]);
+    const allRes = runDetector(["--json", chuanshu]);
+    const blkRes = runDetector(["--json", "--fail-on=blocking", chuanshu]);
+    assert.equal(allRes.status, 1);
+    assert.equal(blkRes.status, 0, "穿书/快穿主角/男主/女主/反派 must NEVER block");
+    const meta = allRes.json().findings.filter((f) => f.type === "meta-leak");
+    assert.equal(meta.length, 4, JSON.stringify(meta));
+    assert.ok(meta.every((f) => f.severity === "advisory"));
+
+    // 【】弹幕/心声/系统播报里的「主角/男主/女主/反派」跳过 tier2，叙述层照常提示
+    const danmu = writeFixture("danmu-tier2.md", [
+      "【快跑啊！原书女主和反派马上就要联手坑男主了！】",
+      "她端起茶盏，看着走廊尽头的原书主角，没出声。",
+    ]);
+    const danmuRes = runDetector(["--json", danmu]);
+    const danmuMeta = danmuRes.json().findings.filter((f) => f.type === "meta-leak");
+    assert.equal(danmuMeta.length, 1, JSON.stringify(danmuMeta));
+    assert.equal(danmuMeta[0].line, 2);
+    assert.equal(danmuMeta[0].severity, "advisory");
+  });
+
   test("classifies tier1 meta-leaks by quote scope and includes v0.10 field names", () => {
     const tier1 = writeFixture("tier1-dialogue.md", [
       "“今天的字数目标是六千字。”他盯着屏幕，烟一根接一根。",

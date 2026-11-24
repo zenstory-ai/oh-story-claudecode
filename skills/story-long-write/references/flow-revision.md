@@ -42,7 +42,7 @@
 
 ### Step 3：备份、改写与检测
 
-1. **备份与计字**：复制原稿为 `正文/第{X}章_章名_原稿_{YYYYMMDD}.md`；跑 `node {skill 根}/scripts/storyctl.js wordcount measure --file {正文文件}` 记原字数。
+1. **备份与计字**：复制原稿到书内 `.story/work/修订原稿/{YYYYMMDD}_{原文件名}`（不放 `正文/`）；跑 `node {skill 根}/scripts/storyctl.js wordcount measure --file {正文文件}` 记原字数。
 2. **改写**：已部署 `narrative-writer` 时按 `agent-calls.md`「大修改写」派发；否则主会话按 `flow-drafting.md` 笔法与流派包切片自改。局部修改不动范围外文字，不擅自加细纲外剧情。
 3. **检测收口**：跑 `node {skill 根}/scripts/storyctl.js chapter check --project {书目录} --chapter {X} --fix-punctuation --plain`。硬伤清零，`review_required` 改净或提交时附 `--ack <rule-id>:<理由>`；字数出带欠字不补、超字净删一次，仍超请作者选；差异超过 30% 或 800 字时汇报中写明对比。
 4. 核对人物、伏笔与前后章衔接无冲突；外部事实不明时先查证再提交。

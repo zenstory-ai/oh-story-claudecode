@@ -13,12 +13,12 @@
 ## `mode=revision` 事务字段与约束
 
 - 顶层必填：`schema_version`（1）、`mode`（`"revision"`）、`chapter`、`chapter_title`、`expected_state_revision`（取当前 `state_revision`，`draft` 自动预填）、`delta`、`context`、`character_snapshots`。不写 `wordcount`。
-- `delta`：`result`、`character_changes`、`foreshadow_changes`（同 ID `upsert` 当前状态，不增重复行）、`timeline_events`（`action` 为 `upsert/delete`，`未揭示` 的 `reveal_chapter` 必须为 `null`）、`constraints`、`next_chapter_commitments`。**revision 事务不可提交 `retired_characters` 或 `retired_context_items`。**
+- `delta`：`result`、`character_changes`、`foreshadow_changes`（同 ID `upsert` 当前状态，不增重复行）、`timeline_events`（`action` 为 `upsert/delete`，`未揭示` 的 `reveal_chapter` 必须为 `null`）、`constraints`、`next_chapter_commitments`。**revision 事务不可提交 `retired_characters`（仅 `append`）；移除或改写既有 `long_term_constraints` / `continuity_risks` 时须在 `delta.retired_context_items` 声明。**
 - `context`：只交 4 项——`position`、`long_term_constraints`（建议 ≤6 条）、`active_character_names`（建议 ≤20 人，须已有快照）、`continuity_risks`（建议 ≤5 条）；不手填 `recent_chapters` 或 `next_chapter_commitments`（工具自动算出，手填报 exit 2）。
 - `character_snapshots`：核心复用角色须同时出现在 `character_changes`，并在既有快照上交完整新快照；临时角色只写 `character_changes`。
 
 ## 体积上限与错误处理
 
-- 逐章记录目标 ≤1536 字节（约 512 字，软上限 3072 字节 / 约 1024 字）、`上下文.md` 建议 ≤12288 字节（超限只出 `warnings`），单视图安全硬上限 65536 字节。`上下文.md` 由 state 自动生成固定 7 栏：`当前位置`、`长期约束`、`核心角色状态`、`活跃伏笔`、`近三章速记`、`下一章承诺`、`连贯性风险`。
+- 逐章记录目标 ≤2048 字节（约 680 字，软上限 3584 字节 / 约 1200 字）、`上下文.md` 建议 ≤12288 字节（超限只出 `warnings`），单视图安全硬上限 65536 字节。`上下文.md` 由 state 自动生成固定 7 栏：`当前位置`、`长期约束`、`核心角色状态`、`活跃伏笔`、`近三章速记`、`下一章承诺`、`连贯性风险`。
 - 遇 `chapter delta N already exists with different content`：通常是手写逐章记录冲突，删掉手写文件后重跑事务。
 - 视图与 state 不一致时，用新的同章 `mode=revision` 事务重建，不重跑已清理的旧输入，也不手改自动生成的 Markdown。

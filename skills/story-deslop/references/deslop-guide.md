@@ -60,10 +60,10 @@
 |---|---|
 | **`not-is-comparison`**、**`reverse-not-is`**、**`negation-parade`**、`negation-pair-tic` | 是否无靶子否定铺垫；有明确纠错、辩解或强烈情绪对比可留 |
 | **`voice-contrast`** | 「声音不大…却」万能音量反差；删铺垫直接写台词分量或后果 |
-| **`em-dash`**、`ellipsis-density-tic` | 长短篇标准 `——` 适量可留，旁白过密按功能改逗号、冒号或动作；旁白省略号禁刷屏 |
+| **`em-dash`**、`ellipsis-density-tic`、`exclamation-density-tic` | 长短篇标准 `——` 适量可留，旁白过密按功能改标点或动作；旁白省略号禁刷屏；叙述默认 `。`，`！` 仅留峰拍防咆哮 |
 | **`trailer-ending`**、**`trailer-summary`** | 删「命运的齿轮/这一夜注定/才刚刚开始」空泛盖章；短篇具体信息差预告保留 |
 | `formulaic-parallelism`、`quote-emphasis-tic` | 工整栏目与普通词加引号是否机械复述；讽刺/转述/递进可留 |
-| `cliche-density-tic`、`metaphor-density-tic` | 套词与比喻是否堆叠同腔；保留有画面感与情绪功能的少数 |
+| `cliche-density-tic`、`metaphor-density-tic`、`dramatic-cliche-tic` | 套词、比喻与戏剧套词（死寂/轰然/骤然/猛地/瞬间）是否高频复读；保留少数有画面感与情绪功能的 |
 | `stock-reaction-tic`、`micro-action-tic`、`action-list-tic` | 微动作是否只贴标签或流水账；有物理后果或打斗步骤可留 |
 | `period-stutter`、`overcompressed-prose-tic`、`low-connective-density-tic` | 是否真缺主语/因果断裂；短篇与竖屏长篇正常短段不据此合长句 |
 | `long-paragraph` | 单段是否过长挤垮手机阅读，按镜头/动作/对话断段 |

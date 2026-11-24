@@ -240,14 +240,14 @@ function verify(projectDir, contract, options = {}) {
     const median = sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
     const over80Count = paraLengths.filter((len) => len > 80).length
     const over80Ratio = over80Count / paraLengths.length
-    paraRhythmOk = median <= 45 && over80Ratio <= 0.10
+    paraRhythmOk = median <= 30 && over80Ratio <= 0.03
     paraRhythmEvidence = `共 ${paraLengths.length} 段，段长中位 ${median} 字，>80 字段落 ${over80Count} 段（${(over80Ratio * 100).toFixed(1)}%）`
   }
   checks.push(makeCheck(
     'delivery.short-para-rhythm',
     paraRhythmOk,
     paraRhythmEvidence,
-    '建议短篇段落中位 ≤45 字且 >80 字长段占比 ≤10%，贴合手机竖屏阅读节奏',
+    '建议短篇段落中位 ≤30 字且 >80 字长段占比 ≤3%，贴合手机竖屏阅读节奏',
     '复核超长段落：把多动作/多信息混杂的长段按镜头或一句一段拆开；刻意长推理/古言抒情段可保留。',
     'advisory'
   ))
@@ -256,23 +256,28 @@ function verify(projectDir, contract, options = {}) {
   let dialogueEvidence = '正文不足 200 字，跳过对话占比检查'
   if (bodyChars >= 200) {
     let quotedChars = 0
-    const quoteRe = /“[^”\n]*”|「[^」\n]*」|『[^』\n]*』|"[^"\n]*"/g
+    let bracketChars = 0
+    const speechRe = /(“[^”\n]*”|「[^」\n]*」|『[^』\n]*』|"[^"\n]*")|(【[^】\n]*】)/g
     for (const { line } of bodyLines) {
       let m
-      quoteRe.lastIndex = 0
-      while ((m = quoteRe.exec(line)) !== null) {
-        quotedChars += visibleChars(m[0].slice(1, -1))
+      speechRe.lastIndex = 0
+      while ((m = speechRe.exec(line)) !== null) {
+        if (m[1]) quotedChars += visibleChars(m[1].slice(1, -1))
+        else if (m[2]) bracketChars += visibleChars(m[2].slice(1, -1))
       }
     }
-    const dialogueRatio = quotedChars / bodyChars
+    const speechChars = quotedChars + bracketChars
+    const dialogueRatio = speechChars / bodyChars
     dialogueOk = dialogueRatio >= 0.15
-    dialogueEvidence = `引号内对话 ${quotedChars} / ${bodyChars} 字（${(dialogueRatio * 100).toFixed(1)}%）`
+    dialogueEvidence = bracketChars > 0
+      ? `引号内对话 ${quotedChars} 字 +【】心声/弹幕 ${bracketChars} 字（共 ${speechChars} / ${bodyChars} 字，${(dialogueRatio * 100).toFixed(1)}%）`
+      : `引号内对话 ${quotedChars} / ${bodyChars} 字（${(dialogueRatio * 100).toFixed(1)}%）`
   }
   checks.push(makeCheck(
     'delivery.short-dialogue-share',
     dialogueOk,
     dialogueEvidence,
-    '建议短篇对话占比 ≥15%，用直接交锋推动节奏（纯独白/书信/强悬疑独角戏可按题材豁免）',
+    '建议短篇对话/心声弹幕占比 ≥15%，用直接交锋推动节奏（纯独白/书信/强悬疑独角戏可按题材豁免）',
     '复核对话占比：若中段大段旁白转述冲突，改成当面对质或短促台词交锋；独白体题材可保留。',
     'advisory'
   ))
