@@ -6,7 +6,7 @@
     {
       "name": "oh-story",
       "source": "./",
-      "version": "0.12.0",
+      "version": "0.12.1",
       "description": "14 web-novel writing skills, commands, and ZCode prose guards. 14 个网文写作技能、命令与 ZCode 写作守卫。"
     }
   ]

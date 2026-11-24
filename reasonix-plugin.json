@@ -1,7 +1,7 @@
 {
   "apiVersion": "reasonix.io/plugin/v2",
   "name": "oh-story",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "Agent skill pack for writing web novels: 14 skills covering chart scanning, bestseller deconstruction, outlining, drafting, foreshadowing tracking, de-AI-flavor revision, and cover generation. 网文写作 Agent 技能包：14 个技能覆盖扫榜、拆文、大纲细纲、长短篇连载、伏笔追踪、去 AI 味与封面生成。",
   "skills": "skills"
 }
