@@ -108,6 +108,10 @@ function verify(projectDir, options = {}) {
 
   const settings = settingsRead.text
   const outline = outlineRead.text
+  const isImportedSettings = /^#{1,6}[ \t]*(?:已写部分的写法|本书续写基线)/m.test(settings)
+  const isImportedPartial = isImportedSettings && /半成品/.test(settings)
+  const isImportedOrLegacySettings =
+    isImportedSettings || /^#{1,6}[ \t]*Phase 2 设计校验/m.test(settings)
 
   // 正则保留「红果」仅兼容旧项目已写的设定，新项目引导不再列出
   const platformMatch = settings.match(/目标平台\s*[：:]\s*(知乎(?:盐言|盐选)?|盐[言选]|七猫(?:短篇)?|黑岩|红果|小程序|点众|番茄(?:短篇|短故事)?|未定)/)
@@ -143,6 +147,9 @@ function verify(projectDir, options = {}) {
   } else if (/^冷门/.test(genreValue)) {
     genreOk = fs.existsSync(path.join(skillRoot, 'SKILL.md'))
     genreEvidence = `题材：${genreValue}（冷门题材公式）`
+  } else if (isImportedSettings && genreValue === '[待补充]') {
+    genreOk = true
+    genreEvidence = '导入短篇题材暂标 [待补充]，待续写构思时选流派包'
   } else if (genreValue) {
     const named = genreNames.filter((name) => genreValue.startsWith(name)).sort((a, b) => b.length - a.length)[0]
     genreOk = Boolean(named)
@@ -338,12 +345,16 @@ function verify(projectDir, options = {}) {
     ? rowTargets.reduce((sum, value) => sum + value, 0)
     : null
   const isRange = targetHigh !== null && targetHigh !== targetLow
-  const statedTargetOk = statedTarget !== null && statedTarget >= 1000 && targetHigh <= 200000 && targetHigh >= targetLow
+  const targetPendingOnImport = isImportedPartial && /\[待补充\]/.test(targetLine)
+  const statedTargetOk = targetPendingOnImport ||
+    (statedTarget !== null && statedTarget >= 1000 && targetHigh <= 200000 && targetHigh >= targetLow)
   checks.push(makeCheck(
     'phase2.target-wordcount',
     statedTargetOk,
     '设定.md',
-    statedTarget === null ? '目标字数未识别或不可解析' : `设定目标：${isRange ? `${targetLow}-${targetHigh}` : statedTarget}`,
+    targetPendingOnImport
+      ? '导入半成品目标字数暂标 [待补充]，待续写构思确认'
+      : (statedTarget === null ? '目标字数未识别或不可解析' : `设定目标：${isRange ? `${targetLow}-${targetHigh}` : statedTarget}`),
     '设定.md 的目标字数为 1000-200000 的正整数或区间（低值 ≤ 高值）',
     ['SKILL.md'],
     '只在 设定.md 基本信息补或修正可解析的目标字数。',
@@ -351,14 +362,18 @@ function verify(projectDir, options = {}) {
   ))
 
   const targetSumOk = statedTargetOk && shapedRows.length > 0 && shapedRows.length === rows.length && targetSum !== null &&
-    (isRange
-      ? targetSum >= targetLow && targetSum <= targetHigh
-      : Math.abs(targetSum - statedTarget) <= statedTarget * 0.05)
+    (isImportedPartial
+      ? (targetPendingOnImport || targetSum <= targetHigh * 1.05)
+      : (isRange
+        ? targetSum >= targetLow && targetSum <= targetHigh
+        : Math.abs(targetSum - statedTarget) <= statedTarget * 0.05))
   checks.push(makeCheck(
     'phase2.target-word-sum',
     targetSumOk,
     '设定.md、小节大纲.md',
-    `设定目标：${statedTarget === null ? '未识别' : (isRange ? `${targetLow}-${targetHigh}` : statedTarget)}；大纲合计：${targetSum === null ? '有非数字目标字数' : targetSum}`,
+    isImportedPartial
+      ? `导入半成品已写节大纲合计：${targetSum === null ? '有非数字目标字数' : targetSum}（全篇目标：${targetPendingOnImport ? '[待补充]' : (isRange ? `${targetLow}-${targetHigh}` : statedTarget)}）`
+      : `设定目标：${statedTarget === null ? '未识别' : (isRange ? `${targetLow}-${targetHigh}` : statedTarget)}；大纲合计：${targetSum === null ? '有非数字目标字数' : targetSum}`,
     '建议大纲每行目标字数可解析，写区间时合计落在区间内，写单值时误差不超过 5%',
     ['SKILL.md'],
     '复核各节目标字数合计：若偏差过大请微调分配，不要用增删剧情绕过数字偏差。',
@@ -415,8 +430,6 @@ function verify(projectDir, options = {}) {
   ))
 
   // 导语/冷开场声明（advisory）：导入书与 0.9.x 旧版设定跳过以保持严格向后兼容。
-  const isImportedOrLegacySettings =
-    /^#{1,6}[ \t]*(?:已写部分的写法|本书续写基线|Phase 2 设计校验)/m.test(settings)
   let leadOk = false
   let leadEvidence = '设定.md 未声明导语或冷开场'
   if (isImportedOrLegacySettings) {

@@ -1394,5 +1394,40 @@ describe("check-ai-patterns.js", () => {
 
     // 11) invalid --mode exits 2
     assert.equal(runDetector(["--mode=bogus", fPara120]).status, 2);
+
+    // 12) NEW-BUG-05: --respect-skip honors <!-- 去味:跳过 --> in first 6 lines while default stays strict
+    const skipBody = [
+      "# 第3章 测试",
+      "<!-- 去味:跳过 -->",
+      "他声音不大，却让全厅骤然安静下来。",
+      "她声音不高，却把对面的人震得后退半步。",
+      "这一夜注定无人入眠。",
+    ];
+    const fSkipTop = writeFixture("respect-skip-top.md", skipBody);
+    const defaultRun = runDetector(["--check", "--json", "--fail-on=review_required", fSkipTop]);
+    assert.equal(defaultRun.status, 1);
+    assert.ok(defaultRun.json().review_required > 0);
+
+    const skipRun = runDetector(["--check", "--json", "--respect-skip", "--fail-on=review_required", fSkipTop]);
+    assert.equal(skipRun.status, 0);
+    assert.equal(skipRun.json().review_required, 0);
+    assert.ok(skipRun.json().findings.some((f) => f.severity === "advisory" && f.exempted === "去味:跳过"));
+
+    const fSkipLate = writeFixture("respect-skip-late.md", [
+      "# 第4章 测试",
+      "第一行正文。",
+      "第二行正文。",
+      "第三行正文。",
+      "第四行正文。",
+      "第五行正文。",
+      "第六行正文。",
+      "<!-- 去味:跳过 -->",
+      "他声音不大，却让全厅骤然安静下来。",
+      "她声音不高，却把对面的人震得后退半步。",
+      "这一夜注定无人入眠。",
+    ]);
+    const lateRun = runDetector(["--check", "--json", "--respect-skip", "--fail-on=review_required", fSkipLate]);
+    assert.equal(lateRun.status, 1);
+    assert.ok(lateRun.json().review_required > 0);
   });
 });

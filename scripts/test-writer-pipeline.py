@@ -912,6 +912,116 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(prompt2.count('【切片 A】'), 1)
         self.assertEqual(prompt2.count('【切片 B】'), 1)
 
+    def test_comma_benchmark_title_injects_style_slices_under_downgrade_and_espionage_routes_to_general(self):
+        # BUG-01: 含逗号的对标书名在召回降档下不能被截断，必须精准命中 对标/{全书名}/文风.md 注入切片。
+        full_title = '全球僵尸降临，你说道士序列没用'
+        self.put(
+            '设定/题材定位.md',
+            f'- 题材类型：都市高武异能\n## 对标登记\n- 主对标书：{full_title}\n'
+            f'| 书名 | 题材类型 | 引用强度 | 用途 |\n|---|---|---|---|\n'
+            f'| {full_title} | 都市高武异能 | 主 | 文风主对标 |\n',
+        )
+        self.put('设定/文风.md', '# 本书文风\n竖屏短段，口语直给。\n')
+        self.put(
+            f'对标/{full_title}/文风.md',
+            '# 对标文风\n'
+            '### 片段 A — 开篇\n```text\n铜铃一响，整条长街的僵尸齐刷刷跪了一地。\n```\n'
+            '### 片段 B — 打脸\n```text\n测力柱嗡的一声裂开三道缝，台下鸦雀无声。\n```\n',
+        )
+        self.put('大纲/细纲_第001章.md', '### 第 1 章：破局\n- 单元ID/位置：L1-01\n- 目标情绪：憋屈→爽\n')
+        res = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 1)
+        self.assertEqual(res.returncode, 0, res.stderr)
+        prompt_body, report_body = res.stdout.split('以下不进 prompt', 1)
+        self.assertIn('铜铃一响，整条长街的僵尸齐刷刷跪了一地。', prompt_body)
+        self.assertIn('测力柱嗡的一声裂开三道缝，台下鸦雀无声。', prompt_body)
+        self.assertIn(f'对标/{full_title}/文风.md', report_body)
+        self.assertIn('召回降档', report_body)
+
+        # BUG-06: 抗战谍战/民国谍战不再命中带古代圣旨切片的 历史架空权谋.md，改落 通用长篇.md。
+        self.put('设定/题材定位.md', '- 题材类型：民国谍战\n## 对标登记\n- 主对标书：无\n')
+        res_spy = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 1)
+        self.assertEqual(res_spy.returncode, 0, res_spy.stderr)
+        self.assertIn('通用长篇.md', res_spy.stdout)
+        self.assertNotIn('历史架空权谋.md', res_spy.stdout)
+
+    def test_secondary_benchmark_style_never_leaks_when_primary_lacks_style_file(self):
+        # NEW-BUG-02: 主对标缺 文风.md 时，绝不滑落加载副/参考对标的 文风.md 并错标成主对标。
+        self.put('对标/主标神瞳/剧情/节奏.md', '# 主标节奏\n')
+        self.put(
+            '对标/副标权谋/文风.md',
+            '# 副标文风\n### 切片 1\n```text\n副标专属泄漏文本绝不能进主对标。\n```\n',
+        )
+        self.put('大纲/细纲_第001章.md', '### 第 1 章：破局\n- 单元ID/位置：L1-01\n- 目标情绪：憋屈→爽\n')
+
+        # 情形 A：显式写了「主对标书：主标神瞳」+ 对标登记表含副标权谋（辅）
+        self.put(
+            '设定/题材定位.md',
+            '- 题材类型：都市脑洞\n'
+            '## 对标登记\n'
+            '- 主对标书：主标神瞳\n'
+            '| 书名 | 题材类型 | 引用强度 | 用途 |\n'
+            '|---|---|---|---|\n'
+            '| 主标神瞳 | 都市脑洞 | 主 | 主对标 |\n'
+            '| 副标权谋 | 历史架空 | 辅 | 只看权谋结构 |\n',
+        )
+        res_a = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 1)
+        self.assertEqual(res_a.returncode, 0, res_a.stderr)
+        self.assertNotIn('副标专属泄漏文本绝不能进主对标', res_a.stdout)
+        self.assertNotIn('对标/副标权谋/文风.md', res_a.stdout)
+
+        # 情形 B：未写「主对标书：」行，仅靠「对标登记」表的「引用强度」列区分主/辅/参考
+        self.put(
+            '设定/题材定位.md',
+            '- 题材类型：都市脑洞\n'
+            '## 对标登记\n'
+            '| 书名 | 题材类型 | 引用强度 | 用途 |\n'
+            '|---|---|---|---|\n'
+            '| 主标神瞳 | 都市脑洞 | 主 | 主对标 |\n'
+            '| 副标权谋 | 历史架空 | 参考 | 仅参考配角 |\n',
+        )
+        res_b = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 1)
+        self.assertEqual(res_b.returncode, 0, res_b.stderr)
+        self.assertNotIn('副标专属泄漏文本绝不能进主对标', res_b.stdout)
+        self.assertNotIn('对标/副标权谋/文风.md', res_b.stdout)
+
+    def test_range_outline_and_hybrid_genre_routing(self):
+        # Polish #1: 范围细纲 细纲_第1-10章.md 按目标章切片读取；缺目标章小节时明确中止。
+        for existing in (self.book / '大纲').glob('细纲_*.md'):
+            existing.unlink()
+        self.put(
+            '大纲/细纲_第1-10章.md',
+            '# 第1-10章细纲\n\n'
+            '### 第 1 章：雾起\n'
+            '- 单元ID/位置：L1-01\n'
+            '- 目标情绪：悬念\n'
+            '- 主角目标与关键选择：进城摸底。\n\n'
+            '### 第 2 章：夜审\n'
+            '- 单元ID/位置：L1-01\n'
+            '- 目标情绪：紧绷→反杀\n'
+            '- 主角目标与关键选择：借假密电反扣内鬼。\n',
+        )
+        self.put('正文/第001章_雾起.md', '# 第001章 雾起\n\n雨夜电报机滴滴作响，他把密码本塞进炉灰里。\n')
+        self.put('设定/题材定位.md', '- 题材类型：民国谍战 / 悬疑\n## 对标登记\n- 主对标书：无\n')
+        res_ch2 = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 2)
+        self.assertEqual(res_ch2.returncode, 0, res_ch2.stderr)
+        self.assertIn('第002章_夜审.md', res_ch2.stdout)
+        self.assertIn('细纲_第1-10章.md', res_ch2.stdout)
+        self.assertIn('紧绷→反杀', res_ch2.stdout)
+        # Polish #3: 混合标签「民国谍战 / 悬疑」以 通用长篇.md 为主流派包，不落入古代历史权谋。
+        self.assertIn('主流派包：agent-references/genre-styles/通用长篇.md', res_ch2.stdout)
+        self.assertIn('辅流派包：agent-references/genre-styles/悬疑灵异.md', res_ch2.stdout)
+        self.assertNotIn('历史架空权谋.md', res_ch2.stdout)
+
+        res_missing = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 3)
+        self.assertEqual(res_missing.returncode, 2)
+        self.assertIn('未找到第 3 章小节', res_missing.stderr)
+
+        # Polish #3: 规则怪谈可直达 悬疑灵异.md（含悬疑规则怪谈混合标签）。
+        self.put('设定/题材定位.md', '- 题材类型：悬疑灵异 / 规则怪谈\n## 对标登记\n- 主对标书：无\n')
+        res_rule = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 2)
+        self.assertEqual(res_rule.returncode, 0, res_rule.stderr)
+        self.assertIn('主流派包：agent-references/genre-styles/悬疑灵异.md', res_rule.stdout)
+
     def test_all_writing_deslop_review_cli_scripts_support_help(self):
         # 系统性回归：长篇/短篇/去味/审稿全部 CLI 脚本都必须干净支持 --help 与 -h（exit 0、stdout 非空、stderr 为空）。
         library_only = {'wordcount_core.js', 'style-whitelist.js'}

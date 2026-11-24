@@ -429,11 +429,32 @@ function foldLeadingSpecials(candidates) {
   return [[body, ...candidates.slice(first + 1)], folded];
 }
 
-function buildBoundaries(text, locatorPath, sourceHash, foldPrologue = false) {
+const NO_HEADING_AUTHOR_MESSAGE =
+  "原文认不出章节标题（如「第1章」「楔子」），能看一下开头格式吗？未分章文本建议改用短篇拆文；若确认按整篇长篇拆，请明确说明后继续。";
+
+function buildBoundaries(text, locatorPath, sourceHash, foldPrologue = false, allowSingleChapter = false) {
   const lines = physicalLines(text);
   let candidates = dropAdjacentDuplicateHeadings(dropLeadingToc(headingCandidates(lines)), lines);
   if (!candidates.length) {
-    throw new Error("chapter_heading_not_found");
+    if (allowSingleChapter && text.trim()) {
+      const charCount = codepointLength(text.replace(/\s+/g, ""));
+      const endLine = lines.length;
+      return [[{
+        chapter: 1,
+        source_chapter: "1",
+        volume: "",
+        title: "全文",
+        start_line: 1,
+        end_line: endLine,
+        char_count: charCount,
+        source_locator: `${locatorPath}:L1-L${endLine}`,
+        status: charCount ? "ok" : "empty",
+        chapter_sha256: sha256(Buffer.from(normalizedChapterText(lines, 1, endLine), "utf8")),
+        source_sha256: sourceHash,
+        parser_version: PARSER_VERSION,
+      }], [], []];
+    }
+    throw new RebuildMismatch("chapter_heading_not_found", NO_HEADING_AUTHOR_MESSAGE);
   }
   let folded = [];
   if (foldPrologue) {
@@ -664,13 +685,17 @@ class RebuildMismatch extends Error {
   }
 }
 
-function indexWasFolded(oldRows, newRows) {
+function indexWasFolded(oldRows, newRows, foldedRows = null) {
   const oldFirst = oldRows.length ? String(oldRows[0].source_chapter ?? "") : "";
   const newFirst = newRows.length ? String(newRows[0].source_chapter ?? "") : "";
-  return (
+  const headingShifted =
     isAsciiDigits(oldFirst) && parseInt(oldFirst, 10) >= 1 &&
-    !(isAsciiDigits(newFirst) && parseInt(newFirst, 10) >= 1)
-  );
+    !(isAsciiDigits(newFirst) && parseInt(newFirst, 10) >= 1);
+  if (!headingShifted) return false;
+  if (Array.isArray(foldedRows)) {
+    return foldedRows.length > 0 && oldRows[0].chapter_sha256 === foldedRows[0].chapter_sha256;
+  }
+  return true;
 }
 
 function compareRebuild(oldRows, newRows) {
@@ -705,7 +730,7 @@ function compareRebuild(oldRows, newRows) {
 
 function printHelp() {
   process.stdout.write(
-    "usage: build_chapter_index.js --source SOURCE --output OUTPUT [--locator-path LOCATOR_PATH] [--rebuild] [--fold-prologue]\n\n" +
+    "usage: build_chapter_index.js --source SOURCE --output OUTPUT [--locator-path LOCATOR_PATH] [--rebuild] [--fold-prologue] [--allow-single-chapter]\n\n" +
     "Build the mechanical, content-addressed chapter index.\n\n" +
     "options:\n" +
     "  --source SOURCE            Source novel text path\n" +
@@ -713,6 +738,7 @@ function printHelp() {
     "  --locator-path PATH        Relative locator path under 原文/\n" +
     "  --rebuild                  Explicitly rebuild an existing index\n" +
     "  --fold-prologue            merge 楔子/序章/第0章 before the first numbered chapter into it\n" +
+    "  --allow-single-chapter     treat unchaptered source text as a single chapter when user insists\n" +
     "  -h, --help                 show this help message and exit\n"
   );
 }
@@ -724,6 +750,7 @@ function parseArgs(argv) {
     locatorPath: null,
     rebuild: false,
     foldPrologue: false,
+    allowSingleChapter: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const tok = argv[i];
@@ -756,6 +783,8 @@ function parseArgs(argv) {
       args.rebuild = true;
     } else if (flag === "--fold-prologue") {
       args.foldPrologue = true;
+    } else if (flag === "--allow-single-chapter") {
+      args.allowSingleChapter = true;
     } else {
       throw new Error(`unknown_argument:${tok}`);
     }
@@ -819,14 +848,23 @@ function main(argv = process.argv.slice(2)) {
       return 0;
     }
     const text = decodeSource(raw);
-    let [rows, folded, anomalies] = buildBoundaries(text, locatorPath, sourceHash, args.foldPrologue);
+    let [rows, folded, anomalies] = buildBoundaries(text, locatorPath, sourceHash, args.foldPrologue, args.allowSingleChapter);
     let pending = rows.map((_, idx) => idx + 1);
     let oldCount = 0;
     if (isFile(args.output)) {
       const [, oldRows] = readExisting(args.output);
       oldCount = oldRows.length;
       if (!args.foldPrologue && indexWasFolded(oldRows, rows)) {
-        [rows, folded, anomalies] = buildBoundaries(text, locatorPath, sourceHash, true);
+        const [foldedRows, foldedPrologue, foldedAnomalies] = buildBoundaries(
+          text,
+          locatorPath,
+          sourceHash,
+          true,
+          args.allowSingleChapter
+        );
+        if (indexWasFolded(oldRows, rows, foldedRows)) {
+          [rows, folded, anomalies] = [foldedRows, foldedPrologue, foldedAnomalies];
+        }
       }
       pending = compareRebuild(oldRows, rows);
     } else {

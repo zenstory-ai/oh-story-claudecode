@@ -2445,6 +2445,102 @@ function testCdpIncrementalRefreshCopiesWalAndLocalState() {
   assert.strictEqual(run.copiedLocalState, '{"os_crypt":{"encrypted_key":"K1"}}', "应同步父级 Local State 密钥文件");
 }
 
+// LIVE-BUG-01: 七猫排行榜页面热度行末尾带 iconfont 私有区字形（如「109.0 万 热度 \uE64B」），
+// 解析器必须正常提取热度且绝不能把热度行漏进简介。
+function testQimaoRankHeatStripsPuaIcons() {
+  const qimao = loadFresh(path.join(repoRoot, "skills/story-long-scan/scripts/qimao-rank-scraper.js"));
+  assert.strictEqual(typeof qimao.extractBooksFromTextJS, "function");
+  const innerText = [
+    "男生榜",
+    "大热榜",
+    "日榜",
+    "1",
+    "大周司农",
+    "墨青",
+    "历史",
+    "架空历史",
+    "连载中",
+    "120.5万字",
+    "这是第一本书的正常简介。",
+    "最近更新 第88章 丰收",
+    "109.0 万 热度 \uE64B",
+    "2",
+    "新书测试",
+    "作者乙",
+    "都市",
+    "都市脑洞",
+    "连载中",
+    "8500字",
+    "第二本书简介。",
+    "8500 热度\uE64A",
+    "下一页",
+  ].join("\n");
+  const books = JSON.parse(
+    require("vm").runInNewContext(qimao.extractBooksFromTextJS(), {
+      document: { body: { innerText } },
+    })
+  );
+  assert.strictEqual(books.length, 2, `期望 2 本书，实际 ${books.length}`);
+  assert.strictEqual(books[0].heat, "109.0万");
+  assert.strictEqual(books[0].desc, "这是第一本书的正常简介。");
+  assert(!books[0].desc.includes("热度"), `热度不得漏进简介: ${books[0].desc}`);
+  assert.strictEqual(books[1].heat, "8500");
+  assert.strictEqual(books[1].desc, "第二本书简介。");
+}
+
+// LIVE-BUG-02: 晋江排行榜页顶部搜索/筛选栏包含「古代言情」「多元」等频道同名项及「-范围-」「-视角-」等 UI 文本；
+// 解析器必须校验 novelid 锚点，绝不把筛选 UI 吐成假书目，同时保留含「投」字的真实书名。
+function testJjwxcRankSkipsFilterUiWithoutNovelId() {
+  const jjwxc = loadFresh(path.join(repoRoot, "skills/story-long-scan/scripts/jjwxc-rank-scraper.js"));
+  assert.strictEqual(typeof jjwxc.extractRankDataJS, "function");
+  const innerText = [
+    "晋江文学城",
+    "古代言情",
+    "-范围-",
+    "全站",
+    "完结半价",
+    "VIP库",
+    "多元",
+    "-视角-",
+    "男主",
+    "女主",
+    "-时代-",
+    "近代现代",
+    "收入金榜",
+    "古代言情",
+    "春日宴",
+    "作者甲",
+    "投桃报李",
+    "作者乙",
+    "多元",
+    "异界纪事",
+    "作者丙",
+    "榜单说明",
+  ].join("\n");
+  const anchors = [
+    { getAttribute: () => "/onebook.php?novelid=101", innerText: "春日宴" },
+    { getAttribute: () => "/onebook.php?novelid=102", innerText: "投桃报李" },
+    { getAttribute: () => "/onebook.php?novelid=103", innerText: "异界纪事" },
+    { getAttribute: () => "/onebook.php?novelid=999", innerText: "路人向《春日宴》投了1个地雷" },
+  ];
+  const parsed = JSON.parse(
+    require("vm").runInNewContext(jjwxc.extractRankDataJS(), {
+      document: {
+        body: { innerText },
+        querySelectorAll: (sel) => (sel === "a" ? anchors : []),
+      },
+    })
+  );
+  const byName = Object.fromEntries(parsed.channels.map((c) => [c.name, c.books]));
+  assert.deepStrictEqual(byName["古代言情"], [
+    { title: "春日宴", author: "作者甲", novelid: "101" },
+    { title: "投桃报李", author: "作者乙", novelid: "102" },
+  ]);
+  assert.deepStrictEqual(byName["多元"], [
+    { title: "异界纪事", author: "作者丙", novelid: "103" },
+  ]);
+}
+
 testCdpUtils(longUtilsPath);
 testWindowsInvocationBuilder(longUtilsPath);
 testLocalDateStamp(longUtilsPath);
@@ -2459,6 +2555,8 @@ testQidianCaptchaCheckIgnoresBookText();
 testQidianLibraryFontDecoding();
 testQidianLibraryPagingE2E();
 testQimaoPeriodPlan();
+testQimaoRankHeatStripsPuaIcons();
+testJjwxcRankSkipsFilterUiWithoutNovelId();
 testQimaoPartialTargetStatus();
 testQimaoLibraryPagedCollection();
 testQimaoLibraryPageFailures();

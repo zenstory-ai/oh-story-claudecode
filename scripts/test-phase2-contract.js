@@ -473,6 +473,19 @@ try {
   ), ['--strict'])
   assert.strictEqual(shortFourSections.status, 0, shortFourSections.stdout + shortFourSections.stderr)
 
+  // BUG-03: 导入半成品短篇（带「已写部分的写法：半成品」、题材 [待补充]、已写 4 节大纲合计小于全篇目标或目标 [待补充]）
+  // 在 --strict 下应直接通过，不与 structure-mapping-short.md 冲突。
+  for (const [label, targetLine] of [['numeric-full-target', '9000'], ['pending-target', '[待补充]']]) {
+    const importedSettings = validSettings({
+      target: targetLine,
+      genre: '题材：[待补充]',
+      reversal: '反转在：第 3 节（共 9 节）',
+      paywall: '付费点：第 3 节末',
+    }) + '\n## 已写部分的写法\n- 已写到：第 4 节，半成品\n'
+    const importedRes = run(writeCase(`imported-partial-${label}`, importedSettings, fourSectionOutline), ['--strict'])
+    assert.strictEqual(importedRes.status, 0, `${label}: ${importedRes.stdout}${importedRes.stderr}`)
+  }
+
   const invalidInvocation = spawnSync(process.execPath, [verifier, '--unknown'], {
     cwd: repoRoot,
     encoding: 'utf8',

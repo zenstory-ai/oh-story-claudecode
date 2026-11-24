@@ -102,6 +102,7 @@ const DRAFT_LIMITS = {
   'character_snapshots.*.goal / state': 100,
   'character_snapshots.*.四个列表单项': 200,
   角色快照单文件: 21500,
+  逐章记录目标字数: 512,
   逐章记录总量: 1024,
 };
 
@@ -464,22 +465,30 @@ function requireNoRetiredTrackingPaths(tracking) {
   requireCondition(found.length === 0, `retired tracking files are not supported: ${found.join(', ')}`);
 }
 
+function findPreexistingTrackingEntries(tracking) {
+  if (!isDir(tracking)) return [];
+  return fs
+    .readdirSync(tracking)
+    .filter((name) => name !== RETIRED_ARCHIVE_DIR && name !== '.tracking-commit.lock' && !name.endsWith('.lock'))
+    .sort();
+}
+
 function archiveRetiredTrackingPaths(tracking) {
-  const retired = findRetiredTrackingPaths(tracking);
-  if (!retired.length) return [];
+  const preexisting = findPreexistingTrackingEntries(tracking);
+  if (!preexisting.length) return [];
   const archive = path.join(tracking, RETIRED_ARCHIVE_DIR);
-  for (const relative of retired) {
+  for (const relative of preexisting) {
     requireCondition(
       !exists(path.join(archive, relative)),
       `追踪/${RETIRED_ARCHIVE_DIR}/${relative} already exists; move it away before initializing`
     );
   }
-  for (const relative of retired) {
+  for (const relative of preexisting) {
     const target = path.join(archive, relative);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.renameSync(path.join(tracking, relative), target);
   }
-  return retired;
+  return preexisting;
 }
 
 function bothBlank(position) {
@@ -1545,11 +1554,14 @@ function warnSizes(views, deltaPayload = null, warningsOut = null) {
     const deltaSize = byteSize(deltaPayload);
     if (deltaSize > DELTA_MAX_BYTES) {
       emitWarning(
-        `chapter delta is ${deltaSize} bytes; recommended cap is <= ${DELTA_MAX_BYTES} bytes（不影响本次提交，建议后续精简）`,
+        `chapter delta is ${deltaSize} bytes; target is <= ${DELTA_TARGET_BYTES} bytes（约 512 字），recommended cap is <= ${DELTA_MAX_BYTES} bytes（约 1024 字，不影响本次提交，建议后续精简）`,
         warningsOut
       );
     } else if (deltaSize > DELTA_TARGET_BYTES) {
-      emitWarning(`chapter delta is ${deltaSize} bytes; target is <= ${DELTA_TARGET_BYTES}`, warningsOut);
+      emitWarning(
+        `chapter delta is ${deltaSize} bytes; target is <= ${DELTA_TARGET_BYTES} bytes（约 512 字，软上限 ${DELTA_MAX_BYTES} 字节 / 约 1024 字）`,
+        warningsOut
+      );
     }
   }
   const contextSize = byteSize(views['上下文.md']);

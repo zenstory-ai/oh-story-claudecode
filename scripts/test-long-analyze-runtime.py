@@ -923,6 +923,43 @@ def test_fold_prologue_survives_rebuild() -> None:
         require(mismatch.returncode == 2 and mismatch_payload["error"] == "chapter_mapping_ambiguous:position=1"
                 and author_text_is_plain(mismatch_payload.get("author_message", "")),
                 "重建改变章号口径时必须停下并说明：" + mismatch.stdout)
+        # Polish #2: 已建好无楔子索引的书，在开头新增「序章」后直接 --rebuild 不得静默并入第 1 章，必须触发章号错位告警。
+        prepended = Path(temporary) / "无楔子建表后新增序章"
+        (prepended / "原文").mkdir(parents=True)
+        base_no_prologue = "第一章 起程\n正文一。\n\n第二章 遇敌\n正文二。\n"
+        (prepended / "原文" / "原文.txt").write_text(base_no_prologue, encoding="utf-8")
+        require(build_index(prepended).returncode == 0, "无楔子新书初建索引失败")
+        (prepended / "原文" / "原文.txt").write_text("序章 缘起\n序章内容。\n\n" + base_no_prologue, encoding="utf-8")
+        prepended_res = build_index(prepended, "--rebuild")
+        prepended_payload = json.loads(prepended_res.stdout)
+        require(prepended_res.returncode == 2 and prepended_payload["error"] == "chapter_mapping_ambiguous:position=1"
+                and author_text_is_plain(prepended_payload.get("author_message", "")),
+                "已建无楔子索引后开头插序章必须拦下而非静默折叠：" + prepended_res.stdout)
+
+
+def test_unchaptered_source_author_message_and_single_chapter_opt_in() -> None:
+    # NEW-BUG-04: 无章节标题的原文默认报 chapter_heading_not_found 并附白话 author_message；
+    # 传入 --allow-single-chapter 时按整篇单章建表，供后续 plan 正常消费。
+    with tempfile.TemporaryDirectory(prefix="long-single-chapter-") as temporary:
+        root = Path(temporary) / "无章标题文本"
+        (root / "原文").mkdir(parents=True)
+        (root / "原文" / "原文.txt").write_text(
+            "林远推开院门，看见雪地上多了一串新脚印。\n\n他提着灯笼走到井边，井沿上挂着半块碎玉。\n",
+            encoding="utf-8",
+        )
+        blocked = build_index(root)
+        payload = json.loads(blocked.stdout)
+        require(blocked.returncode == 2 and payload["error"] == "chapter_heading_not_found"
+                and payload.get("author_message") and author_text_is_plain(payload["author_message"]),
+                "无章标题原文必须返回白话 author_message：" + blocked.stdout)
+        single = build_index(root, "--allow-single-chapter")
+        single_payload = json.loads(single.stdout)
+        require(single.returncode == 0 and single_payload["chapters"] == 1
+                and single_payload["pending_chapters"] == [1],
+                "--allow-single-chapter 应按单章建表：" + single.stdout)
+        plan = run(MANAGE, "plan", "--root", root)
+        require(plan.returncode == 0 and len(json.loads(plan.stdout)["batches"]) == 1,
+                "单章索引必须能被 manage_analysis_run plan 正常消费：" + plan.stdout)
 
 
 def test_cli_output_is_utf8_on_legacy_consoles() -> None:
@@ -1418,6 +1455,7 @@ def main() -> int:
     test_legacy_summaries_prologue_way_out()
     test_legacy_table_title_variants()
     test_fold_prologue_survives_rebuild()
+    test_unchaptered_source_author_message_and_single_chapter_opt_in()
     test_cli_output_is_utf8_on_legacy_consoles()
     test_relation_chart_never_falls_back_to_pinyin()
     test_relation_chart_font_choice()

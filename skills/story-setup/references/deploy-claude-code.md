@@ -16,7 +16,7 @@
 | `skills/story-setup/scripts/copy-path-safety.js` | 每个递归复制步骤前执行，不复制到项目专用目录 | story-setup helper | execute | JSON 仅 `copy_allowed: true` 时允许复制；symlink 同对象 no-op；target 位于 source 内时停止 |
 | generated sentinel | `.story-deployed` | story-setup managed | replace | contains `agents_version`, `setup_skill_version`, `target_cli`, `resolver_strategy`, `references_dir` |
 
-`references/templates/hooks/` 内容：`run-story-hook.sh`（统一启动器，探测 Node.js 18+ 并路由 8 个 Claude hook 事件）+ `story_hook_core.js`（正文网/大纲守卫/缺口检测/连续性/commit 侦测的共享实现，与 Codex/OpenCode/ZCode/Antigravity 同一份）+ `story_hook_cli.js`（Claude Code 统一 Node 适配器及 `analysis-input-guard`）。正文兜底限 PostToolUse Write/Edit；`cat>`/`tee` 等 Bash 写正文在 Claude 端仅运行写前守卫。
+`references/templates/hooks/` 内容：`run-story-hook.sh`（统一启动器，探测 Node.js 18+ 并路由 6 个 Claude hook 事件 / 8 处挂载）+ `story_hook_core.js`（正文网/大纲守卫/缺口检测/连续性/commit 侦测的共享实现，与 Codex/OpenCode/ZCode/Antigravity 同一份）+ `story_hook_cli.js`（Claude Code 统一 Node 适配器及 `analysis-input-guard`）。正文兜底限 PostToolUse Write/Edit；`cat>`/`tee` 等 Bash 写正文在 Claude 端仅运行写前守卫。
 
 ## 部署 CLAUDE.md
 

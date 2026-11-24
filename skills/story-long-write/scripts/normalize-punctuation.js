@@ -9,7 +9,7 @@ const USAGE = `Usage: node normalize-punctuation.js [--check] [--mode=auto|long|
 
 Normalize正文 punctuation deterministically:
   - keep standard ellipses (……) in dialogue, 【…】 panels, and narration; unify non-standard ellipses (..., single …, ………+, 。。。+, .……..) to ……
-  - keep standard em dashes (——) in dialogue quotes (“”「」『』 and paired ASCII ") and narration across both long and short modes; unify non-standard dashes (single —, triple ———+, --) to —— (and numeric ranges like 10--20 outside quotes to 「到」)
+  - keep standard em dashes (——) in dialogue quotes (“”「」『』 and paired ASCII ") and narration across both long and short modes; unify non-standard dashes (single —, triple ———+, --) to —— (and numeric ranges like 10--20 to 「到」 both inside and outside quotes)
   - --mode=auto|long|short is accepted for CLI symmetry with check-ai-patterns.js (narration —— density is governed by check-ai-patterns.js)
   - remove markdown divider lines (---) from正文
   - preserve pause punctuation covered by book-local .deslop-whitelist literals
@@ -325,11 +325,11 @@ function normalizePausePunctuationPass(line, lineNo, commentSpans) {
     }
 
     // 破折号（对话引号内与叙述旁白均保留标准 `——`）：长短篇网文均用 `——` 做打断、拖音、系统提示或转折揭底拍，
-    // 不再机械删改标准 `——`；仅把非标 `—` / `———` / `--` 统一为 `——`（引号外数字区间 `10--20` 仍转为「到」）。
+    // 不再机械删改标准 `——`；仅把非标 `—` / `———` / `--` 统一为 `——`（数字区间 `10--20` 无论引号内外均转为「到」）。
     if (hasDash) {
       const before = previousNonSpace(original, match.index - 1);
       const after = nextNonSpace(original, match.index + token.length);
-      if (!inDialogueQuote && token.startsWith('-') && /\d/.test(before) && /\d/.test(after)) {
+      if (token.startsWith('-') && /\d/.test(before) && /\d/.test(after)) {
         output += original.slice(lastIndex, match.index) + '到';
         findings.push({
           line: lineNo,

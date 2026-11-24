@@ -17,7 +17,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 1. 只据可读原文与已有资料下结论，缺失写「未知/文本未明确」，不虚构事实、不把结果倒推成早有计划；硬事实附章节、`source_locator` 或 5–15 字定位词，推断标证据等级。
 2. 区分客观发生、文本披露、读者与角色所知；量化网感与爽点节奏，不用文学散文评价替代实测数据；只迁移抽象机制，不复刻专有设定、事件链、场面或原句。
 3. 作者可见回复与报告按 [references/author-facing.md](references/author-facing.md) 说白话、编号带人话名，`author_message` 原意转述。
-4. 脚本用 `node`（18+），Stage 4 关系图用 Python（见 stage4-characters-settings.md）。`{story-long-analyze skill 根}` 为本目录，`{拆文目录}` 为 `拆文库/{书名}/`。首次拆书存 TXT 至 `{拆文目录}/原文/原文.txt`（非 UTF-8 先转 UTF-8）。不足 2 万字或无章标题建议改用 `/story-short-analyze`（作者坚持或导入调用则照常按长篇拆）。
+4. 脚本用 `node`（18+），Stage 4 关系图用 Python（见 stage4-characters-settings.md）。`{story-long-analyze skill 根}` 为本目录，`{拆文目录}` 为 `拆文库/{书名}/`。首次拆书存 TXT 至 `{拆文目录}/原文/原文.txt`（非 UTF-8 先转 UTF-8）。不足 2 万字或无章标题建议改用 `/story-short-analyze`（作者坚持或导入调用则照常按长篇拆；无章标题时 `build_chapter_index.js` 加 `--allow-single-chapter` 按整篇单章建表）。
 
 ## 按时刻读
 
@@ -70,7 +70,7 @@ node "{story-long-analyze skill 根}/scripts/inspect_existing_assets.js" --root 
 
 - **Stage 0 索引**：按 LF 计物理行、剔目录块并校验章号连续；错位报错读 [pipeline-ops.md](references/pipeline-ops.md#原文变化与章号对不上) 转告选项（默认推按旧章号继续）。
 - **Stage 1–6**：Stage 1 拆完前三章未要求全跑则停问；Stage 2 默认每轮 3 批有限并行；Stage 3–5 用 `digest` 取料；Stage 6 定点生成量化指标＋原文切片 `文风.md`。
-- **选题回填**：Stage 5 后找 `选题决策.md`，只回填标「待拆文验证」且题材匹配项（见 stage5-report.md）。无「推荐选题」跳过；有推荐选题但缺「能爆的原因」报 `invalid_topic_decision_contract` 提示重跑 `story-long-scan` Phase 5；无文件不影响拆文。
+- **选题回填**：Stage 5 后找 `选题决策.md`，只回填标「待拆文验证」且题材匹配项（见 stage5-report.md）。无「推荐选题」跳过；有推荐选题但缺「能爆的原因」按 author-facing「选题决策缺栏目」告知并跳过回填、不影响拆文完成；无文件不影响拆文。
 - **状态保护**：运行状态唯一落在 `_progress.md` 受管区，既有 `schema_version: 2` 原值保留；`最终状态` 由脚本写（Stage 3–6 全成写 `completed`，供 hooks 判断，不手改）。
 
 全部完成后按 [references/pipeline-ops.md](references/pipeline-ops.md#收尾检查) 收尾检查，再按 author-facing「全部拆完」汇报。

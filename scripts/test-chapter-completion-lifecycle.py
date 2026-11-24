@@ -179,6 +179,8 @@ class FinalChapterFlowTests(unittest.TestCase):
         self.assertEqual(checked["available_actions"], ["commit"])
         committed = self.run_chapter("commit", 1, document=transaction(1, self.state()["state_revision"]))
         self.assertTrue(committed["tracking_committed"])
+        self.assertEqual(committed["state_revision"], self.state()["state_revision"])
+        self.assertEqual(committed["state_revision"], 1)
 
         # 2: under never auto-commits; accept re-reads changed body and target, then commits once.
         self.write_contract(2, 800)

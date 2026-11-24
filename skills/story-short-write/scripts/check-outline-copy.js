@@ -153,22 +153,56 @@ function splitByAnchors(frag, anchors) {
   return { rest, anchoredLen }
 }
 
-/** 定位同章细纲：遍历 大纲/ 按章号正则匹配，支持带后缀的文件名 */
+const RANGE_OUTLINE_RE = /^细纲_第(\d+)[-–—~～至到]第?(\d+)章.*\.md$/
+
+function extractChapterSlice(text, chapter) {
+  const lines = text.split(/\r?\n/)
+  const targetRe = new RegExp(`^#{2,3}\\s*第\\s*0*${chapter}\\s*章(?:[：:\\s]|$)`)
+  const anyChapterRe = /^#{2,3}\s*第\s*\d+\s*章(?:[：:\s]|$)/
+  const start = lines.findIndex((line) => targetRe.test(line))
+  if (start === -1) return null
+  let end = lines.length
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (anyChapterRe.test(lines[i])) {
+      end = i
+      break
+    }
+  }
+  return lines.slice(start, end).join('\n')
+}
+
+function parseProseChapter(proseFile) {
+  const m = path.basename(proseFile).match(/^第\s*(\d+)\s*章/)
+  return m ? Number(m[1]) : null
+}
+
+/** 定位同章细纲：遍历 大纲/ 先找单章细纲，再回落范围细纲（细纲_第A-B章*.md） */
 function findOutline(proseFile) {
   const base = path.basename(proseFile)
   // 短篇没有章号：正文.md 与 小节大纲.md 在同目录平铺
   if (base === '正文.md') {
     const sibling = path.join(path.dirname(proseFile), '小节大纲.md')
-    return fs.existsSync(sibling) ? sibling : null
+    return fs.existsSync(sibling) ? { file: sibling, chapter: null, fromRangeFile: false } : null
   }
-  const m = base.match(/^第\s*0*(\d+)\s*章/)
-  if (!m) return null
-  const chapter = m[1]
+  const wanted = parseProseChapter(proseFile)
+  if (!wanted) return null
   const dir = path.join(path.dirname(path.dirname(proseFile)), '大纲')
   try {
-    for (const file of fs.readdirSync(dir)) {
-      const fm = file.match(/^细纲_第0*(\d+)章.*\.md$/)
-      if (fm && fm[1] === chapter) return path.join(dir, file)
+    const entries = fs.readdirSync(dir).sort()
+    for (const file of entries) {
+      const fm = file.match(/^细纲_第(\d+)章.*\.md$/)
+      if (fm && Number(fm[1]) === wanted) {
+        return { file: path.join(dir, file), chapter: wanted, fromRangeFile: false }
+      }
+    }
+    for (const file of entries) {
+      const rm = file.match(RANGE_OUTLINE_RE)
+      if (!rm) continue
+      const start = Number(rm[1])
+      const end = Number(rm[2])
+      if (Number.isInteger(start) && Number.isInteger(end) && start <= wanted && wanted <= end) {
+        return { file: path.join(dir, file), chapter: wanted, fromRangeFile: true }
+      }
     }
   } catch (error) {
     if (error.code !== 'ENOENT') throw error
@@ -218,17 +252,37 @@ function checkOne(proseFile, explicitOutline) {
   }
   const prose = proseResult.text
 
-  const outlineFile = explicitOutline || findOutline(proseFile)
+  const discovered = explicitOutline ? null : findOutline(proseFile)
+  const outlineFile = explicitOutline || (discovered ? discovered.file : null)
+  const isShortContext =
+    (outlineFile && path.basename(outlineFile) === '小节大纲.md') ||
+    path.basename(proseFile) === '正文.md'
+  const detectLabel = isShortContext ? '小节大纲照搬检测' : '细纲照搬检测'
   if (!outlineFile) {
-    process.stdout.write(`细纲照搬检测：跳过 "${proseFile}"（未自动发现细纲）。\n`)
+    process.stdout.write(`${detectLabel}：跳过 "${proseFile}"（未自动发现${isShortContext ? '小节大纲' : '细纲'}）。\n`)
     return 0
   }
   const outlineResult = readTextFile(outlineFile)
   if (!outlineResult.ok) {
-    reportInputError(explicitOutline ? '显式细纲' : '自动发现的细纲', outlineFile, outlineResult.reason)
+    const kindName = isShortContext ? '小节大纲' : '细纲'
+    reportInputError(explicitOutline ? `显式${kindName}` : `自动发现的${kindName}`, outlineFile, outlineResult.reason)
     return 2
   }
-  const outline = outlineResult.text
+  let outline = outlineResult.text
+  const chapter = discovered ? discovered.chapter : parseProseChapter(proseFile)
+  const fromRangeFile = discovered
+    ? discovered.fromRangeFile
+    : Boolean(chapter && RANGE_OUTLINE_RE.test(path.basename(outlineFile)))
+  if (fromRangeFile && chapter) {
+    const slice = extractChapterSlice(outline, chapter)
+    if (slice === null) {
+      process.stdout.write(
+        `${detectLabel}：跳过 "${proseFile}"（范围细纲 "${path.basename(outlineFile)}" 中未找到第 ${chapter} 章小节）。\n`
+      )
+      return 0
+    }
+    outline = slice
+  }
 
   // 正文去掉标题行后比对
   const P = hanOnly(prose.replace(/^#.*$/gm, ''))
@@ -279,7 +333,7 @@ function checkOne(proseFile, explicitOutline) {
     // 全部命中都是锚句豁免：静默放行，但把豁免量报出来供人工复核滥用
     if (anchoredCount) {
       process.stdout.write(
-        `细纲照搬检测（${path.basename(proseFile)}）：无未授权誊抄；` +
+        `${detectLabel}（${path.basename(proseFile)}）：无未授权誊抄；` +
           `另有 ${anchoredCount} 处 ${anchored} 字为登记原话的逐字落地。\n`
       )
     }
