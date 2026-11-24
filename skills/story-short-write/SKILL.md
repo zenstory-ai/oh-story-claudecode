@@ -14,7 +14,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 3 份冷路径文件**仅命中时按需读**：有 `对标/`/`拆文库/`/参考书 → `references/benchmark-recall.md`；管理习惯 → `references/author-memory.md`（完成即停）；作者要求派助手 → `references/agent-calls.md`。
 
-> 宿主派发：Claude `.claude/agents`（`subagent_type`）、OpenCode `.opencode/agents`（`subagent`）、Codex `.codex/agents` TOML（`agent_type`）、Antigravity `.agents/agents`（`invoke_subagent`）、ZCode 已注册同名角色（`Agent`）；缺角色直接自写只说「这次我自己写」。`.story-deployed` 的 `agents_version` ≠ `agents_version: 46` 时照常派发，仅提示升 `/story-setup`（>46 先更仓）。有作者记忆写前跑 `node {skill 根}/scripts/author_memory_commit.js query --workspace {工作区} --book-root {项目目录} --kind prose_style --kind story_design [--genre {题材}] [--workflow 短篇]`（去味仅 `prose_style`），`lines` 作倾向，未装下交稿原话告知。
+> 宿主派发：Claude `.claude/agents`（`subagent_type`）、OpenCode `.opencode/agents`（`subagent`）、Codex `.codex/agents` TOML（`agent_type`）、Antigravity `.agents/agents`（`invoke_subagent`）、ZCode 已启用插件注册的同名角色（`Agent`）；缺角色直接自写只说「这次我自己写」。`.story-deployed` 的 `agents_version` ≠ `agents_version: 46` 时照常派发，仅提示升 `/story-setup`（>46 先更仓）。有作者记忆写前跑 `node {skill 根}/scripts/author_memory_commit.js query --workspace {工作区} --book-root {项目目录} --kind prose_style --kind story_design [--genre {题材}] [--workflow 短篇]`（去味仅 `prose_style`），`lines` 作倾向，没装下的交稿原话告知。
 
 优先级：作者这次说的 ＞ `设定.md`「文风约定」「作者已定」 ＞ 作者记忆 ＞ 流派包 ＞ 本文件默认。
 
