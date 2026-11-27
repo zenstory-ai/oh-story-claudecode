@@ -79,6 +79,8 @@ node scripts/measure-short-metrics.js --json 拆文库/{书名}/原文/{原文�
 | Stage 4–6（反转、网感手法、人物首尾、综合评估与验收） | [output-contract.md](references/output-contract.md)、[stage4-6-reversal-summary.md](references/stage4-6-reversal-summary.md) | 细拆三层反差、动机链、反派、关系或感情线：[analysis-characters.md](references/analysis-characters.md) | 通过验收，`stages_completed` 含 6 |
 | 拆完后作者要求同类对比或逐节节奏 | [optional-modules.md](references/optional-modules.md) | — | — |
 
+> **旧版参考迁移说明**：原 7 份碎片参考已并入现行文件（外部旧 prompt 如仍按旧名查找请改读对应新文件）：`analysis-method` / `analysis-short-hooks` → [stage2-3-structure-emotion.md](references/stage2-3-structure-emotion.md)；`analysis-short-patterns` / `analysis-submission` / `source-story-quality` → [stage4-6-reversal-summary.md](references/stage4-6-reversal-summary.md)；`analysis-report-style` / `quality-checklist` → [output-contract.md](references/output-contract.md)。
+
 每阶段写盘顺序、断点续跑与 Stage 6 三道验收（报告表达自检、`_meta.json` 校验、`[BLOCK]` 清单扫描）以 [references/output-contract.md](references/output-contract.md) 为唯一真源；任一阻断回对应 Stage 补齐（源文没有的写明「源文没有」），`[WARN]` 缺项记入 `拆文报告.md` 末尾「待补」清单。
 
 ## 完成汇报（验收全通过并写入 Stage 6 后）

@@ -561,6 +561,81 @@ try {
   assert.strictEqual(invalidInvocation.status, 2)
   assert.match(invalidInvocation.stderr, /用法/)
 
+  // ── slice-genre-pack.js：短篇题材包脚本级按节分读（plan 1–3 / write 4–5 / 优雅回退）──
+  const slicer = path.join(repoRoot, 'skills/story-short-write/scripts/slice-genre-pack.js')
+  const runSlicer = (args) => {
+    const res = spawnSync(process.execPath, [slicer, ...args], { cwd: repoRoot, encoding: 'utf8' })
+    return { status: res.status, stdout: res.stdout, stderr: res.stderr, json: res.status === 0 && args.includes('--json') ? JSON.parse(res.stdout) : null }
+  }
+
+  // 1) --stage plan 只出 1–3 节，不含 4–5 节；--stage write 只出 4–5 节，不含 1–3 节
+  const planZhaidou = runSlicer(['--stage', 'plan', '--genre', '宅斗宫斗', '--json'])
+  assert.strictEqual(planZhaidou.status, 0, planZhaidou.stderr)
+  assert.strictEqual(planZhaidou.json.pack, '宅斗宫斗')
+  assert.strictEqual(planZhaidou.json.sliced, true)
+  assert.deepStrictEqual(planZhaidou.json.sections, ['1. 故事线设计', '2. 常见剧情设计', '3. 人物设计'])
+  assert.match(planZhaidou.json.content, /## 1\. 故事线设计/)
+  assert.match(planZhaidou.json.content, /## 3\. 人物设计/)
+  assert(!/## 4\. 正文技巧/.test(planZhaidou.json.content), 'plan slice must exclude section 4')
+  assert(!/## 5\. 案例片段/.test(planZhaidou.json.content), 'plan slice must exclude section 5')
+  assert(planZhaidou.json.saved_pct > 30, `expected >30% savings, got ${planZhaidou.json.saved_pct}`)
+
+  const writeZhaidou = runSlicer(['--stage', 'write', '--genre', '宅斗宫斗', '--json'])
+  assert.strictEqual(writeZhaidou.status, 0, writeZhaidou.stderr)
+  assert.deepStrictEqual(writeZhaidou.json.sections, ['4. 正文技巧', '5. 案例片段'])
+  assert.match(writeZhaidou.json.content, /## 4\. 正文技巧/)
+  assert.match(writeZhaidou.json.content, /## 5\. 案例片段/)
+  assert(!/## 1\. 故事线设计/.test(writeZhaidou.json.content), 'write slice must exclude section 1')
+  assert(!/## 3\. 人物设计/.test(writeZhaidou.json.content), 'write slice must exclude section 3')
+  assert(writeZhaidou.json.saved_pct > 40, `expected >40% savings, got ${writeZhaidou.json.saved_pct}`)
+
+  // 2) --project 从 设定.md 自动读「题材：」并解析别名 + 言情纯爱不误判双男主 + 冷门兜底通用短篇
+  const projSliceDir = writeCase('slice-from-project', validSettings({ genre: '题材：白月光替身' }), validOutline())
+  const fromProj = runSlicer(['--stage', 'write', '--project', projSliceDir, '--json'])
+  assert.strictEqual(fromProj.status, 0, fromProj.stderr)
+  assert.strictEqual(fromProj.json.pack, '追妻火葬场')
+  assert.strictEqual(fromProj.json.sliced, true)
+
+  const pureLoveBg = runSlicer(['--stage', 'plan', '--genre', '现言纯爱', '--json'])
+  assert.strictEqual(pureLoveBg.status, 0)
+  assert.notStrictEqual(pureLoveBg.json.pack, '双男主', '现言纯爱不得误路由双男主')
+
+  const strictBl = runSlicer(['--stage', 'plan', '--genre', '双男主追夫', '--json'])
+  assert.strictEqual(strictBl.status, 0)
+  assert.strictEqual(strictBl.json.pack, '双男主')
+
+  const coldGenre = runSlicer(['--stage', 'plan', '--genre', '冷门：深海考古', '--json'])
+  assert.strictEqual(coldGenre.status, 0)
+  assert.strictEqual(coldGenre.json.pack, '通用短篇')
+
+  // 3) 非 v5 自定义旧包优雅回退全文（sliced: false），不崩溃
+  const customPackPath = path.join(tmpRoot, 'legacy-custom.md')
+  fs.writeFileSync(customPackPath, '---\ngenre: 自定义\n---\n# 自定义流派\n\n## 老结构\n内容照常保留。\n', 'utf8')
+  const legacyRes = runSlicer(['--stage', 'write', '--file', customPackPath, '--json'])
+  assert.strictEqual(legacyRes.status, 0, legacyRes.stderr)
+  assert.strictEqual(legacyRes.json.sliced, false)
+  assert.match(legacyRes.json.content, /老结构/)
+
+  // 4) 全 14 份现行短篇题材包均能干净分切 plan (1-3) 与 write (4-5)
+  const shortGenreDir = path.join(repoRoot, 'skills/story-short-write/references/genre-styles')
+  const shortFiles = fs.readdirSync(shortGenreDir).filter((f) => f.endsWith('.md')).sort()
+  assert.strictEqual(shortFiles.length, 14)
+  for (const file of shortFiles) {
+    const g = file.slice(0, -3)
+    const p = runSlicer(['--stage', 'plan', '--genre', g, '--json'])
+    const w = runSlicer(['--stage', 'write', '--genre', g, '--json'])
+    assert.strictEqual(p.status, 0, `${g} plan failed`)
+    assert.strictEqual(w.status, 0, `${g} write failed`)
+    assert.strictEqual(p.json.sliced, true, `${g} plan should be v5 sliced`)
+    assert.strictEqual(w.json.sliced, true, `${g} write should be v5 sliced`)
+    assert.strictEqual(p.json.sections.length, 3, `${g} plan should have 3 sections`)
+    assert.strictEqual(w.json.sections.length, 2, `${g} write should have 2 sections`)
+  }
+
+  // 5) 非法参数返回 exit 2
+  const badSlicer = runSlicer(['--stage', 'invalid'])
+  assert.strictEqual(badSlicer.status, 2)
+
   process.stdout.write('phase2-contract: all tests passed\n')
 } finally {
   fs.rmSync(tmpRoot, { recursive: true, force: true })

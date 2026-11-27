@@ -8,9 +8,9 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ## 1. 读取规则（先读后写）
 
-短篇同会话跑完 Phase 1–4，默认读本文件＋1 份 `references/genre-styles/{流派}.md`（构思/提纲读 **1–3 节**，写正文读 **4–5 节**；兜底 `通用短篇.md`）。
+短篇同会话跑完 Phase 1–4，默认读本文件＋题材包切片：用 `node {skill 根}/scripts/slice-genre-pack.js --stage plan|write` 按阶段取节（构思/提纲 `plan` 取 **1–3 节**，写正文 `write` 取 **4–5 节**；兜底 `通用短篇.md`）。
 
-14 流派（`references/genre-styles/`）：`追妻火葬场.md`、`总裁豪门.md`、`世情打脸.md`、`宅斗宫斗.md`、`年代重生打脸.md`、`脑洞设定流.md`、`复仇打脸.md`、`甜宠.md`、`男频都市反杀.md`、`双男主.md`、`悬疑.md`（含民俗怪谈）、`校园青春暗恋.md`、`仙侠奇幻末世.md`、`通用短篇.md`。
+14 流派（`references/genre-styles/`）：追妻火葬场、总裁豪门、世情打脸、宅斗宫斗、年代重生打脸、脑洞设定流、复仇打脸、甜宠、男频都市反杀、双男主、悬疑（含民俗）、校园青春暗恋、仙侠奇幻末世、通用短篇。
 
 3 份冷路径文件**仅命中时按需读**：有 `对标/`/`拆文库/`/参考书 → `references/benchmark-recall.md`；管理习惯 → `references/author-memory.md`（完成即停）；作者要求派助手 → `references/agent-calls.md`。
 
@@ -63,7 +63,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ### Phase 2：写 `设定.md` 与 `小节大纲.md`
 
-读题材包 **1–3 节**（有对标读 `benchmark-recall.md`），白话定卖点、导语与付费点落盘；作者设定照用不抠刑侦，起名禁默认套用陆砚深/周砚深/沈砚/林砚/林知微/温知微/林晚/林婉清/苏婉清/苏晚晴/顾沉舟/周明远（作者指定除外）。**导入的书**：`设定.md` 有「已写部分的写法」（旧称「本书续写基线」）时只补 `[待补充]`，不改已写节。
+跑 `slice-genre-pack.js --stage plan --genre {题材}` 取 **1–3 节**（有对标读 `benchmark-recall.md`），白话定卖点、导语与付费点落盘；作者设定照用不抠刑侦，起名禁套用陆砚深/周砚深/沈砚/林砚/林知微/温知微/林晚/林婉清/苏婉清/苏晚晴/顾沉舟/周明远（作者指定除外）。**导入的书**：`设定.md` 有「已写部分的写法」（旧称「本书续写基线」）时只补 `[待补充]`，不改已写节。
 
 <!-- 机器按名读取：目标平台、目标字数、平台基调、一句话梗概、这篇靠什么撑住、这篇用的套路、文风约定、作者已定、构思要点（题材、反派五字段、反转类型、反转在、付费点）；小节大纲五列名与「原样出现的原话」。改名须同步检查脚本与导入模板。 -->
 
@@ -139,14 +139,14 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 **导入的书**：读「已写部分的写法」，正文从第 N+1 节接着写，不改已写节。
 
-1. **锁参数**：作者字数范围优先（单数取 95%–105%，未给取 `设定.md` 与大纲节数）。写前跑 `node {skill 根}/scripts/check-delivery-contract.js --json --check-contract --min-chars {MIN} --max-chars {MAX} --sections {N} {短篇目录}`（exit 2 请作者调参数）。
-2. **锚定切片**：每批前重读题材包 **4–5 节**（正文技巧与案例片段，或对标切片），锁定短段高对白口语语感。
+1. **锁参数**：作者字数范围优先（单数取 95%–105%，未给取 `设定.md` 与大纲节数）。写前跑 `check-delivery-contract.js --json --check-contract --min-chars {MIN} --max-chars {MAX} --sections {N} {短篇目录}`（exit 2 调参数）。
+2. **锚定切片**：每批前跑 `slice-genre-pack.js --stage write --project {短篇目录}` 重读 **4–5 节**（或对标切片），锁短段高对白口语语感。
 3. **2–3 节/批写 `正文.md`**（续写重读导语与尾 400 字；写完付费点节及每批后跑 `check-delivery-contract.js --counts --json`，核对付费累计 ≤`目标×0.44`、单节超 `+15%` 现场瘦身，按目标下限 `+2%–5%` 留余量）：导语（150–300 字）零秒续接第 1 节（1,300–1,600 字，禁复述导语）打透赌注 → 第 2 节至付费点（32%–44%）阶梯加压卡刀口 → 付费后首拍立刻兑现 → 末段清算/真回旋镖落地。
 4. **红线**：叙述、对话与心理禁 `第X章`/`上一章`/`本章`/`前文`/`后文`/`伏笔`/`细纲`/`读者`（仅标题与节标记允许）；欠字扩现场对话，超字压重复解释。
 
 ## 字数统计
 
-整篇、逐节与导语字数均以 `check-delivery-contract.js` 为准；随时核对跑 `node {skill 根}/scripts/check-delivery-contract.js --counts {短篇目录}`（加 `--json` 出结构化计数）。
+整篇、逐节与导语字数以 `check-delivery-contract.js --counts [--json] {短篇目录}` 为准。
 
 ---
 
