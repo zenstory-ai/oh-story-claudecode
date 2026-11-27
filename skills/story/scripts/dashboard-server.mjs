@@ -505,13 +505,7 @@ export async function searchWorkspace(root, queryValue, scopeValue) {
     if (!info || info.isSymbolicLink()) return;
     if (info.isFile()) {
       const path = toPosixPath(relativePath);
-      const nameMatched = basename(absolutePath).toLocaleLowerCase("zh-CN").includes(normalizedQuery);
-      let contentMatched = false;
-      if (!nameMatched && isEditableFile(absolutePath) && info.size <= MAX_FILE_BYTES) {
-        const raw = await readFile(absolutePath, "utf8").catch(() => "");
-        contentMatched = raw.slice(0, 65536).toLocaleLowerCase("zh-CN").includes(normalizedQuery);
-      }
-      if (nameMatched || contentMatched) {
+      if (basename(absolutePath).toLocaleLowerCase("zh-CN").includes(normalizedQuery)) {
         state.results.push({
           name: basename(absolutePath),
           path,
