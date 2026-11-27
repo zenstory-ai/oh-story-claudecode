@@ -95,11 +95,11 @@ node -e "require('http').get('http://127.0.0.1:'+process.argv[1]+'/json/version'
 
 ### 第二步：CDP 研究（主链路）
 
-#### 2.1 构建搜索词
+#### 构建搜索词
 
 根据 `type` 和 `query` 构造 2-3 组搜索词：主关键词、关键词 + `详解/科普/入门`、关键词 + 权威限定词（如 `site:gov.cn`、`site:edu.cn` 或研究场景限定词）。
 
-#### 2.2 执行搜索
+#### 执行搜索
 
 ```bash
 # Google 搜索（默认）
@@ -107,9 +107,9 @@ agent-browser --cdp {cdp_port} eval "window.location.replace('https://www.google
 agent-browser --cdp {cdp_port} wait 5000
 ```
 
-> eval 表达式整体用引号包裹，查询参数用 `URLSearchParams` 组装，避免 `&` 被 shell 拆开。
+> eval 表达式整体用引号包裹，查询参数用 `URLSearchParams` 组装，避免 `&` 被 shell 拆开；长命令需要超时保护时用 Node `spawnSync(..., { timeout: 30000 })`，不依赖 macOS/Windows 缺失的 GNU `timeout`。
 
-#### 2.3 验证页面加载并获取搜索结果
+#### 验证页面加载并获取搜索结果
 
 ```bash
 # 获取 snapshot，检查搜索结果是否正常加载
@@ -120,7 +120,7 @@ agent-browser --cdp {cdp_port} snapshot 2>&1
 - Google 失败 → 切换 Bing：`eval "window.location.replace('https://www.bing.com/search?...')"` → wait 5000 → 重新 snapshot
 - Bing 也失败 → 降级到 WebSearch/webReader 兜底
 
-#### 2.4 从搜索结果中提取链接
+#### 从搜索结果中提取链接
 
 用 DOM 查询提取真实 URL，再导航到选定来源，避免猜测目标地址：
 
@@ -131,21 +131,21 @@ agent-browser --cdp {cdp_port} eval 'JSON.stringify(Array.from(document.querySel
 
 从返回的 JSON 列表中选择权威来源（学术、百科、官方、专业论坛），记录其 href。
 
-#### 2.5 导航到目标页面并提取正文
+#### 导航到目标页面并提取正文
 
 ```bash
 # 用提取到的真实 URL 导航（不要构造 URL；从搜索结果 DOM 中提取）
 agent-browser --cdp {cdp_port} eval "window.location.replace('{提取到的URL}')"
 agent-browser --cdp {cdp_port} wait 5000
 
-# 验证页面加载
-agent-browser --cdp {cdp_port} snapshot 2>&1 | head -20
+# 验证页面加载（跨平台读取前 20 行，不依赖 Unix head）
+node -e "const r=require('child_process').spawnSync('agent-browser',['--cdp',process.argv[1],'snapshot'],{encoding:'utf8',timeout:30000});console.log((r.stdout||r.stderr||'').split(/\r?\n/).slice(0,20).join('\n'))" {cdp_port}
 
 # 提取正文
 agent-browser --cdp {cdp_port} eval 'document.body.innerText.substring(0,8000)'
 ```
 
-#### 2.6 多源交叉
+#### 多源交叉
 
 至少访问 2 个独立来源（不同域名），对比关键信息：
 - 来源一致 → 高置信度

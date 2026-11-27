@@ -35,7 +35,7 @@ Codex CLI 中优先通过 `$skill-name` 或 `/skills` 调用；自然语言也�
 
 - Codex custom agents 在 `.codex/agents/*.toml`，信任后需新开会话；若仍报 `unknown agent_type`，按 skill 的 solo/direct fallback 执行。
 - Codex hooks 部署在 `.codex/hooks.json` 和 `.codex/hooks/`；项目 `.codex/` 层需要被信任，非 managed hooks 还需要在 `/hooks` 中 review/trust 后才会运行。
-- 写正文前必须先有对应大纲：长篇 `大纲/细纲_第N章*.md`，短篇 `小节大纲.md`。Codex hooks 会做机械守卫，但 skill 流程本身也必须遵守。
+- 写正文前必须先有对应大纲：长篇 `大纲/细纲_第N章*.md`（或区间细纲 `大纲/细纲_第A-B章*.md`），短篇 `小节大纲.md`。Codex hooks 会做机械守卫，但 skill 流程本身也必须遵守。
 
 ## 与作者协作
 

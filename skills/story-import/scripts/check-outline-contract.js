@@ -48,6 +48,10 @@ function fieldPattern(name) {
 
 function readUtf8(file) {
   try {
+    const stat = fs.statSync(file)
+    if (!stat.isFile()) {
+      return { ok: false, text: '', error: `路径不是普通细纲文件（传入了目录或特殊文件）：${file}；请传具体 .md 文件路径，或改用 --project <书目录> --chapter N` }
+    }
     const text = fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')
     return { ok: text.trim().length > 0, text }
   } catch (error) {
@@ -252,7 +256,7 @@ function verify(file, projectRoot = null, options = {}) {
     'outline.wordcount-target',
     targetParse.status === 'ok' && target >= minTarget && target <= maxTarget && caliberOk && rangeParse.status !== 'invalid',
     name,
-    `字数目标：${targetLabel}；字数口径（可不写，写了须是 ${CALIBER}）：${caliberOk}${rangeLabel}`,
+    `字数目标：${targetLabel}；字数口径（可不写，写了须是 ${CALIBER}）：${caliberOk ? '合规' : '不合规'}${rangeLabel}`,
     `字数目标为 ${minTarget}-${maxTarget} 的正整数；字数口径不用写，写了只能是 ${CALIBER}；作者给了上下限时另写一行「字数范围：2000-2600」`,
     '只补字数目标、字数范围，或删掉写错的字数口径行，不调整情节安排。',
     'blocking'

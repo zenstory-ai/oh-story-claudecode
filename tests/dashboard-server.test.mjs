@@ -10,6 +10,7 @@ import {
   browserLaunchCommand,
   createDashboardServer,
   listWorkspaceDirectory,
+  parseCliArguments,
   pathsReferToSameFile,
   resolveWorkspaceDirectory,
   resolveWorkspacePath,
@@ -427,6 +428,25 @@ describe("CLI portability", () => {
       ),
       true,
     );
+  });
+
+  test("rejects missing flag values and empty/non-numeric --port cleanly", () => {
+    assert.throws(
+      () => parseCliArguments(["--host"]),
+      (error) => error instanceof DashboardError && error.code === "missing_host",
+    );
+    assert.throws(
+      () => parseCliArguments(["--root", "--open"]),
+      (error) => error instanceof DashboardError && error.code === "missing_root",
+    );
+    for (const badPort of ["", "   ", "-1", "70000", "43110.5", "abc"]) {
+      assert.throws(
+        () => parseCliArguments(["--port", badPort]),
+        (error) => error instanceof DashboardError && error.code === "invalid_port",
+      );
+    }
+    assert.equal(parseCliArguments(["--port", "0"]).port, 0);
+    assert.equal(parseCliArguments(["--port", "65535"]).port, 65535);
   });
 });
 

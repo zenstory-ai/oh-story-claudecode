@@ -166,6 +166,14 @@ const OUTDIR = getArg(args, "--outdir") || ".";
 const RANKTYPE = getArg(args, "--type") || "all";
 
 function main() {
+  if (RANKTYPE !== "all" && !RANK_TYPES.some((r) => r.id === RANKTYPE)) {
+    throw new Error(`未知 --type: ${RANKTYPE}（可选：${RANK_TYPES.map((r) => r.id).join(" / ")} / all）`);
+  }
+  const targetTypes =
+    RANKTYPE === "all"
+      ? RANK_TYPES
+      : RANK_TYPES.filter((r) => r.id === RANKTYPE);
+
   console.log("\n→ 采集 刺猬猫排行榜...");
   console.log(`  URL: ${RANK_URL}`);
 
@@ -210,17 +218,15 @@ function main() {
 
   console.log(`  ✓ 提取 ${sections.length} 个榜单，${urls.length} 个书籍链接`);
 
-  // 筛选需要的榜单类型
-  const targetTypes =
-    RANKTYPE === "all"
-      ? RANK_TYPES
-      : RANK_TYPES.filter((r) => r.id === RANKTYPE);
-
   let written = 0;
+  let failed = 0;
+  const partialReasons = [];
   for (const rt of targetTypes) {
     try {
       const section = sections.find((s) => s.name === rt.header);
       if (!section || !section.entries.length) {
+        failed++;
+        partialReasons.push(`${rt.label}: 无数据`);
         console.log(`  ⚠ ${rt.label} 无数据，跳过`);
         continue;
       }
@@ -234,10 +240,19 @@ function main() {
       written++;
       console.log(`  ✓ ${rt.label}：${section.entries.length} 条 → ${filepath}`);
     } catch (rankErr) {
-      console.error(`[ciweimao] ${rt.label} 处理出错，跳过: ${rankErr.message}`);
+      failed++;
+      const message = rankErr && rankErr.message ? rankErr.message : String(rankErr);
+      partialReasons.push(`${rt.label}: ${message}`);
+      console.error(`[ciweimao] ${rt.label} 处理出错，跳过: ${message}`);
     }
   }
-  return written;
+  return {
+    planned: targetTypes.length,
+    written,
+    failed,
+    partial: failed > 0,
+    partialReasons,
+  };
 }
 
 if (require.main === module) {

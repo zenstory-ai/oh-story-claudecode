@@ -17,7 +17,7 @@ developer_instructions = """
 
 ### `raw-original`（尚未拆解章节）
 
-调用方提供：单个 `RAW-{起章}-{止章}` 批次 ID、连续起止章（一次最多 3 章，超 3 章、章号不连续、与计划不一致或要求按章起多任务时返回 `BATCH_ERROR`）与 `input_kind: raw-original`；每章 `source_locator`（`原文/原文.txt:L起-L止`，**由你按行号 Read，调用方不转贴原文**）、`chapter_chars`、`min_plot_points`；输出路径 `{拆文目录}/_analysis_cache/输入-{批次ID}.md`；可选 `handoff_cache`（只 Grep/Read 其中 `### 跨批状态` 承接别名、未闭合剧情点、悬念、关系与待核事项，不读逐章块；与本批隔着未拆章时不假设已接上，延续不了的目标另建剧情点 ID 交 Stage 3 合并）。同一次阅读完成轻量章节事实与跨章剧情点，不得再次读取该批原文。
+调用方提供：单个 `RAW-{起章}-{止章}` 批次 ID、连续起止章（一次最多 3 章，超 3 章、章号不连续、与计划不一致或要求按章起多任务时返回 `BATCH_ERROR`）与 `input_kind: raw-original`；每章 `source_locator`（`原文/原文.txt:L起-L止`，**由你按行号 Read，调用方不转贴原文**）、`chapter_chars`、`min_plot_points`；输出路径 `{拆文目录}/_analysis_cache/输入-{批次ID}.md`；可选 `handoff_cache`（只 Grep/Read 其中 `### 跨批状态` 承接别名、未闭合剧情点、悬念、关系与待核事项，不读逐章块；与本批隔着未拆章时不假设已接上，延续不了的目标另建剧情点 ID 交 Stage 3 合并）。提取情节点与章尾钩子时忽略正文首尾的 `【作者有话说】`、求票求书架段及残留 `<br>` 标签，不把作者感言拆成情节点或章尾钩子。同一次阅读完成轻量章节事实与跨章剧情点，不得再次读取该批原文。
 
 ### `existing-results`（已有拆文覆盖章节）
 

@@ -11,6 +11,11 @@
   ],
   "files": [
     {
+      "path": "skills/story/SKILL.md",
+      "budget": 4700,
+      "why": "主入口路由：意图分发、工具箱菜单、查资料子代理派发与冷路径工作台指针（2026-11-26 拆出 dashboard-and-update.md 后登记锁住瘦身收益）。"
+    },
+    {
       "path": "skills/story-publish/SKILL.md",
       "budget": 3600,
       "why": "发布资料准备入口：状态与定稿原则、作品材料定位、封面交接、输出模板与格式检查；番茄规则只在参考文件里写一次。发布资料文件是以后自动填表的格式契约（元信息、三种字段取值、文件名），随入口读。 2026-11-04：调用即保存缺项草案，短故事省略简介；显式更新预算。 每次调用必须交付资料，补齐写入失败、未适配及覆盖冲突的交付规则。"
@@ -53,7 +58,7 @@
     {
       "path": "skills/story-long-write/SKILL.md",
       "budget": 4800,
-      "why": "长篇入口：时刻路由表、16 流派索引、平台表、授权边界、白话汇报与新增物三级（2026-11-22 流程化重构）。"
+      "why": "长篇入口：时刻路由表、20 流派索引、平台表、授权边界、白话汇报与新增物三级（2026-11-22 流程化重构；2026-11-26 扩至 20 流派）。"
     },
     {
       "path": "skills/story-long-write/references/flow-opening-plan.md",
@@ -93,47 +98,77 @@
     {
       "path": "skills/story-long-write/references/genre-styles/传统玄幻仙侠.md",
       "budget": 2600,
-      "why": "长篇 16 流派包「传统玄幻仙侠」（按书只读命中 1 份，含 2–3 段真网感示范切片）。"
+      "why": "长篇 20 流派包「传统玄幻仙侠」（按书只读命中 1 份，含 2–3 段真网感示范切片）。"
+    },
+    {
+      "path": "skills/story-long-write/references/genre-styles/动漫男频衍生.md",
+      "budget": 2850,
+      "why": "长篇 20 流派包「动漫男频衍生」（2026-11-26 新增，覆盖番茄男频衍生/同人/搜打撤/四合院）。"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/历史架空权谋.md",
       "budget": 2700,
-      "why": "长篇 16 流派包「历史架空权谋」（按书只读命中 1 份，含 2–3 段真网感示范切片）。"
+      "why": "长篇 20 流派包「历史架空权谋」（按书只读命中 1 份，含 2–3 段真网感示范切片）。"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/双男主.md",
       "budget": 2750,
-      "why": "长篇 16 流派包「双男主」（按书只读命中 1 份，含 2–3 段真网感示范切片）。"
+      "why": "长篇 20 流派包「双男主」（按书只读命中 1 份，含 2–3 段真网感示范切片）。"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/古言宅斗重生.md",
       "budget": 3050,
-      "why": "长篇 16 流派包「古言宅斗重生」（按书只读命中 1 份，含 2–3 段真网感示范切片）。"
+      "why": "长篇 22 流派包「古言宅斗重生」（含后宫位分+朝堂权谋女帝双轨及示范切片）。"
+    },
+    {
+      "path": "skills/story-long-write/references/genre-styles/女频年代军婚.md",
+      "budget": 2900,
+      "why": "长篇 22 流派包「女频年代军婚」（2026-11-26 从年代种田拆出，专精 60–80s 年代随军/海岛家属院/大院知青）。"
+    },
+    {
+      "path": "skills/story-long-write/references/genre-styles/女频末世天灾囤货.md",
+      "budget": 2850,
+      "why": "长篇 22 流派包「女频末世天灾囤货」（2026-11-26 新增，专精女频天灾空间囤货/安全屋美食反差/反杀道德绑架）。"
+    },
+    {
+      "path": "skills/story-long-write/references/genre-styles/官场商战职场.md",
+      "budget": 2800,
+      "why": "长篇 20 流派包「官场商战职场」（2026-11-26 新增，覆盖官场仕途/商战博弈/职场规则）。"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/年代种田经商.md",
       "budget": 3000,
-      "why": "长篇 16 流派包「年代种田经商」（按书只读命中 1 份，含 2–3 段真网感示范切片）。"
+      "why": "长篇 20 流派包「年代种田经商」（按书只读命中 1 份，含 2–3 段真网感示范切片）。"
+    },
+    {
+      "path": "skills/story-long-write/references/genre-styles/幻想言情仙侠.md",
+      "budget": 2900,
+      "why": "长篇 20 流派包「幻想言情仙侠」（2026-11-26 新增，覆盖女频玄幻仙侠/神女迪化/玄学直播）。"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/悬疑灵异.md",
       "budget": 2800,
-      "why": "长篇 16 流派包「悬疑灵异」（按书只读命中 1 份，含 2–3 段真网感示范切片）。"
+      "why": "长篇 20 流派包「悬疑灵异」（按书只读命中 1 份，含 2–3 段真网感示范切片）。"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/末世规则科幻.md",
       "budget": 2650,
-      "why": "长篇 16 流派包「末世规则科幻」（按书只读命中 1 份，含 2–3 段真网感示范切片）。"
+      "why": "长篇 20 流派包「末世规则科幻」（按书只读命中 1 份，含 2–3 段真网感示范切片）。"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/玄幻脑洞反套路.md",
       "budget": 2650,
-      "why": "长篇 16 流派包「玄幻脑洞反套路」（按书只读命中 1 份，含 2–3 段真网感示范切片）。"
+      "why": "长篇 20 流派包「玄幻脑洞反套路」（按书只读命中 1 份，含 2–3 段真网感示范切片）。"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/现言脑洞快穿.md",
       "budget": 2800,
-      "why": "长篇 16 流派包「现言脑洞快穿」（按书只读命中 1 份，含 2–3 段真网感示范切片）。"
+      "why": "长篇 20 流派包「现言脑洞快穿」（按书只读命中 1 份，含 2–3 段真网感示范切片）。"
+    },
+    {
+      "path": "skills/story-long-write/references/genre-styles/男频年代乡村.md",
+      "budget": 2800,
+      "why": "长篇 20 流派包「男频年代乡村」（2026-11-26 新增，覆盖男频年代护妻/赶山打猎/赶海致富/98创业）。"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/西幻游戏同人.md",
@@ -188,37 +223,47 @@
     {
       "path": "skills/story-short-write/references/genre-styles/世情打脸.md",
       "budget": 3350,
-      "why": "短篇 12 流派包「世情打脸」（含导语公式、付费卡点、核心招式与真网感切片）。"
+      "why": "短篇 14 流派包「世情打脸」（含导语公式、付费卡点、核心招式与真网感切片）。"
+    },
+    {
+      "path": "skills/story-short-write/references/genre-styles/仙侠奇幻末世.md",
+      "budget": 3150,
+      "why": "短篇 14 流派包「仙侠奇幻末世」（2026-11-26 新增，覆盖仙侠追夫/宗门火葬场/末世规则货币/都市玄学/非人视角）。"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/双男主.md",
       "budget": 3150,
-      "why": "短篇 12 流派包「双男主」（含导语公式、付费卡点、核心招式与真网感切片）。"
+      "why": "短篇 14 流派包「双男主」（含导语公式、付费卡点、核心招式与真网感切片）。"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/复仇打脸.md",
       "budget": 3100,
-      "why": "短篇 12 流派包「复仇打脸」（含导语公式、付费卡点、核心招式与真网感切片）。"
+      "why": "短篇 14 流派包「复仇打脸」（含导语公式、付费卡点、核心招式与真网感切片）。"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/宅斗宫斗.md",
       "budget": 3200,
-      "why": "短篇 12 流派包「宅斗宫斗」（含导语公式、付费卡点、核心招式与真网感切片）。"
+      "why": "短篇 14 流派包「宅斗宫斗」（含导语公式、付费卡点、核心招式与真网感切片）。"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/年代重生打脸.md",
       "budget": 3300,
-      "why": "短篇 12 流派包「年代重生打脸」（含导语公式、付费卡点、核心招式与真网感切片）。"
+      "why": "短篇 14 流派包「年代重生打脸」（含导语公式、付费卡点、核心招式与真网感切片）。"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/总裁豪门.md",
       "budget": 3150,
-      "why": "短篇 12 流派包「总裁豪门」（含导语公式、付费卡点、核心招式与真网感切片）。"
+      "why": "短篇 14 流派包「总裁豪门」（含导语公式、付费卡点、核心招式与真网感切片）。"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/悬疑.md",
       "budget": 3350,
-      "why": "短篇 12 流派包「悬疑」（含导语公式、付费卡点、核心招式与真网感切片）。"
+      "why": "短篇 14 流派包「悬疑」（含导语公式、付费卡点、核心招式与真网感切片）。"
+    },
+    {
+      "path": "skills/story-short-write/references/genre-styles/校园青春暗恋.md",
+      "budget": 3150,
+      "why": "短篇 14 流派包「校园青春暗恋」（2026-11-26 新增，覆盖学霸暗恋/手语换志愿/状元顶替/教资闭环/寝室霸凌）。"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/甜宠.md",
@@ -569,9 +614,7 @@
       "label": "短篇扫榜",
       "files": [
         "skills/story-short-scan/SKILL.md",
-        "skills/story-short-scan/references/real-market-data.md",
-        "skills/story-short-scan/references/topic-match.md",
-        "skills/story-short-scan/references/manual-rank-input.md"
+        "skills/story-short-scan/references/topic-match.md"
       ],
       "branches": [
         {
@@ -579,54 +622,64 @@
           "files": [
             "skills/story-short-scan/references/platform-dianzhong.md"
           ],
-          "budget": 7600
+          "budget": 5600
         },
         {
           "label": "黑岩",
           "files": [
             "skills/story-short-scan/references/platform-heiyan.md"
           ],
-          "budget": 7750
+          "budget": 5750
+        },
+        {
+          "label": "作者提供",
+          "files": [
+            "skills/story-short-scan/references/manual-rank-input.md"
+          ],
+          "budget": 5600
+        },
+        {
+          "label": "内置知识",
+          "files": [
+            "skills/story-short-scan/references/real-market-data.md"
+          ],
+          "budget": 6800
         }
       ],
-      "why": "v0.8.2：同上，短篇。 2026-10-17 按时刻重组：real-market-data 删去写作排版行和空字数列（-561），topic-match 加平台对照表、写作端六种情绪与失败风险栏，manual-rank-input 写明缺作者用「佚名」占位，黑岩参考写明近期上架分布与默认带详情（+167）；两分支锁住余量（实测点众 7549、黑岩 7716）。"
+      "why": "2026-11-26：与长篇扫榜对齐，将 manual-rank-input 与 real-market-data 移入互斥分支（点众/黑岩脚本采集时不预加载手工输入与内置行情），同步补齐番茄短故事、14 流派映射与 8.78 万篇实证行情。"
     },
     {
       "label": "短篇拆文 Stage 2–3",
       "files": [
         "skills/story-short-analyze/SKILL.md",
         "skills/story-short-analyze/references/output-contract.md",
-        "skills/story-short-analyze/references/analysis-method.md",
         "skills/story-short-analyze/references/stage2-3-structure-emotion.md",
-        "skills/story-short-analyze/references/quality-checklist.md",
-        "skills/story-short-analyze/references/analysis-report-style.md",
-        "skills/story-short-analyze/references/analysis-short-genres.md",
-        "skills/story-short-analyze/references/analysis-short-hooks.md"
+        "skills/story-short-analyze/references/analysis-short-genres.md"
       ],
       "branches": [
         {
           "label": "常规",
           "files": [],
-          "budget": 21600
+          "budget": 14000
         },
         {
           "label": "源文靠证据链或信息差推进",
           "files": [
             "skills/story-short-analyze/references/analysis-short-suspense.md"
           ],
-          "budget": 23100
+          "budget": 15400
         },
         {
           "label": "有反复运转的核心机制",
           "files": [
             "skills/story-short-analyze/references/analysis-short-mechanics.md"
           ],
-          "budget": 23100
+          "budget": 15200
         }
       ],
-      "why": "v0.8.2：短篇拆文分两个时刻。 v0.8.x：题材标尺与钩子标尺改为本时刻常规读取（题材取值与钩子计数都以它们为准）；悬念与机制两份标尺按源文条件读，两者可同时成立，登记 stacking。",
+      "why": "2026-11-26 重构：删去重复碎片（analysis-method/quality-checklist/analysis-report-style/analysis-short-hooks 并入主文件），常规与最坏叠加均省 7K+，并同步 14 类短篇题材标尺。",
       "stacking": {
-        "budget": 24600,
+        "budget": 16600,
         "slots": [
           [
             "源文靠证据链或信息差推进"
@@ -642,46 +695,23 @@
       "files": [
         "skills/story-short-analyze/SKILL.md",
         "skills/story-short-analyze/references/output-contract.md",
-        "skills/story-short-analyze/references/analysis-method.md",
-        "skills/story-short-analyze/references/stage4-6-reversal-summary.md",
-        "skills/story-short-analyze/references/quality-checklist.md",
-        "skills/story-short-analyze/references/analysis-report-style.md",
-        "skills/story-short-analyze/references/analysis-short-patterns.md",
-        "skills/story-short-analyze/references/analysis-submission.md"
+        "skills/story-short-analyze/references/stage4-6-reversal-summary.md"
       ],
       "branches": [
         {
           "label": "常规",
           "files": [],
-          "budget": 26650
+          "budget": 14400
         },
         {
           "label": "细拆反差、动机、反派、关系或感情线",
           "files": [
             "skills/story-short-analyze/references/analysis-characters.md"
           ],
-          "budget": 27900
-        },
-        {
-          "label": "判断源文好坏",
-          "files": [
-            "skills/story-short-analyze/references/source-story-quality.md"
-          ],
-          "budget": 28300
+          "budget": 15700
         }
       ],
-      "why": "v0.8.2：短篇拆文分两个时刻。 v0.8.x：五份人物、读者、技法迁移文件合并为 analysis-characters（只留短篇拆文用到的关系四类、动机链、反派四要素、三层反差、感情线阶段表），投稿层（导语、付费断点、书名简介、平台写法）新建 analysis-submission 并进常规读取；结构模式标尺改为常规读取。人物细拆与源文好坏可在同一篇里同时发生，登记 stacking，最坏叠加约 29.4K，原先多份人物标尺叠加超 35K 的问题随合并消失。",
-      "stacking": {
-        "budget": 29550,
-        "slots": [
-          [
-            "细拆反差、动机、反派、关系或感情线"
-          ],
-          [
-            "判断源文好坏"
-          ]
-        ]
-      }
+      "why": "2026-11-26 重构：合并 analysis-short-patterns/analysis-submission/source-story-quality/quality-checklist/analysis-report-style，接入确定性 measure-short-metrics.js，最坏叠加从 23.7K 降至 ~14.9K。"
     },
     {
       "label": "短篇拆文 拆完后同类对比或逐节节奏",
@@ -693,10 +723,10 @@
         {
           "label": "常规",
           "files": [],
-          "budget": 6900
+          "budget": 4600
         }
       ],
-      "why": "v0.8.x：拆完后作者要同类对比或逐节节奏时单独读 optional-modules，不与 Stage 2–6 叠加。"
+      "why": "2026-11-26 重构：SKILL.md 瘦身后锁紧预算（实测 ~4.05K）。"
     },
     {
       "label": "导入·逐批反推细纲（主会话自己做）",
@@ -743,6 +773,13 @@
           "budget": 10250
         },
         {
+          "label": "仙侠奇幻末世",
+          "files": [
+            "skills/story-short-write/references/genre-styles/仙侠奇幻末世.md"
+          ],
+          "budget": 10150
+        },
+        {
           "label": "双男主",
           "files": [
             "skills/story-short-write/references/genre-styles/双男主.md"
@@ -783,6 +820,13 @@
             "skills/story-short-write/references/genre-styles/悬疑.md"
           ],
           "budget": 10250
+        },
+        {
+          "label": "校园青春暗恋",
+          "files": [
+            "skills/story-short-write/references/genre-styles/校园青春暗恋.md"
+          ],
+          "budget": 10100
         },
         {
           "label": "甜宠",
@@ -839,12 +883,14 @@
         "slots": [
           [
             "世情打脸",
+            "仙侠奇幻末世",
             "双男主",
             "复仇打脸",
             "宅斗宫斗",
             "年代重生打脸",
             "总裁豪门",
             "悬疑",
+            "校园青春暗恋",
             "甜宠",
             "男频都市反杀",
             "脑洞设定流",
@@ -875,7 +921,7 @@
       "files": [
         "skills/story-long-write/SKILL.md",
         "skills/story-long-write/references/flow-opening-plan.md",
-        "skills/story-long-write/references/genre-styles/豪门虐恋追妻.md"
+        "skills/story-long-write/references/genre-styles/西幻游戏同人.md"
       ],
       "branches": [
         {
@@ -916,7 +962,7 @@
       "files": [
         "skills/story-long-write/SKILL.md",
         "skills/story-long-write/references/flow-outline.md",
-        "skills/story-long-write/references/genre-styles/豪门虐恋追妻.md"
+        "skills/story-long-write/references/genre-styles/西幻游戏同人.md"
       ],
       "branches": [
         {
@@ -957,7 +1003,7 @@
       "files": [
         "skills/story-long-write/SKILL.md",
         "skills/story-long-write/references/flow-drafting.md",
-        "skills/story-long-write/references/genre-styles/豪门虐恋追妻.md"
+        "skills/story-long-write/references/genre-styles/西幻游戏同人.md"
       ],
       "branches": [
         {
@@ -1009,7 +1055,7 @@
         "skills/story-long-write/SKILL.md",
         "skills/story-long-write/references/flow-revision.md",
         "skills/story-long-write/references/flow-drafting.md#正文笔法与竖屏网感",
-        "skills/story-long-write/references/genre-styles/豪门虐恋追妻.md"
+        "skills/story-long-write/references/genre-styles/西幻游戏同人.md"
       ],
       "branches": [
         {
@@ -1048,7 +1094,9 @@
     {
       "label": "长篇开书·定设定（story-architect 任务包）",
       "agent": "skills/story-setup/references/templates/agents/story-architect.md",
-      "files": [],
+      "files": [
+        "skills/story-long-write/references/genre-styles/西幻游戏同人.md"
+      ],
       "generated": [
         {
           "script": "skills/story-long-write/scripts/build_architect_brief.js",
@@ -1063,22 +1111,24 @@
         {
           "label": "常规",
           "files": [],
-          "budget": 7300
+          "budget": 10400
         },
         {
           "label": "有对标",
           "files": [
             "skills/story-long-write/references/benchmark-recall.md"
           ],
-          "budget": 9000
+          "budget": 12100
         }
       ],
-      "why": "2026-11-22 流程化重构：build_architect_brief.js 切片 flow-opening-plan 方法与模板。"
+      "why": "2026-11-27：补算运行时 build_architect_brief 必拼入的最重流派包（西幻游戏同人.md），消除 --rules-only 空目录漏计盲区。"
     },
     {
       "label": "长篇出卷纲（story-architect 任务包）",
       "agent": "skills/story-setup/references/templates/agents/story-architect.md",
-      "files": [],
+      "files": [
+        "skills/story-long-write/references/genre-styles/西幻游戏同人.md"
+      ],
       "generated": [
         {
           "script": "skills/story-long-write/scripts/build_architect_brief.js",
@@ -1093,22 +1143,24 @@
         {
           "label": "常规",
           "files": [],
-          "budget": 6900
+          "budget": 10000
         },
         {
           "label": "有对标",
           "files": [
             "skills/story-long-write/references/benchmark-recall.md"
           ],
-          "budget": 8650
+          "budget": 11750
         }
       ],
-      "why": "2026-11-22 流程化重构：build_architect_brief.js 切片 flow-opening-plan 卷纲方法与模板。"
+      "why": "2026-11-27：补算运行时 build_architect_brief 必拼入的最重流派包（西幻游戏同人.md），账面与真实上下文一致。"
     },
     {
       "label": "长篇出一批细纲（story-architect 任务包）",
       "agent": "skills/story-setup/references/templates/agents/story-architect.md",
-      "files": [],
+      "files": [
+        "skills/story-long-write/references/genre-styles/西幻游戏同人.md"
+      ],
       "generated": [
         {
           "script": "skills/story-long-write/scripts/build_architect_brief.js",
@@ -1125,17 +1177,17 @@
         {
           "label": "首批含前 3 章（最重的包）",
           "files": [],
-          "budget": 8400
+          "budget": 11500
         },
         {
           "label": "有对标",
           "files": [
             "skills/story-long-write/references/benchmark-recall.md"
           ],
-          "budget": 10150
+          "budget": 13250
         }
       ],
-      "why": "2026-11-22 流程化重构：build_architect_brief.js 切片 flow-outline 排纲方法与模板。"
+      "why": "2026-11-27：补算运行时 build_architect_brief 必拼入的最重流派包（西幻游戏同人.md），账面与真实上下文一致。"
     },
     {
       "label": "story-architect 无任务包（long / short profile）",
@@ -1149,9 +1201,9 @@
           "files": [
             "skills/story-setup/references/agent-references/flow-opening-plan.md",
             "skills/story-setup/references/agent-references/genre-readers.md",
-            "skills/story-setup/references/agent-references/genre-styles/豪门虐恋追妻.md"
+            "skills/story-setup/references/agent-references/genre-styles/西幻游戏同人.md"
           ],
-          "budget": 16450
+          "budget": 16850
         },
         {
           "label": "长篇细纲与结构审查",
@@ -1172,19 +1224,18 @@
           "budget": 9250
         }
       ],
-      "why": "2026-11-22 流程化重构：story-architect 按精简后的 Long / Short profile 读取。"
+      "why": "2026-11-26 女频加强：genre-readers 增女频年代军婚与末世天灾囤货画像，flow-opening-plan 补开书排雷 6 要素与主体性红线，总计 16.65K（远低于 35K 上限）。"
     },
     {
       "label": "写手写正文（narrative-writer 每次调用）",
       "agent": "skills/story-setup/references/templates/agents/narrative-writer.md",
-      "files": [
-        "skills/story-setup/references/agent-references/flow-drafting.md#正文笔法与竖屏网感"
-      ],
+      "files": [],
       "branches": [
         {
           "label": "长篇常规（含最重流派包）",
           "files": [
-            "skills/story-setup/references/agent-references/genre-styles/豪门虐恋追妻.md"
+            "skills/story-setup/references/agent-references/flow-drafting.md#正文笔法与竖屏网感",
+            "skills/story-setup/references/agent-references/genre-styles/西幻游戏同人.md"
           ],
           "budget": 12500
         },
@@ -1194,10 +1245,61 @@
             "skills/story-setup/references/agent-references/format-and-structure.md",
             "skills/story-setup/references/agent-references/short-deslop.md"
           ],
-          "budget": 13300
+          "budget": 11500
         }
       ],
-      "why": "2026-11-22 重构：写手写长篇读 flow-drafting「正文笔法与竖屏网感」+ 1 份流派包，写短篇读 format-and-structure + short-deslop。"
+      "why": "2026-11-26：短篇写手解耦长篇 flow-drafting.md（立省 ~2K 且消除规则混读）；长篇仍读 flow-drafting「正文笔法与竖屏网感」+ 1 份最重流派包。"
+    },
+    {
+      "label": "角色设计与对话（character-designer 每次调用）",
+      "agent": "skills/story-setup/references/templates/agents/character-designer.md",
+      "files": [],
+      "branches": [
+        {
+          "label": "主角与配角建卡",
+          "files": [
+            "skills/story-setup/references/agent-references/flow-opening-plan.md"
+          ],
+          "budget": 7600
+        },
+        {
+          "label": "对话与审查（短篇含卖点保护）",
+          "files": [
+            "skills/story-setup/references/agent-references/flow-drafting.md#正文笔法与竖屏网感",
+            "skills/story-setup/references/agent-references/short-deslop.md"
+          ],
+          "budget": 6000
+        }
+      ],
+      "why": "2026-11-26：补齐第 6 个专业助手预算监控。"
+    },
+    {
+      "label": "外部资料研究（story-researcher 每次调用）",
+      "agent": "skills/story-setup/references/templates/agents/story-researcher.md",
+      "files": [],
+      "budget": 5800,
+      "why": "2026-11-26：补齐第 7 个专业助手预算监控，实现 7/7 agent 模板全覆盖。"
+    },
+    {
+      "label": "主入口路由（story）",
+      "files": [
+        "skills/story/SKILL.md"
+      ],
+      "branches": [
+        {
+          "label": "常规路由",
+          "files": [],
+          "budget": 4700
+        },
+        {
+          "label": "工作台与版本更新",
+          "files": [
+            "skills/story/references/dashboard-and-update.md"
+          ],
+          "budget": 7000
+        }
+      ],
+      "why": "2026-11-26：登记主入口路由与冷路径工作台参考，锁住 SKILL.md -2.1K 瘦身收益。"
     },
     {
       "label": "写手去味审查（narrative-writer 审查调用）",
@@ -1254,6 +1356,14 @@
           "budget": 16250
         },
         {
+          "label": "女频长篇（晋江或番茄/七猫女频叠加）",
+          "files": [
+            "skills/story-review/references/rubrics/fanqie.md",
+            "skills/story-review/references/rubrics/female.md"
+          ],
+          "budget": 16300
+        },
+        {
           "label": "分批审查（平台 rubric＋追踪）",
           "files": [
             "skills/story-review/references/rubrics/zhihu.md",
@@ -1287,7 +1397,15 @@
             "skills/story-review/references/rubrics/short-shuang.md",
             "skills/story-review/references/short-deslop.md"
           ],
-          "budget": 17000
+          "budget": 17300
+        },
+        {
+          "label": "女频长篇（晋江或番茄/七猫女频叠加）",
+          "files": [
+            "skills/story-review/references/rubrics/fanqie.md",
+            "skills/story-review/references/rubrics/female.md"
+          ],
+          "budget": 17500
         },
         {
           "label": "分批审查（短篇平台 + 卖点保护）",
@@ -1296,10 +1414,10 @@
             "skills/story-review/references/short-deslop.md",
             "skills/story-review/references/batch-review.md"
           ],
-          "budget": 17950
+          "budget": 18200
         }
       ],
-      "why": "2026-11-22 重构：三层方法收口为 deslop-guide.md，审稿 solo 降到约 17K。"
+      "why": "2026-11-26 女频加强：新增 rubrics/female.md 并将晋江与番茄/七猫女频接入叠加路由，审稿 solo 最坏分支约 17.97K（远低于 35K 上限）。"
     },
     {
       "label": "去AI味主会话",

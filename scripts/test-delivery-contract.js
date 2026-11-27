@@ -236,6 +236,36 @@ try {
   const nestedCheck = nestedRes.report.checks.find((c) => c.id === 'delivery.short-dialogue-share')
   assert.doesNotMatch(nestedCheck.evidence, /【】心声\/弹幕/, 'nested 【】 inside quotes must not double-count as separate bracket chars')
 
+  // 独立单行切镜/番外标头（如【邓承宇视角】、【沈知行视角（五年前）】、【番外】）不计入【】心声/弹幕
+  const povHeaderBody = [
+    DEFAULT_LEAD,
+    '###1.',
+    '【邓承宇视角】',
+    sectionChunk(400),
+    '【沈知行视角（五年前）】',
+    sectionChunk(300),
+    '【男主番外】',
+    sectionChunk(300),
+  ].join('\n') + '\n'
+  const povRes = run(writeCase('short-pov-header', povHeaderBody), ['800', '2000', '1'])
+  const povCheck = povRes.report.checks.find((c) => c.id === 'delivery.short-dialogue-share')
+  assert.doesNotMatch(povCheck.evidence, /【】心声\/弹幕/, 'standalone 【XX视角/番外】 header must not count as danmu/inner-thought')
+
+  // 黑岩/七猫真实格式：###第1章 首节内嵌导语以行末 …… 或 ... 结尾，自动识别为 ch1-top-embedded
+  for (const [tag, tail] of [['cn-ell', '……'], ['ascii-dots', '...']]) {
+    const inlineLeadText = [
+      '###第1章 婚宴反杀',
+      `结婚第三年，他在家宴上当众把股权质押章递给新来的秘书，我笑着推回离婚协议，转身发出了四十八小时抽贷函${tail}`,
+      sectionChunk(950),
+      '###第2章 抽薪清算',
+      sectionChunk(1000),
+    ].join('\n') + '\n'
+    const inlineRes = run(writeCase(`inline-lead-${tag}`, inlineLeadText), ['1800', '3000', '2'], 800, false, ['--strict'])
+    assert.strictEqual(inlineRes.status, 0, `${tag}: ${inlineRes.stdout}${inlineRes.stderr}`)
+    assert.strictEqual(inlineRes.report.lead_placement, 'ch1-top-embedded')
+    assert.strictEqual(inlineRes.report.body_verified, true)
+  }
+
   // 3) delivery.short-lead-present：缺少导语或导语 >500 字
   const noLeadWarn = assertSoftOnly(
     writeCase('short-no-lead', body(1000, 6, 'numeric', { includeLead: false })),
@@ -243,7 +273,7 @@ try {
   )
   assert.deepStrictEqual(softIds(noLeadWarn.normal), ['delivery.short-lead-present'])
 
-  const hugeLead = `${sectionChunk(540)}\n${body(1000, 6, 'numeric', { includeLead: false })}`
+  const hugeLead = `${'“当年这笔账你打算怎么算？”\n我把账本摊开，逐条念给满堂亲戚听。\n'.repeat(19)}${body(1000, 6, 'numeric', { includeLead: false })}`
   const longLeadWarn = assertSoftOnly(
     writeCase('short-huge-lead', hugeLead),
     'delivery.short-lead-present'
@@ -278,6 +308,33 @@ try {
   assert.deepStrictEqual(softIds(multiCommentWarn.normal), ['delivery.short-lead-present'])
   assert.match(multiCommentWarn.normal.report.soft_warnings[0].evidence, /缺少导语（0 字）/)
 
+  // 5) 导语与第 1 节首 400 字连续 ≥12 字原句倒带复述 → soft warning；正常承接 → strict PASS；中文中点 `······` 内嵌导语可识别。
+  const rewindLead = [
+    '结婚三周年纪念日，我不顾一切冲进火场救出未婚夫，他父母感动安排我们成婚。',
+    '后来白月光回国，他把我的哮喘药换成维生素。',
+  ].join('\n')
+  const rewindBody = [
+    rewindLead,
+    '###1.',
+    '那天我不顾一切冲进火场救出未婚夫，他父母感动安排我们成婚，现在我重生了。',
+    sectionChunk(960),
+    ...Array.from({ length: 5 }, (_, i) => `###${i + 2}.\n${sectionChunk(1000)}`),
+  ].join('\n') + '\n'
+  const rewindWarn = assertSoftOnly(writeCase('short-lead-rewind', rewindBody), 'delivery.short-lead-rewind')
+  assert.deepStrictEqual(softIds(rewindWarn.normal), ['delivery.short-lead-rewind'])
+  assert.match(rewindWarn.normal.report.soft_warnings[0].evidence, /连续原句倒带复述/)
+
+  const middotEmbedded = [
+    '###1.',
+    '选美决赛当天他扔下一笔钱离场，八年后顶流重逢却发疯求复合。',
+    '······',
+    sectionChunk(970),
+    ...Array.from({ length: 5 }, (_, i) => `###${i + 2}.\n${sectionChunk(1000)}`),
+  ].join('\n') + '\n'
+  const middotPass = run(writeCase('short-middot-embedded-lead', middotEmbedded), ['6000', '8000', '6'], undefined, false, ['--strict'])
+  assert.strictEqual(middotPass.status, 0, middotPass.stdout + middotPass.stderr)
+  assert.strictEqual(middotPass.report.lead_placement, 'ch1-top-embedded')
+
   // HARD: missing 正文.md → exit 1 + hard_failures.
   const missing = run(writeCase('missing', null))
   assert.strictEqual(missing.status, 1)
@@ -289,6 +346,8 @@ try {
   const preflight = run(preflightDir, ['6000', '8000', '6'], 800, true)
   assert.strictEqual(preflight.status, 0, preflight.stdout + preflight.stderr)
   assert.strictEqual(preflight.report.scope, 'parameters-only')
+  assert.strictEqual(preflight.report.body_verified, false)
+  assert.match(preflight.report.note, /未扫描/)
   assert.strictEqual(fs.existsSync(path.join(preflightDir, '正文.md')), false)
   assert.strictEqual(run(preflightDir, ['1', '3000', '6'], 800, true).status, 2)
   // Even the shortest permitted marker counts in the total: floor 800 + "1." = 802.
@@ -306,6 +365,143 @@ try {
       }
     }
   }
+
+  // 6) ### 导语 与 【XX视角】 切镜标头相邻空行豁免，不误报 delivery.blank-lines（--strict 也通过）。
+  const exemptBlankBody = [
+    '### 导语',
+    '',
+    DEFAULT_LEAD,
+    '',
+    '###1.',
+    sectionChunk(1000),
+    '###2.',
+    sectionChunk(1000),
+    '###3.',
+    '',
+    '【程景川视角】',
+    '',
+    sectionChunk(1000),
+    '###4.',
+    sectionChunk(1000),
+    '###5.',
+    sectionChunk(1000),
+    '###6.',
+    sectionChunk(1000),
+  ].join('\n') + '\n'
+  const exemptBlankPass = run(writeCase('exempt-lead-pov-blanks', exemptBlankBody), ['6000', '8000', '6'], undefined, false, ['--strict'])
+  assert.strictEqual(exemptBlankPass.status, 0, exemptBlankPass.stdout + exemptBlankPass.stderr)
+  assert.strictEqual(exemptBlankPass.report.ok, true)
+  assert.strictEqual(exemptBlankPass.report.raw_visible_chars, exemptBlankPass.report.total_chars)
+  assert(exemptBlankPass.report.body_chars > 0 && exemptBlankPass.report.body_chars < exemptBlankPass.report.raw_visible_chars)
+
+  // 7) delivery.short-paywall-ratio：按设定/大纲付费节统计正文累计占比（30%-45% 通过，偏离给纯 advisory）。
+  const paywallOkDir = writeCase('paywall-ratio-ok', body(1000, 8))
+  fs.writeFileSync(path.join(paywallOkDir, '设定.md'), '- 付费点：第 3 节末\n', 'utf8')
+  const paywallOkRes = run(paywallOkDir, ['7500', '9000', '8'], undefined, false, ['--strict'])
+  assert.strictEqual(paywallOkRes.status, 0, paywallOkRes.stdout + paywallOkRes.stderr)
+  const paywallOkCheck = paywallOkRes.report.checks.find((c) => c.id === 'delivery.short-paywall-ratio')
+  assert.match(paywallOkCheck.evidence, /实际累计正文/)
+
+  const paywallDriftDir = writeCase('paywall-ratio-drift', body(1000, 8))
+  fs.writeFileSync(path.join(paywallDriftDir, '题材与大纲.md'), '- 付费点：第 5 节末\n', 'utf8')
+  const paywallDrift = assertSoftOnly(paywallDriftDir, 'delivery.short-paywall-ratio', ['7500', '9000', '8'])
+  assert.deepStrictEqual(softIds(paywallDrift.normal), ['delivery.short-paywall-ratio'])
+
+  // 8) --counts --json 保留 total_chars 并增补 body_chars / raw_visible_chars
+  const countsRes = spawnSync(process.execPath, [verifier, '--counts', '--json', validDir], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  })
+  assert.strictEqual(countsRes.status, 0, countsRes.stdout + countsRes.stderr)
+  const countsJson = JSON.parse(countsRes.stdout)
+  assert.strictEqual(countsJson.raw_visible_chars, countsJson.total_chars)
+  assert(countsJson.body_chars > 0 && countsJson.body_chars < countsJson.raw_visible_chars)
+
+  // 9) R050 回归：###1. 外层分节 + 首节内嵌导语以独立行 1. 分隔（七猫/黑岩/点众常见形态）不误报样式混用或编号重复；
+  //    同时 section_counts 剔除 HTML 注释，与 body_chars 口径一致。
+  const numericEmbeddedLead = [
+    '###1.',
+    DEFAULT_LEAD,
+    '1.',
+    '<!-- 内部批注不应计入节字数 -->',
+    sectionChunk(1000),
+    '###2.',
+    sectionChunk(1000),
+    '###3.',
+    sectionChunk(1000),
+    '###4.',
+    sectionChunk(1000),
+    '###5.',
+    sectionChunk(1000),
+    '###6.',
+    sectionChunk(1000),
+  ].join('\n') + '\n'
+  const numEmbDir = writeCase('numeric-embedded-lead-1dot', numericEmbeddedLead)
+  const numEmbRes = run(numEmbDir, ['6000', '8000', '6'], undefined, false, ['--strict'])
+  assert.strictEqual(numEmbRes.status, 0, numEmbRes.stdout + numEmbRes.stderr)
+  assert.strictEqual(numEmbRes.report.ok, true)
+  assert.strictEqual(numEmbRes.report.lead_placement, 'ch1-top-embedded')
+  assert.strictEqual(numEmbRes.report.section_counts.length, 6)
+  const sec1NoComment = numEmbRes.report.section_counts[0].chars
+  const numEmbNoCommentBody = numericEmbeddedLead.replace('<!-- 内部批注不应计入节字数 -->\n', '')
+  const numEmbRef = run(writeCase('numeric-embedded-lead-ref', numEmbNoCommentBody), ['6000', '8000', '6'], undefined, false, ['--strict'])
+  assert.strictEqual(sec1NoComment, numEmbRef.report.section_counts[0].chars)
+
+  // 10) R086 回归：
+  //   a) --counts --json 返回 paywall_preview_ratio / median_para_chars / long_dialogue_45_ratio
+  //   b) delivery.short-long-dialogue 仅对 ≥45 字长对白占比 >35% 报纯 advisory（--strict 退出 1）
+  //   c) delivery.visible-chars 证据明示 raw_visible_chars 与 body_chars
+  //   d) 与 measure-short-metrics.js 付费点累计字数与百分比口径完全一致
+  const speechBloatLine = '“我今天就把这三年四十六笔银行流水和婚前全款房产证原件全部摊在客厅桌上，你们老郭家少一分钱我都按不当得利起诉冻结账户。”' // 59 quoted chars >= 45
+  const speechBloatChunk = [
+    ...Array.from({ length: 12 }, () => speechBloatLine),
+    ...Array.from({ length: 18 }, () => '她垂下眼没搭话，把单子折齐放回包里。'),
+  ].join('\n')
+  const speechBloatBody = [
+    DEFAULT_LEAD,
+    ...Array.from({ length: 6 }, (_, i) => `###${i + 1}.\n${speechBloatChunk}`),
+  ].join('\n') + '\n'
+  const speechWarn = assertSoftOnly(
+    writeCase('short-long-dialogue-bloat', speechBloatBody),
+    'delivery.short-long-dialogue',
+    ['4000', '9000', '6']
+  )
+  assert.deepStrictEqual(softIds(speechWarn.normal), ['delivery.short-long-dialogue'])
+  const visCheck = speechWarn.normal.report.checks.find((c) => c.id === 'delivery.visible-chars')
+  assert.match(visCheck.evidence, /raw_visible_chars=\d+/)
+  assert.match(visCheck.evidence, /body_chars=\d+/)
+
+  const midDraftDir = writeCase('mid-draft-counts', body(1100, 3))
+  fs.writeFileSync(path.join(midDraftDir, '设定.md'), '- 目标字数：8400 字\n- 付费点：第 3 节末\n', 'utf8')
+  const midCountsRes = spawnSync(process.execPath, [verifier, '--counts', '--json', midDraftDir], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  })
+  assert.strictEqual(midCountsRes.status, 0, midCountsRes.stdout + midCountsRes.stderr)
+  const midCounts = JSON.parse(midCountsRes.stdout)
+  assert.strictEqual(typeof midCounts.median_para_chars, 'number')
+  assert.strictEqual(typeof midCounts.long_dialogue_45_ratio, 'number')
+  assert(midCounts.paywall_preview_ratio > 0.35 && midCounts.paywall_preview_ratio < 0.45, `mid-draft paywall preview should divide by target_chars, got ${midCounts.paywall_preview_ratio}`)
+
+  // Cross-script paywall ratio parity between check-delivery-contract.js and measure-short-metrics.js
+  const metricsScript = path.join(repoRoot, 'skills/story-short-analyze/scripts/measure-short-metrics.js')
+  const parityDir = writeCase('paywall-parity', `《测试书名》\n${body(1000, 8)}`)
+  fs.writeFileSync(path.join(parityDir, '设定.md'), '- 目标字数：8000 字\n- 付费点：第 3 节末\n', 'utf8')
+  const parityDeliv = run(parityDir, ['7500', '9000', '8'], undefined, false, ['--strict'])
+  assert.strictEqual(parityDeliv.status, 0, parityDeliv.stdout + parityDeliv.stderr)
+  const parityMetricsRes = spawnSync(process.execPath, [metricsScript, '--json', '--paywall-section', '3', path.join(parityDir, '正文.md')], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  })
+  assert.strictEqual(parityMetricsRes.status, 0, parityMetricsRes.stdout + parityMetricsRes.stderr)
+  const parityMetrics = JSON.parse(parityMetricsRes.stdout)
+  assert.strictEqual(parityDeliv.report.body_chars, parityMetrics.total_chars)
+  const delivPwCheck = parityDeliv.report.checks.find((c) => c.id === 'delivery.short-paywall-ratio')
+  const expectedPct = `${(parityMetrics.paywall.char_ratio * 100).toFixed(1)}%`
+  assert(
+    delivPwCheck.evidence.includes(`${parityMetrics.paywall.cumulative_chars} / ${parityMetrics.total_chars} 字（${expectedPct}）`),
+    `paywall parity mismatch: delivery="${delivPwCheck.evidence}" vs metrics=${parityMetrics.paywall.cumulative_chars}/${parityMetrics.total_chars} (${expectedPct})`
+  )
 
   const invalid = spawnSync(process.execPath, [verifier, '--json', '--min-chars', '8000'], {
     cwd: repoRoot,

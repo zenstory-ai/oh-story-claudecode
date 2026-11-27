@@ -34,11 +34,14 @@ Detect high-risk AI-flavor prose patterns that need human rewrite:
   - 叙述省略号过密 (引号与面板外 …… 高密度刷屏，advisory)
   - 感叹号过密 (叙述旁白或全文 ！ 高密度咆哮标点，advisory)
   - 戏剧套词刷屏 (死寂同章重复或死寂/轰然/骤然/猛地/瞬间高密度聚集，advisory)
+  - 女频油腻/言情套词聚集 (指节泛白/宠溺/喉结轻滚/眸色一暗/声音低哑/小女人聚集，豁免轻笑/低笑，advisory)
+  - 短篇塑料反应套词聚集 (--mode=short 眼底闪过一丝/瞳孔骤缩|猛地一缩|失焦/喉结滚/指节泛白/气得浑身发抖/死一般寂静合计 ≥2 处，advisory)
+  - 闲笔道具贴纸过密 (--mode=long 无功能材质/服饰/光影/环境音效贴纸聚集且叙述口语连接词偏低，advisory)
 
 Book-local .deslop-whitelist literal spans are excluded from style scanning (no regex or ancestor inheritance).
 Each finding carries severity: review_required for high-risk stylistic patterns (not-is-comparison / em-dash / voice-contrast / negation-parade / reverse-not-is / trailer-ending / trailer-summary), where single/low-count hits of rhetorical patterns (or moderate narration em-dash density, and all short-mode narration em-dash density) downgrade to semantic advisory and high-density clusters (or long-mode dense narration em-dash / trailer-summary) require explicit review-and-ack. This is a local style/readability soft-gate, not an AIGC detector score; functional human text can be kept with explicit acknowledgement instead of hard-blocked.
-或 advisory (period-stutter / long-paragraph / micro-action-tic / negation-pair-tic / stock-reaction-tic / action-list-tic / abstract-summary-tic / cliche-density-tic / metaphor-density-tic / reasoning-chain-tic / system-notice-formality-tic / overcompressed-prose-tic / low-connective-density-tic / quote-emphasis-tic / formulaic-parallelism / ellipsis-density-tic / exclamation-density-tic / dramatic-cliche-tic，是提示，justified 的长推理/氛围段可保留)。
---fail-on=blocking 只在出现 hard blocking finding 时退出 1（当前风格规则均为 review_required/advisory，故返回 0）；--fail-on=review_required 在出现 blocking 或 review_required finding 时退出 1；默认 --fail-on=all 有任何 finding 即退出 1。
+或 advisory (period-stutter / long-paragraph / micro-action-tic / negation-pair-tic / stock-reaction-tic / action-list-tic / abstract-summary-tic / cliche-density-tic / metaphor-density-tic / reasoning-chain-tic / system-notice-formality-tic / overcompressed-prose-tic / low-connective-density-tic / idle-prop-decoration-tic / quote-emphasis-tic / formulaic-parallelism / ellipsis-density-tic / exclamation-density-tic / dramatic-cliche-tic / romance-cliche-tic / short-plastic-reaction-tic / staccato-paragraph-tic，是提示，justified 的长推理/氛围段可保留)。
+--fail-on=blocking 只在出现 hard blocking finding 时退出 1（当前风格规则均为 review_required/advisory，故返回 0）；--fail-on=review_required 在出现 blocking 或 review_required finding 时退出 1（阻断门禁请加 --fail-on=review_required）；默认 --fail-on=all 有任何 finding 即退出 1。
 Each finding also carries review: mechanical（表面形态确定、就地改写或确认保留即可）或 semantic（可能承担叙事功能，需读上下文判断是否保留）；review_required / blocking 一律 mechanical。--list-review-classes 输出完整分类表（JSON）。
 HTML comments (<!-- ... -->, e.g. the 去味:跳过 exemption marker) are metadata, not prose, and are never scanned.
 
@@ -57,9 +60,10 @@ const MAX_POSITIVE_SPAN = 80;
 const STUTTER_MIN_RUN = 6;
 const SHORT_STUTTER_MIN_RUN = 9;
 const STUTTER_MAX_SENTENCE = 5;
-// 长段落：单段原始字符数超过阈值即提示按镜头断段（长篇保守阈值 200；短篇竖屏阅读收紧到 100）。
+// 长段落：单段原始字符数超过阈值即提示按镜头断段（长篇保守阈值 200；短篇竖屏叙述收紧到 100，纯引号台词/书信/公告放宽到 150）。
 const LONG_PARAGRAPH_CHARS = 200;
 const SHORT_LONG_PARAGRAPH_CHARS = 100;
+const SHORT_LONG_QUOTED_PARAGRAPH_CHARS = 150;
 // 旁白破折号密度门槛（真人网文长篇/短篇均常用 —— 做系统提示、拖音与转折揭底拍）：
 // 长篇 ≥4 处且 ≥1.5/千字给 advisory（短篇 ≥6 处且 ≥1.5/千字）；长篇 ≥10 处且 ≥2.5/千字升为 review_required（短篇始终 advisory）。
 const LONG_EM_DASH_ADVISORY_MIN_HITS = 4;
@@ -67,6 +71,9 @@ const EM_DASH_ADVISORY_MIN_HITS = 6;
 const EM_DASH_ADVISORY_PER_KILO = 1.5;
 const LONG_EM_DASH_REVIEW_MIN_HITS = 10;
 const LONG_EM_DASH_REVIEW_PER_KILO = 2.5;
+const ONOMATOPOEIA_BEFORE_DASH_RE = /(?:^|[\s，,。！？!?：:；;、—]|[声响一阵])[轰砰咚咔嗡吱嘟哗铮啪叮嘶呼唰呜嗷吼哒嚓啦咯嘎哐咣隆]{1,4}$/;
+const ONOMATOPOEIA_PAIR_BEFORE_DASH_RE = /(?:轰隆隆?|铮铮|咔嚓|咔哒|哗啦|叮咚|嘎吱|哐当|哐啷|咣当|咕噜|嗡嗡|嘶嘶|呼呼|嘟嘟|砰砰|咚咚|啪啪|嗷呜)$/;
+const OPEN_TO_CLOSE_QUOTE = { '“': '”', '「': '」', '『': '』' };
 // 短篇套式反应细节门槛：短篇情绪与生理速记频率高于长篇，抬高到 8 处且 3.0/千字。
 const SHORT_STOCK_REACTION_MIN_HITS = 8;
 const SHORT_STOCK_REACTION_PER_KILO = 3.0;
@@ -90,7 +97,7 @@ const STOCK_REACTION_PATTERNS = [
   /(?:指尖|指腹|手指|指节|手背|掌心|拳头|袖口|衣角|裙角|下唇|嘴唇|唇角|嘴角|眉头|眼底|眸光|目光|视线|肩膀|呼吸)[^。！？!?\n]{0,16}(?:轻轻|微微|缓缓|慢慢|悄然|不自觉|无意识|下意识|攥紧|握紧|收紧|绞紧|拢住|按住|压住|扣住|捻|泛白|发白|叩|敲|摩挲|抿紧|抿成|移开|垂下|躲开|落[在到][^，。！？!?\n]{1,10}(?:停|顿)|一颤|颤了?一下|停了?一下|顿了?一下)/g,
   /(?:手|指尖|手指)往(?:袖口?|怀|兜|口袋|身后|背后)里?一?(?:缩|揣|收|藏)/g,
   /(?:语气|声音)[^。！？!?\n]{0,12}(?:平静|冷静|平淡|冷淡|淡漠|平直)[^。！？!?\n]{0,12}(?:像|仿佛|如同|好像)[^。！？!?\n]{0,16}(?:念|读|报|说|陈述|宣判|背诵)/g,
-  /(?:胸口|心口)[^。！？!?\n]{0,16}(?:像|仿佛|如同|好像)[^。！？!?\n]{0,16}(?:撞|锤|压|攥|堵)[^。！？!?\n]{0,8}(?:一下|一记|一拳)?/g,
+  /(?:胸口|心口)[^。！？!?\n]{0,16}(?:像|仿佛|如同|好像)[^。！？!?\n]{0,16}(?:撞|锤|压|攥|堵)[^。！？!?\n]{0,8}(?:一下|一记|一拳)?|(?:心跳|心头)漏跳?了?一拍/g,
   /(?:声音|嗓音|语气)[^。！？!?\n]{0,12}(?:放轻|压低|发紧|发颤|很轻|轻了些)/g,
   /(?:喉结|喉头|喉咙)[^。！？!?\n]{0,10}(?:滚|动|紧|堵|发涩|发干)/g,
   /(?:眼眶|眼圈|鼻子)[^。！？!?\n]{0,8}(?:发红|红了|发热|发酸|一酸)/g,
@@ -132,7 +139,7 @@ const CLICHE_PATTERNS = [
   /深吸一口气|缓缓|微微|轻轻|淡淡/g,
   /眼中闪过|嘴角勾起|眸光微微一闪|指节泛白|目光锐利|眼神锐利/g,
   /心中涌起一股|心头一震|心中一动|心下了然|心中暗道|心中一凛/g,
-  /不容置疑|不容置喙|不易察觉|显而易见|毫无疑问|不可否认/g,
+  /不容置疑|不容置喙|不易察觉|微不可察|显而易见|毫无疑问|不可否认/g,
   /声音不大[，,]?却带着|语气平静无波|平静无波|声音平直|听不出情绪/g,
   /不知何时|唾手可得|无声翻涌|沉默(?:在[^。！？!?\n]{0,16})?蔓延|难以言说/g,
   /散发着一股|冰冷的光|格外刺眼|深邃而冰冷/g,
@@ -198,10 +205,33 @@ const LOW_CONNECTIVE_TINY_SENTENCE_CHARS = 10;
 const LOW_CONNECTIVE_TINY_SENTENCE_RATIO = 0.50;
 const LOW_CONNECTIVE_LONG_SENTENCE_CHARS = 25;
 const LOW_CONNECTIVE_LONG_SENTENCE_RATIO = 0.05;
+// 长篇干硬镜头叙述分支（2,450 篇真 9.0+ 长篇标定，误报 0.33%）：纯叙述段偏长（中位 ≥28 字）却同时缺口语连接词（≤5.5/千字）
+// 与自然「的」（≤25.0/千字），即抽干人物内心盘算的剧本报幕体；绝不误伤正常手机竖屏短段（中位 ~23 字）。
+const COLLOQUIAL_CONNECTIVE_PATTERN = /但是|可是|不过|虽然|因为|所以|偏偏|干脆|其实|毕竟|竟然|好在|倒也|却|才|便|正要|已经/g;
+const DRY_NARRATION_MIN_CHARS = 400;
+const DRY_NARRATION_MIN_UNIQUE_PARAS = 8;
+const DRY_NARRATION_MAX_CONN_PER_KILO = 5.5;
+const DRY_NARRATION_MAX_DE_PER_KILO = 25.0;
+const DRY_NARRATION_MIN_PURE_MEDIAN = 28;
+const PURE_NARRATION_QUOTE_RE = /[“”「」『』"]/;
 
-// either-or「不是A就是B / 不是A也是B」里紧贴的「是」是连词的一部分，不是肯定项系动词。
-// 含「不」以沿用「不是A，也不是B」第二个否定段不算翻转的旧排除。
-const COMPACT_EITHER_OR_PREV = new Set(['不', '就', '也']);
+// 闲笔材质/道具/光影贴纸过密（advisory only；2,450 篇真 9.0+ 长篇标定，误报 0.00%）：
+// 仅在 --mode=long 扫描引号外叙述（≥400 字），同时要求命中 ≥3 种不同装饰贴纸、唯一密度 ≥1.8/千字，
+// 且口语连接词 ≤7.0/千字（写专业器物但带活人口语因果的真人类自动放行）。
+const IDLE_PROP_DECORATION_PATTERN = /磨砂|骨瓷|紫檀|红木|黄铜|青漆|红漆|黑漆|漆面|太师椅|酸枝|花梨|珐琅|青砖|青石板|玻璃幕墙|落地窗|百叶窗|大理石|胡桃木|亚光|鎏金|描金|雕花|算盘珠|水渍|茶渍|烟炱|(?:深灰|藏青|炭黑|烟灰|定制|高定)(?:西装|西服|大衣|羊绒|风衣|旗袍|礼服)|熨得|一丝不苟|袖扣|领带夹|鳄鱼皮|公文包|腕表|表盘|白炽灯|日光灯|吸顶灯|冷白光|暖黄光|咖啡机|嗡鸣|低鸣|空调外机|淅淅沥沥|滴答作响|钟摆|窗霜|瓷盏|茶盏|折扇|油灯/g;
+const IDLE_PROP_MIN_CHARS = 400;
+const IDLE_PROP_MIN_UNIQUE = 3;
+const IDLE_PROP_MIN_UNIQUE_PER_KILO = 1.8;
+const IDLE_PROP_MAX_CONN_PER_KILO = 7.0;
+
+// either-or「不是A就是B / 不是A也是B」及紧凑子句中的合成词/人称主语前字，不作为无逗号紧凑翻转的肯定项系动词。
+const COMPACT_EITHER_OR_PREV = new Set([
+  '不', '就', '也', '还', '只', '可', '但', '于', '倒', '像', '若', '要', '正', '便', '总', '老',
+  '更', '最', '算', '怕', '凡', '或', '即', '自', '竟', '原', '本', '仍', '许', '净', '光', '单',
+  '尽', '又', '才', '都', '真', '你', '我', '他', '她', '它', '这', '那',
+]);
+const COMPACT_NOT_IS_CLAUSE_PREFIX_RE = /^不是(?:因为|说|听说|以为|觉得|认为)/;
+const COMPACT_NOT_IS_TAIL_EXCLUDE_RE = /^是(?:什么|假的|真的|错的|对的|谁|哪|怎么)/;
 // 句尾语气/反问助词；「…，是吗 / 是吧 / 是嘛」是反问尾巴，不是否定后的肯定翻转。
 const TAG_PARTICLES = new Set(['吗', '吧', '嘛']);
 // 段首确认语；「不是第一次来。是的，他还记得……」里的「是的/是啊」
@@ -224,7 +254,7 @@ const QUOTE_SOURCES = QUOTE_PAIRS.map(([open, close]) => `${escapeRegExp(open)}[
 // 旧网只有套词密度桶里的「声音不大，却带着」，音量词/转折词一换就漏。
 // 引号外叙述逐处 blocking；修法是删掉音量铺垫，直接写声音落进场子的具体效果。
 // 校准：《万疆》20 章 0 命中，demo 前 20 章 0 命中。
-const VOICE_CONTRAST_PATTERN = /声音(?:并)?不[大高响亮][^。！？!?\n]{0,16}[却但偏]/g;
+const VOICE_CONTRAST_PATTERN = /(?:声音|嗓音|语调|语气)(?:(?:并)?不[大高响亮]|很淡)[^。！？!?\n]{0,16}[却但偏]/g;
 
 // 否定排比（实战漏网 B）：「没有伴奏，没有和声，没有提词器。」同句 ≥2 个「没有X，」连排；
 // 变体「他没炫技，没有那种…架势。他只是唱」先否定铺垫、再用「只是/只会/只有」收肯定。
@@ -242,11 +272,28 @@ const NEGATION_PARADE_PATTERNS = [
 const CROSS_NEGATION_START = /^不是[^。！？!?\n]{1,24}[。！？!?]?$/;
 const CROSS_NEGATION_MIDDLE = /^(?:也|还)不是[^。！？!?\n]{1,24}[。！？!?]?$/;
 const CROSS_NEGATION_END = /^只是[^。！？!?\n]{1,32}[。！？!?]?$/;
+// 跨句/跨行「没有A，没有B。只有C。」与三段「没有A / 也没有B / 只有C」（Wave 3D FN-7，仅 advisory）
+const PERIOD_NEGATION_ONLY_PATTERN = /没有[^。！？!?\n，,]{1,14}[。！？!?]\s*(?:也)?没有[^。！？!?\n，,]{1,14}[。！？!?]\s*[^。！？!?\n，,]{0,6}只有/g;
+const CROSS_MEIYOU_PAIR_END = /没有[^。！？!?\n，,]{1,14}[，,]\s*(?:也)?没有[^。！？!?\n，,]{1,14}[。！？!?]$/;
+const CROSS_MEIYOU_SINGLE_START = /^没有[^。！？!?\n]{1,20}[。！？!?]?$/;
+const CROSS_MEIYOU_SINGLE_MIDDLE = /^(?:也)?没有[^。！？!?\n]{1,20}[。！？!?]?$/;
+const CROSS_ZHIYOU_START = /^只有[^。！？!?\n]{1,32}[。！？!?]?$/;
+// 极碎电报体（Wave 3D FN-4，advisory）：整章/场景 ≥350 可见字，且纯叙述自然段 ≥15 段、段长中位数 ≤12 字（排除纯对白/面板/聊天体）。
+const STACCATO_PARA_MIN_COUNT = 15;
+const STACCATO_PARA_MAX_MEDIAN = 12;
+const SHORT_STACCATO_PARA_MAX_MEDIAN = 9;
+const STACCATO_PARA_MIN_DOC_CHARS = 350;
 
 // 两类常见但不能直接判错的工整框架，只做 advisory。与 blocking 规则不同，这里故意扫描
 // 台词：自然点单「不放辣，不放葱」靠对象最短长度排除；更长的同动词清单交语义审查判断功能。
 const DECISION_FRAME_PATTERN = /至于([\u3400-\u9fff]{1,3})不\1[，,]\s*怎么\1/g;
 const REPEATED_NEGATIVE_VERB_PATTERN = /不([\u3400-\u9fff]{1,2})([\u3400-\u9fff]{2,8})[，,]\s*不\1([\u3400-\u9fff]{2,8})/g;
+// 排除常见虚词/关联词/情态词（不管…不管…、不是…不是…、不要…不要…、不想…不想…），避免误杀自然中文情绪递进。
+const PARALLELISM_EXCLUDED_STEMS = new Set([
+  '管', '论', '是', '用', '要', '想', '会', '能', '敢', '准', '许', '必', '可', '得',
+  '知', '知道', '愿', '愿意', '肯', '再', '仅', '但', '只', '止', '够', '配', '值', '值得',
+  '顾', '顾及', '停', '断', '该', '让', '怕',
+]);
 
 // 反序对比腔（实战漏网 C）：「是真嗓子，不是修音修出来的」——not-is-comparison 的反序变种。
 // 复用 not-is 的排除基建：引号内剥离（maskQuoted）、「是的/是啊」确认语（isAffirmationTagAt）；
@@ -269,7 +316,9 @@ const REVERSE_NOT_IS_PREV_EXCLUDE = new Set([...COMPACT_EITHER_OR_PREV, '还', '
 const TRAILER_SPOILER_PATTERN = /没人知道|谁也不知道|谁也没想到|[他她它]们?不知道的是|殊不知/g;
 const TRAILER_CLICHE_PATTERN = /(?:这)?才刚刚开(?:始|头)|正(?:朝着|向着)[^。！？!?\n]{0,24}(?:压|涌|袭|逼)(?:了?过去|了?过来|来)|(?<!正式)拉开(?:序幕|帷幕)|即将(?:开始|来临|降临)/g;
 const TRAILER_ENDING_PATTERN = new RegExp(`${TRAILER_SPOILER_PATTERN.source}|${TRAILER_CLICHE_PATTERN.source}`, 'g');
-const TRAILER_ENDING_WINDOW_CHARS = 600;
+const TRAILER_ENDING_WINDOW_CHARS = 250;
+const TRAILER_ENDING_WINDOW_MAX_LINES = 4;
+const TRAILER_ENDING_LINE_CAP_MIN_DOC_CHARS = 500;
 const shortSpoilerFindings = new WeakSet();
 
 // 章尾状态总结体：把细纲「结尾设定」原样写成总结句收章（「这一夜注定无人入眠」
@@ -285,7 +334,7 @@ const shortSpoilerFindings = new WeakSet();
 // heiyan 整篇 3999 篇命中 22 处（0.550%，全部是上列禁用形态）；同批既有 trailer-ending
 // 分别命中 1.345% / 6.602%——本规则误报面显著小于已上线的同窗口规则。短篇整篇即收口，
 // 基线天然高于长篇章中段，故两个总体分别报数。
-const TRAILER_SUMMARY_PATTERN = /这一(?:夜|天|刻|战|年|局|役)[，,]?[^。！？!?，,\n]{0,6}(?<!命中)(?<!是)注定[^。！？!?\n]{0,8}[。！]|就这样[，,][^。！？!?，,\n]{0,8}(?:一切|全部)[^。！？!?，,\n]{0,4}(?:结束了|落幕|收场)[。！]|这一切[，,]?[^。！？!?，,\n]{0,6}(?:都)?(?:说明|意味着|结束了)(?!的)(?:(?!什么)[^。！？!?\n]){0,6}[。！]|(?:新的篇章|新的旅程|崭新的篇章|新的人生)[^。！？!?\n]{0,6}(?:开始|拉开|展开)|命运[^。！？!?\n]{0,6}齿轮/g;
+const TRAILER_SUMMARY_PATTERN = /这一(?:夜|天|刻|战|年|局|役)[，,]?[^。！？!?，,\n]{0,6}(?<!命中)(?<!是)注定[^。！？!?\n]{0,8}[。！]|就这样[，,][^。！？!?，,\n]{0,8}(?:一切|全部)[^。！？!?，,\n]{0,4}(?:结束了|落幕|收场)[。！]|这一切[，,]?[^。！？!?，,\n]{0,6}(?:都)?(?:说明|意味着|结束了)(?!的)(?:(?!什么)[^。！？!?\n]){0,6}[。！]|(?:新的篇章|新的旅程|崭新的篇章|新的人生)[^。！？!?\n]{0,6}(?:开始|拉开|展开)|命运[^。！？!?\n]{0,6}齿轮|(?:这就是|这才是)[^。！？!?\n]{1,10}(?:最大的)?意义|活下来的[，,]?是一个更|花了[一二三四五六七八九十百千万0-9]+年[，,]?才明白这个道理|获得了[^。！？!?\n]{0,12}(?:真正的自由|解脱)/g;
 
 // 引号强调滥用（实战漏网 E，advisory 密度型，风格照 metaphor-density-tic）：
 // 叙述里短词加引号强调（他是被请来"把关"的）。只数叙述层 1-4 字成对引号片段；
@@ -300,7 +349,7 @@ const QUOTE_EMPHASIS_SPEECH_VERB_PATTERN = /[说道问喊答念叫回吼骂写�
 // 历史/世情专名与印信匾额豁免（如“江宁崔氏”“仁和堂”或 刻着/写着/印着/挂着/贴着“……”）
 const QUOTE_EMPHASIS_PROPER_SUFFIX_PATTERN = /[氏府堂号铺庄坊印匾]$/;
 const QUOTE_EMPHASIS_INSCRIPTION_BEFORE_PATTERN = /刻着|写着|印着|挂着|贴着/;
-const QUOTE_EMPHASIS_ONOMATOPOEIA_PATTERN = /^(?:啪|噼啪|咔哒|咔嚓|咣当|砰|咚|哗啦|哗|哇|嗡|嘶|滴答|叮|叮咚|哐当|轰隆|呼啦|嘎吱)$/;
+const QUOTE_EMPHASIS_ONOMATOPOEIA_PATTERN = /^(?:啪|噼啪|咔哒|咔嚓|咣当|砰|咚|哗啦|哗|哇|嗡|嘶|滴答|叮|叮咚|哐当|哐啷|轰隆|呼啦|嘎吱)$/;
 
 // 叙述旁白省略号密度：真人网文（尤其番茄男频/女频）常用旁白 `……` 表达停顿/心理吐槽，
 // 少量留白正常保留；全章引号与面板外 ≥10 处且 ≥6.0/千字才报 advisory。
@@ -309,25 +358,50 @@ const ELLIPSIS_DENSITY_MIN_HITS = 10;
 const ELLIPSIS_DENSITY_PER_KILO = 6.0;
 
 // 感叹号过密（advisory only）：反文学腔后模型常出现叙述咆哮标点过矫正。
-// 引号与面板外叙述 ！ ≥12 处且 ≥10.0/千字，或全文（含对白）！ ≥25 处且 ≥18.0/千字（短篇 ≥28 处且 ≥21.0/千字）给 advisory。
+// 引号与面板外叙述 ！ ≥12 处且 ≥10.0/千字，或全文（含对白）！ ≥25 处且 ≥22.0/千字（短篇 ≥28 处且 ≥21.0/千字）给 advisory。
 const EXCLAMATION_PATTERN = /[！!]/g;
 const EXCLAMATION_NARRATION_MIN_HITS = 12;
 const EXCLAMATION_NARRATION_PER_KILO = 10.0;
 const EXCLAMATION_TOTAL_MIN_HITS = 25;
-const EXCLAMATION_TOTAL_PER_KILO = 18.0;
+const EXCLAMATION_TOTAL_PER_KILO = 22.0;
 const SHORT_EXCLAMATION_TOTAL_MIN_HITS = 28;
 const SHORT_EXCLAMATION_TOTAL_PER_KILO = 21.0;
 
-// 戏剧套词刷屏（advisory only）：死寂同章重复（长篇 ≥2 处，短篇按篇幅缩放 ≥3 处）
-// 或引号外叙述中 死寂/轰然/骤然/猛地/瞬间 高密度聚集。
+// 戏剧套词刷屏（advisory only）：死寂同章重复（长篇 ≥2 处，短篇按篇幅缩放 ≥3 处）、
+// 核心戏剧震惊套词（死寂/轰然/骤然/骇然/色变/倒吸）聚集，或正常动作副词（猛地/瞬间）极端高频刷屏。
 const DRAMATIC_SIJI_PATTERN = /死寂/g;
-const DRAMATIC_CLUSTER_PATTERN = /死寂|轰然|骤然|猛地|瞬间/g;
+const DRAMATIC_CORE_PATTERN = /死寂|轰然|骤然|骇然|色变|倒吸/g;
+const DRAMATIC_ACTION_PATTERN = /猛地|瞬间/g;
 const LONG_DRAMATIC_SIJI_MIN_HITS = 2;
 const SHORT_DRAMATIC_SIJI_MIN_HITS = 3;
-const LONG_DRAMATIC_CLUSTER_MIN_HITS = 6;
-const LONG_DRAMATIC_CLUSTER_PER_KILO = 3.5;
-const SHORT_DRAMATIC_CLUSTER_MIN_HITS = 10;
-const SHORT_DRAMATIC_CLUSTER_PER_KILO = 4.2;
+const LONG_DRAMATIC_CORE_MIN_HITS = 4;
+const LONG_DRAMATIC_CORE_PER_KILO = 2.5;
+const SHORT_DRAMATIC_CORE_MIN_HITS = 6;
+const SHORT_DRAMATIC_CORE_PER_KILO = 2.5;
+const LONG_DRAMATIC_ACTION_MIN_HITS = 10;
+const LONG_DRAMATIC_ACTION_PER_KILO = 5.5;
+const SHORT_DRAMATIC_ACTION_MIN_HITS = 16;
+const SHORT_DRAMATIC_ACTION_PER_KILO = 6.0;
+
+// 女频油腻/言情套词聚集（advisory only；262.4 万字女频实证：指节泛白 6.10×、宠溺 2.98×、喉结 2.69×、声音低哑 2.44×、耳尖泛红 2.26×）。
+// 严禁收录「轻笑/低笑」（实测 0.90× 为人类高口碑女频正常语感）。单章命中 ≥3 处且密度 ≥1.5/千字时提示人工去油。
+const ROMANCE_CLICHE_NARRATION_PATTERN = /指节泛白|眸色一暗|眸光一暗|喉结(?:轻)?滚|声音低(?:沉)?沙哑|声音低哑|耳尖(?:泛红|发烫|微红)|(?:眼神|满眼|语气|带着[^，。\n]{0,4})宠溺|骨节分明的大手|骨节分明|(?:心跳|心头)漏跳?了?一拍|微不可察|拆吞入腹|暧昧流转|木质雪松|眼底(?:掠过|闪过)一丝(?:难以察觉|不易察觉|微不可察)/g;
+const ROMANCE_CLICHE_PATERNAL_PATTERN = /小女人|香香软软|小白兔|女人[，,]你/g;
+// 极高危女频言情 AI 套词：单次即出低级 advisory（2000 篇实库几乎零误报），防单次漏网。
+// 注：「微不可察」已移出单次触发，改由 ≥2 处聚集规则兜底，避免误伤高分男频/女频单次正常用法。
+const ROMANCE_CLICHE_SINGLE_HIGH_RISK_PATTERN = /骨节分明的大手|眼底(?:掠过|闪过)一丝(?:难以察觉|不易察觉|微不可察)|(?:心跳|心头)漏跳?了?一拍|拆吞入腹|小女人|香香软软|女人[，,]你/g;
+const ROMANCE_CLICHE_WEIBUKECHA_PATTERN = /微不可察/g;
+const ROMANCE_CLICHE_WEIBUKECHA_MIN_HITS = 2;
+const ROMANCE_CLICHE_MIN_HITS = 3;
+const ROMANCE_CLICHE_PER_KILO = 1.5;
+// 非言情语境（末世异兽/怪兽/丧尸/虫族等字面吞噬）里的「拆吞入腹」不计入言情油腻套词（Wave 6 P04 实测误伤修复）。
+const MONSTER_DEVOUR_CTX_RE = /异兽|丧尸|魔兽|妖兽|巨兽|虫族|怪物|荒兽|猛兽|凶兽|血口|獠牙|利齿|吞噬|啃食|咬碎|尸潮|兽潮/;
+
+// 短篇高频塑料反应套词聚集（advisory only；R077/R080 真人盲测补漏）：
+// 短篇整篇体量下通用密度门常漏掉离散 AI 塑料反应词；仅在 --mode=short 下扫描引号外叙述，
+// 合计命中 ≥2 处即发 1 条 semantic advisory，不阻断也不误伤单次偶发。
+const SHORT_PLASTIC_REACTION_PATTERN = /眼底闪过一丝|瞳孔(?:骤缩|猛地?一缩|失焦)|喉结[^，。！？!?\n]{0,3}滚|指节[^，。！？!?\n]{0,3}泛白|气得浑身发抖|死一般(?:的)?寂静/g;
+const SHORT_PLASTIC_REACTION_MIN_HITS = 2;
 
 // 单章密度分级门槛（800 章真人长篇 + 500 篇真人短篇误报校准）：偶发 1 处（not-is 族 1-2 处）常承担正常纠错、转折或章末钩子，
 // 降为 advisory + semantic 交上下文判断；同章高频连刷升为 blocking + mechanical 强制清零。
@@ -363,6 +437,7 @@ const TRAILER_ENDING_BLOCKING_MIN_HITS = 2;
 //   system-notice-formality-tic  semantic    系统/规则文本本就可以公文腔，看体裁功能
 //   overcompressed-prose-tic     semantic    短段过密可能是节奏选择，禁止机械注水
 //   low-connective-density-tic   semantic    同上，连接词补不补要看读感
+//   idle-prop-decoration-tic     semantic    材质/服饰/光影/声效贴纸是否承担实证功能要读上下文
 //   quote-emphasis-tic           semantic    标语/转述载体的引号是正常写法
 //   formulaic-parallelism        semantic    工整并列可能承担辩解或悬念排除
 const REVIEW_CLASSES = Object.freeze({
@@ -386,11 +461,15 @@ const REVIEW_CLASSES = Object.freeze({
   'system-notice-formality-tic': 'semantic',
   'overcompressed-prose-tic': 'semantic',
   'low-connective-density-tic': 'semantic',
+  'idle-prop-decoration-tic': 'semantic',
   'quote-emphasis-tic': 'semantic',
   'formulaic-parallelism': 'semantic',
   'ellipsis-density-tic': 'semantic',
   'exclamation-density-tic': 'semantic',
   'dramatic-cliche-tic': 'semantic',
+  'romance-cliche-tic': 'semantic',
+  'short-plastic-reaction-tic': 'semantic',
+  'staccato-paragraph-tic': 'semantic',
 });
 
 // 与 hooks / storyctl 同一语法：文件前 6 行含 `<!-- 去味:跳过 -->` 时，仅在传入 `--respect-skip` 时将
@@ -434,6 +513,13 @@ for (let i = 2; i < process.argv.length; i += 1) {
       die("--mode must be 'auto', 'long', or 'short'");
     }
     options.mode = v;
+  } else if (arg === '--fail-on') {
+    const v = process.argv[i + 1];
+    if (v !== 'blocking' && v !== 'review_required' && v !== 'all') {
+      die("--fail-on must be 'blocking', 'review_required', or 'all'");
+    }
+    options.failOn = v;
+    i += 1;
   } else if (arg.startsWith('--fail-on=')) {
     const v = arg.slice('--fail-on='.length);
     if (v !== 'blocking' && v !== 'review_required' && v !== 'all') {
@@ -501,6 +587,7 @@ const advisoryCount = allFindings.filter((f) => f.severity === 'advisory').lengt
 
 if (options.json) {
   process.stdout.write(`${JSON.stringify({
+    fail_on: options.failOn,
     findings: allFindings,
     blocking: blockingCount,
     review_required: reviewRequiredCount,
@@ -549,7 +636,9 @@ function die(message) {
 // unclosedOpenings：到文末都没闭合的 `<!--` 位置（"行号:列号"）。未闭合的注释不是注释，
 // 否则一个漏写的 `-->` 会把后面整章藏起来；这些位置按正文扫描，只把 `<!--` 本身抹掉。
 function scanDocument(input, unclosedOpenings = new Set(), mode = 'long') {
-  const lines = input.split(/\r?\n/);
+  // 剥离零宽不可见字符，防从网页/飞书/微信粘贴夹带 \u200b 绕过机械检测
+  const cleanedInput = String(input || '').replace(/[\u200B-\u200D\uFEFF]/g, '');
+  const lines = cleanedInput.split(/\r?\n/);
   const findings = [];
   let fence = null;
   let inFrontMatter = hasYamlFrontMatter(lines);
@@ -632,7 +721,7 @@ function applyDensitySeverityGates(findings, proseChars = 0, mode = 'long') {
   }
   const notIsCombined = (counts.get('not-is-comparison') || 0) + (counts.get('reverse-not-is') || 0);
   const notIsThreshold = mode === 'short'
-    ? Math.max(6, Math.round(5 * scale))
+    ? Math.max(6, Math.round(3 * scale))
     : NOT_IS_BLOCKING_MIN_HITS * scale;
   for (const f of findings) {
     let block = null;
@@ -659,10 +748,17 @@ function applyDensitySeverityGates(findings, proseChars = 0, mode = 'long') {
   }
 }
 
+function isQuotedMonologueParagraph(para) {
+  if (/^[“「『"【]/.test(para)) return true;
+  const totalVis = visibleLength(para);
+  if (totalVis === 0) return false;
+  const narVis = visibleLength(stripQuotedWithUnclosed(para));
+  return narVis <= 20 || (totalVis - narVis) / totalVis >= 0.7;
+}
+
 // 段落级检测：碎句号（连续短叙述句）、长段落、旁白破折号密度（对白引号与面板内豁免）。
 function scanProsePatterns(proseLines, mode = 'long', scale = 1) {
   const findings = [];
-  const longParaLimit = mode === 'short' ? SHORT_LONG_PARAGRAPH_CHARS : LONG_PARAGRAPH_CHARS;
   let dashHits = 0;
   let dashNarrativeChars = 0;
   let dashFirstLine = null;
@@ -674,10 +770,14 @@ function scanProsePatterns(proseLines, mode = 'long', scale = 1) {
     if (!trimmed || isDivider(trimmed) || isStructural(trimmed)) continue;
 
     const dashScanText = maskQuotedWithUnclosed(text);
-    const dashPattern = /——|—|--+/g;
+    const dashPattern = /——+|—|--+/g;
     dashNarrativeChars += visibleLength(stripQuotedWithUnclosed(trimmed));
     let dash;
     while ((dash = dashPattern.exec(dashScanText)) !== null) {
+      // 跳过连续 ≥3 个「—」的行内场景装饰线（如 ————）与紧跟拟声词的拖音（如 轰隆隆——！/嘟——嘟——）
+      if (dash[0].length >= 3 && /^—+$/.test(dash[0])) continue;
+      const beforeDash = dashScanText.slice(Math.max(0, dash.index - 6), dash.index);
+      if (ONOMATOPOEIA_BEFORE_DASH_RE.test(beforeDash) || ONOMATOPOEIA_PAIR_BEFORE_DASH_RE.test(beforeDash)) continue;
       dashHits += 1;
       if (dashFirstLine === null) {
         dashFirstLine = lineNo;
@@ -688,6 +788,9 @@ function scanProsePatterns(proseLines, mode = 'long', scale = 1) {
     }
 
     const effectivePara = (stripped !== undefined ? stripped : text).trim();
+    const longParaLimit = mode === 'short'
+      ? (isQuotedMonologueParagraph(effectivePara) ? SHORT_LONG_QUOTED_PARAGRAPH_CHARS : SHORT_LONG_PARAGRAPH_CHARS)
+      : LONG_PARAGRAPH_CHARS;
     if (effectivePara.length > longParaLimit) {
       findings.push({
         line: lineNo,
@@ -746,10 +849,14 @@ function scanProsePatterns(proseLines, mode = 'long', scale = 1) {
   if (mode !== 'short') {
     findings.push(...findOvercompressedProseTic(proseLines));
     findings.push(...findLowConnectiveDensityTic(proseLines));
+    findings.push(...findIdlePropDecorationTic(proseLines, mode));
   }
   findings.push(...findEllipsisDensityTic(proseLines));
   findings.push(...findExclamationDensityTic(proseLines, mode));
   findings.push(...findDramaticClicheTic(proseLines, mode, scale));
+  findings.push(...findRomanceClicheTic(proseLines));
+  findings.push(...findShortPlasticReactionTic(proseLines, mode));
+  findings.push(...findStaccatoParagraphTic(proseLines, mode));
   return findings;
 }
 
@@ -832,6 +939,12 @@ function findFormulaicParallelism(proseLines) {
       pattern.lastIndex = 0;
       let match;
       while ((match = pattern.exec(text)) !== null) {
+        if (pattern === REPEATED_NEGATIVE_VERB_PATTERN) {
+          const stem = match[1];
+          if (PARALLELISM_EXCLUDED_STEMS.has(stem) || (stem.length === 2 && PARALLELISM_EXCLUDED_STEMS.has(stem[0]))) {
+            continue;
+          }
+        }
         findings.push({
           line: lineNo,
           column: match.index + 1,
@@ -842,10 +955,23 @@ function findFormulaicParallelism(proseLines) {
         });
       }
     }
+    PERIOD_NEGATION_ONLY_PATTERN.lastIndex = 0;
+    const maskedLine = maskQuoted(text);
+    let pMatch;
+    while ((pMatch = PERIOD_NEGATION_ONLY_PATTERN.exec(maskedLine)) !== null) {
+      findings.push({
+        line: lineNo,
+        column: pMatch.index + 1,
+        type: 'formulaic-parallelism',
+        severity: 'advisory',
+        message: '跨句「没有A。没有B。只有C。」属于否定铺排对比腔；删掉多余否定句，直接写现场实景。',
+        excerpt: compact(text.slice(pMatch.index, pMatch.index + pMatch[0].length + 8)),
+      });
+    }
   }
 
-  // 跨段「不是A / 也不是B / 只是C」既可能是细纲复述，也可能是正常的
-  // 辩解、悬念排除或情绪递进。纯句法无法稳定区分，因此只给 advisory，交给语义复核。
+  // 跨段「不是A / 也不是B / 只是C」及「没有A，没有B。/ 只有C」「没有A / 也没有B / 只有C」：
+  // 纯句法无法稳定区分修辞铺排与悬念排除，因此只给 advisory，交给语义复核。
   const window = [];
   for (const { text, lineNo } of proseLines) {
     const trimmed = text.trim();
@@ -855,20 +981,46 @@ function findFormulaicParallelism(proseLines) {
       continue;
     }
     if (window.length && lineNo - window[window.length - 1].lineNo > 2) window.length = 0;
-    window.push({ text: maskQuoted(trimmed), original: trimmed, lineNo });
+    const curEntry = { text: maskQuoted(trimmed), original: trimmed, lineNo };
+    if (window.length >= 1) {
+      const prevEntry = window[window.length - 1];
+      if (CROSS_MEIYOU_PAIR_END.test(prevEntry.text) && CROSS_ZHIYOU_START.test(curEntry.text)) {
+        findings.push({
+          line: prevEntry.lineNo,
+          column: 1,
+          type: 'formulaic-parallelism',
+          severity: 'advisory',
+          message: '跨行「没有A，没有B。/ 只有C。」属于否定铺排对比腔；删掉空泛否定铺垫，直接写现场实景。',
+          excerpt: compact(`${prevEntry.original} / ${curEntry.original}`),
+        });
+      }
+    }
+    window.push(curEntry);
     if (window.length > 3) window.shift();
     if (window.length !== 3) continue;
-    if (!CROSS_NEGATION_START.test(window[0].text)
-      || !CROSS_NEGATION_MIDDLE.test(window[1].text)
-      || !CROSS_NEGATION_END.test(window[2].text)) continue;
-    findings.push({
-      line: window[0].lineNo,
-      column: 1,
-      type: 'formulaic-parallelism',
-      severity: 'advisory',
-      message: '跨段「不是… / 也不是… / 只是…」可能是工整否定铺排，也可能承担辩解或悬念排除；通读语境，只在重复细纲或拖慢画面时改写。',
-      excerpt: compact(window.map((entry) => entry.original).join(' / ')),
-    });
+    if (CROSS_NEGATION_START.test(window[0].text)
+      && CROSS_NEGATION_MIDDLE.test(window[1].text)
+      && CROSS_NEGATION_END.test(window[2].text)) {
+      findings.push({
+        line: window[0].lineNo,
+        column: 1,
+        type: 'formulaic-parallelism',
+        severity: 'advisory',
+        message: '跨段「不是… / 也不是… / 只是…」可能是工整否定铺排，也可能承担辩解或悬念排除；通读语境，只在重复细纲或拖慢画面时改写。',
+        excerpt: compact(window.map((entry) => entry.original).join(' / ')),
+      });
+    } else if (CROSS_MEIYOU_SINGLE_START.test(window[0].text)
+      && CROSS_MEIYOU_SINGLE_MIDDLE.test(window[1].text)
+      && CROSS_ZHIYOU_START.test(window[2].text)) {
+      findings.push({
+        line: window[0].lineNo,
+        column: 1,
+        type: 'formulaic-parallelism',
+        severity: 'advisory',
+        message: '跨段「没有… / 也没有… / 只有…」属于否定铺排对比腔；通读语境，删掉多余否定句直接写现场实景。',
+        excerpt: compact(window.map((entry) => entry.original).join(' / ')),
+      });
+    }
   }
 
   return findings;
@@ -909,13 +1061,22 @@ function findReverseNotIs(proseLines) {
   return findings;
 }
 
-// 预告式总结收尾（实战漏网 D）：只扫文末窗口。从文末往回收集叙述行，
-// 直到剥引号后的可见字数达到窗口大小（按行取整，边界行整行计入）。
+// 预告式总结收尾（实战漏网 D）：只扫文末窗口（正文 ≥500 字时收紧为 min(末 4 行, 末 250 字)，
+// 根治 1k 字场景中段「没人知道」误报；短测试样本 <500 字仅按 250 字截断）。
 function findTrailerEnding(proseLines, mode = 'long') {
+  let totalDocChars = 0;
+  for (const { text } of proseLines) {
+    const trimmed = text.trim();
+    if (!trimmed || isDivider(trimmed) || isStructural(trimmed)) continue;
+    totalDocChars += visibleLength(stripQuoted(trimmed));
+  }
+  const maxLines = totalDocChars >= TRAILER_ENDING_LINE_CAP_MIN_DOC_CHARS
+    ? TRAILER_ENDING_WINDOW_MAX_LINES
+    : Infinity;
   const windowLines = [];
   let accumulated = 0;
 
-  for (let i = proseLines.length - 1; i >= 0 && accumulated < TRAILER_ENDING_WINDOW_CHARS; i -= 1) {
+  for (let i = proseLines.length - 1; i >= 0 && accumulated < TRAILER_ENDING_WINDOW_CHARS && windowLines.length < maxLines; i -= 1) {
     const { text } = proseLines[i];
     const trimmed = text.trim();
     if (!trimmed || isDivider(trimmed) || isStructural(trimmed)) continue;
@@ -1098,6 +1259,18 @@ function findEllipsisDensityTic(proseLines) {
   }];
 }
 
+function findClosingQuoteAhead(proseLines, startIdx, closeChar, maxLookahead = 8) {
+  let seen = 0;
+  for (let j = startIdx + 1; j < proseLines.length && seen < maxLookahead; j += 1) {
+    const t = proseLines[j].text.trim();
+    if (!t) continue;
+    if (isDivider(t) || isStructural(t)) return false;
+    seen += 1;
+    if (t.includes(closeChar)) return true;
+  }
+  return false;
+}
+
 function findExclamationDensityTic(proseLines, mode = 'long') {
   let narHits = 0;
   let narChars = 0;
@@ -1107,12 +1280,38 @@ function findExclamationDensityTic(proseLines, mode = 'long') {
   let firstTotalLine = null;
   const narSamples = [];
   const totalSamples = [];
+  let activeCloseQuote = null;
 
-  for (const { text, lineNo } of proseLines) {
+  for (let i = 0; i < proseLines.length; i += 1) {
+    const { text, lineNo } = proseLines[i];
     const trimmed = text.trim();
-    if (!trimmed || isDivider(trimmed) || isStructural(trimmed)) continue;
+    if (!trimmed) continue;
+    if (isDivider(trimmed) || isStructural(trimmed)) {
+      activeCloseQuote = null;
+      continue;
+    }
     totalChars += visibleLength(trimmed);
-    const narrative = stripQuotedWithUnclosed(trimmed);
+
+    let working = trimmed;
+    if (activeCloseQuote) {
+      const closeIdx = working.indexOf(activeCloseQuote);
+      if (closeIdx === -1) {
+        working = '';
+      } else {
+        working = working.slice(closeIdx + 1);
+        activeCloseQuote = null;
+      }
+    }
+    const afterPaired = stripQuoted(working);
+    const unclosed = /[“「『"]/.exec(afterPaired);
+    let narrative = afterPaired;
+    if (unclosed) {
+      narrative = afterPaired.slice(0, unclosed.index);
+      const closer = OPEN_TO_CLOSE_QUOTE[unclosed[0]];
+      if (closer && findClosingQuoteAhead(proseLines, i, closer)) {
+        activeCloseQuote = closer;
+      }
+    }
     narChars += visibleLength(narrative);
 
     EXCLAMATION_PATTERN.lastIndex = 0;
@@ -1159,11 +1358,14 @@ function findExclamationDensityTic(proseLines, mode = 'long') {
 
 function findDramaticClicheTic(proseLines, mode = 'long', scale = 1) {
   let sijiHits = 0;
-  let clusterHits = 0;
+  let coreHits = 0;
+  let actionHits = 0;
   let narrativeChars = 0;
   let firstSijiLine = null;
-  let firstClusterLine = null;
-  const samples = [];
+  let firstCoreLine = null;
+  let firstActionLine = null;
+  const coreSamples = [];
+  const actionSamples = [];
 
   for (const { text, lineNo } of proseLines) {
     const trimmed = text.trim();
@@ -1178,34 +1380,212 @@ function findDramaticClicheTic(proseLines, mode = 'long', scale = 1) {
       if (firstSijiLine === null) firstSijiLine = lineNo;
     }
 
-    DRAMATIC_CLUSTER_PATTERN.lastIndex = 0;
-    while ((m = DRAMATIC_CLUSTER_PATTERN.exec(narrative)) !== null) {
-      clusterHits += 1;
-      if (firstClusterLine === null) firstClusterLine = lineNo;
-      if (samples.length < 6) samples.push(m[0]);
+    DRAMATIC_CORE_PATTERN.lastIndex = 0;
+    while ((m = DRAMATIC_CORE_PATTERN.exec(narrative)) !== null) {
+      coreHits += 1;
+      if (firstCoreLine === null) firstCoreLine = lineNo;
+      if (coreSamples.length < 6) coreSamples.push(m[0]);
+    }
+
+    DRAMATIC_ACTION_PATTERN.lastIndex = 0;
+    while ((m = DRAMATIC_ACTION_PATTERN.exec(narrative)) !== null) {
+      actionHits += 1;
+      if (firstActionLine === null) firstActionLine = lineNo;
+      if (actionSamples.length < 6) actionSamples.push(m[0]);
     }
   }
 
   const sijiMinHits = mode === 'short' ? Math.max(SHORT_DRAMATIC_SIJI_MIN_HITS, Math.round(1.5 * scale)) : LONG_DRAMATIC_SIJI_MIN_HITS;
-  const clusterMinHits = mode === 'short' ? SHORT_DRAMATIC_CLUSTER_MIN_HITS : LONG_DRAMATIC_CLUSTER_MIN_HITS;
-  const clusterPerKiloLimit = mode === 'short' ? SHORT_DRAMATIC_CLUSTER_PER_KILO : LONG_DRAMATIC_CLUSTER_PER_KILO;
-  const clusterPerKilo = narrativeChars > 0 ? (clusterHits / narrativeChars) * 1000 : 0;
+  const coreMinHits = mode === 'short' ? SHORT_DRAMATIC_CORE_MIN_HITS : LONG_DRAMATIC_CORE_MIN_HITS;
+  const corePerKiloLimit = mode === 'short' ? SHORT_DRAMATIC_CORE_PER_KILO : LONG_DRAMATIC_CORE_PER_KILO;
+  const actionMinHits = mode === 'short' ? SHORT_DRAMATIC_ACTION_MIN_HITS : LONG_DRAMATIC_ACTION_MIN_HITS;
+  const actionPerKiloLimit = mode === 'short' ? SHORT_DRAMATIC_ACTION_PER_KILO : LONG_DRAMATIC_ACTION_PER_KILO;
+  const corePerKilo = narrativeChars > 0 ? (coreHits / narrativeChars) * 1000 : 0;
+  const actionPerKilo = narrativeChars > 0 ? (actionHits / narrativeChars) * 1000 : 0;
 
   const sijiTriggered = sijiHits >= sijiMinHits;
-  const clusterTriggered = narrativeChars > 0 && clusterHits >= clusterMinHits && clusterPerKilo >= clusterPerKiloLimit;
-  if (!sijiTriggered && !clusterTriggered) return [];
+  const coreTriggered = narrativeChars > 0 && coreHits >= coreMinHits && corePerKilo >= corePerKiloLimit;
+  const actionTriggered = narrativeChars > 0 && actionHits >= actionMinHits && actionPerKilo >= actionPerKiloLimit;
+  if (!sijiTriggered && !coreTriggered && !actionTriggered) return [];
 
   const reasons = [];
   if (sijiTriggered) reasons.push(`「死寂」重复 ${sijiHits} 次`);
-  if (clusterTriggered) reasons.push(`死寂/轰然/骤然/猛地/瞬间 聚集 ${clusterHits} 处（${clusterPerKilo.toFixed(1)}/千字）`);
+  if (coreTriggered) reasons.push(`死寂/轰然/骤然/骇然/色变/倒吸 聚集 ${coreHits} 处（${corePerKilo.toFixed(1)}/千字）`);
+  if (actionTriggered) reasons.push(`猛地/瞬间 刷屏 ${actionHits} 处（${actionPerKilo.toFixed(1)}/千字）`);
+  const samples = coreSamples.length ? coreSamples : actionSamples;
+  const firstLine = sijiTriggered ? firstSijiLine : (coreTriggered ? firstCoreLine : firstActionLine);
 
   return [{
-    line: sijiTriggered ? firstSijiLine : firstClusterLine,
+    line: firstLine,
     column: 1,
     type: 'dramatic-cliche-tic',
     severity: 'advisory',
     message: `戏剧套词刷屏：${reasons.join('、')}；保留最有冲击力的一处，其余改写为具体环境声响、人物失态动作或利害反应，避免强行拉满惊愕感。`,
     excerpt: compact([...new Set(samples)].join(' ')),
+  }];
+}
+
+function findRomanceClicheTic(proseLines) {
+  let hits = 0;
+  let highRiskHits = 0;
+  let weiBuKeChaHits = 0;
+  let totalChars = 0;
+  let firstLine = null;
+  let firstHighRiskLine = null;
+  let firstWeiLine = null;
+  const samples = [];
+  const highRiskSamples = [];
+
+  for (const { text, lineNo } of proseLines) {
+    const trimmed = text.trim();
+    if (!trimmed || isDivider(trimmed) || isStructural(trimmed)) continue;
+    totalChars += visibleLength(trimmed);
+    const narrative = stripQuoted(trimmed);
+    const isMonsterDevourLine = MONSTER_DEVOUR_CTX_RE.test(narrative);
+
+    ROMANCE_CLICHE_NARRATION_PATTERN.lastIndex = 0;
+    let m;
+    while ((m = ROMANCE_CLICHE_NARRATION_PATTERN.exec(narrative)) !== null) {
+      if (m[0] === '拆吞入腹' && isMonsterDevourLine) continue;
+      hits += 1;
+      if (firstLine === null) firstLine = lineNo;
+      if (samples.length < 6) samples.push(m[0]);
+    }
+
+    ROMANCE_CLICHE_PATERNAL_PATTERN.lastIndex = 0;
+    while ((m = ROMANCE_CLICHE_PATERNAL_PATTERN.exec(trimmed)) !== null) {
+      hits += 1;
+      if (firstLine === null) firstLine = lineNo;
+      if (samples.length < 6) samples.push(m[0]);
+    }
+
+    ROMANCE_CLICHE_SINGLE_HIGH_RISK_PATTERN.lastIndex = 0;
+    while ((m = ROMANCE_CLICHE_SINGLE_HIGH_RISK_PATTERN.exec(narrative)) !== null) {
+      if (m[0] === '拆吞入腹' && isMonsterDevourLine) continue;
+      highRiskHits += 1;
+      if (firstHighRiskLine === null) firstHighRiskLine = lineNo;
+      if (highRiskSamples.length < 6) highRiskSamples.push(m[0]);
+    }
+    ROMANCE_CLICHE_PATERNAL_PATTERN.lastIndex = 0;
+    while ((m = ROMANCE_CLICHE_PATERNAL_PATTERN.exec(trimmed)) !== null) {
+      highRiskHits += 1;
+      if (firstHighRiskLine === null) firstHighRiskLine = lineNo;
+      if (highRiskSamples.length < 6) highRiskSamples.push(m[0]);
+    }
+
+    ROMANCE_CLICHE_WEIBUKECHA_PATTERN.lastIndex = 0;
+    while (ROMANCE_CLICHE_WEIBUKECHA_PATTERN.exec(narrative) !== null) {
+      weiBuKeChaHits += 1;
+      if (firstWeiLine === null) firstWeiLine = lineNo;
+    }
+  }
+
+  if (totalChars === 0) return [];
+  const perKilo = (hits / totalChars) * 1000;
+  if (hits >= ROMANCE_CLICHE_MIN_HITS && perKilo >= ROMANCE_CLICHE_PER_KILO) {
+    return [{
+      line: firstLine,
+      column: 1,
+      type: 'romance-cliche-tic',
+      severity: 'advisory',
+      message: `女频油腻/言情套词聚集：${hits} 处（${perKilo.toFixed(1)}/千字）；砍掉壁咚生理标签与物化称呼，改用边界尊重、微物件偏爱或上位者体面认错立苏感（注：轻笑/低笑属正常语感，不计入本项）。`,
+      excerpt: compact([...new Set(samples)].join(' ')),
+    }];
+  }
+  if (highRiskHits >= 1) {
+    return [{
+      line: firstHighRiskLine,
+      column: 1,
+      type: 'romance-cliche-tic',
+      severity: 'advisory',
+      message: `高危言情 AI 套词提示（${highRiskHits} 处）：尽量改写为具体动作、视线停顿或手边物象，避免模板化描写（注：轻笑/低笑属正常语感，不计入本项）。`,
+      excerpt: compact([...new Set(highRiskSamples)].join(' ')),
+    }];
+  }
+  if (weiBuKeChaHits >= ROMANCE_CLICHE_WEIBUKECHA_MIN_HITS) {
+    return [{
+      line: firstWeiLine,
+      column: 1,
+      type: 'romance-cliche-tic',
+      severity: 'advisory',
+      message: `高危言情 AI 套词聚集：「微不可察」同章出现 ${weiBuKeChaHits} 处；保留必要一处，其余改写为具体动作、视线停顿或手边物象。`,
+      excerpt: '微不可察',
+    }];
+  }
+  return [];
+}
+
+function findShortPlasticReactionTic(proseLines, mode = 'long') {
+  if (mode !== 'short') return [];
+  let hits = 0;
+  let firstLine = null;
+  const samples = [];
+
+  for (const { text, lineNo } of proseLines) {
+    const trimmed = text.trim();
+    if (!trimmed || isDivider(trimmed) || isStructural(trimmed)) continue;
+    const narrative = stripQuoted(trimmed);
+    SHORT_PLASTIC_REACTION_PATTERN.lastIndex = 0;
+    let m;
+    while ((m = SHORT_PLASTIC_REACTION_PATTERN.exec(narrative)) !== null) {
+      hits += 1;
+      if (firstLine === null) firstLine = lineNo;
+      const sample = compact(m[0]);
+      if (samples.length < 6 && !samples.includes(sample)) samples.push(sample);
+    }
+  }
+
+  if (hits < SHORT_PLASTIC_REACTION_MIN_HITS) return [];
+  return [{
+    line: firstLine,
+    column: 1,
+    type: 'short-plastic-reaction-tic',
+    severity: 'advisory',
+    review: 'semantic',
+    message: `短篇高频塑料反应套词聚集（${hits} 处）：眼底闪过一丝/瞳孔骤缩/喉结滚/指节泛白/气得浑身发抖/死一般寂静等易显 AI 腔；保留必要体感，其余改写为具体物件动作、台词反击或可核验细节。`,
+    excerpt: compact(samples.join(' | ')),
+  }];
+}
+
+// 极碎电报体（Wave 3D FN-4，advisory only）：纯叙述自然段 ≥15 段且段长中位数 ≤12 字，
+// 抓碎段电报清单（排除纯对白、面板、聊天体与极短片段），不误伤正常手机竖屏 18-30 字短段。
+function findStaccatoParagraphTic(proseLines, mode = 'long') {
+  const maxMedian = mode === 'short' ? SHORT_STACCATO_PARA_MAX_MEDIAN : STACCATO_PARA_MAX_MEDIAN;
+  const lens = [];
+  let totalDocChars = 0;
+  let firstLine = null;
+  const samples = [];
+
+  for (const { text, lineNo } of proseLines) {
+    const trimmed = text.trim();
+    if (!trimmed || isDivider(trimmed) || isStructural(trimmed) || /^【[^】]+】$/.test(trimmed)) continue;
+    totalDocChars += visibleLength(trimmed);
+    // 跳过微信/短信聊天体发言人行
+    if (/^[\u4e00-\u9fffA-Za-z0-9_()（）]{1,10}[：:](?:\s*$|[^“「『"【]*$)/.test(trimmed) && !/[说道问喊笑叹]/.test(trimmed.slice(0, trimmed.search(/[：:]/)))) {
+      continue;
+    }
+    // 只统计纯叙述段落（跳过含引号台词的行，避免把短台词接动作归成电报碎段）
+    if (quotedRanges(trimmed).length > 0) continue;
+    const len = visibleLength(trimmed);
+    if (len === 0) continue;
+    if (firstLine === null) firstLine = lineNo;
+    lens.push(len);
+    if (len <= maxMedian && samples.length < 5) samples.push(trimmed);
+  }
+
+  if (lens.length < STACCATO_PARA_MIN_COUNT || totalDocChars < STACCATO_PARA_MIN_DOC_CHARS) return [];
+  lens.sort((a, b) => a - b);
+  const mid = Math.floor(lens.length / 2);
+  const median = lens.length % 2 === 1 ? lens[mid] : (lens[mid - 1] + lens[mid]) / 2;
+  if (median > maxMedian) return [];
+
+  return [{
+    line: firstLine,
+    column: 1,
+    type: 'staccato-paragraph-tic',
+    severity: 'advisory',
+    message: `极碎电报体：纯叙述段 ${lens.length} 段，段长中位数仅 ${median} 字（≤${maxMedian} 字）；合并连排碎片句拉出长短呼吸，刻意快切动作镜头可保留。`,
+    excerpt: compact(samples.join(' | ')),
   }];
 }
 
@@ -1553,19 +1933,38 @@ function findOvercompressedProseTic(proseLines) {
 
 }
 
-// 低连接密度：长文本/中短窗口里，引号外叙述的功能词和白话连接同时偏低，且缺少中长承接句，
-// 会呈现“提纲/电报体”分布。修法是恢复必要连接和句群，不是全局补词。
+// 低连接密度：长篇引号外叙述包含两条互补分支（均仅 advisory）：
+//   1) 极碎大纲电报体：≥50% 叙述句 ≤10 字、功能词与白话连接双低且缺 ≥25 字承接句；
+//   2) 干硬镜头报幕体（2,450 篇真 9.0+ 长篇标定，误报 0.33%）：纯叙述段中位 ≥28 字，但口语连接词 ≤5.5/千字且「的」≤25.0/千字。
+// 修法是恢复角色内心盘算与自然口语连接，不是全局机械注水。
 function findLowConnectiveDensityTic(proseLines) {
   let bodyChars = 0;
   let functionHits = 0;
   let plainHits = 0;
+  let connHits = 0;
+  let deHits = 0;
   let firstLine = null;
   const sentences = [];
   const samples = [];
+  const pureNarrLens = [];
+  const uniquePureNarr = new Set();
+  const drySamples = [];
 
   for (const { text, lineNo } of proseLines) {
     const trimmed = text.trim();
     if (!trimmed || isDivider(trimmed) || isStructural(trimmed)) continue;
+
+    if (!/^【[^】]+】$/.test(trimmed) && !PURE_NARRATION_QUOTE_RE.test(trimmed)) {
+      const compactPara = trimmed.replace(/\s+/g, '');
+      const paraLen = Array.from(compactPara).length;
+      if (paraLen > 0) {
+        pureNarrLens.push(paraLen);
+        uniquePureNarr.add(compactPara);
+        if (drySamples.length < 4 && paraLen >= DRY_NARRATION_MIN_PURE_MEDIAN) {
+          drySamples.push(compact(trimmed.slice(0, 36)));
+        }
+      }
+    }
 
     // 只看引号外叙述。台词/弹幕/系统播报可以天然短促，混入统计会把体裁特征误当电报体。
     const narrative = stripQuoted(trimmed).trim();
@@ -1576,6 +1975,11 @@ function findLowConnectiveDensityTic(proseLines) {
     bodyChars += narrativeLen;
     functionHits += countTerms(narrative, LOW_CONNECTIVE_FUNCTION_TERMS);
     plainHits += countTerms(narrative, LOW_CONNECTIVE_PLAIN_TERMS);
+    COLLOQUIAL_CONNECTIVE_PATTERN.lastIndex = 0;
+    while (COLLOQUIAL_CONNECTIVE_PATTERN.exec(narrative) !== null) connHits += 1;
+    for (let i = 0; i < narrative.length; i += 1) {
+      if (narrative[i] === '的') deHits += 1;
+    }
 
     for (const sentence of splitSentences(narrative)) {
       const len = visibleLength(sentence);
@@ -1585,23 +1989,97 @@ function findLowConnectiveDensityTic(proseLines) {
     }
   }
 
-  if (bodyChars < LOW_CONNECTIVE_MIN_CHARS || sentences.length === 0) return [];
-  const functionPerKilo = (functionHits / bodyChars) * 1000;
-  if (functionPerKilo >= LOW_CONNECTIVE_FUNCTION_PER_KILO) return [];
-  const plainPerKilo = (plainHits / bodyChars) * 1000;
-  if (plainPerKilo >= LOW_CONNECTIVE_PLAIN_PER_KILO) return [];
-  const tinySentenceRatio = sentences.filter((len) => len <= LOW_CONNECTIVE_TINY_SENTENCE_CHARS).length / sentences.length;
-  if (tinySentenceRatio < LOW_CONNECTIVE_TINY_SENTENCE_RATIO) return [];
-  const longSentenceRatio = sentences.filter((len) => len >= LOW_CONNECTIVE_LONG_SENTENCE_CHARS).length / sentences.length;
-  if (longSentenceRatio >= LOW_CONNECTIVE_LONG_SENTENCE_RATIO) return [];
+  if (bodyChars === 0 || sentences.length === 0) return [];
+
+  // 分支 1：既有极碎大纲电报体契约
+  if (bodyChars >= LOW_CONNECTIVE_MIN_CHARS) {
+    const functionPerKilo = (functionHits / bodyChars) * 1000;
+    const plainPerKilo = (plainHits / bodyChars) * 1000;
+    const tinySentenceRatio = sentences.filter((len) => len <= LOW_CONNECTIVE_TINY_SENTENCE_CHARS).length / sentences.length;
+    const longSentenceRatio = sentences.filter((len) => len >= LOW_CONNECTIVE_LONG_SENTENCE_CHARS).length / sentences.length;
+    if (
+      functionPerKilo < LOW_CONNECTIVE_FUNCTION_PER_KILO &&
+      plainPerKilo < LOW_CONNECTIVE_PLAIN_PER_KILO &&
+      tinySentenceRatio >= LOW_CONNECTIVE_TINY_SENTENCE_RATIO &&
+      longSentenceRatio < LOW_CONNECTIVE_LONG_SENTENCE_RATIO
+    ) {
+      return [{
+        line: firstLine,
+        column: 1,
+        type: 'low-connective-density-tic',
+        severity: 'advisory',
+        message: `疑似大纲电报体：引号外叙述≤${LOW_CONNECTIVE_TINY_SENTENCE_CHARS}字碎句占比 ${(tinySentenceRatio * 100).toFixed(0)}%、功能词 ${functionPerKilo.toFixed(1)}/千字、白话连接 ${plainPerKilo.toFixed(1)}/千字；通读检查是否有动作跳跃或主语/因果残缺，有意快切镜头可保留，别机械注水。`,
+        excerpt: compact(samples.join(' | ')),
+      }];
+    }
+  }
+
+  // 分支 2：长篇干硬镜头报幕体（纯叙述段偏长但口语连接与「的」双低）
+  if (bodyChars >= DRY_NARRATION_MIN_CHARS && uniquePureNarr.size >= DRY_NARRATION_MIN_UNIQUE_PARAS && pureNarrLens.length > 0) {
+    const sorted = [...pureNarrLens].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    const pureNarrMedian = sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    const connPerKilo = (connHits / bodyChars) * 1000;
+    const dePerKilo = (deHits / bodyChars) * 1000;
+    if (
+      pureNarrMedian >= DRY_NARRATION_MIN_PURE_MEDIAN &&
+      connPerKilo <= DRY_NARRATION_MAX_CONN_PER_KILO &&
+      dePerKilo <= DRY_NARRATION_MAX_DE_PER_KILO
+    ) {
+      return [{
+        line: firstLine,
+        column: 1,
+        type: 'low-connective-density-tic',
+        severity: 'advisory',
+        message: `疑似抽干内心的剧本报幕体：纯叙述段中位 ${pureNarrMedian} 字，但口语连接词仅 ${connPerKilo.toFixed(1)}/千字、「的」${dePerKilo.toFixed(1)}/千字；通读补回人物当下利害盘算与自然口语转折，别机械注水。`,
+        excerpt: compact((drySamples.length ? drySamples : samples).join(' | ')),
+      }];
+    }
+  }
+
+  return [];
+}
+
+// 闲笔材质/道具/光影贴纸过密（advisory only；仅长篇）：
+// 引号外叙述堆砌无功能材质、服饰熨烫、光影音效贴纸且口语连接偏低时提醒按刀子物件原则收口。
+function findIdlePropDecorationTic(proseLines, mode = 'long') {
+  if (mode === 'short') return [];
+  let narrativeChars = 0;
+  let connHits = 0;
+  let firstLine = null;
+  const uniqueProps = new Set();
+
+  for (const { text, lineNo } of proseLines) {
+    const trimmed = text.trim();
+    if (!trimmed || isDivider(trimmed) || isStructural(trimmed) || /^【[^】]+】$/.test(trimmed)) continue;
+    const narrative = stripQuoted(trimmed).trim();
+    const narrativeLen = visibleLength(narrative);
+    if (narrativeLen === 0) continue;
+
+    narrativeChars += narrativeLen;
+    COLLOQUIAL_CONNECTIVE_PATTERN.lastIndex = 0;
+    while (COLLOQUIAL_CONNECTIVE_PATTERN.exec(narrative) !== null) connHits += 1;
+
+    IDLE_PROP_DECORATION_PATTERN.lastIndex = 0;
+    let match;
+    while ((match = IDLE_PROP_DECORATION_PATTERN.exec(narrative)) !== null) {
+      if (firstLine === null) firstLine = lineNo;
+      uniqueProps.add(match[0]);
+    }
+  }
+
+  if (narrativeChars < IDLE_PROP_MIN_CHARS || uniqueProps.size < IDLE_PROP_MIN_UNIQUE) return [];
+  const uniquePerKilo = (uniqueProps.size / narrativeChars) * 1000;
+  const connPerKilo = (connHits / narrativeChars) * 1000;
+  if (uniquePerKilo < IDLE_PROP_MIN_UNIQUE_PER_KILO || connPerKilo > IDLE_PROP_MAX_CONN_PER_KILO) return [];
 
   return [{
     line: firstLine,
     column: 1,
-    type: 'low-connective-density-tic',
+    type: 'idle-prop-decoration-tic',
     severity: 'advisory',
-    message: `疑似大纲电报体：引号外叙述≤${LOW_CONNECTIVE_TINY_SENTENCE_CHARS}字碎句占比 ${(tinySentenceRatio * 100).toFixed(0)}%、功能词 ${functionPerKilo.toFixed(1)}/千字、白话连接 ${plainPerKilo.toFixed(1)}/千字；通读检查是否有动作跳跃或主语/因果残缺，有意快切镜头可保留，别机械注水。`,
-    excerpt: compact(samples.join(' | ')),
+    message: `闲笔材质/道具贴纸过密：引号外叙述出现 ${uniqueProps.size} 种材质/服饰/光影/声效贴纸（${uniquePerKilo.toFixed(1)}/千字），且口语连接仅 ${connPerKilo.toFixed(1)}/千字；按刀子物件原则只留改变局势或露破绽的实证物，删掉无功能静物贴纸并补足人物盘算。`,
+    excerpt: compact([...uniqueProps].slice(0, 8).join(' | ')),
   }];
 }
 
@@ -1659,7 +2137,7 @@ function findPeriodStutter(proseLines, mode = 'long') {
         column: 1,
         type: 'period-stutter',
         severity: 'advisory',
-        message: `碎句号：连续 ${runLen} 个短句无呼吸；按目标句长把碎句合并成中长句、补回画面与连接（见本 skill 句长/疏密节奏规则）。`,
+        message: `碎句号：连续 ${runLen} 个短句无呼吸；若为缺主语或因果断裂的机械碎句则按行动主干接顺，有意短镜头或聊天体可保留。`,
         excerpt: compact(runSample.join(' ')),
       });
     }
@@ -1675,9 +2153,19 @@ function findPeriodStutter(proseLines, mode = 'long') {
       flush(); // 分隔线/markdown 结构行：重置碎句计数
       continue;
     }
+    // 跳过微信/短信聊天体发言人行（如「我：」「老公李伟：」「老公：今晚不回。」）
+    if (/^[\u4e00-\u9fffA-Za-z0-9_()（）]{1,10}[：:](?:\s*$|[^“「『"【]*$)/.test(trimmed) && !/[说道问喊笑叹]/.test(trimmed.slice(0, trimmed.search(/[：:]/)))) {
+      flush();
+      continue;
+    }
     const narrative = stripQuoted(trimmed);
     if (visibleLength(narrative) === 0) {
       flush(); // 纯对话/弹幕/系统播报：成片短句是正常形态，重置碎句计数
+      continue;
+    }
+    // 无句末标点的短名词列举/清单项（如无标点条目行）不是碎句号
+    if (!/[。！？!?]/.test(narrative) && visibleLength(narrative) <= 8) {
+      flush();
       continue;
     }
     // 只数引号外叙述句：混合行（叙述+引号内物件/短台词）的引号外片段仍参与碎句计数。
@@ -1696,13 +2184,15 @@ function findPeriodStutter(proseLines, mode = 'long') {
 }
 
 function isDivider(trimmed) {
-  return /^-{3,}$/.test(trimmed) || /^[*_]{3,}$/.test(trimmed);
+  const compactDiv = trimmed.replace(/\s+/g, '');
+  if (compactDiv.length < 2) return false;
+  return /^(?:-{3,}|—{2,}|─{3,}|={3,}|[*_]{3,}|[·•.~～]{3,})$/.test(compactDiv);
 }
 
 // markdown 结构行（标题/列表/引用/表格/短篇纯数字小节标 `1.`）不是叙述正文，长段落/碎句号/破折号检测都跳过。
 function isStructural(trimmed) {
   return /^(#{1,6}(?:\s|\d)|>\s?|[-*+]\s|\d+[.)](?:\s|$)|\|)/.test(trimmed)
-    || /^第[零〇一二三四五六七八九十百千万两\d]+[章节回](?:$|[\s_：:——\-]+[^\n。；;]{0,28}$)/.test(trimmed);
+    || /^第\s*[零〇一二三四五六七八九十百千万两\d]+\s*[章节回](?:$|[\s_：:——\-]+[^\n；;]{0,36}$)/.test(trimmed);
 }
 
 // 去掉成对引号内的片段（台词/系统播报），只留引号外叙述。碎句号判定用：纯对话/弹幕成片短句
@@ -1896,8 +2386,12 @@ function findNotIsComparisons(text, getPosition) {
       continue;
     }
 
-    // Avoid the common yes/no question fragment “是不是”.
-    if (start > 0 && text[start - 1] === '是') {
+    // Avoid the common yes/no question fragment “是不是” and counterfactual conditionals (“要不是/若不是/如果不是”).
+    if (start > 0 && (text[start - 1] === '是' || text[start - 1] === '要' || text[start - 1] === '若')) {
+      offset = start + 2;
+      continue;
+    }
+    if (start >= 2 && (text.slice(start - 2, start) === '如果' || text.slice(start - 2, start) === '倘若' || text.slice(start - 2, start) === '假如')) {
       offset = start + 2;
       continue;
     }
@@ -1967,7 +2461,15 @@ function findPositiveFlipEnd(candidate) {
     // rarer form. The “是” in the either-or idiom “不是A就是B / 也是B” is part of
     // the 就是/也是 conjunction, not a copula, so 就/也 are excluded too. Also never
     // treat the “是” inside a second negative fragment (“不是A，也不是B”) as the flip.
-    if (char === '是' && !COMPACT_EITHER_OR_PREV.has(candidate[index - 1]) && !crossedSeparator) {
+    if (
+      char === '是' &&
+      !COMPACT_EITHER_OR_PREV.has(candidate[index - 1]) &&
+      !crossedSeparator &&
+      !COMPACT_NOT_IS_CLAUSE_PREFIX_RE.test(candidate) &&
+      !COMPACT_NOT_IS_TAIL_EXCLUDE_RE.test(candidate.slice(index)) &&
+      !TAG_PARTICLES.has(candidate[index + 1]) &&
+      !isAffirmationTagAt(candidate, index)
+    ) {
       return index + 1;
     }
 

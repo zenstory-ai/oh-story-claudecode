@@ -18,7 +18,7 @@
 
 ## 二、首章追踪初始化（仅 `_tracking-state.json` 不存在时）
 
-新书从 `last_chapter: 0` 初始化：将下面 JSON 写入 `{书目录}/.story/work/init.json`，跑 `node {skill 根}/scripts/tracking_commit.js init --project {书目录} --input {书目录}/.story/work/init.json`，成功后删临时文件（导入小说填 `last_chapter: N` 与实际状态）。
+新书从 `last_chapter: 0` 初始化：将下面 JSON 写入 `{书目录}/.story/work/init.json`，跑 `node {skill 根}/scripts/tracking_commit.js init --project {书目录} --input {书目录}/.story/work/init.json`，成功后删临时文件（导入小说填 `last_chapter: N` 与实际状态，`recent_chapters` 仅收 `{"chapter": N, "summary": "一句概要"}`）。
 
 ```json
 {
@@ -75,4 +75,5 @@ node {skill 根}/scripts/storyctl.js chapter accept-current-length --project {�
 - `draft` 自动预填 `expected_state_revision` 并导出角色快照到 `work/第NNN章/snapshots/`；`append` 填 `delta` 与变化快照，`revision` 在预填记录上修订（禁交 `retired_characters`）。
 - `context`：`init` 收 6 项；`commit` 只收前 4 项（`recent_chapters`、`next_chapter_commitments` 由脚本算，手填 exit 2）。
 - `character_snapshots` 角色须同时在 `character_changes`；`active_character_names` 仅列已有快照者（建议 ≤20）。移除或改写旧约束/风险写 `delta.retired_context_items`（`append`/`revision` 均支持），退场角色写 `delta.retired_characters`（仅 `append`）。
-- `timeline_events` 未揭示时 `reveal_chapter` 必须为 `null`；未来计划留大纲不入追踪。单视图硬上限 65536 字节（`上下文.md` 自动生成 7 栏：`当前位置 / 长期约束 / 核心角色状态 / 活跃伏笔 / 近三章速记 / 下一章承诺 / 连贯性风险`）。
+- `timeline_events` 未揭示时 `reveal_chapter` 须为 `null`；未来计划留大纲不入追踪。单视图上限 65536 字节（`上下文.md` 自动生成 7 栏：`当前位置/长期约束/核心角色状态/活跃伏笔/近三章速记/下一章承诺/连贯性风险`）。
+- **长跑防漂**：① 核心角色年龄/职级硬锚进 `identity`，形近人名或易混称谓登进 `continuity_risks` 防叫错姓氏算错岁数；② 跨卷或每 50 章盘点 `long_term_constraints`（留随迁老配角 ≥2、未结旧账 ≥1、当前上限），超 40 章未出场记进 `continuity_risks` 或走 `retired_characters` 退场。

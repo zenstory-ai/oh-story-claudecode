@@ -34,6 +34,7 @@ const TEMPO_FIELD_NAMES = [...UNIT_CARD_FIELDS['单元节拍/章功能分配'], 
 const TAIL_CHARS = 400;
 const TIMELINE_ANCHOR_MAX_EVENTS = 5;
 const TIMELINE_ANCHOR_MAX_CHARS = 180;
+const TIMELINE_ANCHOR_MIN_FACT_CHARS = 6;
 const STATE_SECTIONS = ['当前位置', '长期约束', '核心角色状态', '活跃伏笔', '近三章速记', '下一章承诺', '连贯性风险'];
 const SLOT_MARK = '［主会话填］';
 const AUTHOR_DECIDED_CHARS = 600;
@@ -226,8 +227,11 @@ function outlineGaps(outlineText) {
 }
 
 function unitIdFrom(field) {
-  const match = /[A-Za-z]+\d+(?:-\d+)+/.exec(field) || /^([A-Za-z0-9-]+)/.exec(field);
-  return match ? match[0] : null;
+  const match =
+    /[A-Za-z]+\d+(?:-\d+)+/.exec(field) ||
+    /^([A-Za-z0-9-]+)/.exec(field) ||
+    /(第[一二三四五六七八九十百\d]+段)/.exec(field);
+  return match ? match[1] || match[0] : null;
 }
 
 function ownNames(project) {
@@ -313,15 +317,19 @@ function truncateChars(text, maxChars) {
 }
 
 function recentTimelineAnchors(project) {
-  const raw = readText(path.join(project, '追踪', '_tracking-state.json'));
-  if (!raw) return null;
+  const stateFile = path.join(project, '追踪', '_tracking-state.json');
+  if (!isFile(stateFile)) return null;
+  const raw = readText(stateFile);
+  if (!raw) return { error: '追踪/_tracking-state.json 为空或不可读，请先修复或重新 /story-import，不能带着损毁状态继续写正文' };
   let state;
   try {
     state = JSON.parse(raw);
-  } catch {
-    return null;
+  } catch (err) {
+    return { error: `追踪/_tracking-state.json 无法解析（${err.message}），请先修复或重新 /story-import，不能带着损毁状态继续写正文` };
   }
-  if (!state || typeof state !== 'object' || Array.isArray(state)) return null;
+  if (!state || typeof state !== 'object' || Array.isArray(state)) {
+    return { error: '追踪/_tracking-state.json 顶层不是合法对象，请先修复或重新 /story-import' };
+  }
   let events = [];
   if (state.timeline && typeof state.timeline === 'object' && !Array.isArray(state.timeline)) {
     events = Object.values(state.timeline);
@@ -331,11 +339,13 @@ function recentTimelineAnchors(project) {
   const valid = events
     .filter((ev) => ev && typeof ev === 'object' && typeof ev.story_time === 'string' && ev.story_time.trim())
     .map((ev) => {
-      const ch = Number.isInteger(ev.first_recorded_chapter)
-        ? ev.first_recorded_chapter
-        : Number.isInteger(ev.updated_chapter)
-          ? ev.updated_chapter
-          : 0;
+      const ch = Number.isInteger(ev.reveal_chapter) && ev.reveal_chapter >= 1
+        ? ev.reveal_chapter
+        : Number.isInteger(ev.first_recorded_chapter) && ev.first_recorded_chapter >= 1
+          ? ev.first_recorded_chapter
+          : Number.isInteger(ev.updated_chapter)
+            ? ev.updated_chapter
+            : 0;
       const id = typeof ev.id === 'string' ? ev.id.trim() : '';
       const storyTime = ev.story_time.trim().replace(/\s+/g, ' ');
       const unrevealed = ev.reveal_status === '未揭示';
@@ -365,14 +375,29 @@ function recentTimelineAnchors(project) {
   let used = Array.from(headerPrefix).length;
   for (let i = recent.length - 1; i >= 0; i -= 1) {
     const ev = recent[i];
-    const baseTag = `${ev.id ? `${ev.id}` : ''}(${ev.ch > 0 ? `第${ev.ch}章·` : ''}${truncateChars(ev.storyTime, 22)})`;
-    const sepLen = used > 0 ? 1 : 0;
-    const withFact = ev.fact ? `${baseTag}${truncateChars(ev.fact, 10)}` : baseTag;
-    const withFactLen = Array.from(withFact).length;
+    const baseTag = `${ev.id ? `${ev.id}` : ''}(${ev.ch > 0 ? `第${ev.ch}章揭·` : ''}${truncateChars(ev.storyTime, 22)})`;
+    const sepLen = picked.length > 0 ? 1 : 0;
     const baseLen = Array.from(baseTag).length;
-    if (used + sepLen + withFactLen <= TIMELINE_ANCHOR_MAX_CHARS) {
-      picked.push(withFact);
-      used += sepLen + withFactLen;
+    if (ev.fact) {
+      const fullFact = truncateChars(ev.fact, 10);
+      const withFact = `${baseTag}${fullFact}`;
+      const withFactLen = Array.from(withFact).length;
+      const availForFact = TIMELINE_ANCHOR_MAX_CHARS - used - sepLen - baseLen;
+      if (used + sepLen + withFactLen <= TIMELINE_ANCHOR_MAX_CHARS) {
+        picked.push(withFact);
+        used += sepLen + withFactLen;
+      } else if (availForFact >= TIMELINE_ANCHOR_MIN_FACT_CHARS) {
+        const fitted = `${baseTag}${truncateChars(ev.fact, availForFact)}`;
+        picked.push(fitted);
+        used += sepLen + Array.from(fitted).length;
+      } else if (picked.length === 0) {
+        const budget = Math.max(8, TIMELINE_ANCHOR_MAX_CHARS - used - sepLen);
+        picked.push(truncateChars(withFact, budget));
+        used = TIMELINE_ANCHOR_MAX_CHARS;
+        break;
+      } else {
+        break;
+      }
     } else if (used + sepLen + baseLen <= TIMELINE_ANCHOR_MAX_CHARS) {
       picked.push(baseTag);
       used += sepLen + baseLen;
@@ -489,8 +514,19 @@ function findWorkspace(project) {
 
 function genreLine(project) {
   const text = stripHtmlComments(readText(path.join(project, '设定', '题材定位.md')));
-  const match = /^[ \t]*[-*+]?[ \t]*\**题材(?:类型)?\**[ \t]*[：:](.*)$/m.exec(text);
-  return !match || match[1].includes('{') ? '' : match[1].trim();
+  const labels = ['题材参考包', '题材类型', '流派', '题材', '主类型', '子类型'];
+  const parts = [];
+  for (const label of labels) {
+    const re = new RegExp(`^[ \\t]*[-*+]?[ \\t]*\\**${label}\\**[ \\t]*[：:](.*)$`, 'gm');
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const val = m[1].trim();
+      if (val && !val.includes('{') && !val.includes('｛') && !parts.includes(val)) {
+        parts.push(val);
+      }
+    }
+  }
+  return parts.join(' / ');
 }
 
 function bookGenres(project) {
@@ -502,8 +538,64 @@ function bookGenres(project) {
   );
 }
 
+const BL_GENRE_CARDS = new Set(['双男主.md']);
+const DUAL_CHANNEL_GENRE_CARDS = new Set(['悬疑灵异.md']);
+const FEMALE_GENRE_CARDS = new Set([
+  '幻想言情仙侠.md', '古言宅斗重生.md', '豪门虐恋追妻.md',
+  '现言脑洞快穿.md', '年代种田经商.md', '青春甜宠文娱.md',
+  '女频年代军婚.md', '女频末世天灾囤货.md',
+]);
+const MALE_GENRE_CARDS = new Set([
+  '传统玄幻仙侠.md', '玄幻脑洞反套路.md', '都市高武异能.md', '都市脑洞系统.md',
+  '都市日常神豪.md', '历史架空权谋.md', '动漫男频衍生.md', '官场商战职场.md', '男频年代乡村.md',
+  '末世规则科幻.md', '西幻游戏同人.md',
+]);
+
+function detectChannelAffinity(profileText, rawGenre) {
+  const readerMatch = /^[ \t]*[-*+]?[ \t]*\**(?:目标读者|频道)\**[ \t]*[：:](.*)$/m.exec(profileText || '');
+  const readerText = readerMatch && !readerMatch[1].includes('{') ? readerMatch[1] : '';
+  const readerFemale = /女频|女生/.test(readerText);
+  const readerMale = /男频|男生/.test(readerText);
+  if (readerFemale && !readerMale) return 'female';
+  if (readerMale && !readerFemale) return 'male';
+  const raw = rawGenre || '';
+  const rawFemale = /女频|幻想言情|军婚|随军|天灾囤货|空间囤货/.test(raw);
+  const rawMale = /男频|传统玄幻/.test(raw);
+  if (rawFemale && !rawMale) return 'female';
+  if (rawMale && !rawFemale) return 'male';
+  return 'neutral';
+}
+
+const STRICT_BL_ALIAS_RE = /双男主|耽美|^(?:bl|abo)$/i;
+const BG_CHANNEL_CUE_RE = /言情|女频|现言|古言|男频|男女/;
+const CHANNEL_EXCLUSIVE_FALLBACK_BLOCK_RE = /年代|军婚|随军|天灾囤货|空间囤货|末世|玄幻|仙侠|宅斗|宫斗|豪门|总裁|虐恋|追妻/;
+
+function genreChannelTier(cardBasename, affinity, isStrictBl = false) {
+  if (BL_GENRE_CARDS.has(cardBasename)) {
+    if (isStrictBl) return 0;
+    if (affinity === 'female' || affinity === 'male') return 3;
+    return 2;
+  }
+  if (affinity === 'female') {
+    if (DUAL_CHANNEL_GENRE_CARDS.has(cardBasename) || FEMALE_GENRE_CARDS.has(cardBasename)) return 1;
+    if (MALE_GENRE_CARDS.has(cardBasename)) return 3;
+    return 2;
+  }
+  if (affinity === 'male') {
+    if (DUAL_CHANNEL_GENRE_CARDS.has(cardBasename) || MALE_GENRE_CARDS.has(cardBasename)) return 1;
+    if (FEMALE_GENRE_CARDS.has(cardBasename)) return 3;
+    return 2;
+  }
+  return 2;
+}
+
+const UMBRELLA_ALIASES = new Set(['幻想言情', '现代言情', '古代言情']);
+
 function matchGenreCards(project) {
+  const profileText = stripHtmlComments(readText(path.join(project, '设定', '题材定位.md')));
   const raw = genreLine(project).toLowerCase();
+  const affinity = detectChannelAffinity(profileText, raw);
+  const hasBgCue = affinity === 'female' || affinity === 'male' || BG_CHANNEL_CUE_RE.test(raw);
   const fallback = isFile(FALLBACK_CARD) ? [[FALLBACK_CARD, 'low']] : [];
   if (!raw || !isDir(GENRE_CARD_DIR)) return fallback;
   const rank = { high: 0, medium: 1, low: 2 };
@@ -516,6 +608,7 @@ function matchGenreCards(project) {
   for (const card of cards) {
     const head = (readText(card) || '').split('---');
     const meta = head.length > 2 ? head[1] : '';
+    if (/^fallback:\s*true\s*$/m.test(meta)) continue;
     const genre = /^genre:\s*(.+)$/m.exec(meta);
     const aliases = /^aliases:\s*\[(.*)\]/m.exec(meta);
     const confidence = /^confidence:\s*(\w+)/m.exec(meta);
@@ -524,28 +617,33 @@ function matchGenreCards(project) {
     const aliasList = aliases
       ? aliases[1].split(',').map((a) => a.trim().replace(/^['"]|['"]$/g, ''))
       : [];
+    const cardBase = path.basename(card);
+    const isBlCard = BL_GENRE_CARDS.has(cardBase);
     const names = new Set([baseName, ...aliasList].filter(Boolean).map((n) => n.toLowerCase()));
     for (const name of names) {
+      if (isBlCard && name === '纯爱' && hasBgCue) continue;
+      const isStrictBl = isBlCard && (STRICT_BL_ALIAS_RE.test(name) || (name === '纯爱' && !hasBgCue));
       let pos = 0;
       while (pos <= raw.length) {
         const idx = raw.indexOf(name, pos);
         if (idx < 0) break;
-        spans.push([idx, idx + name.length, card, level]);
+        spans.push([idx, idx + name.length, card, level, UMBRELLA_ALIASES.has(name) ? 1 : 0, isStrictBl]);
         pos = idx + name.length || idx + 1;
       }
     }
   }
   const best = new Map();
   const compareKey = (a, b) => {
-    for (let i = 0; i < 3; i += 1) {
+    for (let i = 0; i < 5; i += 1) {
       if (a[i] !== b[i]) return a[i] - b[i];
     }
-    return a[3] < b[3] ? -1 : a[3] > b[3] ? 1 : 0;
+    return a[5] < b[5] ? -1 : a[5] > b[5] ? 1 : 0;
   };
-  for (const [start, end, card, level] of spans) {
+  for (const [start, end, card, level, isUmbrella, isStrictBl] of spans) {
     const dominated = spans.some(([s, e, c]) => c !== card && s <= start && end <= e && e - s > end - start);
     if (dominated) continue;
-    const key = [start, -(end - start), rank[level] ?? 2, path.basename(card)];
+    const base = path.basename(card);
+    const key = [genreChannelTier(base, affinity, isStrictBl), isUmbrella, start, -(end - start), rank[level] ?? 2, base];
     if (!best.has(card) || compareKey(key, best.get(card)[0]) < 0) {
       best.set(card, [key, level]);
     }
@@ -553,7 +651,20 @@ function matchGenreCards(project) {
   const hits = [...best.entries()]
     .map(([card, [key, level]]) => ({ key, card, level }))
     .sort((a, b) => compareKey(a.key, b.key));
-  return hits.length ? hits.slice(0, 2).map((h) => [h.card, h.level]) : fallback;
+  const rawExplicitOpposite =
+    (affinity === 'female' && /男频|传统玄幻/.test(raw)) ||
+    (affinity === 'male' && /女频|言情/.test(raw));
+  let filtered = hits.length && affinity !== 'neutral' && !rawExplicitOpposite
+    ? hits.filter((h) => h.key[0] < 3)
+    : hits;
+  if (!filtered.length && hits.length && !CHANNEL_EXCLUSIVE_FALLBACK_BLOCK_RE.test(raw)) {
+    const fallbackCandidate = hits.find((h) => !BL_GENRE_CARDS.has(path.basename(h.card)));
+    if (fallbackCandidate) filtered = [fallbackCandidate];
+  }
+  if (filtered.length > 1 && BL_GENRE_CARDS.has(path.basename(filtered[0].card))) {
+    filtered = [filtered[0], ...filtered.slice(1).filter((h) => !FEMALE_GENRE_CARDS.has(path.basename(h.card)))];
+  }
+  return filtered.length ? filtered.slice(0, 2).map((h) => [h.card, h.level]) : fallback;
 }
 
 function benchmarkSearchRoots(project) {
@@ -660,8 +771,124 @@ function findBenchmarkStyleFile(project) {
   return null;
 }
 
-function extractProseSlices(text, chapter = 1, maxSlices = 2) {
-  if (!text) return null;
+function scoreSliceForGenre(title, body, genreHint) {
+  if (!genreHint) return 0;
+  const hint = String(genreHint).toLowerCase();
+  const titleLower = title.toLowerCase();
+  const text = `${title}\n${body.slice(0, 120)}`.toLowerCase();
+  let score = 0;
+  // 正向子类词命中（2–4 字中文词/英文词；4 字纯中文复合词同步拆双字子词，避免「商战职场」「实业崛起」全 0 分）
+  const tokens = [...new Set(hint.split(/[\s/／、,，+＋|｜:：（）()【】\[\]]+/).filter((t) => t.length >= 2))];
+  const subTokens = new Set();
+  for (const tok of tokens) {
+    if (titleLower.includes(tok)) score += 6;
+    else if (text.includes(tok)) score += 2;
+    if (/^[\u4e00-\u9fff]{4}$/.test(tok)) {
+      subTokens.add(tok.slice(0, 2));
+      subTokens.add(tok.slice(2, 4));
+    }
+  }
+  for (const sub of subTokens) {
+    if (tokens.includes(sub)) continue;
+    if (titleLower.includes(sub)) score += 3;
+    else if (text.includes(sub)) score += 1;
+  }
+  // 高频防串台加减分（抗战谍战 vs 古代权谋；无CP vs 恋爱；退宗仙侠 vs 烤红薯迪化；星际向哨 vs 现代丧尸；实业商战 vs 官场）
+  if (/无cp|无感情线|搞事业|纯破案/.test(hint)) {
+    if (/无cp|破案|查案|直播|事业|算账|兽语|刑侦/.test(text)) score += 5;
+    if (/恋爱|暧昧|甜宠|霸总|追妻|吻|心动|告白|婚/.test(title)) score -= 6;
+  }
+  if (/谍战|抗战|民国|特工|军统/.test(hint)) {
+    if (/谍战|抗战|民国|电台|特工|暗杀|密电/.test(text)) score += 6;
+    if (/古代|退婚|金銮|朝堂|王爷|皇帝|嫡女/.test(title)) score -= 6;
+  }
+  if (/退宗|宗门|修仙|剑修|长生/.test(hint)) {
+    if (/退宗|宗门|修仙|剑|筑基|灵根|长老/.test(text)) score += 4;
+    if (/烤红薯|种田|美食|摆摊/.test(text)) score -= 4;
+  }
+  if (/星际|向哨|哨兵|向导|精神海|荒星/.test(hint)) {
+    if (/星际|向哨|哨兵|向导|精神海|精神体|抑制剂|荒星|星舰|污染/.test(text)) score += 6;
+    if (/丧尸|房车|防盗门|小区|亲戚/.test(title)) score -= 2;
+  }
+  if (/商战|实业|职场|技改|工厂|国企|制造业|机床|重工|市场部|策划/.test(hint)) {
+    if (/实业|技改|工厂|机床|母机|专利|商战|收购|产线|报价|车间|订单|股权|职场|市场部|策划|方案|博弈/.test(text)) score += 6;
+    if (/官场|仕途|县长|政绩|纪委/.test(title) && !/官场|仕途/.test(hint)) score -= 2;
+  }
+  if (/神仙婆婆|大院互助|婆母/.test(hint)) {
+    if (/婆婆|婆母|大院|小姑子|护短|政治处/.test(text)) score += 4;
+  }
+  return score;
+}
+
+function stripLeadingYamlFrontmatter(text) {
+  const src = String(text || '').replace(/^\ufeff/, '').replace(/\r\n/g, '\n');
+  if (!src.startsWith('---\n')) return src;
+  const end = src.indexOf('\n---\n', 4);
+  if (end === -1) return src;
+  return src.slice(end + 5);
+}
+
+/**
+ * 按 5 段标准题材包结构（## 1. 故事线设计 … ## 5. 案例片段）精准切片：
+ * - 保留 YAML 后的 # 标题与 > 导语，以及编号在 wantedNums 中的 ## 节；
+ * - 若遇非标准/旧自定义包（不含 `## 1. 故事线设计`），优雅回退全文（sliced: false）。
+ */
+function sliceGenrePack(rawText, wantedNums = [1, 2, 3], options = {}) {
+  const src = String(rawText || '').replace(/^\ufeff/, '').replace(/\r\n/g, '\n');
+  const includeHeader = options.includeHeader !== false;
+  const body = stripLeadingYamlFrontmatter(src);
+  const lines = body.split('\n');
+  let fence = null;
+  const h2Marks = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const ln = lines[i];
+    const mFence = /^\s{0,3}(`{3,}|~{3,})/.exec(ln);
+    if (mFence) {
+      if (fence === null) fence = mFence[1];
+      else if (mFence[1][0] === fence[0] && mFence[1].length >= fence.length) fence = null;
+      continue;
+    }
+    if (fence) continue;
+    const mH2 = /^##\s+(.*\S)\s*$/.exec(ln);
+    if (mH2) {
+      const title = mH2[1].trim();
+      const mNum = /^(\d+)\.\s*(.*)$/.exec(title);
+      h2Marks.push({ index: i, title, num: mNum ? Number(mNum[1]) : null });
+    }
+  }
+  const isStandardV5 = h2Marks.some((h) => /^1\.\s*故事线设计$/.test(h.title));
+  if (!isStandardV5) {
+    return { text: src, sliced: false };
+  }
+  const wanted = new Set(wantedNums);
+  const parts = [];
+  if (includeHeader && h2Marks.length) {
+    const preamble = lines.slice(0, h2Marks[0].index).join('\n').trim();
+    if (preamble) parts.push(preamble);
+  }
+  for (let idx = 0; idx < h2Marks.length; idx += 1) {
+    const mark = h2Marks[idx];
+    if (!wanted.has(mark.num)) continue;
+    const end = idx + 1 < h2Marks.length ? h2Marks[idx + 1].index : lines.length;
+    const chunk = lines.slice(mark.index, end).join('\n').trim();
+    if (chunk) parts.push(chunk);
+  }
+  if (!parts.length) {
+    return { text: src, sliced: false };
+  }
+  return { text: parts.join('\n\n'), sliced: true };
+}
+
+function extractGenreProseTechniques(rawText) {
+  const res = sliceGenrePack(rawText, [4], { includeHeader: false });
+  if (!res.sliced) return null;
+  const lines = res.text.split('\n');
+  const body = /^##\s+4\.\s*正文技巧/.test(lines[0] || '') ? lines.slice(1).join('\n').trim() : res.text.trim();
+  return body || null;
+}
+
+function collectProseSlices(text) {
+  if (!text) return [];
   const lines = text.split('\n');
   const slices = [];
   let i = 0;
@@ -704,10 +931,81 @@ function extractProseSlices(text, chapter = 1, maxSlices = 2) {
     }
     i += 1;
   }
+  if (!slices.length) {
+    // 兼容导入书/本书 设定/文风.md 使用 `## 原文语感锚点切片` + ```text 代码块
+    let k = 0;
+    while (k < lines.length) {
+      const h2 = /^##\s+(.+)$/.exec(lines[k]);
+      if (h2 && /(?:切片|片段|原文|锚点|示例)/.test(h2[1])) {
+        const title = h2[1].trim();
+        let j = k + 1;
+        let inFence = false;
+        let current = [];
+        let blockIdx = 0;
+        while (j < lines.length && (inFence || !/^##\s+/.test(lines[j]))) {
+          const ln = lines[j];
+          if (/^\s*```/.test(ln)) {
+            if (inFence) {
+              const cleaned = current.map((x) => x.replace(/^>\s?/, '')).join('\n').trim();
+              if (cleaned) {
+                blockIdx += 1;
+                slices.push({ title: blockIdx === 1 ? title : `${title}（${blockIdx}）`, body: cleaned });
+              }
+              current = [];
+            }
+            inFence = !inFence;
+          } else if (inFence) {
+            current.push(ln);
+          }
+          j += 1;
+        }
+        k = j;
+        continue;
+      }
+      k += 1;
+    }
+  }
+  if (!slices.length) {
+    // 兼容无二级/三级切片小节头、直接放 ```text 代码块的 设定/文风.md
+    let inFence = false;
+    let current = [];
+    let blockIdx = 0;
+    for (let j = 0; j < lines.length; j += 1) {
+      const ln = lines[j];
+      if (/^\s*```/.test(ln)) {
+        if (inFence) {
+          const cleaned = current.map((x) => x.replace(/^>\s?/, '')).join('\n').trim();
+          if (cleaned) {
+            blockIdx += 1;
+            slices.push({ title: `原文语感切片${blockIdx}`, body: cleaned });
+          }
+          current = [];
+        }
+        inFence = !inFence;
+      } else if (inFence) {
+        current.push(ln);
+      }
+    }
+  }
+  return slices;
+}
+
+function extractProseSlices(text, chapter = 1, maxSlices = 2, genreHint = '') {
+  const slices = collectProseSlices(text);
   if (!slices.length) return null;
   let picked;
   if (slices.length <= maxSlices) {
     picked = slices;
+  } else if (genreHint) {
+    const start = (Math.max(1, Number(chapter) || 1) - 1) % slices.length;
+    const ranked = slices
+      .map((s, idx) => ({
+        s,
+        score: scoreSliceForGenre(s.title, s.body, genreHint),
+        rot: (idx - start + slices.length) % slices.length,
+      }))
+      .sort((a, b) => (b.score - a.score) || (a.rot - b.rot));
+    picked = ranked.slice(0, maxSlices).map((x) => x.s);
   } else {
     const start = (Math.max(1, Number(chapter) || 1) - 1) % slices.length;
     picked = [];
@@ -833,8 +1131,13 @@ function queryAuthorMemory(project) {
 
 function learnHeadingForm(project, chapter, title) {
   const body = path.join(project, '正文');
-  if (!isDir(body)) return { headingLine: null, how: '正文/ 目录不存在' };
-  const pattern = /^(#+)([ \t　]*)第(0*\d+)章([ \t　]*)(.*)$/;
+  if (!isDir(body)) {
+    return {
+      headingLine: null,
+      how: chapter === 1 ? '首章尚无前文标题参照，按默认格式写' : '正文/ 目录不存在',
+    };
+  }
+  const pattern = /^(#*)([ \t　]*)第(0*\d+)章([ \t　]*)(.*)$/;
   let best = null;
   for (const name of fs.readdirSync(body).filter((n) => n.endsWith('.md')).sort()) {
     const num = /^第(\d+)章/.exec(name);
@@ -855,9 +1158,11 @@ function learnHeadingForm(project, chapter, title) {
   const padded = digits.startsWith('0');
   const number = padded ? String(chapter).padStart(digits.length, '0') : String(chapter);
   const how = padded ? `${digits.length} 位补零` : '不补零';
+  const levelPrefix = level ? `${level}${gap1}` : '';
+  const levelLabel = level || '无 #';
   return {
-    headingLine: `${level}${gap1}第${number}章${gap2 || ' '}${title}`,
-    how: `照既有章形态（${level} ＋ 章号${how}）`,
+    headingLine: `${levelPrefix}第${number}章${gap2 || ' '}${title}`,
+    how: `照既有章形态（${levelLabel} ＋ 章号${how}）`,
   };
 }
 
@@ -934,12 +1239,21 @@ function build(project, chapter, report) {
     }
     if (hasBooks) break;
   }
+  const matchedCards = matchGenreCards(project);
+  const primaryGenreName =
+    matchedCards.length && matchedCards[0][1] === 'high' && path.basename(matchedCards[0][0]) !== '通用长篇.md'
+      ? path.basename(matchedCards[0][0], '.md')
+      : null;
   const noBenchmark = registry === 'none' || (registry === 'missing' && !hasBooks);
   if (customStyle) {
     parts.push(`文风：读 ${styleFile} 全文（本书文风；表达与通用写法冲突时按它写，不覆盖细纲事实与信息边界）`);
     report.push('文风：本书有 设定/文风.md，已给路径');
   } else if (noBenchmark) {
-    parts.push('文风：本书没有 设定/文风.md，也不对标——按作者这次的要求和通用写法写');
+    if (primaryGenreName) {
+      parts.push(`文风：本书没有 设定/文风.md，也不对标——按作者这次的要求和本书流派包（${primaryGenreName}）语感写`);
+    } else {
+      parts.push('文风：本书没有 设定/文风.md，也不对标——按作者这次的要求和通用写法写');
+    }
     report.push(`文风：无文风文件、无对标${registry === 'none' ? '（作者登记了不对标）' : ''}`);
   } else {
     parts.push(`——— 文风 ———\n${SLOT_MARK} 本书没有 设定/文风.md：按 benchmark-recall.md 取主对标文风，填路径与要点`);
@@ -949,7 +1263,7 @@ function build(project, chapter, report) {
   if (chapter > 1) {
     const { prev: prevFile, tail } = previousChapterTail(project, chapter);
     if (prevFile === null || !tail) {
-      errors.push(`必在块缺失：找不到或读不到第 ${chapter - 1} 章正文`);
+      errors.push(`必在块缺失：找不到或读不到第 ${chapter - 1} 章正文（如有意跳章写作且前章未落盘，提交时请配合 --allow-gap）`);
     } else {
       parts.push(`——— 上一章结尾（承接用，不重写；不给全章路径）———\n${tail}`);
       report.push(`上一章结尾：${path.basename(prevFile)} 末 ${Array.from(tail).length} 字（按整行回退）`);
@@ -987,7 +1301,6 @@ function build(project, chapter, report) {
     report.push('细纲两行：目标情绪、主角目标/关键选择都有');
   }
 
-  const matchedCards = matchGenreCards(project);
   const targetEmotion = extractAny(outlineText, OUTLINE_MUST['目标情绪']);
   const legacyCardPath = path.join(project, '设定', '题材正文提示卡.md');
   const cardText = readText(legacyCardPath);
@@ -996,8 +1309,8 @@ function build(project, chapter, report) {
   const tempo = extractAny(unitBlock || '', TEMPO_FIELD_NAMES);
   const needs = {
     目标情绪: targetEmotion,
-    单元情绪引擎: engine,
-    '单元节拍/章功能分配': tempo,
+    这段让读者图什么: engine,
+    这段怎么排: tempo,
   };
   const why = Object.entries(needs)
     .filter(([, value]) => !substantive(value))
@@ -1012,36 +1325,75 @@ function build(project, chapter, report) {
   let slotRecall;
   if (!why.length) {
     const lines = [
-      'selected_emotion_module：降档（来源：细纲「目标情绪」＋单元卡「单元情绪引擎」）',
+      'selected_emotion_module：降档（来源：细纲「目标情绪」＋本段剧情「这段让读者图什么」）',
       `  细纲目标情绪：${targetEmotion}`,
-      ...(engine ? [`  单元情绪引擎：${engine}`] : []),
-      'rhythm_reference：降档（来源：单元卡「单元节拍/章功能分配」）',
+      ...(engine ? [`  这段让读者图什么：${engine}`] : []),
+      'rhythm_reference：降档（来源：本段剧情「这段怎么排」）',
       ...(tempo ? [`  ${tempo}`] : []),
     ];
     slotRecall = `——— 情绪与节奏召回 ———\n${lines.join('\n')}`;
     report.push(
-      `召回降档：成立，${noBenchmark && !customStyle ? '无对标，' : '文风、'}流派包、目标情绪和单元 ${unitId} 情绪/节拍均可用`
+      `召回降档：成立，${noBenchmark && !customStyle ? '无对标，' : '文风、'}流派包、目标情绪和剧情段 ${unitId} 情绪/节拍均可用`
     );
   } else {
     slotRecall = `——— 情绪与节奏召回 ———\n${SLOT_MARK} 降档不成立（${why.join('、')}），按 benchmark-recall.md 走全量召回后填此槽`;
     report.push(`召回降档：不成立（${why.join('、')}）—— 全量召回归主会话`);
   }
 
+  const { workspace: wsRoot } = findWorkspace(project);
+  const isDeployedPack = (base) => {
+    const deployedRel = `agent-references/genre-styles/${base}`;
+    return [
+      path.join(wsRoot, '.claude', deployedRel),
+      path.join(wsRoot, '.agents', deployedRel),
+      path.join(wsRoot, '.codex', deployedRel),
+      path.join(wsRoot, '.opencode', deployedRel),
+      path.join(wsRoot, deployedRel),
+    ].some((p) => isFile(p));
+  };
+  let genreProseTech = null;
+  let genreProseTechName = null;
+  if (matchedCards.length) {
+    const primaryCard = matchedCards[0][0];
+    const primaryRaw = readText(primaryCard);
+    const tech = primaryRaw ? extractGenreProseTechniques(primaryRaw) : null;
+    if (tech) {
+      genreProseTech = tech;
+      genreProseTechName = path.basename(primaryCard, '.md');
+    }
+  }
+
   const genrePackLines = matchedCards.length
     ? matchedCards
         .map(
-          ([card, level], i) =>
-            `${i === 0 ? '主' : '辅'}流派包：agent-references/genre-styles/${path.basename(card)}（置信度 ${level}）`
+          ([card, level], i) => {
+            const base = path.basename(card);
+            const deployed = isDeployedPack(base);
+            const sectionHint =
+              i === 0
+                ? (genreProseTech ? '（仅读 4. 正文技巧 与 5. 案例片段；已注入下方）' : '（写正文只看正文技巧与案例片段）')
+                : '（主读主流派包，辅包仅跨题材冲突时按需对照 4–5 节）';
+            const undeployedHint = deployed ? '' : '（未部署环境若读不到此相对路径，按主会话核对报告里的本机路径或直接依下方已注入正文技巧与案例片段执行）';
+            return `${i === 0 ? '主' : '辅'}流派包：agent-references/genre-styles/${base}（置信度 ${level}）${sectionHint}${undeployedHint}`;
+          }
         )
         .join('\n')
     : `${SLOT_MARK} 未匹配到流派包，请检查 agent-references/genre-styles/`;
 
+  const sliceGenreHint = [genreLine(project), authorDecided(project).decided || ''].filter(Boolean).join(' ');
   let proseSliceText = null;
   let proseSliceSource = null;
-  if (!noBenchmark) {
+  if (customStyle) {
+    const ownSlices = extractProseSlices(readText(styleFile), chapter, 2, sliceGenreHint);
+    if (ownSlices) {
+      proseSliceText = ownSlices;
+      proseSliceSource = `本书文风（${styleFile}）原文锚点`;
+    }
+  }
+  if (!proseSliceText && !noBenchmark) {
     const bench = findBenchmarkStyleFile(project);
     if (bench) {
-      const benchSlices = extractProseSlices(readText(bench.file), chapter, 2);
+      const benchSlices = extractProseSlices(readText(bench.file), chapter, 2, sliceGenreHint);
       if (benchSlices) {
         proseSliceText = benchSlices;
         proseSliceSource = `主对标「${bench.name}」文风原文锚点（${bench.file}）`;
@@ -1050,11 +1402,31 @@ function build(project, chapter, report) {
   }
   if (!proseSliceText && matchedCards.length) {
     const primaryCard = matchedCards[0][0];
-    const packSlices = extractProseSlices(readText(primaryCard), chapter, 2);
-    if (packSlices) {
-      proseSliceText = packSlices;
-      proseSliceSource = `流派包「${path.basename(primaryCard, '.md')}」内置原文切片`;
+    const primarySlices = collectProseSlices(readText(primaryCard));
+    const secondaryCard = matchedCards.length > 1 ? matchedCards[1][0] : null;
+    const secondarySlices = secondaryCard ? collectProseSlices(readText(secondaryCard)) : [];
+    if (primarySlices.length && secondarySlices.length && sliceGenreHint) {
+      const bestPrim = primarySlices
+        .map((s) => ({ s, score: scoreSliceForGenre(s.title, s.body, sliceGenreHint) }))
+        .sort((a, b) => b.score - a.score);
+      const bestSec = secondarySlices
+        .map((s) => ({ s, score: scoreSliceForGenre(s.title, s.body, sliceGenreHint) }))
+        .sort((a, b) => b.score - a.score);
+      if (bestSec[0].score > (bestPrim[1] ? bestPrim[1].score : -1)) {
+        proseSliceText = [bestPrim[0].s, bestSec[0].s].map((s) => `【${s.title}】\n${s.body}`).join('\n\n');
+        proseSliceSource = `主流派包「${path.basename(primaryCard, '.md')}」＋辅流派包「${path.basename(secondaryCard, '.md')}」子类匹配切片`;
+      }
     }
+    if (!proseSliceText) {
+      const packSlices = extractProseSlices(readText(primaryCard), chapter, 2, sliceGenreHint);
+      if (packSlices) {
+        proseSliceText = packSlices;
+        proseSliceSource = `流派包「${path.basename(primaryCard, '.md')}」内置原文切片`;
+      }
+    }
+  }
+  if (genreProseTech) {
+    report.push(`流派正文技巧：已注入「${genreProseTechName}」4. 正文技巧（跳过 1–3 节大纲设计）`);
   }
   if (proseSliceText) {
     report.push(`语感锚点：已注入（来源：${proseSliceSource}，召回降档亦必传）`);
@@ -1062,8 +1434,13 @@ function build(project, chapter, report) {
     report.push('语感锚点：未抽到可用原文切片（请按 benchmark-recall.md 手动补 1-2 段 200-300 字原文锚点）');
   }
 
-  const timelineAnchor = recentTimelineAnchors(project);
-  if (timelineAnchor) {
+  const timelineAnchorRaw = recentTimelineAnchors(project);
+  let timelineAnchor = null;
+  if (timelineAnchorRaw && timelineAnchorRaw.error) {
+    errors.push(`追踪状态异常：${timelineAnchorRaw.error}`);
+    report.push(`追踪状态：错误（${timelineAnchorRaw.error}）`);
+  } else if (timelineAnchorRaw) {
+    timelineAnchor = timelineAnchorRaw;
     report.push(`近期时间锚点：已注入 ${timelineAnchor.count} 条（≤${TIMELINE_ANCHOR_MAX_CHARS} 字，防相对时间跨日漂移）`);
   }
 
@@ -1072,9 +1449,14 @@ function build(project, chapter, report) {
     `——— 作者本轮要求 ———\n${SLOT_MARK} 本轮字数范围、必发生、禁发生、停笔点与章尾要求；无写「无」。`,
     slotRecall,
     `——— 本章流派包 ———\n${genrePackLines}`,
+    ...(genreProseTech
+      ? [
+          `——— 流派正文技巧（${genreProseTechName} · 4. 正文技巧）———\n${genreProseTech}`,
+        ]
+      : []),
     ...(proseSliceText
       ? [
-          `——— 语感锚点切片（只学断行、句长、口语节奏与标点力度，严禁照抄人名/台词/桥段）———\n${proseSliceText}`,
+          `——— 语感锚点切片（只学口语连接、句长断行与对话推进感，严禁照抄人名/台词/桥段）———\n${proseSliceText}`,
         ]
       : []),
     ...(timelineAnchor
@@ -1148,6 +1530,10 @@ function build(project, chapter, report) {
   }
   parts.push(
     `——— 作者偏好（作者记下的写作习惯，低优先级倾向，不逐条追求命中）———\n${memoryBlock}`,
+    '——— 写作硬底线 ———\n' +
+      '1. 叙述保人物内心盘算与口语因果连接，严禁抽干内心写成主谓宾摄像头分镜电报体。\n' +
+      '2. 对白净白短打直接交锋，严禁每句台词捆绑端杯、摸袖口、看表盘等道具微动作。\n' +
+      '3. 刀子物件原则：只留改局势或露破绽的实证物，删无功能材质/服饰/天气光影/声效贴纸；反派须按私心反咬设阻，禁走打卡过场。',
     '检查分工：写手负责编排、内容覆盖和格式自检；主会话质量阶段负责语义去味及最终文件扫描，写手不重复整轮去味。',
     '本次照你的铁律 1-8 与被调用协议执行（细纲边界、正文形状、新增物三级、交付三附件均以你的定义为准）。',
     `字数目标按细纲执行；整章一次写完，直接写到最终输出路径（临时文件只放 ${chapterWorkDir(project, chapter)}，不写 /tmp）；不拆逐点配额、不自测字数。`
@@ -1281,4 +1667,4 @@ if (require.main === module) {
   process.exitCode = main();
 }
 
-module.exports = { build, matchGenreCards, queryAuthorMemory, main };
+module.exports = { build, genreLine, matchGenreCards, queryAuthorMemory, sliceGenrePack, extractGenreProseTechniques, main };

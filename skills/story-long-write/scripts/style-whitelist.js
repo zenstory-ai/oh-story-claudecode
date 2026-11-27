@@ -37,3 +37,16 @@ function maskStyleText(text, whitelist) {
 }
 
 module.exports = { loadStyleWhitelist, styleSpans, maskStyleText };
+
+if (require.main === module) {
+  const args = process.argv.slice(2);
+  if (args.includes('-h') || args.includes('--help') || args.length === 0) {
+    console.log(
+      'style-whitelist.js — 库模块，供 check-ai-patterns.js / normalize-punctuation.js 加载当前书目局部 .deslop-whitelist 豁免词表。\n' +
+      '用法（仅作为模块引入）：const { loadStyleWhitelist, maskStyleText } = require("./style-whitelist");'
+    );
+    process.exit(0);
+  }
+  console.error('style-whitelist.js 是内部库模块，不支持直接执行参数；请使用 --help 查看说明。');
+  process.exit(2);
+}

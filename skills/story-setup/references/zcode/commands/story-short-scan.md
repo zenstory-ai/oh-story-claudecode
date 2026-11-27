@@ -1,5 +1,5 @@
 ---
-description: 短篇网文扫榜，分析盐言、七猫、黑岩、点众等平台趋势。
+description: 短篇网文扫榜，分析知乎盐言、番茄短故事、七猫、黑岩、点众等平台趋势。
 skills: story-short-scan
 ---
 

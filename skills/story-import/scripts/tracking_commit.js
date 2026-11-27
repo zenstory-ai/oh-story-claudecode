@@ -465,11 +465,24 @@ function requireNoRetiredTrackingPaths(tracking) {
   requireCondition(found.length === 0, `retired tracking files are not supported: ${found.join(', ')}`);
 }
 
+const MANAGED_EMPTY_SUBDIRS = new Set(['逐章记录', '角色状态', '时间线']);
+
 function findPreexistingTrackingEntries(tracking) {
   if (!isDir(tracking)) return [];
   return fs
     .readdirSync(tracking)
-    .filter((name) => name !== RETIRED_ARCHIVE_DIR && name !== '.tracking-commit.lock' && !name.endsWith('.lock'))
+    .filter((name) => {
+      if (name === RETIRED_ARCHIVE_DIR || name === '.tracking-commit.lock' || name.endsWith('.lock')) {
+        return false;
+      }
+      if (MANAGED_EMPTY_SUBDIRS.has(name)) {
+        const full = path.join(tracking, name);
+        if (isDir(full) && fs.readdirSync(full).length === 0) {
+          return false;
+        }
+      }
+      return true;
+    })
     .sort();
 }
 
@@ -1151,13 +1164,24 @@ function normalizeState(document) {
     new Set([
       'schema_version', 'book_title', 'last_committed_chapter', 'imported_through_chapter',
       'state_revision', 'context', 'characters', 'foreshadow', 'timeline', 'wordcount_records',
+      'skipped_chapters',
     ]),
     'tracking state'
   );
-  requireCondition(root.schema_version === TRACKING_SCHEMA_VERSION, 'tracking state schema is unsupported');
+  requireCondition(root.schema_version === TRACKING_SCHEMA_VERSION, `tracking state schema is unsupported (expected schema_version=${TRACKING_SCHEMA_VERSION})`);
   const lastChapter = asInt(root.last_committed_chapter, 'tracking state.last_committed_chapter');
   const importedThrough = asInt(root.imported_through_chapter, 'tracking state.imported_through_chapter');
   requireCondition(importedThrough <= lastChapter, 'imported chapter cutoff exceeds current chapter');
+  let skippedChapters = [];
+  if (root.skipped_chapters !== undefined) {
+    requireCondition(Array.isArray(root.skipped_chapters), 'tracking state.skipped_chapters must be an array');
+    const seen = new Set();
+    for (const item of root.skipped_chapters) {
+      const ch = asInt(item, 'tracking state.skipped_chapters[]', { minimum: 1 });
+      if (ch > importedThrough && ch < lastChapter) seen.add(ch);
+    }
+    skippedChapters = [...seen].sort((a, b) => a - b);
+  }
   const context = validateContextInput(root.context, { includeInitialFields: true });
   requireCondition(
     context.position.volume_start_chapter <= Math.max(1, lastChapter),
@@ -1189,7 +1213,7 @@ function normalizeState(document) {
   }
   const stateRevision = asInt(root.state_revision, 'tracking state.state_revision');
   const wordcountRecords = normalizeWordcountRecords(root.wordcount_records ?? {}, lastChapter);
-  return {
+  const normalized = {
     schema_version: TRACKING_SCHEMA_VERSION,
     book_title: cleanText(root.book_title, 'tracking state.book_title', { maxBytes: 240 }),
     last_committed_chapter: lastChapter,
@@ -1201,6 +1225,10 @@ function normalizeState(document) {
     timeline,
     wordcount_records: wordcountRecords,
   };
+  if (skippedChapters.length) {
+    normalized.skipped_chapters = skippedChapters;
+  }
+  return normalized;
 }
 
 function loadState(project) {
@@ -1223,16 +1251,133 @@ function normalizeInitialDocument(document, warningsOut = null) {
   return normalizeState(stateDoc);
 }
 
+function buildInitTemplate(project = null) {
+  let bookTitle = '请填书名';
+  if (project) {
+    try {
+      const profile = path.join(path.resolve(String(project)), '设定', '题材定位.md');
+      if (exists(profile)) {
+        const raw = fs.readFileSync(profile, 'utf8');
+        const match = /^[ \t]*[-*+]?[ \t]*\**书名\**[ \t]*[：:][ \t]*(.+)$/m.exec(raw);
+        if (match && !match[1].includes('{') && !match[1].includes('｛')) {
+          const cleaned = match[1].replace(/[（(][^）)]*[）)]/g, '').trim().replace(/^《+|》+$/g, '');
+          if (cleaned) bookTitle = cleaned;
+        }
+      }
+    } catch {
+      // ignore unreadable profile and fall back to directory name
+    }
+    if (bookTitle === '请填书名') {
+      const base = path.basename(path.resolve(String(project)));
+      if (base && base !== '.' && base !== '..') bookTitle = base;
+    }
+  }
+  return {
+    schema_version: INPUT_SCHEMA_VERSION,
+    book_title: bookTitle,
+    last_chapter: 0,
+    context: {
+      position: {
+        volume: '第一卷',
+        volume_start_chapter: 1,
+        story_time: '开篇时间',
+        scene: '开篇场景',
+      },
+      long_term_constraints: [],
+      active_character_names: [],
+      continuity_risks: [],
+      recent_chapters: [],
+      next_chapter_commitments: [],
+    },
+    character_snapshots: {},
+    foreshadow: [],
+    timeline_events: [],
+  };
+}
+
+function collectInitSchemaIssues(root) {
+  const issues = [];
+  const allowedRoot = new Set([
+    'schema_version', 'book_title', 'last_chapter', 'context', 'character_snapshots', 'foreshadow', 'timeline_events',
+  ]);
+  const unknownRoot = Object.keys(root).filter((k) => !allowedRoot.has(k)).sort();
+  if (unknownRoot.length) {
+    issues.push(`init input contains unsupported fields: ${unknownRoot.join(', ')}（只收 ${[...allowedRoot].sort().join(', ')}）`);
+  }
+  if (!Object.prototype.hasOwnProperty.call(root, 'schema_version') || root.schema_version === undefined) {
+    issues.push(`missing required field schema_version (expected ${INPUT_SCHEMA_VERSION})`);
+  } else if (root.schema_version !== INPUT_SCHEMA_VERSION) {
+    issues.push(`init input schema_version is unsupported (expected schema_version=${INPUT_SCHEMA_VERSION})`);
+  }
+  if (!Object.prototype.hasOwnProperty.call(root, 'book_title') || root.book_title === undefined) {
+    issues.push('missing required field book_title');
+  } else if (typeof root.book_title !== 'string' || !root.book_title.trim()) {
+    issues.push('book_title must be a non-empty string');
+  }
+  if (!Object.prototype.hasOwnProperty.call(root, 'last_chapter') || root.last_chapter === undefined) {
+    issues.push('missing required field last_chapter (expected integer >= 0)');
+  } else if (!Number.isInteger(root.last_chapter)) {
+    issues.push('last_chapter must be an integer');
+  } else if (root.last_chapter < 0) {
+    issues.push('last_chapter must be >= 0');
+  }
+  if (!Object.prototype.hasOwnProperty.call(root, 'context') || root.context === undefined) {
+    issues.push('missing required field context');
+  } else if (!isPlainObject(root.context)) {
+    issues.push('context must be a JSON object');
+  } else {
+    const allowedContext = new Set([
+      'position', 'long_term_constraints', 'active_character_names', 'continuity_risks',
+      'recent_chapters', 'next_chapter_commitments',
+    ]);
+    const unknownContext = Object.keys(root.context).filter((k) => !allowedContext.has(k)).sort();
+    if (unknownContext.length) {
+      issues.push(`context contains unsupported fields: ${unknownContext.join(', ')}（只收 ${[...allowedContext].sort().join(', ')}）`);
+    }
+    if (!Object.prototype.hasOwnProperty.call(root.context, 'position') || root.context.position === undefined) {
+      issues.push('missing required field context.position');
+    } else if (!isPlainObject(root.context.position)) {
+      issues.push('context.position must be a JSON object');
+    } else {
+      const pos = root.context.position;
+      const allowedPos = new Set(['volume', 'volume_start_chapter', 'story_time', 'scene']);
+      const unknownPos = Object.keys(pos).filter((k) => !allowedPos.has(k)).sort();
+      if (unknownPos.length) {
+        issues.push(`context.position contains unsupported fields: ${unknownPos.join(', ')}（只收 ${[...allowedPos].sort().join(', ')}）`);
+      }
+      if (!Object.prototype.hasOwnProperty.call(pos, 'volume') || pos.volume === undefined) {
+        issues.push('missing required field context.position.volume');
+      } else if (typeof pos.volume !== 'string' || !pos.volume.trim()) {
+        issues.push('context.position.volume must be a non-empty string');
+      }
+      if (!Object.prototype.hasOwnProperty.call(pos, 'volume_start_chapter') || pos.volume_start_chapter === undefined) {
+        issues.push('missing required field context.position.volume_start_chapter (expected integer >= 1)');
+      } else if (!Number.isInteger(pos.volume_start_chapter) || pos.volume_start_chapter < 1) {
+        issues.push('context.position.volume_start_chapter must be an integer >= 1');
+      }
+      const timeMissing = !Object.prototype.hasOwnProperty.call(pos, 'story_time') || pos.story_time === undefined;
+      const sceneMissing = !Object.prototype.hasOwnProperty.call(pos, 'scene') || pos.scene === undefined;
+      if (timeMissing) {
+        issues.push('missing required field context.position.story_time');
+      } else if (typeof pos.story_time !== 'string' || !pos.story_time.trim()) {
+        issues.push('context.position.story_time must be a non-empty string');
+      }
+      if (sceneMissing) {
+        issues.push('missing required field context.position.scene');
+      } else if (typeof pos.scene !== 'string' || !pos.scene.trim()) {
+        issues.push('context.position.scene must be a non-empty string');
+      }
+    }
+  }
+  return issues;
+}
+
 function _normalizeInitialDocument(document) {
   const root = asMapping(document, 'init input');
-  requireKnownKeys(
-    root,
-    new Set([
-      'schema_version', 'book_title', 'last_chapter', 'context', 'character_snapshots', 'foreshadow', 'timeline_events',
-    ]),
-    'init input'
-  );
-  requireCondition(root.schema_version === INPUT_SCHEMA_VERSION, 'init input schema_version is unsupported');
+  const schemaIssues = collectInitSchemaIssues(root);
+  if (schemaIssues.length) {
+    throw new TrackingError(`${schemaIssues.join('；')}（可用 init-draft 或 init --init-example 查看最小合法初始化模板）`);
+  }
   const lastChapter = asInt(root.last_chapter, 'last_chapter');
   const bookTitle = cleanText(root.book_title, 'book_title', { maxBytes: 240 });
   const context = validateContextInput(root.context, { includeInitialFields: true });
@@ -1319,7 +1464,7 @@ function _normalizeTransaction(project, state, document, { allowGap = false } = 
     ]),
     'transaction'
   );
-  requireCondition(root.schema_version === INPUT_SCHEMA_VERSION, 'transaction schema_version is unsupported');
+  requireCondition(root.schema_version === INPUT_SCHEMA_VERSION, `transaction schema_version is unsupported (expected schema_version=${INPUT_SCHEMA_VERSION})`);
   const mode = cleanText(root.mode, 'mode', { maxBytes: 24 });
   requireCondition(mode === 'append' || mode === 'revision', 'mode must be append or revision');
   const chapter = asInt(root.chapter, 'chapter', { minimum: 1 });
@@ -1327,12 +1472,16 @@ function _normalizeTransaction(project, state, document, { allowGap = false } = 
   const wordcountInput = root.wordcount;
   requireCondition(expectedRevision === state.state_revision, 'tracking state changed since this transaction was prepared');
   const last = state.last_committed_chapter;
+  const skippedChapters = [];
   if (mode === 'append') {
     if (allowGap) {
       if (chapter > last + 1) {
+        for (let gapCh = last + 1; gapCh < chapter; gapCh += 1) {
+          skippedChapters.push(gapCh);
+        }
         const skippedRange = chapter - 1 > last + 1 ? `第${last + 1}-${chapter - 1}章` : `第${last + 1}章`;
         addSoftWarning(
-          `跳章提交：当前最后提交章为第${last}章，本次直接提交第${chapter}章（跳过${skippedRange}）`
+          `跳章提交：当前最后提交章为第${last}章，本次直接提交第${chapter}章（跳过${skippedRange}，已记入 skipped_chapters）`
         );
       } else if (chapter <= last) {
         const targetDelta = deltaPath(trackingRoot(project), chapter);
@@ -1396,6 +1545,7 @@ function _normalizeTransaction(project, state, document, { allowGap = false } = 
     context,
     snapshots,
     wordcount,
+    skippedChapters,
   };
 }
 
@@ -1416,6 +1566,16 @@ function mergeTransaction(state, transaction) {
   const chapter = transaction.chapter;
   if (transaction.mode === 'append') {
     nextState.last_committed_chapter = Math.max(state.last_committed_chapter, chapter);
+  }
+  const mergedSkipped = new Set(state.skipped_chapters || []);
+  for (const gapCh of transaction.skippedChapters || []) {
+    mergedSkipped.add(gapCh);
+  }
+  mergedSkipped.delete(chapter);
+  if (mergedSkipped.size > 0) {
+    nextState.skipped_chapters = [...mergedSkipped].sort((a, b) => a - b);
+  } else {
+    delete nextState.skipped_chapters;
   }
   nextState.state_revision += 1;
   Object.assign(nextState.characters, transaction.snapshots);
@@ -1464,7 +1624,9 @@ function mergeTransaction(state, transaction) {
   const undeclared = dropped.filter((item) => !retiredSet.has(item)).sort();
   requireCondition(
     undeclared.length === 0,
-    'context items were dropped without being declared in delta.retired_context_items: ' + undeclared.join('；')
+    'context items were dropped without being declared in delta.retired_context_items: ' +
+      undeclared.join('；') +
+      '（若要删改旧条目，请把原句原样放进 delta.retired_context_items；若无意改动，先跑 draft 继承当前 context）'
   );
   transaction.delta.retired_context_items = dropped;
 
@@ -1549,12 +1711,12 @@ function warnSizes(views, deltaPayload = null, warningsOut = null) {
     const deltaSize = byteSize(deltaPayload);
     if (deltaSize > DELTA_MAX_BYTES) {
       emitWarning(
-        `chapter delta is ${deltaSize} bytes; target is <= ${DELTA_TARGET_BYTES} bytes（约 682 字），recommended cap is <= ${DELTA_MAX_BYTES} bytes（约 1194 字，不影响本次提交，建议后续精简）`,
+        `chapter delta is ${deltaSize} bytes; target is <= ${DELTA_TARGET_BYTES} bytes（约 682 字），recommended cap is <= ${DELTA_MAX_BYTES} bytes（约 1194 字，不影响本次提交，建议后续精简；多角色高潮章压缩顺序：先压已退场配角与已结算伏笔，保留在场核心变化）`,
         warningsOut
       );
     } else if (deltaSize > DELTA_TARGET_BYTES) {
       emitWarning(
-        `chapter delta is ${deltaSize} bytes; target is <= ${DELTA_TARGET_BYTES} bytes（约 682 字，软上限 ${DELTA_MAX_BYTES} 字节 / 约 1194 字）`,
+        `chapter delta is ${deltaSize} bytes; target is <= ${DELTA_TARGET_BYTES} bytes（约 682 字，软上限 ${DELTA_MAX_BYTES} 字节 / 约 1194 字；多角色高潮章压缩顺序：先压已退场配角与已结算伏笔，保留在场核心变化）`,
         warningsOut
       );
     }
@@ -1767,8 +1929,10 @@ function checkProject(project, { strict = false, warningsOut = null, driftWarnin
   const state = loadState(project);
   const lastChapter = state.last_committed_chapter;
   const requiredDeltaStart = state.imported_through_chapter + 1;
+  const skippedSet = new Set(state.skipped_chapters || []);
   const driftWarnings = driftWarningsOut || [];
   for (let chapter = requiredDeltaStart; chapter <= lastChapter; chapter += 1) {
+    if (skippedSet.has(chapter)) continue;
     if (!exists(deltaPath(tracking, chapter))) {
       if (strict) {
         throw new TrackingError(`chapter delta ${chapter} is missing`);
@@ -1908,6 +2072,49 @@ function checkProject(project, { strict = false, warningsOut = null, driftWarnin
       prompt: '请询问作者：将手工新增/修改的角色视图吸回状态，还是按 _tracking-state.json 重建？',
     });
     emit(`WARNING: ${message}`, { error: true });
+  }
+  const proseDir = path.join(path.resolve(String(project)), '正文');
+  if (isDir(proseDir) && isPlainObject(state.wordcount_records)) {
+    const recordedChapters = Object.keys(state.wordcount_records)
+      .map((k) => Number(k))
+      .filter((n) => Number.isInteger(n) && n >= 1)
+      .sort((a, b) => a - b);
+    for (const chapter of recordedChapters) {
+      const record = state.wordcount_records[String(chapter)];
+      if (!record || typeof record.body_sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(record.body_sha256)) {
+        continue;
+      }
+      let bodyPath = null;
+      try {
+        bodyPath = wordcountCore.findChapterFile(proseDir, chapter, { outline: false });
+      } catch {
+        bodyPath = null;
+      }
+      if (!bodyPath || !exists(bodyPath)) continue;
+      let currentSha = null;
+      try {
+        currentSha = crypto.createHash('sha256').update(fs.readFileSync(bodyPath)).digest('hex');
+      } catch {
+        continue;
+      }
+      if (currentSha !== record.body_sha256) {
+        const relFile = path.join('正文', path.basename(bodyPath)).replace(/\\/g, '/');
+        const message =
+          `第${chapter}章正文（${path.basename(bodyPath)}）的 body_sha256 与已提交追踪记录不一致` +
+          `（记录 ${record.body_sha256.slice(0, 12)}…，现为 ${currentSha.slice(0, 12)}…；` +
+          '提交后正文被修改，请用 storyctl.js chapter commit 以 mode=revision 重新计数并同步追踪）';
+        driftWarnings.push({
+          type: 'body_sha256_drift',
+          chapter,
+          file: relFile,
+          recorded_sha256: record.body_sha256,
+          current_sha256: currentSha,
+          message,
+          prompt: `请核对第${chapter}章正文改动并运行 storyctl.js chapter commit（mode=revision）重新计数并同步追踪。`,
+        });
+        emit(`WARNING: ${message}`, { error: true });
+      }
+    }
   }
   return state;
 }
@@ -2221,8 +2428,11 @@ function parseCliArgs(argv) {
   if (!argv.length || argv[0] === '-h' || argv[0] === '--help') {
     return { help: argv.length > 0, error: argv.length === 0 ? 'command is required' : null };
   }
+  if (argv[0] === '--init-example') {
+    return { command: 'init-draft', project: null, input: null, chapter: null, out: null, force: false, strict: false, allowGap: false, initExample: true };
+  }
   const command = argv[0];
-  if (!['init', 'commit', 'check', 'draft'].includes(command)) {
+  if (!['init', 'init-draft', 'commit', 'check', 'draft'].includes(command)) {
     return { error: `invalid command: ${command}` };
   }
   const args = {
@@ -2234,6 +2444,7 @@ function parseCliArgs(argv) {
     force: false,
     strict: false,
     allowGap: false,
+    initExample: false,
   };
   for (let i = 1; i < argv.length; i += 1) {
     const token = argv[i];
@@ -2243,7 +2454,11 @@ function parseCliArgs(argv) {
       return argv[++i];
     };
     try {
-      if (token === '--project' || token.startsWith('--project=')) {
+      if (token === '-h' || token === '--help') {
+        return { help: true, command, error: null };
+      } else if (command === 'init' && token === '--init-example') {
+        args.initExample = true;
+      } else if (token === '--project' || token.startsWith('--project=')) {
         args.project = readVal('--project');
       } else if ((command === 'init' || command === 'commit') && (token === '--input' || token.startsWith('--input='))) {
         args.input = readVal('--input');
@@ -2251,10 +2466,12 @@ function parseCliArgs(argv) {
         const raw = readVal('--chapter');
         if (!/^-?\d+$/.test(raw)) return { error: `invalid --chapter: ${raw}` };
         args.chapter = Number(raw);
-      } else if (command === 'draft' && (token === '--out' || token.startsWith('--out='))) {
+      } else if ((command === 'draft' || command === 'init-draft') && (token === '--out' || token.startsWith('--out='))) {
         args.out = readVal('--out');
       } else if (command === 'draft' && token === '--force') {
         args.force = true;
+      } else if (command === 'init' && token === '--force') {
+        return { error: '--force is only supported by draft; init never overwrites existing tracking state' };
       } else if (command === 'check' && token === '--strict') {
         args.strict = true;
       } else if ((command === 'commit' || command === 'draft') && token === '--allow-gap') {
@@ -2265,6 +2482,9 @@ function parseCliArgs(argv) {
     } catch (err) {
       return { error: err.message };
     }
+  }
+  if (command === 'init-draft' || (command === 'init' && args.initExample)) {
+    return args;
   }
   if (!args.project) return { error: 'missing required --project' };
   if ((command === 'init' || command === 'commit') && !args.input) {
@@ -2280,13 +2500,36 @@ function main(argv = process.argv.slice(2)) {
   const args = parseCliArgs(argv);
   if (args.help) {
     process.stdout.write(
-      'usage: node tracking_commit.js {init,commit,check,draft} --project DIR [--input FILE] [--chapter N] [--out FILE] [--force] [--strict] [--allow-gap]\n'
+      'usage: node tracking_commit.js <command> --project DIR [options]\n' +
+        '  init   --project DIR --input FILE | --init-example\n' +
+        '  init-draft [--project DIR] [--out FILE]\n' +
+        '  commit --project DIR --input FILE [--allow-gap]\n' +
+        '  draft  --project DIR --chapter N [--out FILE] [--force] [--allow-gap]\n' +
+        '  check  --project DIR [--strict]\n'
     );
     return 0;
   }
   if (args.error) {
     emit(`ERROR: ${args.error}`, { error: true });
     return 2;
+  }
+  if (args.command === 'init-draft' || (args.command === 'init' && args.initExample)) {
+    let resolvedProject = null;
+    if (args.project) {
+      try {
+        resolvedProject = wordcountCore.resolveBookDir(args.project);
+      } catch {
+        resolvedProject = path.resolve(String(args.project));
+      }
+    }
+    const template = buildInitTemplate(resolvedProject);
+    if (args.out) {
+      atomicWriteText(args.out, `${JSON.stringify(template, null, 2)}\n`);
+      emit(JSON.stringify({ draft: args.out, template }));
+    } else {
+      process.stdout.write(`${JSON.stringify(template, null, 2)}\n`);
+    }
+    return 0;
   }
   let result;
   const warnings = [];
@@ -2317,7 +2560,8 @@ function main(argv = process.argv.slice(2)) {
         );
         if (existing.expected_state_revision === document.expected_state_revision) {
           document = existing;
-          refreshed = '已有草稿且修订号未变，原样保留';
+          refreshed = '已有草稿且修订号未变，原样保留（如需覆盖重建请加 --force）';
+          emit(`NOTE: ${out} 已存在且修订号未变，原样保留；如需覆盖重建请加 --force`, { error: true });
         } else {
           refreshed = rebuildStaleDraft(
             document,
@@ -2359,7 +2603,9 @@ function main(argv = process.argv.slice(2)) {
         fill =
           '只填 delta 里本章的变化；context 其余字段已是当前值，要撤下的长期约束或连贯性风险从 context 删掉并把原文放进 ' +
           'delta.retired_context_items；本章有变化的核心角色从 current_snapshots（未内联的大快照或久别回归角色读 snapshot_files 对应 JSON）' +
-          '取当前快照整份改好放进 character_snapshots，并在 character_changes 写一句变化。每类条目照 shapes 的形状写，不要从脚本源码或 state 文件里另找格式。';
+          '取当前快照整份改好放进 character_snapshots，并在 character_changes 写一句变化。' +
+          '多角色高潮章若逐章记录接近或超 2048 字节，先压已退场配角与已结算伏笔，保留在场核心变化。' +
+          '每类条目照 shapes 的形状写，不要从脚本源码或 state 文件里另找格式。';
       }
       if (omittedSnapshots.length) {
         fill =

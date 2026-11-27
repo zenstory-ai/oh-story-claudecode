@@ -18,7 +18,9 @@ const SCOPE = /^>\s*作用域[：:]\s*(.+?)\s*$/;
 const TRAILING = /^(.*?)\s*<!--\s*(.*?)\s*-->\s*$/;
 const RETIRED_LINE = /^\s*(?:[-*]\s*)?⊘|^\s*\|\s*⊘/;
 const UNIT_IN_TITLE = /(?<![A-Za-z0-9_-])([LD]\d+-\d+|U\d+)(?![A-Za-z0-9_-])/;
+const PLAIN_UNIT_TITLE = /^(第[一二三四五六七八九十百\d]+段)(?:[：:\s（(]|$)/;
 const CH_RANGE = /章节范围[：:]\s*第\s*(\d+)\s*[-–—~至]\s*(\d+)\s*章/;
+const TITLE_CH_RANGE = /[（(]\s*第?\s*(\d+)\s*[-–—~～至]\s*第?\s*(\d+)\s*章\s*[）)]/;
 const ARC_ROW = /^\|\s*第?\s*(\d+)\s*章?\s*\|/;
 const UNIT_ID = /(?<![A-Za-z0-9_-])([A-Za-z]\d+-\d+|U\d+)(?![A-Za-z0-9_-])/;
 
@@ -60,6 +62,7 @@ function isUnitCard(section) {
   return (
     section.title.includes('剧情单元') ||
     section.title.includes('段剧情') ||
+    PLAIN_UNIT_TITLE.test(section.title) ||
     section.lines.some((line) => CH_RANGE.test(line))
   );
 }
@@ -94,13 +97,21 @@ function unitForChapter(sections, chapter) {
     if (section.status === '已退役' || !section.unit || !isUnitCard(section)) {
       continue;
     }
+    let matchedLine = false;
     for (const line of section.lines) {
       const found = CH_RANGE.exec(line);
       if (found) {
+        matchedLine = true;
         if (Number(found[1]) <= chapter && chapter <= Number(found[2])) {
           return section.unit;
         }
         break;
+      }
+    }
+    if (!matchedLine) {
+      const titleRange = TITLE_CH_RANGE.exec(section.title);
+      if (titleRange && Number(titleRange[1]) <= chapter && chapter <= Number(titleRange[2])) {
+        return section.unit;
       }
     }
   }
@@ -205,6 +216,13 @@ function parse(text) {
         }
       }
     }
+    if (section.unit === null && section.scope === null) {
+      const plainMatch = PLAIN_UNIT_TITLE.exec(section.title);
+      if (plainMatch && (TITLE_CH_RANGE.test(section.title) || section.lines.some((line) => CH_RANGE.test(line)))) {
+        section.unit = plainMatch[1];
+        section.kind = '单元级';
+      }
+    }
   }
 
   const stack = [];
@@ -248,6 +266,10 @@ function unitChapterRange(sections, unit) {
         if (found) {
           return [Number(found[1]), Number(found[2])];
         }
+      }
+      const titleRange = TITLE_CH_RANGE.exec(section.title);
+      if (titleRange) {
+        return [Number(titleRange[1]), Number(titleRange[2])];
       }
     }
   }

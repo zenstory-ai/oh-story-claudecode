@@ -1882,7 +1882,7 @@ function main(argv = process.argv.slice(2)) {
   const args = parseCliArgs(argv);
   if (args.help) {
     process.stdout.write(
-      'usage: node author_memory_commit.js {init,commit,record,query,migrate,check} --workspace DIR [--book-root DIR] [--book NAME] [--input FILE] [--kind KIND ...] [--strict]\n'
+      'usage: node author_memory_commit.js {init,commit,record,query,migrate,check} --workspace DIR [--book-root DIR] [--book NAME] [--input FILE] [--kind KIND ...] [--genre GENRE] [--workflow WORKFLOW] [--strict]\n'
     );
     return 0;
   }

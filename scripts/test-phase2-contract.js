@@ -486,6 +486,74 @@ try {
     assert.strictEqual(importedRes.status, 0, `${label}: ${importedRes.stdout}${importedRes.stderr}`)
   }
 
+  // 别名解析与双男主性别向最高优先层回归
+  const aliasCases = [
+    ['题材：宫斗宅斗', '题材：宅斗宫斗（别名：宫斗宅斗）'],
+    ['题材：豪门霸总 双男主', '题材：双男主'],
+    ['题材：甜宠 / 纯爱', '题材：双男主（别名：纯爱）'],
+    ['题材：总裁豪门 ABO', '题材：双男主（别名：ABO）'],
+    ['题材：言情/脑洞/豪门霸总/弹幕/甜宠', '题材：脑洞设定流（别名：脑洞）'],
+    ['题材：言情/学霸/校园/甜宠', '题材：校园青春暗恋（别名：校园）'],
+    ['题材：病娇/豪门霸总/双男主/甜宠/暗恋', '题材：双男主'],
+  ]
+  for (const [idx, [genreLine, expectedEv]] of aliasCases.entries()) {
+    const res = run(writeCase(`genre-alias-${idx}`, validSettings({ genre: genreLine }), validOutline()), ['--strict'])
+    assert.strictEqual(res.status, 0, `${genreLine}: ${res.stdout}${res.stderr}`)
+    const gchk = res.report.checks.find((c) => c.id === 'phase2.genre-reference-declared')
+    assert.strictEqual(gchk.evidence, expectedEv)
+  }
+
+  // BG 言情带「纯爱」标签不得被误劫持进「双男主」
+  const bgPureLove = run(writeCase('bg-pure-love', validSettings({ genre: '题材：言情/虐恋/纯爱' }), validOutline()), ['--strict'])
+  assert.strictEqual(bgPureLove.status, 0, bgPureLove.stdout + bgPureLove.stderr)
+  assert.strictEqual(
+    bgPureLove.report.checks.find((c) => c.id === 'phase2.genre-reference-declared').evidence,
+    '题材：追妻火葬场（别名：虐恋）'
+  )
+
+  // 兼容 题材与大纲.md 命名双轨 + 平台提示语含「点众」+ 付费点兼容无「末」字 + 所有检查项文件名为 题材与大纲.md
+  const altDir = path.join(tmpRoot, 'alt-settings-filename')
+  fs.mkdirSync(altDir, { recursive: true })
+  fs.writeFileSync(path.join(altDir, '题材与大纲.md'), validSettings({ platform: '点众', paywall: '付费点：第 4 节' }), 'utf8')
+  fs.writeFileSync(path.join(altDir, '小节大纲.md'), validOutline(), 'utf8')
+  const altRes = run(altDir, ['--strict'])
+  assert.strictEqual(altRes.status, 0, altRes.stdout + altRes.stderr)
+  assert.match(
+    altRes.report.checks.find((c) => c.id === 'phase2.platform-declared').expected,
+    /点众/
+  )
+  assert.match(
+    altRes.report.checks.find((c) => c.id === 'phase2.paywall-position-ratio').evidence,
+    /按目标字数/
+  )
+  for (const chk of altRes.report.checks) {
+    assert(!chk.file.includes('设定.md'), `expected 题材与大纲.md instead of 设定.md in ${chk.id}: ${chk.file}`)
+  }
+
+  // 目标字数严重前倾时（节数 3/8=38% 正常，但前 3 节目标字数占 5600/8000=70% > 55%）应触发 paywall-position-ratio 软提醒
+  const skewedRows = [
+    ['开局', '冲突开场', '紧张', '卡点1', '2000'],
+    ['铺垫', '矛盾升级', '压抑', '卡点2', '1800'],
+    ['卡点', '反转前夜', '蓄势', '亮牌（付费点）', '1800'],
+    ['反击', '首轮打脸', '解气', '卡点4', '500'],
+    ['升级', '二次反杀', '爽感', '卡点5', '500'],
+    ['反转', '真相揭晓', '震撼', '卡点6', '500'],
+    ['高潮', '彻底清算', '痛快', '卡点7', '500'],
+    ['结尾', '硬动作收刀', '余韵', '转身离开', '400'],
+  ]
+  const skewedOutline = [
+    '# 小节大纲',
+    `| ${headers.join(' | ')} |`,
+    `| ${headers.map(() => '---').join(' | ')} |`,
+    ...skewedRows.map((row) => `| ${row.join(' | ')} |`),
+    '',
+  ].join('\n')
+  const skewedPaywall = assertSoftOnly(
+    writeCase('skewed-paywall-target-words', validSettings({ paywall: '付费点：第 3 节末' }), skewedOutline),
+    'phase2.paywall-position-ratio'
+  )
+  assert.match(skewedPaywall.normal.report.soft_warnings[0].evidence, /按目标字数 5600\/8000 约 70%/)
+
   const invalidInvocation = spawnSync(process.execPath, [verifier, '--unknown'], {
     cwd: repoRoot,
     encoding: 'utf8',

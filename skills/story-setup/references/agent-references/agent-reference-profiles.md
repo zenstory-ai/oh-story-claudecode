@@ -26,7 +26,7 @@
 | [flow-outline.md](flow-outline.md) | 排或审长篇细纲、黄金三章、钩子与悬念反转节奏 |
 | [flow-drafting.md](flow-drafting.md) | 核对长篇正文笔法、竖屏网感、对话与爽点围观分层 |
 | [benchmark-recall.md](benchmark-recall.md) | 有外部对标或任务包点名召回时读；无对标时不读 |
-| [long-quality.md](long-quality.md) | 黄金三章、连载节奏、读者契约与终局储备审查 |
+| [long-quality.md](long-quality.md) | 黄金三章、连载节奏、读者期待与后手储备审查 |
 
 Long profile 禁止读取 `short-*` 文件，不得采用“6 章”“每节 500–800 字”“每两节一钩”“全文 70–85% 必须高潮”等短篇默认口径。
 
@@ -37,10 +37,10 @@ Long profile 禁止读取 `short-*` 文件，不得采用“6 章”“每节 50
 | [short-quality.md](short-quality.md) | 设计或审查短篇导语冷开场、付费卡点、连环反击/反转节奏与明账清算收尾 |
 | [short-deslop.md](short-deslop.md) | 短篇写作、去味或审查时的卖点保护与长篇默认规则覆盖 |
 
-Short profile 禁止读取 `long-*`、`flow-*`、`benchmark-recall.md` 或 `genre-styles/*`；不得把卷级、日更或跨十几章指标当硬门槛。
+Short profile 禁止读取 `long-*`、`flow-*`、`benchmark-recall.md` 或 `genre-styles/*`（长篇流派包）；不得把卷级、日更或跨十几章指标当硬门槛。
 
-## 长篇流派包索引（Long profile 按书只读命中 1 份）
+## 长篇流派包索引（Long profile 按书只读命中 1 份，共 22 份）
 
-- 男频：[都市脑洞系统](genre-styles/都市脑洞系统.md)、[都市日常神豪](genre-styles/都市日常神豪.md)、[都市高武异能](genre-styles/都市高武异能.md)、[传统玄幻仙侠](genre-styles/传统玄幻仙侠.md)、[玄幻脑洞反套路](genre-styles/玄幻脑洞反套路.md)、[历史架空权谋](genre-styles/历史架空权谋.md)、[末世规则科幻](genre-styles/末世规则科幻.md)、[悬疑灵异](genre-styles/悬疑灵异.md)、[西幻游戏同人](genre-styles/西幻游戏同人.md)
-- 女频与双男主：[现言脑洞快穿](genre-styles/现言脑洞快穿.md)、[豪门虐恋追妻](genre-styles/豪门虐恋追妻.md)、[古言宅斗重生](genre-styles/古言宅斗重生.md)、[年代种田经商](genre-styles/年代种田经商.md)、[青春甜宠文娱](genre-styles/青春甜宠文娱.md)、[双男主](genre-styles/双男主.md)
+- 男频：[都市脑洞系统](genre-styles/都市脑洞系统.md)、[都市日常神豪](genre-styles/都市日常神豪.md)、[都市高武异能](genre-styles/都市高武异能.md)、[传统玄幻仙侠](genre-styles/传统玄幻仙侠.md)、[玄幻脑洞反套路](genre-styles/玄幻脑洞反套路.md)、[历史架空权谋](genre-styles/历史架空权谋.md)、[末世规则科幻](genre-styles/末世规则科幻.md)、[悬疑灵异](genre-styles/悬疑灵异.md)、[西幻游戏同人](genre-styles/西幻游戏同人.md)、[动漫男频衍生](genre-styles/动漫男频衍生.md)、[官场商战职场](genre-styles/官场商战职场.md)、[男频年代乡村](genre-styles/男频年代乡村.md)
+- 女频与双男主：[现言脑洞快穿](genre-styles/现言脑洞快穿.md)、[豪门虐恋追妻](genre-styles/豪门虐恋追妻.md)、[古言宅斗重生](genre-styles/古言宅斗重生.md)、[幻想言情仙侠](genre-styles/幻想言情仙侠.md)、[女频年代军婚](genre-styles/女频年代军婚.md)、[年代种田经商](genre-styles/年代种田经商.md)、[女频末世天灾囤货](genre-styles/女频末世天灾囤货.md)、[青春甜宠文娱](genre-styles/青春甜宠文娱.md)、[双男主](genre-styles/双男主.md)
 - 冷门兜底：[通用长篇](genre-styles/通用长篇.md)

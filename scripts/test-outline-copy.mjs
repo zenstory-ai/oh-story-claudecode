@@ -336,4 +336,28 @@ fs.readFileSync = function (file, ...args) {
     assert.equal(rSkip.status, 0, rSkip.output);
     assert.ok(rSkip.output.includes("未找到第 3 章小节"), rSkip.output);
   });
+
+  test("33. opening-hook quotes exempted without exempting unquoted narrative", () => {
+    const quoteLine = "这亲我不换了三百八十块存折今天当面点清";
+    const oQuoted = writeFile(
+      "章首引号.md",
+      `### 第 1 章：退亲\n- 章首钩子：“这亲我不换了，三百八十块存折今天当面点清！”\n`
+    );
+    const pQuoted = writeFile(
+      "章首引号正文.md",
+      `# 第1章 退亲\n\n“这亲我不换了，三百八十块存折今天当面点清！”\n她把红本拍在八仙桌上。\n`
+    );
+    const rQuoted = runDetector(["--outline", oQuoted, pQuoted]);
+    assert.equal(rQuoted.status, 0, rQuoted.output);
+    assert.ok(rQuoted.output.includes("登记原话的逐字落地"), rQuoted.output);
+
+    const oNarr = writeFile(
+      "章首叙述.md",
+      `### 第 1 章：退亲\n- 章首钩子：${COPIED}\n`
+    );
+    const pNarr = writeFile("章首叙述正文.md", `# 第1章 退亲\n\n${COPIED}。\n`);
+    const rNarr = runDetector(["--outline", oNarr, pNarr]);
+    assert.equal(rNarr.status, 1, rNarr.output);
+    assert.ok(rNarr.output.includes(COPIED), rNarr.output);
+  });
 });

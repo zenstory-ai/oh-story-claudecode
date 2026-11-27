@@ -103,14 +103,34 @@ function stripCompletionRecord(outline) {
  * 用 `1.` 编号、缩进 `-` 列表或纯文本都能正确提取，不必额外标记。
  */
 function extractAnchors(outline) {
+  const anchors = []
   const m = outline.match(/(?:原样出现的原话|复沓锚句)[^：:\n]*[：:]([\s\S]*?)(?=\n[-*+]\s|\n#{1,6}\s|$)/)
-  if (!m) return []
-  return m[1]
-    .split("\n")
-    // 去掉列表符号与「点N：」这类落点前缀，只留原话本身
-    .map((line) => line.replace(/^\s*[-*+]?\s*(?:\d+[.、)]\s*)?(?:点\s*\d+\s*[：:])?/, ""))
-    .map((line) => hanOnly(line))
-    .filter((a) => a.length >= 2)
+  if (m) {
+    for (const line of m[1].split("\n")) {
+      // 去掉列表符号与「点N：」这类落点前缀，只留原话本身
+      const cleaned = hanOnly(line.replace(/^\s*[-*+]?\s*(?:\d+[.、)]\s*)?(?:点\s*\d+\s*[：:])?/, ""))
+      if (cleaned.length >= 2) anchors.push(cleaned)
+    }
+  }
+  // 细纲「章首钩子 / 章尾钩子」字段若预设具体原话（如引号内台词/短信/面板句），允许落地不误判照搬；
+  // 章首钩子只放行引号内台词原话，不放行无引号长叙述，避免把开篇成品叙述段顺手照抄。
+  const hookRe = /^\s*[-*+]\s*\*{0,2}章([首尾])钩子\*{0,2}\s*[：:]\s*(.+)$/gm
+  let hm
+  while ((hm = hookRe.exec(outline)) !== null) {
+    const kind = hm[1]
+    const rawHook = hm[2]
+    const quoted = rawHook.match(/[“「『"【][^”」』"】\n]{2,}[”」』"】]/g)
+    if (quoted) {
+      for (const q of quoted) {
+        const cleaned = hanOnly(q)
+        if (cleaned.length >= 2) anchors.push(cleaned)
+      }
+    } else if (kind === '尾') {
+      const cleaned = hanOnly(rawHook)
+      if (cleaned.length >= 2 && cleaned.length <= 45) anchors.push(cleaned)
+    }
+  }
+  return [...new Set(anchors)]
 }
 
 /**
@@ -284,8 +304,12 @@ function checkOne(proseFile, explicitOutline) {
     outline = slice
   }
 
-  // 正文去掉标题行后比对
-  const P = hanOnly(prose.replace(/^#.*$/gm, ''))
+  // 正文去掉标题行（含 `#` 标题与无 `#` 纯文本章标题）后比对
+  const P = hanOnly(
+    prose
+      .replace(/^#.*$/gm, '')
+      .replace(/^[ \t]*第[0-9０-９零一二三四五六七八九十百千万两]+章(?:[ \t　：:][^\n]*)?$/gm, '')
+  )
   const O = hanOnly(stripCompletionRecord(outline))
   if (P.length < MIN_RUN || O.length < MIN_RUN) return 0
 
@@ -349,7 +373,7 @@ function checkOne(proseFile, explicitOutline) {
     : `逐条对照原文判断：确属把细纲叙述搬进正文就重写——细纲只锁功能与结果，句子在正文现场写；系统面板、誓词、案卷原话、固定专名等功能性重合可保留。每条都要有结论，不为归零机械改写。保留项由主会话补进细纲「原样出现的原话」——子代理只重写正文或标 \`[需复核]\` 交回，不改大纲细纲。`
   const out = [
     `=== ${isShort ? '小节大纲' : '细纲'}照搬检测（${path.basename(proseFile)}）===`,
-    `正文 ${P.length} 字，与 ${path.basename(outlineFile)} 连续重合 >${MIN_RUN - 1} 字的片段 ${hits.length} 处，共 ${copied} 字（${rate}%）。`,
+    `去标点正文 ${P.length} 字（按汉字比对），与 ${path.basename(outlineFile)} 连续重合 >${MIN_RUN - 1} 字的片段 ${hits.length} 处，共 ${copied} 字（${rate}%）。`,
     guidance,
   ]
   hits

@@ -19,20 +19,20 @@ const CSV_COLUMNS = [
 ];
 const MAX_HEADING_CHARS = 50;
 const MAX_VOLUME_HEADING_CHARS = 30;
-const HEADING_PREFIX = "^\\s*(?:#{1,6}\\s+)?";
+const HEADING_PREFIX = "^\\s*(?:#{1,6}\\s+)?(?:正文(?:卷)?\\s+)?";
 const HEADING_SEP = "[\\s:：、.．\\-—【《「（(]";
 const NUMBER = "〇零一二三四五六七八九十百千万两0-9";
 const VOLUME_RE = new RegExp(
-  `${HEADING_PREFIX}(?:第(?<number>[${NUMBER}]+)(?:卷|部(?!分))(?=$|${HEADING_SEP})|卷(?<cn_number>[${NUMBER}]+)(?=$|${HEADING_SEP}))(?<title>.*)$`
+  `${HEADING_PREFIX}(?:第\\s*(?<number>[${NUMBER}]+)\\s*(?:卷|部(?!分))(?=$|${HEADING_SEP})|卷\\s*(?<cn_number>[${NUMBER}]+)(?=$|${HEADING_SEP}))(?<title>.*)$`
 );
 const COMBINED_RE = new RegExp(
-  `${HEADING_PREFIX}第(?<volume>[${NUMBER}]+)(?:卷|部(?!分))` +
+  `${HEADING_PREFIX}第\\s*(?<volume>[${NUMBER}]+)\\s*(?:卷|部(?!分))` +
   `(?:\\s+|《(?<vol_title>[^》\\n]{1,16})》\\s*)` +
-  `第(?<chapter>[${NUMBER}]+)` +
+  `第\\s*(?<chapter>[${NUMBER}]+)\\s*` +
   `(?:章(?!至[${NUMBER}]+章)(?<title>.*)|[回节](?<title_rs>$|(?=${HEADING_SEP}).*))$`
 );
 const CHAPTER_RE = new RegExp(
-  `${HEADING_PREFIX}第(?<number>[${NUMBER}]+)` +
+  `${HEADING_PREFIX}第\\s*(?<number>[${NUMBER}]+)\\s*` +
   `(?:章(?<title>.*)|[回节](?<title_rs>$|(?=${HEADING_SEP}).*))$`
 );
 const ENGLISH_RE = new RegExp(`${HEADING_PREFIX}Chapter\\s+(?<number>[0-9]+)\\b(?<title>.*)$`, "i");
@@ -276,7 +276,30 @@ function headingCandidates(lines) {
       });
     }
   }
-  return explicit.length ? explicit : numericCandidates;
+  if (!explicit.length) return numericCandidates;
+  if (!numericCandidates.length) return explicit;
+  // Preserve mixed-format numeric headings (e.g. Chapter 3 -> 4. 标题) only when they
+  // continue the explicit numbering sequence without colliding with existing chapter numbers.
+  const explicitNumbers = new Set(
+    explicit.map((item) => item.number_value).filter((n) => n !== null && n !== undefined)
+  );
+  const merged = [...explicit];
+  for (const cand of numericCandidates) {
+    if (cand.number_value === null || cand.number_value === undefined) continue;
+    if (explicitNumbers.has(cand.number_value)) continue;
+    let prev = null;
+    for (const item of merged) {
+      if (item.line < cand.line && item.number_value !== null && item.number_value !== undefined) {
+        if (!prev || item.line > prev.line) prev = item;
+      }
+    }
+    if (prev && cand.number_value === prev.number_value + 1) {
+      merged.push(cand);
+      explicitNumbers.add(cand.number_value);
+    }
+  }
+  merged.sort((a, b) => a.line - b.line);
+  return merged;
 }
 
 function identityKey(candidate) {
@@ -734,8 +757,8 @@ function printHelp() {
     "Build the mechanical, content-addressed chapter index.\n\n" +
     "options:\n" +
     "  --source SOURCE            Source novel text path\n" +
-    "  --output OUTPUT            Output chapter_index.csv path\n" +
-    "  --locator-path PATH        Relative locator path under 原文/\n" +
+    "  --output OUTPUT            Output chapter_index.csv path (default expected by manage_analysis_run.js: <root>/chapter_index.csv)\n" +
+    "  --locator-path PATH        Locator path under 原文/ (e.g. 原文.txt or 原文/原文.txt)\n" +
     "  --rebuild                  Explicitly rebuild an existing index\n" +
     "  --fold-prologue            merge 楔子/序章/第0章 before the first numbered chapter into it\n" +
     "  --allow-single-chapter     treat unchaptered source text as a single chapter when user insists\n" +
@@ -822,8 +845,18 @@ function main(argv = process.argv.slice(2)) {
     }
     const raw = fs.readFileSync(args.source);
     const sourceHash = sha256(raw);
-    const locatorPath = (args.locatorPath || `原文/${path.basename(args.source)}`).replace(/\\/g, "/");
-    if (!locatorPath.startsWith("原文/") || locatorPath.split("/").includes("..")) {
+    let locatorPath = (args.locatorPath || `原文/${path.basename(args.source)}`).replace(/\\/g, "/").trim();
+    if (locatorPath.startsWith("./")) {
+      locatorPath = locatorPath.slice(2);
+    }
+    const isAbsoluteOrDrive = locatorPath.startsWith("/") || /^[A-Za-z]:\//.test(locatorPath);
+    if (!locatorPath || isAbsoluteOrDrive || locatorPath.split("/").includes("..")) {
+      throw new Error("locator_path_must_stay_under_original");
+    }
+    if (!locatorPath.startsWith("原文/")) {
+      locatorPath = `原文/${locatorPath}`;
+    }
+    if (locatorPath === "原文/" || locatorPath.split("/").includes("..")) {
       throw new Error("locator_path_must_stay_under_original");
     }
     if (existsPath(args.output) && !isFile(args.output)) {

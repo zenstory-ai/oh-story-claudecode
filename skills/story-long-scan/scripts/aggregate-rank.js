@@ -36,7 +36,7 @@ function localDay(stamp) {
 }
 
 const OWN_OUTPUT_PREFIXES = ["扫榜聚合", "选题决策", "短篇扫榜结论"];
-const SHORT_PLATFORMS = new Set(["点众", "黑岩", "知乎盐言", "盐言", "番茄短篇", "七猫短篇"]);
+const SHORT_PLATFORMS = new Set(["点众", "黑岩", "知乎盐言", "盐言", "番茄短篇", "番茄短故事", "七猫短篇"]);
 const METRIC_PRIORITY = ["在读", "热度", "收藏", "赞同", "点赞", "阅读", "月票", "总推荐", "榜单值", "营养液", "积分", "评分"];
 // 每榜条目少的小平台，样本门槛默认按这里的本数；其余平台默认 DEFAULT_SPARSE。
 const SMALL_PLATFORM_SPARSE = { "刺猬猫": 10 };
@@ -687,7 +687,7 @@ function renderMarkdown(result) {
     out.push("");
 
     if (p.heat) {
-      out.push(`- 热度分布（${p.metric}，${p.heat.known} 本有值）：P25 ${fmtNum(p.heat.p25)} / 中位 ${fmtNum(p.heat.p50)} / P75 ${fmtNum(p.heat.p75)} / 最高 ${fmtNum(p.heat.max)}`);
+      out.push(`- 热度分布（${p.metric}，${p.heat.known} 本有值）：常见低位 ${fmtNum(p.heat.p25)} / 中位 ${fmtNum(p.heat.p50)} / 常见高位 ${fmtNum(p.heat.p75)} / 最高 ${fmtNum(p.heat.max)}`);
     }
     if (p.perGenreCap) {
       out.push(`- 每题材按上限取前 ${p.perGenreCap.top} 本（${p.perGenreCap.lists.join("、")}）：本数和占比是采样结果，不代表题材大小，样本列标「采样」不算够；同方向够不够数细分梗或标签的本数，题材冷热看热度中位`);

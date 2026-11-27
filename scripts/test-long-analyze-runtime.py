@@ -1468,8 +1468,114 @@ def main() -> int:
     test_plan_carries_every_dispatch_field()
     test_plot_point_floor_scales_with_chapter_length()
     test_plan_chapter_window()
+    test_subcommand_help_outputs_flags()
+    test_mixed_headings_relation_col_and_onomatopoeia()
+    test_locator_path_normalization_and_prose_stats_index_hint()
     print("OK: single-state long-analyze runtime regressions passed")
     return 0
+
+
+def test_locator_path_normalization_and_prose_stats_index_hint() -> None:
+    with tempfile.TemporaryDirectory(prefix="long-track7c-") as temporary:
+        area = Path(temporary)
+        book = area / "定位测试书"
+        (book / "原文").mkdir(parents=True)
+        src = book / "原文" / "原文.txt"
+        src.write_text(
+            "第1章 起步\n雨夜点灯，他推开了门。\n\n第2章 转折\n“你来了？”她问。\n",
+            encoding="utf-8",
+        )
+        # 1) Bare relative --locator-path without 原文/ prefix auto-normalizes under 原文/
+        out_csv = book / "chapter_index.csv"
+        res_bare = run(INDEX, "--source", src, "--output", out_csv, "--locator-path", "原文.txt")
+        require(res_bare.returncode == 0, f"相对 --locator-path 应自动补 原文/ 前缀：{res_bare.stdout}{res_bare.stderr}")
+        idx_rows = rows(out_csv)
+        require(idx_rows[0]["source_locator"].startswith("原文/原文.txt:L"), f"locator 前缀异常：{idx_rows[0]}")
+
+        # 2) Path traversal & absolute paths must still be rejected
+        for bad in ("../outside.txt", "原文/../escape.txt", "/etc/passwd"):
+            res_bad = run(INDEX, "--source", src, "--output", book / "bad.csv", "--locator-path", bad)
+            require(res_bad.returncode != 0, f"越界 --locator-path 必须拒绝({bad})：{res_bad.stdout}")
+            bad_payload = json.loads(res_bad.stdout)
+            require(bad_payload.get("error") == "locator_path_must_stay_under_original", f"错误码异常({bad})：{bad_payload}")
+
+        # 3) prose-stats --root missing <root>/chapter_index.csv gives clear author_message & hints meta/ fallback + supports --index
+        meta_dir = book / "meta"
+        meta_dir.mkdir(parents=True)
+        meta_csv = meta_dir / "chapter_index.csv"
+        out_csv.replace(meta_csv)
+        res_missing = run(MANAGE, "prose-stats", "--root", book, "--chapters", "1-2")
+        require(res_missing.returncode != 0, f"缺根目录索引应非零退出：{res_missing.stdout}")
+        miss_payload = json.loads(res_missing.stdout)
+        require(miss_payload.get("error") == "chapter_index_required", f"错误码异常：{miss_payload}")
+        require("chapter_index.csv" in (miss_payload.get("author_message") or "") and "--index" in (miss_payload.get("author_message") or ""), f"缺少清晰定位提示：{miss_payload}")
+
+        res_custom = run(MANAGE, "prose-stats", "--root", book, "--index", meta_csv, "--chapters", "1-2", "--format", "json")
+        require(res_custom.returncode == 0, f"prose-stats --index 应成功：{res_custom.stdout}{res_custom.stderr}")
+        custom_payload = json.loads(res_custom.stdout)
+        require(custom_payload.get("ok") is True and len(custom_payload.get("chapters") or []) == 2, f"prose-stats --index 数据异常：{custom_payload}")
+
+
+def test_mixed_headings_relation_col_and_onomatopoeia() -> None:
+    with tempfile.TemporaryDirectory(prefix="long-track4c-") as temporary:
+        area = Path(temporary)
+        # 1) Mixed headings: 序章 + 正文 第1章 + spaced empty 第 2 章 + Chapter 3 + 4. 数字标题
+        book = area / "混排书"
+        (book / "原文").mkdir(parents=True)
+        (book / "原文" / "原文.txt").write_text(
+            "序章 引子\n雨夜开篇。\n\n"
+            "正文 第1章 起步\n风吹过院门，故事从这里开始。\n\n"
+            "第 2 章 空章标题\n\n"
+            "Chapter 3 英文章\n山路尽头亮起一盏灯。\n\n"
+            "4. 数字续接\n天亮时队伍抵达北城。\n",
+            encoding="utf-8",
+        )
+        res = build_index(book)
+        require(res.returncode == 0, f"混排建索引失败：{res.stdout}{res.stderr}")
+        payload = json.loads(res.stdout)
+        require(payload["chapters"] == 5 and payload["empty_chapters"] == 1, f"混排切章异常：{payload}")
+        idx_rows = rows(book / "chapter_index.csv")
+        require([r["source_chapter"] for r in idx_rows] == ["序章", "1", "2", "3", "4"], f"章号错乱：{idx_rows}")
+        require(idx_rows[2]["status"] == "empty", f"带空格空章应标记 empty：{idx_rows[2]}")
+
+        # 2) render_relation_chart.py: header column named `关系`
+        (book / "角色").mkdir(parents=True)
+        (book / "角色" / "角色关系.md").write_text(
+            "| 主体 → 客体 | 关系 |\n|---|---|\n| 陆远 → 陈霜 | 师徒反目 |\n",
+            encoding="utf-8",
+        )
+        chart_res = run(CHART, "--root", book)
+        require(chart_res.returncode == 0, f"关系图生成失败：{chart_res.stdout}{chart_res.stderr}")
+        md_text = (book / "人物关系图" / "人物关系图.md").read_text(encoding="utf-8")
+        require("师徒反目" in md_text, f"表头「关系」未读取真实边标签：{md_text}")
+
+        # 3) manage_analysis_run.js prose-stats: quoted onomatopoeia skipped + 1-based pos + markdown heading stripped
+        sample = area / "拟声.txt"
+        sample.write_text("门铃“滴”地响了一声。\n他推开门。\n“你来了？”\n", encoding="utf-8")
+        ps = run(MANAGE, "prose-stats", "--file", sample, "--format", "json")
+        require(ps.returncode == 0, f"prose-stats 失败：{ps.stdout}{ps.stderr}")
+        ps_data = json.loads(ps.stdout)
+        require(ps_data["aggregate"]["first_dialogue_pos"] > 10, f"双引号拟声词不应被误计为首句对话：{ps_data}")
+
+        lead_dialog = area / "首句对话.txt"
+        lead_dialog.write_text("「开门！」\n他转身走了。\n", encoding="utf-8")
+        ps2 = run(MANAGE, "prose-stats", "--file", lead_dialog, "--format", "json")
+        require(ps2.returncode == 0, f"prose-stats 首句对话失败：{ps2.stdout}{ps2.stderr}")
+        ps2_data = json.loads(ps2.stdout)
+        require(ps2_data["aggregate"]["first_dialogue_pos"] == 1, f"首句对话字位应为 1-based 第 1 字：{ps2_data}")
+
+
+def test_subcommand_help_outputs_flags() -> None:
+    prose_help = run(MANAGE, "prose-stats", "--help")
+    assert prose_help.returncode == 0, prose_help.stderr
+    assert "--file PATH" in prose_help.stdout, prose_help.stdout
+    assert "--format json|markdown" in prose_help.stdout, prose_help.stdout
+    plan_help = run(MANAGE, "plan", "--help")
+    assert plan_help.returncode == 0, plan_help.stderr
+    assert "--expected-chapters N" in plan_help.stdout, plan_help.stdout
+    split_help = run(MANAGE, "split", "--help")
+    assert split_help.returncode == 0, split_help.stderr
+    assert "[--at CHAPTER]" in split_help.stdout, split_help.stdout
 
 
 if __name__ == "__main__":

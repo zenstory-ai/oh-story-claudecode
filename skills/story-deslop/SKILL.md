@@ -13,7 +13,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 ## 执行边界
 
 - 未限定范围时完整查表达、用笔、故事三层；用户指定词句、段落或某类问题时只查指定范围。
-- 可直接修表达、恢复已有承接、删无功能冗余或调详略，但须保护伏笔、因果、人物选择、情绪体验与揭露顺序。改变事件、动机、结果或新增成立条件，须先出设计提案获授权；不靠加微动作、粗话或硬造冲突制造「真人感」。
+- 可直接修表达、恢复已有承接、删无功能冗余或调详略，但须保护伏笔、因果、人物选择、情绪体验与揭露顺序。改变事件、动机、结果或新增成立条件，须先出设计提案获授权；不靠加微动作、无功能材质/服饰/天气声效贴纸或硬造冲突制造「真人感」。
 - 文风裁决只管表达，不改事实与信息边界。准确直写情绪、角色算账判断、带立场叙述与功能性停顿均可保留，不机械套「只展示不说明」、固定句长或删减率。
 - 只要求检测时只出诊断、不改正文；说「去AI味」「这篇太AI了」按改稿处理（表达与用笔直接改，故事层缺口给选项待授权）。作者报告用白话、原文位置与读感后果，不写检测类别名或脚本字段。
 - 长篇项目（有 `正文/` 与 `追踪/`）涉及事件、关系、人物所知或结果修改时，即使已授权也带诊断转 `/story-long-write`「修改第X章」执行以同步追踪；本流程只改表达、用笔与已有依据的承接。
@@ -25,7 +25,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 由正文路径定书目录与篇幅：单个 `正文.md` 为短篇，`正文/` 下逐章文件为长篇（优先作者/项目明确说明）。短篇必读 [references/short-deslop.md](references/short-deslop.md)，其规则覆盖表优先于通用默认值。
 
-读取 [references/deslop-guide.md](references/deslop-guide.md)（含表达/用笔/故事三层方法、deslop-guide.md「按检测类别或问题限定范围」与 23 类脚本信号索引）；需核对具体词条时再查 [references/banned-words.md](references/banned-words.md)。通读本次正文并按需查相关前文/已定设计，不整读无关全书；资料缺失标明未知。多章时逐章跑完 Phase 1–4 再进下一章。
+读取 [references/deslop-guide.md](references/deslop-guide.md)（含表达/用笔/故事三层方法、deslop-guide.md「按检测类别或问题限定范围」与 28 类脚本信号索引）；需核对具体词条时再查 [references/banned-words.md](references/banned-words.md)。通读本次正文并按需查相关前文/已定设计，不整读无关全书；资料缺失标明未知。多章时逐章跑完 Phase 1–4 再进下一章。
 
 本地正文先跑确定性预检（从本 skill 根执行，正文用绝对路径；`--mode=auto` 对 `正文.md` 自动走 short 模式，非 `正文.md` 的短篇文件传 `--mode=short`）：
 
@@ -55,7 +55,7 @@ node scripts/check-ai-patterns.js --check --fail-on=review_required --mode=auto 
 
 ### Phase 3：按授权改稿
 
-> 宿主与版本：只查当前宿主的 `narrative-writer`：Claude `.claude/agents/{agent}.md`（`subagent_type`）、OpenCode `.opencode/agents/{agent}.md`（`subagent` 的 `agent`）、Codex `.codex/agents/{agent}.toml`（`agent_type`）、Antigravity `.agents/agents/agent-name/agent.md`（`invoke_subagent` + `TypeName`）、ZCode 插件注册角色（`Agent` 按当前 schema）。先读项目根 `.story-deployed` 的 `agents_version`：与 `agents_version: 46` 不一致时照常检查并 spawn，用一句白话提示更新（小于 46 提示跑 `/story-setup` 后新开会话，大于 46 提示先更新插件/仓库、勿旧版降级覆盖）。仅当前宿主角色缺失或不可调用时降级直接改，白话告诉作者「这次由我直接改」，不加技术备注行。
+> 宿主与版本：只查当前宿主的 `narrative-writer`：Claude `.claude/agents/{agent}.md`（`subagent_type`）、OpenCode `.opencode/agents/{agent}.md`（`subagent` 的 `agent`）、Codex `.codex/agents/{agent}.toml`（`agent_type`）、Antigravity `.agents/agents/agent-name/agent.md`（`invoke_subagent` + `TypeName`）、ZCode 插件注册角色（`Agent` 按当前 schema）。先读项目根 `.story-deployed` 的 `agents_version`：与 `agents_version: 47` 不一致时照常检查并 spawn，用一句白话提示更新（小于 47 提示跑 `/story-setup` 后新开会话，大于 47 提示先更新插件/仓库、勿旧版降级覆盖）。仅当前宿主角色缺失或不可调用时降级直接改，白话告诉作者「这次由我直接改」，不加技术备注行。
 
 改文件前先备份原文到书内 `.story/work/去味原稿/{YYYYMMDD}_{原文件名}`，供 Phase 4 对照与作者撤回。已在 `narrative-writer` 内或宿主无可用角色时直接改；否则派当前宿主 `narrative-writer` 执行（方法由写手按自身读取表加载，不抄规则正文）：
 

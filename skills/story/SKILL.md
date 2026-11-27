@@ -14,7 +14,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | 用户意图 | 关键词示例 | 路由到 |
 |---|---|---|
 | 长篇规划/写作 | 讨论长篇结构、规划剧情、开书、写大纲、补细纲、长篇、连载 | `/story-long-write` |
-| 发布准备 | 发布资料、建书表单、平台书名简介标签、建书资料 | `/story-publish` |
+| 发布准备 | 发布资料、建书表单、平台书名简介标签、建书资料、上架准备 | `/story-publish` |
 | 写短篇 | 短篇、盐言、七猫短篇、点众、一万字 | `/story-short-write` |
 | 长篇拆文 | 拆文、分析这本书、黄金三章 | `/story-long-analyze` |
 | 短篇拆文 | 拆短篇、分析这个故事 | `/story-short-analyze` |
@@ -27,8 +27,8 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | 环境部署 | 准备写书、搭环境、初始化 | `/story-setup` |
 | 浏览器操控 | 浏览器、抓取、登录态 | `/browser-cdp` |
 | 导入小说 | 导入、反向解析、导入小说、把我的书导进来 | `/story-import` |
-| 工作台 | dashboard、工作台、看拆文库、浏览项目文件、打开项目面板 | 见下方「Dashboard 工作台」 |
-| 检查/更新版本 | 检查更新、有新版本吗、升级、更新工具箱 | 见下方「版本更新检查」 |
+| 工作台 | dashboard、工作台、看拆文库、浏览项目文件、打开项目面板 | 见下方「工作台与版本更新」 |
+| 检查/更新版本 | 检查更新、有新版本吗、升级、更新工具箱 | 见下方「工作台与版本更新」 |
 | 切换/列出书目 | 切书、换书、列出我的书、我在写哪几本、切换项目 | 见下方「多书切换」 |
 | 管理作者习惯 | 记住我的写作习惯、作者画像、待确认偏好、忘掉这个偏好 | 见下方「作者习惯管理」 |
 | 查故事资料 | 查角色、查伏笔、查进度、查设定、什么状态、写到哪了 | 见下方「查询」 |
@@ -48,17 +48,13 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ## 书目录判定
 
-本文件的"书目录""当前书"均按此查找：
+本文件的"书目录""当前书"按此查找：
 
-1. 项目根有 `.active-book` 且指向项目内一个存在的目录 → 就是它。
-2. 否则在项目根往下最多 4 层找，跳过以 `.` 开头的目录、`node_modules`、`拆文库/`、`对标/`：
-   - 含 `追踪/`、`正文/` 子目录或 `正文.md` 文件的目录（与写作 hook 同一口径）；
-   - 刚定完方向、还没有正文的长篇：含 `设定/题材定位.md` 的目录；
-   - 构思中、还没有正文的短篇：同时有 `设定.md` 与 `小节大纲.md` 的目录。
-   找到多本又没有 `.active-book` 时，需要"当前书"就问作者是哪本（做法同「多书切换」）。
-3. 篇幅：有 `正文/` 或 `设定/` 子目录的是长篇，有 `正文.md` 或 `设定.md` 文件的是短篇。
+1. 项目根 `.active-book` 指向项目内现有目录即当前书。
+2. 否则从项目根往下最多 4 层找（跳过 `.` 开头目录、`node_modules`、`拆文库/`、`对标/`），含 `追踪/`、`正文/` 子目录、`正文.md` 文件、`设定/题材定位.md`，或同时含 `设定.md` 与 `小节大纲.md` 的是书目录；找到多本又无 `.active-book` 时问作者选（同「多书切换」）。
+3. 篇幅：有 `正文/` 或 `设定/` 子目录为长篇，有 `正文.md` 或 `设定.md` 为短篇。
 
-没找到任何书目录：创建写作项目时先运行 `/story-setup`；只讨论结构、选题，或要扫榜、拆文时直接路由。找到了：按目标 skill 自己的环境检查继续，需要初始化或补部署时运行 `/story-setup`。
+没找到书目录时：创建写作项目先跑 `/story-setup`；只讨论结构、选题、扫榜或拆文时直接路由。找到书目录后按目标 skill 的环境检查继续，需初始化或补部署时跑 `/story-setup`。
 
 ## 作者习惯管理
 
@@ -102,7 +98,7 @@ cdp_port：{可选：Chrome 调试端口不是 9222 时写}
 
 ### 能不能用助手
 
-> 版本：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 46` 不一致时（标记缺失、字段缺失/非整数、小于或大于 46）**照常按当前宿主角色来源检查并 spawn**，只用一句白话提示作者「查资料助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」；大于 46 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct，按下方一句白话告知作者，不另加技术备注行。
+> 版本：先读取项目根 `.story-deployed` 的 `agents_version`。与本版 `agents_version: 47` 不一致时（标记缺失、字段缺失/非整数、小于或大于 47）**照常按当前宿主角色来源检查并 spawn**，只用一句白话提示作者「查资料助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」；大于 47 时额外提示先更新 oh-story-claudecode，不要用本地旧版 setup 降级覆盖。只有当前宿主角色缺失或不暴露调用能力时才降级 solo/direct，按下方一句白话告知作者，不另加技术备注行。
 
 走助手前只做本端可用性检查：当前不在子代理内、有本端调用工具，且对应角色可用（Claude `.claude/agents/*.md`、OpenCode `.opencode/agents/*.md`、Codex `.codex/agents/*.toml`、Antigravity `.agents/agents/agent-name/agent.md`；ZCode 查插件注册的同名角色，不要求 `.zcode/agents`）→ 可尝试 spawn。Antigravity 用 `invoke_subagent` + 同名 `TypeName`，ZCode 用 `Agent` 按实际 schema 派发，不跨端误判。任一不满足或返回 unknown agent，则降级处理：
 
@@ -121,47 +117,7 @@ cdp_port：{可选：Chrome 调试端口不是 9222 时写}
 2. 让用户选择，把所选书的相对路径写入项目根 `.active-book`（覆盖原内容）。
 3. 只发现一本时直接确认为活跃书，无需询问。
 
-## Dashboard 工作台
+## 工作台与版本更新
 
-用户执行 `/story dashboard`，或明确要求打开工作台、查看项目文件时，启动本 skill 的本地 Dashboard：
-
-1. 把**当前工作目录**作为默认工作区；用户明确给出目录时改用该目录。目录必须存在。
-2. 从当前已加载的 `story` skill 目录定位 `scripts/dashboard-server.mjs`，不要硬编码仓库路径、
-   全局 skill 路径或用户主目录。
-3. 检查 `node` 可用后，以长运行进程执行：
-
-   ```bash
-   node "<story-skill-dir>/scripts/dashboard-server.mjs" --root "<workspace>" --open
-   ```
-
-4. 等待输出出现“本机地址”，把完整 URL 回给用户。工具支持后台进程/PTY 时让服务保持运行；
-   无法自动拉起浏览器不算失败，仍返回可点击 URL。
-5. Dashboard 默认只监听 `127.0.0.1`。不要主动增加 `--allow-network`，不要把工作区暴露到
-   局域网或公网。
-
-工作台按自己的规则识别目录，与上方「书目录判定」不同：识别标准 `拆文库/{书名}/`，兼容存量 `拆文库-{书名}/`；写作项目识别同时支持：
-
-- 长篇目录结构：目录内含 `正文/`、`大纲/`、`设定/` 或 `追踪/` 任一普通子目录。
-- 短篇单文件结构：目录内含普通文件 `正文.md` 且同时含 `小节大纲.md` 或 `设定.md`，或构思阶段同时含普通文件 `设定.md` 与 `小节大纲.md`。
-
-符号链接不作为项目标记，只有单个 `正文.md` 或单个 `设定.md` 的资料目录不识别为写作项目。浏览器可编辑 `.md`、`.txt`、`.json`、`.yaml`、`.yml`、`.toml`；保存或确认删除时核对文件内容版本，避免覆盖外部修改。
-
-停止服务时终止对应的 Node 长运行进程即可。若用户只问用法，不要替他启动；告诉用户用 `/story dashboard`（按上方宿主写法替换）。
-
-## 版本更新检查
-
-用户问“有没有新版本”“检查更新”“升级”时执行。**先报告版本，是否安装由用户决定。**
-
-1. **当前版本**：读本 skill 同目录的 `VERSION` 文件；缺失则视为未知。本 skill 在写作项目里（如项目下的 `skills/`、`.agents/skills/`、`.zcode/skills/`）时，读到的是项目副本的版本。
-2. **最新版本**：优先 `gh release view --json tagName,name,url -R zenstory-ai/oh-story-claudecode` 取 `tagName`；无 gh 用 `curl -fsS --max-time 5 https://api.github.com/repos/zenstory-ai/oh-story-claudecode/releases/latest` 取 `.tag_name`（jq 或 grep）。查不到 → 告知"暂时拉不到最新版本，可手动看 [Releases](https://github.com/zenstory-ai/oh-story-claudecode/releases)"，不报错。
-3. **比较**：当前版本已知时，去掉 `v` 前缀按语义版本比较（major.minor.patch）；未知时只展示最新稳定版，不判定是否已最新。`gh release` 默认取 latest 稳定版，不含 pre-release。
-4. **告知**：
-   - 已最新 → 「已是最新版 vX.Y.Z」。
-   - 有新版或当前版本未知 → 展示已知版本与 [Releases](https://github.com/zenstory-ai/oh-story-claudecode/releases)/[CHANGELOG](https://github.com/zenstory-ai/oh-story-claudecode/blob/main/CHANGELOG.md)，有 release notes 时附更新要点，再用宿主可用的提问方式问「现在更新吗？」。选先不 → 不动，告知随时可再来。
-5. **更新**（用户同意后）：按本 skill 目录的位置判断安装方式。
-   - 在插件目录里（路径含 `plugins/`）：Claude Code 跑 `claude plugin marketplace update oh-story-skills` 再跑 `claude plugin update oh-story@oh-story-skills`，重启后生效；ZCode 在 Plugin Management 里刷新市场后更新 `oh-story`。
-   - 用 `npx skills` 装在全局或当前目录：重跑 `npx skills add zenstory-ai/oh-story-claudecode -y -g`（原来装在当前目录的去掉 `-g`）。
-   - 其他安装方式（如 ClawHub）：按原来的方式重装最新版。
-   - 本 skill 在写作项目里：先用上面对应的方式更新安装包，再用新装的包在项目根运行 `/story-setup`，项目里的副本才会换成新版；OpenClaw、Reasonix 和通用文件模式下项目里跑的就是这份旧副本，要用新包手动覆盖项目 `skills/` 下的 14 个 skill 目录。
-
-   更新完提示：已部署过的项目在项目根重跑 `/story-setup` 同步 hooks、agents 和参考资料，然后**新开一个会话**，写作助手才会重新加载。
+- 启动或停止本地 Dashboard 工作台，以及检查/升级工具箱版本时，按需读取 [references/dashboard-and-update.md](references/dashboard-and-update.md) 执行。
+- Dashboard 默认只监听 `127.0.0.1`（不开启局域网监听）；版本更新须先报告版本，经用户同意后再安装。

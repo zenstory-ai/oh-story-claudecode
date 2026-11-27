@@ -27,21 +27,7 @@ metadata: {"openclaw":{"requires":{"bins":["agent-browser"]},"source":"https://g
 node {SKILL_DIR}/scripts/setup-cdp-chrome.js 9222 --detect-only
 ```
 
-输出形如：
-
-```
-CDP_STATUS=ready                        # 已就绪，可直接复用
-CDP_URL=http://127.0.0.1:9222/json/version
-BROWSER=Chrome/148.0.7778.168
-```
-
-或：
-
-```
-CDP_STATUS=needs-setup
-CHROME_RUNNING=yes                      # 用户有 Chrome 在跑，启动会杀掉
-CHROME_PID_COUNT=3
-```
+输出含 `CDP_STATUS=ready`（附 `CDP_URL`、`BROWSER`）或 `CDP_STATUS=needs-setup`（附 `CHROME_INSTALLED=no` 或 `CHROME_RUNNING=yes/no` 与 `CHROME_PID_COUNT`）。
 
 **第二步：根据探测结果分支**
 
@@ -76,7 +62,7 @@ CHROME_PID_COUNT=3
 | `--profile <name>` | 指定来源 profile（默认 `Default`，如 `"Profile 1"`）；显式传入即重建 |
 | `--dry-run` | 打印将执行的步骤，不执行 |
 
-退出码：`0` 成功 / `1` 通用错误 / `2` 用户拒绝（TTY）/ `3` 需同意但缺 `--yes`。
+退出码：`0` 成功 / `1` 通用错误 / `2` 参数错误或用户拒绝（TTY）/ `3` 需同意但缺 `--yes`。
 
 ---
 
@@ -108,58 +94,24 @@ EOF
 
 ## 停止 / 清理
 
-- 关掉 debug Chrome 窗口即可。若窗口无响应，先按 `--user-data-dir` 核验出 debug 实例的 PID 再只结束它：
-  - macOS / Linux：`pgrep -af chrome-debug-profile`
-  - Windows（PowerShell）：`Get-CimInstance Win32_Process | Where-Object CommandLine -like '*chrome-debug-profile*' | Select-Object ProcessId,CommandLine`；没有 PowerShell 的旧系统才用 `wmic process get ProcessId,CommandLine | findstr chrome-debug-profile`
-  核验 PID 后用 `kill -9 {PID}` / `taskkill /F /PID {PID}`，无法核验则停止。**手工清理不得按 Chrome 可执行文件名批量结束进程**；启动脚本仍走上述同意流程。
-- 登录态失效：用 `node {SKILL_DIR}/scripts/setup-cdp-chrome.js 9222 --reset` 重新复制来源 profile，按上方「需要结束 Chrome 时」先 dry-run、征得同意再加 `--yes`。Chrome 127+（尤其 Windows 应用绑定加密或 macOS 钥匙串授权隔离）下若 `--reset` 后仍未带出 Cookie，请用户在已启动的 debug Chrome 窗口里手动登录一次——后续不传 `--reset` 时 `~/chrome-debug-profile` 会持久保留该登录态。
+- 关掉 debug Chrome 窗口即可；无响应时须先按 `--user-data-dir` 核验 debug 实例 PID 再单独结束，**严禁按 Chrome 可执行文件名批量结束进程**：
+  - macOS / Linux：`pgrep -af chrome-debug-profile` → `kill -9 {PID}`
+  - Windows（PowerShell）：`Get-CimInstance Win32_Process | Where-Object CommandLine -like '*chrome-debug-profile*' | Select-Object ProcessId,CommandLine` → `taskkill /F /PID {PID}`
+- 登录态失效：按同意流程跑 `setup-cdp-chrome.js 9222 --reset`；Chrome 127+ 加密未带出 Cookie 时，直接在 debug 窗口登录一次（不传 `--reset` 会持久保留）。
 
----
+## 超时与常见问题
 
-## 长命令加超时
-
-在前台执行耗时的 CDP 命令时，为页面加载和批量采集设置超时，避免单次调用长时间占住会话。
-
-### 超时包装
-
-Windows 用 PowerShell Job 设置超时：
-
-```powershell
-$job = Start-Job { agent-browser --cdp 9222 eval "window.location.replace('https://www.qidian.com/rank/')" }
-Wait-Job $job -Timeout 30 | Out-Null
-if ($job.State -eq 'Running') { Stop-Job $job; Write-Output "⏱ CDP 操作超时（30s），请重试或手动打断" }
-else { Receive-Job $job }
-Remove-Job $job -Force
-```
-
-macOS / Linux 有 `timeout` 时：
+耗时页面加载或批量采集应每页独立加 30s 超时（macOS 默认无 GNU `timeout`，用已有 Node 跨平台包装；Linux 也可用 `timeout 30`）：
 
 ```bash
-timeout 30 agent-browser --cdp 9222 eval "window.location.replace('https://www.qidian.com/rank/')" || echo "⏱ CDP 操作超时（30s），请重试或手动打断"
+node -e 'const {spawnSync}=require("child_process");const r=spawnSync("agent-browser",["--cdp","9222","eval",process.argv[1]],{timeout:30000,stdio:"inherit"});if(r.error?.code==="ETIMEDOUT"){console.error("⏱ CDP 操作超时（30s）");process.exit(124);}process.exit(r.status??1);' "window.location.replace('https://www.qidian.com/rank/')"
 ```
 
-### 已知限制
+持续卡死由用户在宿主按 `ESC` 打断；失败后从断点继续。
 
-| 场景 | 风险 | 缓解 |
-|------|------|------|
-| 页面加载超时 | eval 命令等待永不返回 | 设置 30s 超时，超时后重试 |
-| 大批量数据抓取 | 多页翻页时累计等待过长 | 每页独立超时，失败后从断点继续 |
-| Chrome 进程僵死 | CDP 连接断开但进程未退出 | 先核验 debug profile 对应 PID，只结束该 debug 实例后重连；不得连带普通 Chrome |
-| 网络波动 | 请求挂起无超时 | 超时后自动重试一次 |
-
-持续卡死时，请用户在宿主里手动打断（如 OpenCode、Claude Code 按 `ESC`）。
-
----
-
-## 常见问题
-
-| 问题 | 解决方案 |
-|------|----------|
-| `NEEDS_CONSENT` + 退出码 3 | 按「需要结束 Chrome 时」：先 dry-run 说清会结束几个进程，同意后加 `--yes` 重跑 |
-| `CHROME_INSTALLED=no` 或来源 profile 不存在 | 安装并使用 Chrome 一次；已有其他 profile 时用 `--profile` 指定（会重建，按同意流程） |
-| CDP 端口未监听 | `--detect-only` 再确认；端口被占用就换端口，下游命令一起改（见「换端口」） |
-| 页面跳转到登录页 | `snapshot -i` 找登录按钮并操作 |
-| `eval` 返回 `null` | 检查 localStorage key 名；含引号的 JS 用 `eval -b` 或 `--stdin` |
-| 登录态过期或 `--reset` 后仍掉登录 | 先按同意流程跑 `setup-cdp-chrome.js 9222 --reset`；若因 Chrome 127+ 应用绑定加密仍未带出 Cookie，直接在弹出的 debug Chrome 窗口登录一次（后续不加 `--reset` 会持久保留） |
-| 有多个 Chrome profile | `--profile "Profile 1"` 指定；显式传 `--profile` 会重建，按同意流程 |
-| Chrome 不会启动（30s 超时） | 检查端口冲突；查看 `~/chrome-debug-profile/` 是否损坏；仍不行再按同意流程试 `--reset` |
+| 问题 | 处理 |
+|------|------|
+| `NEEDS_CONSENT`（退出码 3）/ `--reset` / `--profile` | 走同意流程：先 `--dry-run`，同意后加 `--yes` |
+| `CHROME_INSTALLED=no` 或无来源 profile | 安装并登录 Chrome 一次；多 profile 传 `--profile "Profile 1"` |
+| 端口未监听 / 启动 30s 超时 | `--detect-only` 确认；端口冲突就换端口并同步下游；profile 损坏则 `--reset` |
+| 跳转登录页 / `eval` 返回 `null` | `snapshot -i` 操作登录；核对 storage key，复杂 JS 改用 `eval -b` 或 `--stdin` |

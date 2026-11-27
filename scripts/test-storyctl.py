@@ -944,6 +944,123 @@ class FragmentationTests(unittest.TestCase):
             self.assertEqual(cp2_proc.returncode, 0, cp2_proc.stdout + cp2_proc.stderr)
             self.assertEqual(cp2_res["target"], 2350)
 
+    def test_campaign4_readonly_check_without_tracking_and_allow_gap_strict(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="storyctl-c4-") as directory:
+            project = Path(directory)
+            (project / "大纲").mkdir()
+            (project / "正文").mkdir()
+            (project / "大纲/细纲_第001章.md").write_text(
+                "### 第 1 章：试水\n- 字数目标：2000 字\n", encoding="utf-8"
+            )
+            (project / "正文/第001章_试水.md").write_text(
+                "# 第1章 试水\n\n" + "".join(
+                    f"第{i}批货单摆在桌角，他逐项对完数目，在回执联底下签了名。\n" for i in range(1, 75)
+                ),
+                encoding="utf-8",
+            )
+            # 1) 未初始化 _tracking-state.json 时，只读 chapter check 降级放行并给出明确提示
+            completed, result = run_cli("chapter", "check", "--project", str(project), "--chapter", "1")
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            self.assertTrue(result.get("tracking_state_missing"))
+            self.assertIsNone(result["state_revision"])
+
+            # 2) tracking_commit.js init --help 返回 0，非法 schema_version 报出期望版本
+            help_run = subprocess.run(
+                [NODE, str(TRACKING_PATH), "init", "--help"],
+                capture_output=True, text=True, encoding="utf-8",
+            )
+            self.assertEqual(help_run.returncode, 0, help_run.stderr)
+            bad_init = project / "bad_init.json"
+            bad_init.write_text(json.dumps({"schema_version": 4, "book_title": "测试"}), encoding="utf-8")
+            bad_run = subprocess.run(
+                [NODE, str(TRACKING_PATH), "init", "--project", str(project), "--input", str(bad_init)],
+                capture_output=True, text=True, encoding="utf-8",
+            )
+            self.assertNotEqual(bad_run.returncode, 0)
+            self.assertIn("schema_version=1", bad_run.stderr + bad_run.stdout)
+
+            # 3) --allow-gap 跳章提交持久化 skipped_chapters 后，check --strict 通过且不刷告警
+            _init_tracking(project)
+            draft5 = project / "tx5.json"
+            d_run = subprocess.run(
+                [NODE, str(TRACKING_PATH), "draft", "--project", str(project), "--chapter", "5", "--allow-gap", "--out", str(draft5)],
+                capture_output=True, text=True, encoding="utf-8",
+            )
+            self.assertEqual(d_run.returncode, 0, d_run.stderr)
+            tx = json.loads(draft5.read_text(encoding="utf-8"))
+            tx["chapter_title"] = "跨卷跳章"
+            tx["delta"]["result"] = "跳至第5章推进主线。"
+            tx["context"]["position"]["story_time"] = "第5日"
+            tx["context"]["position"]["scene"] = "码头"
+            draft5.write_text(json.dumps(tx, ensure_ascii=False), encoding="utf-8")
+            c_run = subprocess.run(
+                [NODE, str(TRACKING_PATH), "commit", "--project", str(project), "--input", str(draft5), "--allow-gap"],
+                capture_output=True, text=True, encoding="utf-8",
+            )
+            self.assertEqual(c_run.returncode, 0, c_run.stderr)
+            strict_run = subprocess.run(
+                [NODE, str(TRACKING_PATH), "check", "--project", str(project), "--strict"],
+                capture_output=True, text=True, encoding="utf-8",
+            )
+            self.assertEqual(strict_run.returncode, 0, strict_run.stdout + strict_run.stderr)
+            state = json.loads((project / "追踪/_tracking-state.json").read_text(encoding="utf-8"))
+            self.assertEqual(state.get("skipped_chapters"), [1, 2, 3, 4])
+
+    def test_ws4_prose_balance_telemetry_and_camera_report_advisory(self) -> None:
+        # 1) Balanced human-style prose: new telemetry fields present, no advisory warning
+        balanced_lines = [
+            "# 第1章 正常对账",
+            "“你先把旧单据拿出来，别在这儿绕弯子。”她直截了当开口。",
+            "其实她心里早就盘算好了，因为东院这笔账拖了半年，所以今天干脆当面摊牌，免得对方再装糊涂。",
+            "“急什么，账房还在核对呢。”管事笑了笑。",
+            "话虽这么说，可是他眼里的慌乱偏偏藏不住，毕竟库房里少的那批货根本填不上窟窿，好在她提前留了底单。",
+        ] * 6
+        bal = storyctl.prose_balance("\n".join(balanced_lines))
+        self.assertIsNotNone(bal["pure_narr_median"])
+        self.assertIsNotNone(bal["dlg_para_median"])
+        self.assertGreater(bal["narr_conn_per_1k"], 10.0)
+        self.assertGreater(bal["tc_ba_ratio"], 1.0)
+        self.assertIsNone(bal["advisory"])
+
+        # 2) Camera-report imbalanced long chapter: triggers non-blocking advisory + warnings + plain Chinese alert
+        camera_lines = ["# 第1章 摄像头报幕"]
+        for i in range(1, 20):
+            camera_lines.append(
+                f"第{i}回他伸手拿起桌角账册翻过两页，指尖按住页边停顿一瞬，抬头盯着门框没说话，转身迈步走到窗前。"
+            )
+            if i % 3 == 0:
+                camera_lines.append(f"“第{i}笔账明天再说。”对方答了一句。")
+        camera_text = "\n".join(camera_lines) + "\n"
+        skew_bal = storyctl.prose_balance(camera_text)
+        self.assertGreaterEqual(skew_bal["pure_narr_median"], 40)
+        self.assertIsNotNone(skew_bal["dlg_para_median"])
+        self.assertEqual(skew_bal["narr_conn_per_1k"], 0)
+        self.assertLess(skew_bal["tc_ba_ratio"], 0.25)
+        self.assertIsNotNone(skew_bal["advisory"])
+        self.assertEqual(skew_bal["advisory"]["level"], "advisory")
+        self.assertIn("叙述偏摄像头报幕，缺人物内心盘算与口语因果连接", skew_bal["advisory"]["message"])
+
+        with tempfile.TemporaryDirectory(prefix="storyctl-ws4-") as directory:
+            project = Path(directory)
+            (project / "大纲").mkdir()
+            (project / "正文").mkdir()
+            (project / "大纲/细纲_第001章.md").write_text(
+                "- 字数目标：1000 字\n- 字数口径：visible_chars_v1\n", encoding="utf-8"
+            )
+            (project / "正文/第001章_摄像头报幕.md").write_text(camera_text, encoding="utf-8")
+            _init_tracking(project)
+            result = storyctl.chapter_check_with_pass_quality(project, 1)
+            self.assertEqual(result["status"], "ready")
+            self.assertEqual(len(result.get("warnings", [])), 1)
+            self.assertEqual(result["warnings"][0]["level"], "advisory")
+            self.assertIn("叙述偏摄像头报幕，缺人物内心盘算与口语因果连接", result["warnings"][0]["message"])
+            plain = "\n".join(storyctl.plain_report(result))
+            self.assertIn("叙述偏摄像头报幕，缺人物内心盘算与口语因果连接", plain)
+            self.assertIn("纯叙述段中位", plain)
+            self.assertIn("对白段中位", plain)
+            for jargon in ("advisory", "prose_balance", "tc_ba_ratio", "camera-report-telegraph"):
+                self.assertNotIn(jargon, plain)
+
 
 if __name__ == "__main__":
     unittest.main()

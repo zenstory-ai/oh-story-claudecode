@@ -11,6 +11,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { parse: parseVolume, sliceArc, stripRetired, unitChapterRange } = require('./outline_view.js');
+const { genreLine, matchGenreCards, sliceGenrePack } = require('./build_writer_prompt.js');
 
 const SKILL_ROOT = path.resolve(__dirname, '..');
 const REFERENCES = path.join(SKILL_ROOT, 'references');
@@ -40,7 +41,7 @@ const TEMPLATE_TARGETS = {
 const NEW_ADDITION_TIERS =
   '**新增物三级**（缺东西时三种处理；只看下一章需不需要知道它存在过）：\n' +
   '- **直接写**：微连接、路人、器物、地名细部、一次性对话、现场细节；不申报。\n' +
-  '- **补上并记下**：具名配角、势力、复用地点属性、能力形态、规矩、刻度、新伏笔、新关系或承诺；' +
+  '- **补上并记下**：具名配角、势力、复用地点属性、能力形态、规矩、刻度、新伏笔、新关系或承诺、留给主角的物件；' +
   '排纲先落设定档再引用，写正文照写并进申报表。\n' +
   '- **先问作者**：新主线事件或反转、金手指规则与力量档位、真相或伏笔结算、经济锚点、读者期待、' +
   '提前写后续章、改变细纲已定结果或人物决定、卷纲新增主线或故事线、碰这卷主打的线或后面才揭开的东西、' +
@@ -175,86 +176,11 @@ function templates(name, ...tags) {
   return blocks.join('\n\n');
 }
 
-function stripHtmlComments(text) {
-  const src = text || '';
-  let out = '';
-  let cursor = 0;
-  while (cursor < src.length) {
-    const start = src.indexOf('<!--', cursor);
-    if (start === -1) {
-      out += src.slice(cursor);
-      break;
-    }
-    out += src.slice(cursor, start);
-    const end = src.indexOf('-->', start + 4);
-    if (end === -1) {
-      out += src.slice(start);
-      break;
-    }
-    cursor = end + 3;
-  }
-  return out;
-}
-
 function matchPrimaryGenreStyle(project) {
   if (!project) return null;
-  const text = stripHtmlComments(readUtf8IfFile(path.join(project, '设定', '题材定位.md')));
-  if (!text) return null;
-  const match = /^[ \t]*[-*+]?[ \t]*\**题材(?:类型)?\**[ \t]*[：:](.*)$/m.exec(text);
-  const raw = !match || match[1].includes('{') ? '' : match[1].trim().toLowerCase();
-  if (!raw) return null;
-  let entries;
-  try {
-    entries = fs.readdirSync(GENRE_STYLE_DIR).filter((n) => n.endsWith('.md')).sort();
-  } catch {
-    return null;
-  }
-  const rank = { high: 0, medium: 1, low: 2 };
-  const spans = [];
-  for (const file of entries) {
-    const full = path.join(GENRE_STYLE_DIR, file);
-    const content = readUtf8IfFile(full) || '';
-    const head = content.split('---');
-    const meta = head.length > 2 ? head[1] : '';
-    if (/^fallback:\s*true\s*$/m.test(meta)) continue;
-    const genre = /^genre:\s*(.+)$/m.exec(meta);
-    const aliases = /^aliases:\s*\[(.*)\]/m.exec(meta);
-    const confidence = /^confidence:\s*(\w+)/m.exec(meta);
-    const level = confidence ? confidence[1] : 'low';
-    const baseName = genre ? genre[1].trim() : path.basename(file, '.md');
-    const aliasList = aliases
-      ? aliases[1].split(',').map((a) => a.trim().replace(/^['"]|['"]$/g, ''))
-      : [];
-    const names = new Set([baseName, ...aliasList].filter(Boolean).map((n) => n.toLowerCase()));
-    for (const name of names) {
-      let pos = 0;
-      while (pos <= raw.length) {
-        const idx = raw.indexOf(name, pos);
-        if (idx < 0) break;
-        spans.push([idx, idx + name.length, full, level]);
-        pos = idx + name.length || idx + 1;
-      }
-    }
-  }
-  const best = new Map();
-  const compareKey = (a, b) => {
-    for (let i = 0; i < 3; i += 1) {
-      if (a[i] !== b[i]) return a[i] - b[i];
-    }
-    return a[3] < b[3] ? -1 : a[3] > b[3] ? 1 : 0;
-  };
-  for (const [start, end, card, level] of spans) {
-    const dominated = spans.some(([s, e, c]) => c !== card && s <= start && end <= e && e - s > end - start);
-    if (dominated) continue;
-    const key = [start, -(end - start), rank[level] ?? 2, path.basename(card)];
-    if (!best.has(card) || compareKey(key, best.get(card)[0]) < 0) {
-      best.set(card, [key, level]);
-    }
-  }
-  const hits = [...best.entries()]
-    .map(([card, [key]]) => ({ key, card }))
-    .sort((a, b) => compareKey(a.key, b.key));
-  if (hits.length) return hits[0].card;
+  if (!genreLine(project)) return null;
+  const matched = matchGenreCards(project);
+  if (matched.length) return matched[0][0];
   return readUtf8IfFile(FALLBACK_STYLE) ? FALLBACK_STYLE : null;
 }
 
@@ -439,7 +365,12 @@ function build(task, volume, chapters, project = null, rulesOnly = false) {
   if (matchedPack) {
     const packText = readUtf8IfFile(matchedPack);
     if (packText) {
-      parts.push([`genre-styles/${path.basename(matchedPack)}`, packText]);
+      const sliced = sliceGenrePack(packText, [1, 2, 3]);
+      const baseName = path.basename(matchedPack);
+      const label = sliced.sliced
+        ? `genre-styles/${baseName}（1–3节：故事线/剧情/人物）`
+        : `genre-styles/${baseName}`;
+      parts.push([label, sliced.text]);
     }
   }
   parts.push(['SKILL.md（新增物三级）', NEW_ADDITION_TIERS]);
@@ -449,7 +380,8 @@ function build(task, volume, chapters, project = null, rulesOnly = false) {
       '\n\n包里流程写到的脚本命令（取段、`--check`、`check-outline-contract.js`）由主会话在你交付后跑，你不执行命令；需要的取段结果已放进包里。',
   ];
   for (const [name, text] of parts) {
-    body.push(`\n---\n\n<!-- 资料：${name} -->\n\n${text.trim()}\n`);
+    const cleaned = text.trim().replace(/(?:\r?\n)+---[ \t]*$/, '').trimEnd();
+    body.push(`\n---\n\n<!-- 资料：${name} -->\n\n${cleaned}\n`);
   }
   return { text: body.join('\n'), included: parts.map(([name]) => name) };
 }
@@ -570,4 +502,4 @@ if (require.main === module) {
   process.exitCode = main();
 }
 
-module.exports = { build, templateBlock, parseRange, main };
+module.exports = { build, templateBlock, parseRange, sliceGenrePack, main };
