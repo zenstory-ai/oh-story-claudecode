@@ -83,7 +83,6 @@ PR 自动运行 `.github/workflows/cross-platform.yml`，拆为两个 job：`rep
 - `python3 scripts/test-static-check.py` / `python3 scripts/test-current-skill-contracts.py` / `python3 scripts/test-doc-budget.py` / `python3 scripts/test-shared-assets.py` / `python3 scripts/test-shared-references.py` — 仓库守卫行为回归
 - `python3 scripts/test-handoff-contracts.py` — 跨 skill 交接契约回归（拆文、扫榜、导入产物到写作端，写作端平台到审稿，派助手与派写手去味的字段和标签）
 - `node --test scripts/test-ai-patterns.mjs scripts/test-degeneration.mjs scripts/test-outline-copy.mjs` — AI 句式、模型退化、细纲照搬检测器原生 Node 回归
-- `scripts/check-scan-runtime-policy.sh` + `python3 scripts/test-scan-runtime-policy.py` — scraper 本地日期依赖与 CDP 源码策略守卫
 - `python3 scripts/test-scan-aggregate.py` — 扫榜聚合脚本的解析、去重、分布与抽样行为回归
 - `scripts/check-story-setup-deployment.sh` — story-setup 部署完整性
 - `python3 scripts/check-plugin-packaging.py` + `python3 scripts/test-plugin-packaging.py` — Claude/ZCode/Reasonix catalog 与 manifest 打包检查及黑盒变异回归
@@ -92,7 +91,7 @@ PR 自动运行 `.github/workflows/cross-platform.yml`，拆为两个 job：`rep
 - 核心运行时回归：`test-storyctl.py`、`test-writer-pipeline.py`、`test-chapter-completion-lifecycle.py`、`test-tracking-commit.py`、`test-author-memory-commit.py`、`test-long-analyze-runtime.py`、`test-publish-format.py`、`test-style-precedence.py`
 - 采集脚本 `node --check` 语法校验
 
-以上为代表性列举；**强制清单按 `.github/workflows/cross-platform.yml` 为准**，每个脚本的用途与触发时机见 [scripts/README.md](scripts/README.md)。另有 `.github/workflows/cli-compat.yml` 在相关 PR、每周定时和手动触发时安装官方当前版本，真实运行 Claude Code、Codex、OpenCode、OpenClaw、Reasonix 的无鉴权 smoke。
+以上为代表性列举；**强制清单按 `.github/workflows/cross-platform.yml` 为准**，每个脚本的用途与触发时机见 [scripts/README.md](scripts/README.md)。另有 `.github/workflows/cli-compat.yml` 在每周定时和手动触发时安装官方当前版本，真实运行 Claude Code、Codex、OpenCode、OpenClaw、Reasonix 的无鉴权 smoke。
 
 提交前建议在本地跑一遍与改动相关的守卫与回归：
 
@@ -123,8 +122,6 @@ python3 scripts/test-chapter-completion-lifecycle.py
 python3 scripts/test-author-memory-commit.py
 python3 scripts/test-long-analyze-runtime.py
 python3 scripts/test-scan-aggregate.py
-bash scripts/check-scan-runtime-policy.sh
-python3 scripts/test-scan-runtime-policy.py
 bash scripts/check-story-setup-deployment.sh
 bash scripts/check-claude-adapter.sh
 bash scripts/check-codex-adapter.sh
@@ -135,9 +132,6 @@ bash scripts/check-zcode-adapter.sh
 bash scripts/check-reasonix-adapter.sh
 node --test scripts/test-story-hook-core.mjs scripts/test-claude-hooks.mjs scripts/test-codex-hooks.mjs scripts/test-antigravity-hooks.mjs scripts/test-zcode-hooks.mjs
 node --experimental-strip-types --test scripts/test-opencode-plugin.mjs
-bash scripts/check-python-invocation.sh
-bash scripts/test-charcount-portable.sh
-bash scripts/test-charcount-portable.sh --stub
 
 # 可选真实 CLI smoke（需分别安装对应 CLI）
 CLAUDE_REAL_CHECK=1 bash scripts/check-claude-adapter.sh

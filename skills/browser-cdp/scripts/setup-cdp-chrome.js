@@ -49,6 +49,20 @@ const readline = require("readline");
 // 参数解析
 // ---------------------------------------------------------------------------
 
+const USAGE_TEXT = [
+  "用法: node setup-cdp-chrome.js [port] [options]",
+  "",
+  "Options:",
+  "  -h, --help               显示此帮助信息并退出",
+  "  --detect-only            只探测当前状态（结构化输出），不做任何修改",
+  "  --yes, -y                确认杀死现有 Chrome，跳过交互提示",
+  "  --reset                  清空 ~/chrome-debug-profile 后重新复制",
+  "  --profile <name>         使用指定 Chrome profile（默认: Default）",
+  "  --dry-run                打印将执行的操作，不实际执行",
+].join("\n");
+
+const SAFE_PROFILE_RE = /^[A-Za-z0-9 ._()-]+$/;
+
 function parseArgs(argv) {
   const flags = { dryRun: false, yes: false, detectOnly: false, reset: false };
   let profile = "Default";
@@ -57,28 +71,67 @@ function parseArgs(argv) {
   let profileExplicit = false;
   let port = null;
 
+  const setProfile = (next) => {
+    if (!next || !next.trim() || next.startsWith("-")) {
+      console.error("❌ --profile 需要一个合法名称（例如: --profile \"Profile 1\"），不能缺失、纯空白或以 - 开头");
+      process.exit(2);
+    }
+    if (
+      next.includes("..") ||
+      next.includes("/") ||
+      next.includes("\\") ||
+      /^\.+$/.test(next.trim()) ||
+      !SAFE_PROFILE_RE.test(next)
+    ) {
+      console.error(`❌ --profile 名称非法（禁止路径穿越、纯点号或特殊字符）: ${next}`);
+      process.exit(2);
+    }
+    profile = next;
+    profileExplicit = true;
+  };
+  const setPort = (raw) => {
+    if (!raw || !/^\d+$/.test(raw)) {
+      console.error(`❌ 端口非法: ${raw ?? ""}。必须是 1-65535 的整数。`);
+      process.exit(2);
+    }
+    if (port !== null) {
+      console.error(`❌ 重复指定端口参数: ${raw}`);
+      process.exit(2);
+    }
+    port = parseInt(raw, 10);
+  };
+
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
+    if (a.startsWith("--profile=")) {
+      setProfile(a.slice("--profile=".length));
+      continue;
+    }
+    if (a.startsWith("--port=")) {
+      setPort(a.slice("--port=".length));
+      continue;
+    }
     switch (a) {
+      case "-h":
+      case "--help":
+        console.log(USAGE_TEXT);
+        process.exit(0);
       case "--dry-run": flags.dryRun = true; break;
       case "--yes": case "-y": flags.yes = true; break;
       case "--detect-only": flags.detectOnly = true; break;
       case "--reset": flags.reset = true; break;
+      case "--port":
+        setPort(argv[++i]);
+        break;
       case "--profile":
-        profile = argv[++i];
-        if (!profile) {
-          console.error("❌ --profile 需要一个参数（例如: --profile \"Profile 1\"）");
-          process.exit(1);
-        }
-        profileExplicit = true;
+        setProfile(argv[++i]);
         break;
       default:
         if (/^\d+$/.test(a)) {
-          port = parseInt(a, 10);
-        } else if (a.startsWith("--")) {
-          console.error(`⚠️  未知参数: ${a}`);
+          setPort(a);
         } else {
-          console.error(`⚠️  忽略参数: ${a}`);
+          console.error(`❌ 未知或非法参数: ${a}\n\n${USAGE_TEXT}`);
+          process.exit(2);
         }
     }
   }
@@ -86,7 +139,7 @@ function parseArgs(argv) {
   if (port === null) port = 9222;
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     console.error(`❌ 端口非法: ${port}。必须是 1-65535 的整数。`);
-    process.exit(1);
+    process.exit(2);
   }
 
   return { flags, profile, profileExplicit, port };
@@ -794,7 +847,7 @@ async function main() {
       step("⚠️ 无用户 profile，将以空 profile 启动");
     }
     step("清理 SingletonLock / SingletonCookie / SingletonSocket");
-    step("启动 Chrome（含 --remote-allow-origins=*, --no-first-run 等）");
+    step("启动 Chrome（仅监听 127.0.0.1，含 --remote-allow-origins=*, --no-first-run 等）");
     step(
       `验证 http://127.0.0.1:${CDP_PORT}/json/version 来自本次启动的实例` +
         "（身份取得到且已变 + 进程存活 + 端口的 LISTEN 持有者就在这棵进程树里）"
@@ -920,6 +973,7 @@ async function main() {
   // 9) 以 CDP 模式启动 Chrome
   log(`正在以 CDP 模式启动 Chrome（端口 ${CDP_PORT}）...`);
   const chromeArgs = [
+    "--remote-debugging-address=127.0.0.1",
     `--remote-debugging-port=${CDP_PORT}`,
     `--user-data-dir=${debugProfile}`,
     "--remote-allow-origins=*",

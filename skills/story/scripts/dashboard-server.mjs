@@ -662,6 +662,9 @@ async function saveWorkspaceFile(root, payload) {
   if (!payload || typeof payload !== "object") {
     throw new DashboardError(400, "invalid_payload", "缺少保存参数");
   }
+  const initial = await resolveWorkspacePath(root, payload.path, {
+    editableOnly: true,
+  });
   if (typeof payload.content !== "string") {
     throw new DashboardError(400, "invalid_content", "文件内容必须是文本");
   }
@@ -672,9 +675,6 @@ async function saveWorkspaceFile(root, payload) {
     throw new DashboardError(400, "missing_file_version", "保存请求缺少文件版本，请重新载入后再试");
   }
 
-  const initial = await resolveWorkspacePath(root, payload.path, {
-    editableOnly: true,
-  });
   return withSerializedFileMutation(initial.resolvedFile, async () => {
     let current;
     try {
@@ -710,13 +710,13 @@ async function deleteWorkspaceFile(root, payload) {
   if (!payload || typeof payload !== "object") {
     throw new DashboardError(400, "invalid_payload", "缺少删除参数");
   }
+  const initial = await resolveWorkspacePath(root, payload.path, {
+    editableOnly: true,
+  });
   if (!/^[a-f0-9]{64}$/.test(payload.expectedVersion || "")) {
     throw new DashboardError(400, "missing_file_version", "删除请求缺少文件版本，请重新载入后再试");
   }
 
-  const initial = await resolveWorkspacePath(root, payload.path, {
-    editableOnly: true,
-  });
   return withSerializedFileMutation(initial.resolvedFile, async () => {
     let current;
     try {
@@ -859,23 +859,38 @@ export function createDashboardServer({ root, allowNetwork = false }) {
   });
 }
 
-function parseCliArguments(argv) {
+export function parseCliArguments(argv) {
+  const envPort = process.env.STORY_DASHBOARD_PORT;
   const options = {
     root: process.cwd(),
     host: process.env.STORY_DASHBOARD_HOST || "127.0.0.1",
-    port: Number(process.env.STORY_DASHBOARD_PORT || 43110),
+    port: envPort !== undefined && envPort !== "" ? Number(envPort) : 43110,
     open: false,
     allowNetwork: false,
   };
+  let rawPort = envPort !== undefined && envPort !== "" ? String(envPort) : "43110";
 
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === "--root") {
-      options.root = argv[++index];
+      const next = argv[++index];
+      if (!next || next.startsWith("-")) {
+        throw new DashboardError(400, "missing_root", "--root 需要目录参数");
+      }
+      options.root = next;
     } else if (value === "--host") {
-      options.host = argv[++index];
+      const next = argv[++index];
+      if (!next || next.startsWith("-")) {
+        throw new DashboardError(400, "missing_host", "--host 需要地址参数");
+      }
+      options.host = next;
     } else if (value === "--port") {
-      options.port = Number(argv[++index]);
+      const next = argv[++index];
+      if (next === undefined || next.startsWith("-")) {
+        throw new DashboardError(400, "invalid_port", "--port 需要 0–65535 的整数");
+      }
+      rawPort = next;
+      options.port = Number(next);
     } else if (value === "--open") {
       options.open = true;
     } else if (value === "--allow-network") {
@@ -890,7 +905,7 @@ function parseCliArguments(argv) {
   if (!options.root) {
     throw new DashboardError(400, "missing_root", "--root 需要目录参数");
   }
-  if (!Number.isInteger(options.port) || options.port < 0 || options.port > 65535) {
+  if (!/^\d+$/.test(rawPort) || !Number.isInteger(options.port) || options.port < 0 || options.port > 65535) {
     throw new DashboardError(400, "invalid_port", "端口必须是 0–65535 的整数");
   }
   if (!LOOPBACK_HOSTS.has(options.host) && !options.allowNetwork) {
@@ -904,7 +919,10 @@ function parseCliArguments(argv) {
 }
 
 async function listen(server, host, preferredPort) {
-  const attempts = preferredPort === 0 ? [0] : Array.from({ length: 11 }, (_, index) => preferredPort + index);
+  const attempts =
+    preferredPort === 0
+      ? [0]
+      : Array.from({ length: 11 }, (_, index) => preferredPort + index).filter((port) => port <= 65535);
   for (const port of attempts) {
     try {
       await new Promise((accept, reject) => {

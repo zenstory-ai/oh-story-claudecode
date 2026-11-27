@@ -263,6 +263,31 @@ class DocBudgetCliTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("路径「incomplete route」登记的文件不存在：missing.md", result.stdout)
 
+    def test_repo_long_paths_pin_heaviest_genre_pack(self) -> None:
+        manifest = json.loads((REPO_ROOT / "scripts" / "doc-budget.json").read_text(encoding="utf-8"))
+        long_dir = REPO_ROOT / "skills" / "story-long-write" / "references" / "genre-styles"
+        weights = {
+            fp.name: len(re.sub(r"\s+", "", fp.read_text(encoding="utf-8")))
+            for fp in long_dir.glob("*.md")
+        }
+        max_weight = max(weights.values())
+        checked = 0
+        for entry in manifest.get("paths", []):
+            refs = list(entry.get("files", []))
+            for branch in entry.get("branches", []):
+                refs.extend(branch.get("files", []))
+            for ref in refs:
+                if "genre-styles/" in ref and ("story-long-write/" in ref or "agent-references/" in ref):
+                    name = Path(ref.split("#", 1)[0]).name
+                    self.assertIn(name, weights)
+                    self.assertEqual(
+                        weights[name],
+                        max_weight,
+                        f"path {entry['label']!r} pins {name} ({weights[name]} nws) < heaviest long pack ({max_weight} nws)",
+                    )
+                    checked += 1
+        self.assertGreaterEqual(checked, 9)
+
 
 if __name__ == "__main__":
     unittest.main()

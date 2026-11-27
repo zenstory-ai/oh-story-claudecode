@@ -142,7 +142,11 @@ function requireRoot(rootArg) {
 function readIndex(root, indexArg = null) {
   const indexPath = indexArg ? resolveReal(indexArg) : path.join(root, "chapter_index.csv");
   if (!isFile(indexPath)) {
-    throw new RunError("chapter_index_required", String(indexPath));
+    const metaFallback = !indexArg ? path.join(root, "meta", "chapter_index.csv") : null;
+    const hint = metaFallback && isFile(metaFallback)
+      ? `在 ${indexPath} 未找到章节索引（检测到 ${metaFallback}，请将 build_chapter_index.js --output 指向 <root>/chapter_index.csv，或传 --index ${metaFallback}）。`
+      : `在 ${indexPath} 未找到章节索引，请先运行 build_chapter_index.js --output <root>/chapter_index.csv（或传 --index PATH 指定索引路径）。`;
+    throw new RunError("chapter_index_required", String(indexPath), hint);
   }
   const rows = [];
   let parsed;
@@ -1276,6 +1280,9 @@ function stageRequiredOutputs(root, stage) {
       required.push(`章节/第${ch}章_深度拆解.md`);
     }
     required.push("快速预览.md");
+    if (existsPath(path.join(root, "_style-sample.txt"))) {
+      required.push("_style-sample.txt");
+    }
     return required;
   }
   if (stage === "stage2") {
@@ -1367,7 +1374,19 @@ function markStageCommand(args) {
   const [state] = loadState(path.join(root, "_progress.md"));
   state.stages[args.stage] = { status: args.status, output: relativeOutput };
   const changed = writeState(path.join(root, "_progress.md"), state);
-  return { ok: true, stage: args.stage, status: args.status, progress_updated: changed };
+  const result = { ok: true, stage: args.stage, status: args.status, progress_updated: changed };
+  if (
+    args.stage === "stage1" &&
+    args.status === "completed" &&
+    isFile(path.join(root, "chapter_index.csv")) &&
+    fileSize(path.join(root, "_style-sample.txt")) === 0
+  ) {
+    result.missing_recommended_outputs = ["_style-sample.txt"];
+    result.warnings = [
+      "_style-sample.txt 缺失或为空：原文可用时请在 Stage 1 摘录 2–3 段 200–300 字连续原文语感切片落盘",
+    ];
+  }
+  return result;
 }
 
 function digestCaches(root) {
@@ -1498,16 +1517,325 @@ function digestCommand(args) {
   return { ok: true, text: parts.join("\n\n") + "\n" };
 }
 
-function printHelp() {
+const CHAPTER_HEADING_RE = /^(?:#{1,6}\s+)?(?:正文(?:卷)?\s+)?(?:第\s*[0-9一二三四五六七八九十百千万零〇两]+\s*[章回节卷部集]|序章|楔子|引子|番外|后记|Chapter\s*\d+|\d+[.．、]\s*)/i;
+const AUTHOR_NOTE_START_RE = /^(?:【\s*(?:作者有话说|作者说|PS|非水文|排雷|求票|求收藏|求书架)|作者有话说\s*[：:]?|作者说\s*[：:]|PS\s*[：:])/i;
+const DIALOGUE_SPAN_RE = /“[^”\n]+”|「[^」\n]+」|『[^』\n]+』|"[^"\n]+"/g;
+const PURE_DIALOGUE_RE = /^(?:“[^”\n]+”|「[^」\n]+」|『[^』\n]+』|"[^"\n]+")$/;
+const DIVIDER_LINE_RE = /^[—\-─━_=*~·…\s]{4,}$/;
+
+function round1(value) {
+  return Math.round(value * 10) / 10;
+}
+
+function calcMedian(nums) {
+  if (!nums.length) return 0;
+  const sorted = [...nums].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : round1((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
+function countSentencesInParagraph(para) {
+  const trimmed = para.trim();
+  if (!trimmed) return 0;
+  const probe = PURE_DIALOGUE_RE.test(trimmed)
+    ? trimmed.slice(1, -1)
+    : trimmed.replace(DIALOGUE_SPAN_RE, "X");
+  const matches = probe.match(/[。！？!?]+/g);
+  return matches ? matches.length : 1;
+}
+
+function cleanSampleLines(rawLines) {
+  const out = [];
+  let inFence = false;
+  for (const raw of rawLines) {
+    const t = raw.trim();
+    if (/^```/.test(t)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (!inFence && (/^<!--[\s\S]*-->$/.test(t) || /^#{1,6}\s+/.test(t) || /^(?:source_locator|基调|示范点|出处)\s*[：:]/.test(t))) {
+      continue;
+    }
+    out.push(raw);
+  }
+  return out;
+}
+
+function extractBodyParagraphs(rawLines, options = {}) {
+  const expanded = [];
+  for (const line of rawLines) {
+    const parts = String(line || "").replace(/<br\s*\/?>/gi, "\n").split("\n");
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (trimmed) expanded.push(trimmed);
+    }
+  }
+  let lines = expanded;
+  if (options.stripTitle && lines.length && (CHAPTER_HEADING_RE.test(lines[0]) || (options.title && lines[0].includes(options.title)))) {
+    lines = lines.slice(1);
+  }
+  let authorNoteLines = 0;
+  const kept = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (AUTHOR_NOTE_START_RE.test(line)) {
+      if (i >= Math.floor(lines.length * 0.7)) {
+        authorNoteLines += lines.length - i;
+        break;
+      }
+      authorNoteLines += 1;
+      continue;
+    }
+    kept.push(line);
+  }
+  return { paragraphs: kept, authorNoteLines };
+}
+
+function computeProseMetrics(paragraphs, authorNoteLines = 0) {
+  const paraLens = paragraphs.map((p) => p.replace(/\s+/g, "").length).filter((n) => n > 0);
+  const paraCount = paraLens.length;
+  const charCount = paraLens.reduce((sum, n) => sum + n, 0);
+  let le30 = 0;
+  let le50 = 0;
+  let gt80 = 0;
+  let singleSentence = 0;
+  let dialogueChars = 0;
+  let exclaimCount = 0;
+  let questionCount = 0;
+  let emDashCount = 0;
+  let ellipsisCount = 0;
+  let firstDialoguePos = null;
+  let cumulativeChars = 0;
+  let firstPersonCount = 0;
+  let thirdPersonCount = 0;
+
+  for (const para of paragraphs) {
+    const compact = para.replace(/\s+/g, "");
+    const len = compact.length;
+    if (!len) continue;
+    if (len <= 30) le30 += 1;
+    if (len <= 50) le50 += 1;
+    if (len > 80) gt80 += 1;
+    if (countSentencesInParagraph(para) <= 1) singleSentence += 1;
+
+    DIALOGUE_SPAN_RE.lastIndex = 0;
+    let m;
+    while ((m = DIALOGUE_SPAN_RE.exec(compact)) !== null) {
+      const inner = m[0].slice(1, -1).trim();
+      const isQuotedOnomatopoeia =
+        inner.length > 0 &&
+        inner.length <= 2 &&
+        /^[滴啪砰咚咔哒哐哗吱嘎叮咚叮当噗咕咕哝嗡嘭嚓轰嚓嗒吱呀咯噔哐当哗啦叮铃嗡嗡咕咚咚咚啪嗒咔嚓咔哒]+$/.test(inner);
+      if (firstDialoguePos === null && inner.length > 0 && !isQuotedOnomatopoeia) {
+        firstDialoguePos = cumulativeChars + m.index + 1;
+      }
+      dialogueChars += m[0].length;
+    }
+
+    const nonDialogue = compact.replace(DIALOGUE_SPAN_RE, "");
+    const fpMatches = nonDialogue.match(/我/g);
+    const tpMatches = nonDialogue.match(/[他她]/g);
+    if (fpMatches) firstPersonCount += fpMatches.length;
+    if (tpMatches) thirdPersonCount += tpMatches.length;
+
+    const ex = compact.match(/[！!]/g);
+    const qu = compact.match(/[？?]/g);
+    if (ex) exclaimCount += ex.length;
+    if (qu) questionCount += qu.length;
+    if (!DIVIDER_LINE_RE.test(para)) {
+      const dashes = compact.match(/——/g);
+      if (dashes) emDashCount += dashes.length;
+    }
+    const ell = compact.match(/……|\.{3,}/g);
+    if (ell) ellipsisCount += ell.length;
+
+    cumulativeChars += len;
+  }
+
+  const per1k = charCount > 0 ? 1000 / charCount : 0;
+  const per10k = charCount > 0 ? 10000 / charCount : 0;
+  const pronounTotal = firstPersonCount + thirdPersonCount;
+  const firstPersonRatioPct = pronounTotal > 0 ? round1((firstPersonCount / pronounTotal) * 100) : 0;
+  const povGuess = firstPersonCount >= 3 && firstPersonCount > thirdPersonCount ? "第一人称" : "第三人称";
+
+  return {
+    char_count: charCount,
+    para_count: paraCount,
+    para_median_chars: calcMedian(paraLens),
+    para_le_30_pct: paraCount ? round1((le30 / paraCount) * 100) : 0,
+    para_le_50_pct: paraCount ? round1((le50 / paraCount) * 100) : 0,
+    para_gt_80_pct: paraCount ? round1((gt80 / paraCount) * 100) : 0,
+    single_sentence_para_pct: paraCount ? round1((singleSentence / paraCount) * 100) : 0,
+    dialogue_ratio_pct: charCount ? round1((dialogueChars / charCount) * 100) : 0,
+    exclaim_per_1k: round1(exclaimCount * per1k),
+    question_per_1k: round1(questionCount * per1k),
+    exclaim_question_per_1k: round1((exclaimCount + questionCount) * per1k),
+    em_dash_per_10k: round1(emDashCount * per10k),
+    ellipsis_per_1k: round1(ellipsisCount * per1k),
+    first_para_chars: paraLens[0] || 0,
+    first_dialogue_pos: firstDialoguePos,
+    pov_guess: povGuess,
+    first_person_ratio_pct: firstPersonRatioPct,
+    has_author_note: authorNoteLines > 0,
+    author_note_lines: authorNoteLines,
+  };
+}
+
+function formatProseStatsMarkdown(payload) {
+  const agg = payload.aggregate;
+  const chChars = payload.chapters.length
+    ? payload.chapters.map((c) => `Ch${c.chapter}: ${c.char_count}`).join(" / ")
+    : `${agg.char_count} 字（样本文件）`;
+  const lines = [
+    "| 指标 | 实测值 |",
+    "|---|---|",
+    `| 篇幅字数 | ${chChars} |`,
+    `| 段长中位数 | ${agg.para_median_chars} 字 |`,
+    `| ≤30 字 / ≤50 字 / >80 字段占比 | ${agg.para_le_30_pct}% / ${agg.para_le_50_pct}% / ${agg.para_gt_80_pct}% |`,
+    `| 单句成段率 / 对话占比 | ${agg.single_sentence_para_pct}% / ${agg.dialogue_ratio_pct}% |`,
+    `| 人称估计 / ！+？（/千字） | ${agg.pov_guess}（第一人称代词占比 ${agg.first_person_ratio_pct}%） / ${agg.exclaim_question_per_1k}（！${agg.exclaim_per_1k} + ？${agg.question_per_1k}） |`,
+    `| 破折号（/万字） / 省略号（/千字） | ${agg.em_dash_per_10k} / ${agg.ellipsis_per_1k} |`,
+    `| 首段字数 / 首句对话字位 | ${agg.first_para_chars} 字 / ${agg.first_dialogue_pos === null ? "无对话" : `第 ${agg.first_dialogue_pos} 字`} |`,
+  ];
+  if (payload.author_note_warnings && payload.author_note_warnings.length) {
+    lines.push("", `> 提示：已自动剥离作者有话说段落（${payload.author_note_warnings.join("；")}）`);
+  }
+  return lines.join("\n") + "\n";
+}
+
+function proseStatsCommand(args) {
+  if (args.file) {
+    const baseRoot = args.root ? requireRoot(args.root) : null;
+    const targetPath = path.isAbsolute(args.file)
+      ? args.file
+      : baseRoot
+        ? path.join(baseRoot, args.file)
+        : path.resolve(args.file);
+    if (!isFile(targetPath)) {
+      throw new RunError("file_not_found", String(targetPath));
+    }
+    const rawText = normalized(decodeUtf8Strict(fs.readFileSync(targetPath)));
+    const cleaned = cleanSampleLines(rawText.split("\n"));
+    const { paragraphs, authorNoteLines } = extractBodyParagraphs(cleaned, { stripTitle: false });
+    const metrics = computeProseMetrics(paragraphs, authorNoteLines);
+    const warnings = authorNoteLines ? [`${path.basename(targetPath)} 含 ${authorNoteLines} 行作者有话说`] : [];
+    const payload = {
+      ok: true,
+      mode: "file",
+      file: baseRoot ? relPosix(baseRoot, targetPath) : toPosix(targetPath),
+      chapters: [],
+      aggregate: metrics,
+      author_note_warnings: warnings,
+    };
+    payload.markdown_table = formatProseStatsMarkdown(payload);
+    return payload;
+  }
+
+  const root = requireRoot(args.root);
+  const indexRows = readIndex(root, args.index);
+  const window = parseChapterWindow(args.chapters || "1-3");
+  const selected = indexRows.filter((row) => row.chapter >= window[0] && row.chapter <= window[1]);
+  if (!selected.length) {
+    throw new RunError("range_not_in_index", `${window[0]}-${window[1]}`);
+  }
+
+  const fileLinesCache = new Map();
+  const loadLines = (locator) => {
+    const filePart = String(locator || "").split(/:L\d+-L\d+$/)[0] || "原文/原文.txt";
+    const fullPath = path.isAbsolute(filePart) ? filePart : path.join(root, filePart);
+    if (!fileLinesCache.has(fullPath)) {
+      if (!isFile(fullPath)) {
+        throw new RunError("source_file_not_found", String(fullPath));
+      }
+      const text = normalized(decodeUtf8Strict(fs.readFileSync(fullPath)));
+      fileLinesCache.set(fullPath, text.split("\n"));
+    }
+    return fileLinesCache.get(fullPath);
+  };
+
+  const chapters = [];
+  const pooledParagraphs = [];
+  let totalAuthorNoteLines = 0;
+  const authorNoteWarnings = [];
+
+  for (const row of selected) {
+    const allLines = loadLines(row.source_locator);
+    const slice = allLines.slice(Math.max(0, row.start_line - 1), row.end_line);
+    const { paragraphs, authorNoteLines } = extractBodyParagraphs(slice, {
+      stripTitle: true,
+      title: row.title || "",
+    });
+    const metrics = computeProseMetrics(paragraphs, authorNoteLines);
+    chapters.push({
+      chapter: row.chapter,
+      title: row.title || "",
+      source_locator: row.source_locator,
+      ...metrics,
+    });
+    pooledParagraphs.push(...paragraphs);
+    totalAuthorNoteLines += authorNoteLines;
+    if (authorNoteLines > 0) {
+      authorNoteWarnings.push(`第${row.chapter}章含 ${authorNoteLines} 行作者有话说`);
+    }
+  }
+
+  const aggregate = computeProseMetrics(pooledParagraphs, totalAuthorNoteLines);
+  if (chapters.length) {
+    aggregate.first_para_chars = chapters[0].first_para_chars;
+    aggregate.first_dialogue_pos = chapters[0].first_dialogue_pos;
+  }
+  const payload = {
+    ok: true,
+    mode: "chapters",
+    root: String(root),
+    chapter_window: [selected[0].chapter, selected[selected.length - 1].chapter],
+    chapters,
+    aggregate,
+    author_note_warnings: authorNoteWarnings,
+  };
+  payload.markdown_table = formatProseStatsMarkdown(payload);
+  return payload;
+}
+
+const SUBCOMMAND_HELP = {
+  plan:
+    "usage: manage_analysis_run.js plan --root DIR [--index PATH] [--expected-chapters N] [--intent continue|enhance] [--next N] [--chapters A-B]\n\n" +
+    "Compute remaining analysis batches without mutating state.\n",
+  commit:
+    "usage: manage_analysis_run.js commit --root DIR --batch-id ID --input FILE [--range-sha256 SHA] [--source-file PATH ...]\n\n" +
+    "Validate and atomically commit one extraction batch into chapter summaries and _progress.md.\n",
+  split:
+    "usage: manage_analysis_run.js split --root DIR --batch-id ID [--at CHAPTER]\n\n" +
+    "Split an oversized batch (at CHAPTER or auto-midpoint by char count) and persist the split boundary.\n",
+  "repair-progress":
+    "usage: manage_analysis_run.js repair-progress --root DIR [--batch-id ID]\n\n" +
+    "Rebuild or recover _progress.md runtime state from existing verified summaries and caches.\n",
+  "mark-stage":
+    "usage: manage_analysis_run.js mark-stage --root DIR --stage stage1..stage6 [--status completed|completed_with_errors] [--output PATH] [--prepare]\n\n" +
+    "Verify required outputs for a stage and record stage completion in _progress.md.\n",
+  digest:
+    "usage: manage_analysis_run.js digest --root DIR --part observations|chapters [--chapters A-B] [--fields LIST] [--points none|brief|full]\n\n" +
+    "Emit compact observations or chapter summaries for downstream synthesis.\n",
+  "prose-stats":
+    "usage: manage_analysis_run.js prose-stats (--root DIR [--index PATH] [--chapters A-B] | --file PATH) [--format json|markdown]\n\n" +
+    "Measure deterministic prose metrics (char count, paragraph median, dialogue ratio, punctuation, POV) with author-note stripping. Defaults to <root>/chapter_index.csv when --root is used.\n",
+};
+
+function printHelp(command = null) {
+  if (command && SUBCOMMAND_HELP[command]) {
+    process.stdout.write(SUBCOMMAND_HELP[command]);
+    return;
+  }
   process.stdout.write(
-    "usage: manage_analysis_run.js {plan,commit,split,repair-progress,mark-stage,digest} ...\n\n" +
-    "Plan, commit, split, and recover long-analysis batches.\n"
+    "usage: manage_analysis_run.js {plan,commit,split,repair-progress,mark-stage,digest,prose-stats} ...\n\n" +
+    "Plan, commit, split, recover, and measure prose stats for long-analysis batches.\n" +
+    "Run `manage_analysis_run.js <subcommand> --help` for subcommand flags.\n"
   );
 }
 
 function parseArgs(argv) {
   if (!argv.length) {
-    throw new Error("command is required (choose from: plan, commit, split, repair-progress, mark-stage, digest)");
+    throw new Error("command is required (choose from: plan, commit, split, repair-progress, mark-stage, digest, prose-stats)");
   }
   if (argv[0] === "-h" || argv[0] === "--help") {
     printHelp();
@@ -1515,7 +1843,7 @@ function parseArgs(argv) {
   }
   const command = argv[0];
   const rest = argv.slice(1);
-  if (!["plan", "commit", "split", "repair-progress", "mark-stage", "digest"].includes(command)) {
+  if (!["plan", "commit", "split", "repair-progress", "mark-stage", "digest", "prose-stats"].includes(command)) {
     throw new Error(`unknown_command:${command}`);
   }
   const args = {
@@ -1538,12 +1866,14 @@ function parseArgs(argv) {
     part: null,
     fields: null,
     points: "none",
+    file: null,
+    format: "json",
   };
 
   for (let i = 0; i < rest.length; i += 1) {
     const tok = rest[i];
     if (tok === "-h" || tok === "--help") {
-      printHelp();
+      printHelp(command);
       return { help: true };
     }
     let flag = tok;
@@ -1574,8 +1904,13 @@ function parseArgs(argv) {
       if (v !== "continue" && v !== "enhance") throw new Error(`invalid_intent:${v}`);
       args.intent = v;
     } else if (flag === "--next" && command === "plan") args.next = nextInt();
-    else if (flag === "--chapters" && (command === "plan" || command === "digest")) args.chapters = nextVal();
-    else if (flag === "--input" && command === "commit") args.input = nextVal();
+    else if (flag === "--chapters" && (command === "plan" || command === "digest" || command === "prose-stats")) args.chapters = nextVal();
+    else if (flag === "--file" && command === "prose-stats") args.file = nextVal();
+    else if (flag === "--format" && command === "prose-stats") {
+      const v = nextVal();
+      if (v !== "json" && v !== "markdown") throw new Error(`invalid_format:${v}`);
+      args.format = v;
+    } else if (flag === "--input" && command === "commit") args.input = nextVal();
     else if (flag === "--batch-id" && (command === "commit" || command === "split" || command === "repair-progress")) args.batchId = nextVal();
     else if (flag === "--range-sha256" && command === "commit") args.rangeSha256 = nextVal();
     else if (flag === "--source-file" && command === "commit") args.sourceFiles.push(nextVal());
@@ -1604,7 +1939,7 @@ function parseArgs(argv) {
     }
   }
 
-  if (!args.root) throw new Error("--root is required");
+  if (!args.root && !(command === "prose-stats" && args.file)) throw new Error("--root is required");
   if (command === "commit" && (!args.input || !args.batchId)) throw new Error("--input and --batch-id are required");
   if (command === "split" && !args.batchId) throw new Error("--batch-id is required");
   if (command === "mark-stage" && !args.stage) throw new Error("--stage is required");
@@ -1629,12 +1964,17 @@ function main(argv = process.argv.slice(2)) {
     "repair-progress": repairCommand,
     "mark-stage": markStageCommand,
     digest: digestCommand,
+    "prose-stats": proseStatsCommand,
   };
 
   try {
     const payload = handlers[args.command](args);
     if (args.command === "digest") {
       process.stdout.write(payload.text);
+      return 0;
+    }
+    if (args.command === "prose-stats" && args.format === "markdown") {
+      process.stdout.write(payload.markdown_table);
       return 0;
     }
     process.stdout.write(JSON.stringify(sortKeysDeep(payload), null, 2) + "\n");
@@ -1661,6 +2001,8 @@ module.exports = {
   repairCommand,
   markStageCommand,
   digestCommand,
+  proseStatsCommand,
+  computeProseMetrics,
   main,
 };
 

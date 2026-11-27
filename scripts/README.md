@@ -13,8 +13,6 @@
 | `lint-repo.py` + `current-contract.json` | 仓库统一静态守卫（支持 `--only static\|contracts\|shared\|numbering\|agent-refs`）：① `static` 结构化验证 frontmatter、Markdown 路径/锚点、Agent 引用、references 可达性与除 `browser-cdp` 外的跨 Skill 隔离；② `contracts` 校验 `current-contract.json` schema、`setup_skill_version` / `agents_version` 对齐、`progress_schema_version` 锚点、`demo/` 主产物非空及 `quality-rubric.md` 维度一致；③ `shared` 调用 `sync-shared-assets.py check`、`shared-references.py check` 并检查部署 Agent 资料前缀、profile 归属与可达性；④ `numbering` 拦截 `skills/**/*.md` 代码围栏外的 `Step/Phase/Stage N.M` 小数标签 | CI（Linux）；提交前必跑 |
 | `check-doc-budget.mjs` + `doc-budget.json` | 热路径 SKILL/references/agent 模板的去空白字数预算与路径合计上限（纯 Node ESM）；每次调用硬上限 35K（`path_ceiling`，豁免列 `exempt` 并写原因）；带 `agent` 字段的路径按角色计每次调用的实际加载量并自动计入模板预加载的 skill；`文件#小节` 只计一节，`generated` 运行拼包脚本计量，`branches` 默认互斥、会同时发生的登记进 `stacking` 取最坏组合 | CI（Linux）；增删热路径正文后 |
 | `check-plugin-packaging.py` | Claude/ZCode/Reasonix catalog 与原生 manifest 的单 bundle 身份、版本锚点、默认组件发现和 14 个根 Skills | CI（三平台）；改 plugin packaging 后 |
-| `check-python-invocation.sh` | 技能文档禁止裸调 `python3`（须 python3→python→py 探测） | CI（Linux） |
-| `check-scan-runtime-policy.sh` | scraper 输出文件名依赖本地日期 helper；CDP 探测/Windows 监听解析的源码策略 | CI（Linux） |
 | `check-story-setup-deployment.sh` | story-setup 部署/运行时回归（慢，>2min） | CI（Linux） |
 | `check-claude-adapter.sh` | Claude marketplace、根 plugin manifest 与 14 个 skill 自动发现；可选真实 CLI 生命周期 | CI（静态）；`CLAUDE_REAL_CHECK=1`（真实 CLI） |
 | `check-codex-adapter.sh` | Codex 适配层：repo skills symlink、agent TOML、Node hooks 与跨平台 launcher | CI（调 generate-codex-agents.py 验生成确定性） |
@@ -44,8 +42,7 @@
 | `test-outline-contract.js` | 长篇细纲结构验收：新旧字段名与小节名、「这章怎么走」五行、三到五列情节点表、字数口径、双轨 `hard_failures`/`soft_warnings` + `--strict` 与正负例回归 | CI（三平台） |
 | `test-normalize-punctuation.js` | 标点归一化的只读检查、frontmatter/fence、CRLF、引号模式与幂等性 | CI（三平台） |
 | `test-scan-runtime.js` | CDP argv 边界/报错/JSON 契约与 7 个 scraper 无副作用 import；七猫、起点书库翻页与反爬字体解码 | CI（三平台） |
-| `test-scan-runtime-policy.py` | 变异验证 scan/browser 静态策略不会被无关或死代码关键词骗过 | CI（Linux）；改 `check-scan-runtime-policy.sh` 后 |
-| `test-scan-aggregate.py` | 扫榜聚合 `aggregate-rank.js` 的解析、去重、分布、样本不足标注与抽样取回原文回归 | CI（三平台） |
+| `test-scan-aggregate.py` | 扫榜聚合 `aggregate-rank.js` 的解析、去重、分布、样本不足标注与抽样取回原文回归 | CI（Linux） |
 | `test-publish-format.py` | `skills/story-publish/scripts/check-publish-format.js` 回归：元信息与格式版本、字段取值、平台规则、标签/分类上限、书名长度提醒与中文路径只读行为 | CI（三平台） |
 | `test-writer-pipeline.py` | 长篇取段器与 prompt 组装器公开 CLI：存量卷纲、新旧段头写法、退役历史、原生路径、必需资料与召回降档 | CI（三平台） |
 | `test-style-precedence.py` | 书级表达豁免在深扫、标点整理、写后和下一章门禁中一致生效且不跨书 | CI（三平台） |
@@ -68,7 +65,6 @@
 | `test-codex-cli-e2e.sh` | 隔离 HOME 后用真实 Codex CLI 检查 repo 14 个 skill 的发现结果 | CLI compatibility CI；需已安装 `codex` |
 | `test-opencode-cli-e2e.sh` | 真实 OpenCode 2.x CLI e2e：repo 14 skills 发现 / 14 commands / 7 agents / 插件 active，并用 mock 模型验证写正文拦截、写后兜底与 compaction 注入 | CLI compatibility CI；需已安装 OpenCode 2.x |
 | `opencode-mock-llm.mjs` | OpenAI 兼容 mock 模型：按剧本文件发出工具调用并记录请求，供 OpenCode CLI 真实测试驱动运行时 | 被 `test-opencode-cli-e2e.sh`、`test-agent-permissions.py --opencode` 调用 |
-| `test-charcount-portable.sh` | 跨平台字符统计命令在三平台 + Windows Store stub 下的正确性 | CI（三平台） |
 
 ## 代码生成 / 同步
 

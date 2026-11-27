@@ -292,6 +292,27 @@ const LIBRARY_DEFAULT_PAGES = 3;
 const LIBRARY_MAX_PAGES = 10;
 const LIBRARY_REQUEST_GAP_MS = 800;
 const LIBRARY_SPARSE_BELOW = 15;
+// 七猫出版频道（ch=3）及混入全站书库的非网文大类与专有子分类，扫描时自动剔除以免污染网文分布。
+const PUBLISHED_MAIN_CATEGORIES = new Set([
+  "人文社科", "出版小说", "少儿教育", "文学艺术", "经典文学", "经管励志", "出版",
+  "出版物", "文学", "社科", "传记", "科普", "医学", "生活", "工具书", "现实主义",
+]);
+const PUBLISHED_SUB_CATEGORIES = new Set([
+  "散文随笔", "健康养生", "科普读物", "历史文化", "成功有道", "少儿读物", "人物传记",
+  "励志鸡汤", "企业管理", "艺术生活", "心理读物", "外国文学", "亲子教育", "理财经济",
+  "中国文学", "评论研究", "诗词歌赋", "思想政治", "历史传记", "现实故事",
+]);
+
+function isPublishedBook(book) {
+  if (!book) return false;
+  if (String(book.channelId || "") === "3") return true;
+  for (const label of [book.genre, book.subGenre]) {
+    if (label && (PUBLISHED_MAIN_CATEGORIES.has(label) || PUBLISHED_SUB_CATEGORIES.has(label))) {
+      return true;
+    }
+  }
+  return false;
+}
 const DESKTOP_HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
@@ -472,7 +493,7 @@ function parseShukuPage(html) {
     const idMatch = href.match(/\/shuku\/(\d+)\/?(?:[?#]|$)/);
     const categoryEl = firstByClass(chunk, "s-category");
     const categoryHref = categoryEl ? attrValue(categoryEl.attrs, "href") || "" : "";
-    const categoryIds = categoryHref.match(/\/shuku\/a-(\d+)-(\d+)-/);
+    const categoryIds = categoryHref.match(/\/shuku\/([a-z0-9]+)-(\d+)-(\d+)-/i);
     const text = (cls) => {
       const el = firstByClass(chunk, cls);
       return el ? htmlText(el.inner) : "";
@@ -485,7 +506,8 @@ function parseShukuPage(html) {
       author: text("s-author"),
       genre: "",
       subGenre: categoryEl ? htmlText(categoryEl.inner) : "",
-      mainId: categoryIds ? categoryIds[1] : "",
+      channelId: categoryIds ? categoryIds[1] : "",
+      mainId: categoryIds ? categoryIds[2] : "",
       status: text("s-status"),
       words: normalizeWords(text("s-words-num")),
       update: text("s-update-time"),
@@ -551,9 +573,10 @@ function summarizeLibraryQuality(books, rawCount, pageProblems) {
   return { linked, problems, quality: problems.length ? "[存在问题]" : "[OK]" };
 }
 
-function renderLibraryMarkdown({ books, rawCount, pages, pagesRead, pageProblems = [], now = new Date().toISOString() }) {
+function renderLibraryMarkdown({ books, rawCount, pages, pagesRead, pageProblems = [], excludedPublished = 0, now = new Date().toISOString() }) {
   const summary = summarizeLibraryQuality(books, rawCount, pageProblems);
   const range = pagesRead < pages ? `取前 ${pages} 页（实取 ${pagesRead} 页）` : `取前 ${pages} 页`;
+  const publishedNote = excludedPublished > 0 ? `；已排除出版/非网文 ${excludedPublished} 本` : "";
   const lines = [
     `# 七猫 · ${LIBRARY_LIST}`,
     "",
@@ -562,7 +585,7 @@ function renderLibraryMarkdown({ books, rawCount, pages, pagesRead, pageProblems
     `- 问题摘要：${summary.problems.length ? summary.problems.join("；") : "无"}`,
     `- 作品页链接：${summary.linked} / ${books.length}`,
     `- 来源：${libraryPageUrl(1)}`,
-    `- 筛选：${LIBRARY_FILTER_NOTE}；${LIBRARY_SORT}排序，${range}；名次即页序，书库页没有热度数字`,
+    `- 筛选：${LIBRARY_FILTER_NOTE}；${LIBRARY_SORT}排序，${range}；名次即页序，书库页没有热度数字${publishedNote}`,
     `- 抓取时间：${now}`,
     `- 条目数：${books.length}`,
     "",
@@ -662,14 +685,24 @@ async function scrapeLibrary(pages) {
   }
   for (const book of books) book.genre = mainNames.get(book.mainId) || "";
 
+  const webnovelBooks = books.filter((book) => !isPublishedBook(book));
+  const excludedPublished = books.length - webnovelBooks.length;
+  webnovelBooks.forEach((book, idx) => {
+    book.rank = idx + 1;
+  });
+  if (excludedPublished > 0) {
+    console.log(`  已过滤出版/非网文 ${excludedPublished} 本`);
+  }
+
   const { content, summary } = renderLibraryMarkdown({
-    books,
-    rawCount: books.length + invalid,
+    books: webnovelBooks,
+    rawCount: webnovelBooks.length + invalid,
     pages,
     pagesRead,
     pageProblems,
+    excludedPublished,
   });
-  console.log(`  ✓ 提取 ${books.length} 本（链接 ${summary.linked}/${books.length}，${summary.quality}）`);
+  console.log(`  ✓ 提取 ${webnovelBooks.length} 本（链接 ${summary.linked}/${webnovelBooks.length}，${summary.quality}）`);
   return { content, partialReasons: pageProblems };
 }
 
@@ -871,6 +904,9 @@ module.exports = {
   extractBooksFromTextJS,
   extractBooksFromText,
   isUsableBook,
+  isPublishedBook,
+  PUBLISHED_MAIN_CATEGORIES,
+  PUBLISHED_SUB_CATEGORIES,
   cleanDesc,
   renderMarkdown,
   rankUrl,

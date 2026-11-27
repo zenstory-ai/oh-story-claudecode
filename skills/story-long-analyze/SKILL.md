@@ -10,7 +10,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 > Agent 兼容性：只查当前宿主 agent（ZCode 查插件注册同名角色，用 `Agent` 按实际 schema 派发，不要求 `.zcode/agents`）。仅角色/工具缺失或调用失败时降级 solo/direct，用一句白话告知作者，不加技术尾注，不扫描其他 CLI 目录或按宿主名固定降级。
 >
-> Spawn 版本提示（不阻断 spawn）：读项目根 `.story-deployed` 的 `agents_version`。与 `agents_version: 46` 不一致时照常检查并 spawn，仅一句白话提示「分析助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」（>46 另提示先更新 oh-story-claudecode，勿用旧版降级覆盖）。
+> Spawn 版本提示（不阻断 spawn）：读项目根 `.story-deployed` 的 `agents_version`。与 `agents_version: 47` 不一致时照常检查并 spawn，仅一句白话提示「分析助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」（>47 另提示先更新 oh-story-claudecode，勿用旧版降级覆盖）。
 
 ## 分析边界与运行约定
 
@@ -69,7 +69,7 @@ node "{story-long-analyze skill 根}/scripts/inspect_existing_assets.js" --root 
 ## 各阶段要点与状态
 
 - **Stage 0 索引**：按 LF 计物理行、剔目录块并校验章号连续；错位报错读 [pipeline-ops.md](references/pipeline-ops.md#原文变化与章号对不上) 转告选项（默认推按旧章号继续）。
-- **Stage 1–6**：Stage 1 拆完前三章未要求全跑则停问；Stage 2 默认每轮 3 批有限并行；Stage 3–5 用 `digest` 取料；Stage 6 定点生成量化指标＋原文切片 `文风.md`。
+- **Stage 1–6**：Stage 1 先跑 `manage_analysis_run.js prose-stats` 确定性出数再拆前三章并写 `_style-sample.txt`，未要求全跑则停问；Stage 2 默认每轮 3 批有限并行；Stage 3–5 用 `digest` 取料；Stage 6 用 `prose-stats` + 定点原文切片生成 `文风.md`。
 - **选题回填**：Stage 5 后找 `选题决策.md`，只回填标「待拆文验证」且题材匹配项（见 stage5-report.md）。无「推荐选题」跳过；有推荐选题但缺「能爆的原因」按 author-facing「选题决策缺栏目」告知并跳过回填、不影响拆文完成；无文件不影响拆文。
 - **状态保护**：运行状态唯一落在 `_progress.md` 受管区，既有 `schema_version: 2` 原值保留；`最终状态` 由脚本写（Stage 3–6 全成写 `completed`，供 hooks 判断，不手改）。
 

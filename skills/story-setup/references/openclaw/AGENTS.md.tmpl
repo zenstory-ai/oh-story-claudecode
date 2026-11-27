@@ -15,7 +15,7 @@ OpenClaw 会从项目 `skills/` 目录发现 `SKILL.md`。优先通过 OpenClaw 
 | `/skill story-long-scan`、长篇扫榜 | story-long-scan | 长篇小说榜单与市场趋势 |
 | `/skill story-short-scan`、短篇扫榜 | story-short-scan | 短篇小说榜单与情绪风口 |
 | `/skill story-deslop`、去 AI 味 | story-deslop | 去除 AI 写作痕迹 |
-| `/skill story-cover`、封面 | story-cover | 生成封面图；需要 `GPT_IMAGE_API_KEY` |
+| `/skill story-cover`、封面 | story-cover | 封面提示词设计；生图需要 `GPT_IMAGE_API_KEY` |
 | `/skill story-publish`、发布资料 | story-publish | 发布准备：整理并核对平台书籍资料；封面能力不可用时记待办 |
 | `/skill story-review`、审查 | story-review | 多视角审查；OpenClaw Phase 1 默认 solo/soft-fallback |
 | `/skill story-import`、导入 | story-import | 逆向导入已有小说到项目结构 |
@@ -28,7 +28,7 @@ OpenClaw 会从项目 `skills/` 目录发现 `SKILL.md`。优先通过 OpenClaw 
 - Phase 1 只部署 skills：`skills/*/SKILL.md` 使用 OpenClaw 兼容 frontmatter（`name` / `description` 单行，`metadata` 单行 JSON）。
 - 暂不部署 OpenClaw agents/hooks：写正文前大纲守卫、commit 提醒、session/compact 自动注入在 OpenClaw 下不是硬拦截，只作为 skill 内软约束执行。
 - OpenClaw 会在 session 启动时 snapshot eligible skills；部署或更新后如未立即出现，请新开 OpenClaw session，或等待 skills watcher 刷新。
-- `story-cover` 依赖 `GPT_IMAGE_API_KEY`，未配置时 OpenClaw 会将该 skill 标记为不可用/缺少 env。
+- `story-cover` 生图需要 `GPT_IMAGE_API_KEY`（未配置时 OpenClaw 可能标记缺少 env）；仅设计封面提示词不依赖该密钥。
 
 ## 文件结构
 
@@ -43,9 +43,9 @@ OpenClaw 会从项目 `skills/` 目录发现 `SKILL.md`。优先通过 OpenClaw 
 
 ## 写作约束
 
-- 写正文前必须先有对应大纲：长篇 `大纲/细纲_第N章*.md`，短篇 `小节大纲.md`。
+- 写正文前必须先有对应大纲：长篇 `大纲/细纲_第N章*.md`（或区间细纲 `大纲/细纲_第A-B章*.md`），短篇 `小节大纲.md`。
 - OpenClaw Phase 1 没有硬 hook 拦截；执行写作 skill 时必须由 skill 流程自行检查大纲，不得跳过。
-- **每章写完先去 AI 味**（没有 hook 替你检查）：正文落盘后同一轮内按写作 skill 的去味流程复核 `review_required` 机械套式（词表仅作语境定位线索，不逐词清零）；能运行 node 时跑写作 skill 的 `scripts/check-ai-patterns.js --check --respect-skip --fail-on=review_required {正文文件}`。命中 `review_required` 优先改写，确需保留须附简短理由（长篇用 `--ack <规则>:<理由>` 放行）；作者明确说「这章不去味」时仍可在标题行下加 `<!-- 去味:跳过 -->` 跳过。
+- **每章写完先去 AI 味**（没有 hook 替你检查）：正文落盘后同一轮内按写作 skill 的去味流程复核 `review_required` 机械套式（词表仅作语境定位线索，不逐词清零）；能运行 node 时跑写作 skill 的 `scripts/check-ai-patterns.js --check --mode=auto --respect-skip --fail-on=review_required {正文文件}`。命中 `review_required` 优先改写，确需保留须附简短理由（长篇用 `--ack <规则>:<理由>` 放行）；作者明确说「这章不去味」时仍可在标题行下加 `<!-- 去味:跳过 -->` 跳过。
 
 ## 与作者协作
 

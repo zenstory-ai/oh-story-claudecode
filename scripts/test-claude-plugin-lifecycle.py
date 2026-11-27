@@ -48,7 +48,7 @@ def test_scope(scope: str) -> None:
         def installed() -> list[dict[str, Any]]:
             value = json.loads(cli("list", "--json"))
             assert isinstance(value, list), value
-            return value
+            return [item for item in value if not str(item.get("id", "")).endswith("@builtin")]
 
         def assert_records(expected: set[str]) -> list[dict[str, Any]]:
             records = installed()

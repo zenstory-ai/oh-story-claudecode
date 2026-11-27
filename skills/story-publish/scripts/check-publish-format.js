@@ -99,7 +99,28 @@ function unfenced(lines, start = 0, end = lines.length) {
         fence = null;
       }
     } else if (marker) {
-      fence = marker[1];
+      // Only enter a fenced code block when a matching closing fence exists later and the
+      // opening info string is valid (prevents decorative dividers like "~~~~~·" in synopses
+      // from swallowing subsequent "## " headings).
+      const ch = marker[1][0];
+      const len = marker[1].length;
+      const info = marker[2].trim();
+      const validInfo = ch === "`" ? !info.includes("`") : /^[A-Za-z0-9_+-]*$/.test(info);
+      let hasClosing = false;
+      if (validInfo) {
+        for (let j = index + 1; j < end; j++) {
+          const close = lines[j].match(/^ {0,3}(`{3,}|~{3,})[ \t]*$/);
+          if (close && close[1][0] === ch && close[1].length >= len) {
+            hasClosing = true;
+            break;
+          }
+        }
+      }
+      if (hasClosing) {
+        fence = marker[1];
+      } else {
+        kept.push([index, lines[index]]);
+      }
     } else {
       kept.push([index, lines[index]]);
     }
@@ -188,6 +209,15 @@ function titleWarnings(title, rule) {
       warnings.push(`书名只能用这些符号：${rule.symbols}，不能用：${invalid.join("")}`);
     }
   }
+  if (rule.warn_chars) {
+    const found = [...new Set(chars.filter((ch) => rule.warn_chars.includes(ch)))];
+    if (found.length) {
+      warnings.push(`书名含「${found.join("")}」，后台可能提示无法签约。`);
+    }
+  }
+  if (rule.warn_emoji && /(?:\p{Emoji_Presentation}|\p{Extended_Pictographic}\uFE0F)/u.test(title)) {
+    warnings.push("书名含 emoji，后台可能提示无法签约。");
+  }
   return warnings;
 }
 
@@ -216,7 +246,7 @@ function check(text) {
       HEADER_KEYS
     )
   ) {
-    return [[`元信息必须每行一项，依次为：${HEADER_KEYS.join("、")}。`], []];
+    return [[`元信息必须每行一项（每行以「> 字段：值」开头），依次为：${HEADER_KEYS.join("、")}。`], []];
   }
   const meta = {};
   for (const m of headerMatches) {
@@ -235,7 +265,7 @@ function check(text) {
   const colonIdx = headings[0][2].indexOf("：");
   const title = (colonIdx >= 0 ? headings[0][2].slice(colonIdx + 1) : "").trim();
   checkValue("书名", "书本名称", title, errors);
-  if (title && !errors.length) {
+  if (title && title !== BLANK && !errors.length) {
     warnings.push(...titleWarnings(title, spec.title));
   }
 
@@ -267,7 +297,7 @@ function check(text) {
     }
     const limit = spec.max_length && spec.max_length[name];
     const valueLen = [...value].length;
-    if (limit && valueLen > limit) {
+    if (limit && value !== BLANK && valueLen > limit) {
       warnings.push(`${name} ${valueLen} 个字，平台上限 ${limit}。`);
     }
   }
@@ -279,6 +309,11 @@ function check(text) {
   const coverMode = cover.get("模式");
   if (coverMode && !COVER_MODES.has(coverMode)) {
     errors.push(`封面模式只能是：${[...COVER_MODES].sort().join("、")}，未选时留空。`);
+  }
+  for (const fieldName of ["状态", "提示词", "图片"]) {
+    if (cover.has(fieldName)) {
+      checkValue("封面", fieldName, cover.get(fieldName), errors);
+    }
   }
 
   tagSectionEntries.forEach(([section, rule], offset) => {
@@ -326,10 +361,14 @@ function check(text) {
   const synopsis = hasSynopsis
     ? blockLines(lines, headings, tagSectionEntries.length + 2).join("\n").trim()
     : BLANK;
-  if (synopsis !== BLANK) {
+  if (synopsis !== "" && synopsis !== BLANK) {
     checkValue("作品简介", "正文", synopsis, errors);
+    const minLimit = spec.min_length && spec.min_length["作品简介"];
     const limit = spec.max_length && spec.max_length["作品简介"];
     const synLen = [...synopsis].length;
+    if (minLimit && synLen < minLimit) {
+      warnings.push(`作品简介 ${synLen} 字，平台下限 ${minLimit}。`);
+    }
     if (limit && synLen > limit) {
       warnings.push(`作品简介 ${synLen} 字，平台上限 ${limit}。`);
     }
@@ -359,7 +398,7 @@ function main(argv = process.argv.slice(2)) {
     process.stderr.write(`FAIL: ${error}\n`);
   }
   if (!errors.length) {
-    process.stdout.write("PASS: 发布资料符合格式契约与平台候选\n");
+    process.stdout.write("PASS: 发布资料格式与平台候选项校验通过\n");
   }
   return errors.length ? 1 : 0;
 }

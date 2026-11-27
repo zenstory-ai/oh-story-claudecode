@@ -2541,6 +2541,39 @@ function testJjwxcRankSkipsFilterUiWithoutNovelId() {
   ]);
 }
 
+function testCiweimaoAndCdpArgumentValidation() {
+  const ciweimaoPath = path.join(repoRoot, "skills/story-long-scan/scripts/ciweimao-rank-scraper.js");
+  const badType = spawnSync(process.execPath, [ciweimaoPath, "--type", "invalid-rank"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.strictEqual(badType.status, 1, "ciweimao 未知 --type 应立刻以退出码 1 失败");
+  assert.match(badType.stderr, /未知 --type: invalid-rank/, `应报未知 --type，实际：${badType.stderr}`);
+
+  const setupPath = path.join(repoRoot, "skills/browser-cdp/scripts/setup-cdp-chrome.js");
+  const inlineOk = spawnSync(process.execPath, [setupPath, "--port=9333", "--profile=Profile 1", "--dry-run"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  // If Chrome isn't installed on a headless CI box it exits 1 after parsing args; on macOS with Chrome it exits 0.
+  assert(inlineOk.status === 0 || inlineOk.status === 1, `setup-cdp-chrome 应接受 --port= 与 --profile=，实际 status=${inlineOk.status} stderr=${inlineOk.stderr}`);
+  assert.match(inlineOk.stdout, /CDP 端口: 9333 \| profile: Profile 1/, `应解析出端口与 profile，实际：${inlineOk.stdout}`);
+
+  const dupPort = spawnSync(process.execPath, [setupPath, "9222", "--port", "9333", "--detect-only"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.strictEqual(dupPort.status, 2, "重复端口应退出 2");
+  assert.match(dupPort.stderr, /重复指定端口参数/);
+
+  const badProfile = spawnSync(process.execPath, [setupPath, "--profile=../evil", "--detect-only"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.strictEqual(badProfile.status, 2, "路径穿越 --profile= 应退出 2");
+  assert.match(badProfile.stderr, /名称非法/);
+}
+
 testCdpUtils(longUtilsPath);
 testWindowsInvocationBuilder(longUtilsPath);
 testLocalDateStamp(longUtilsPath);
@@ -2574,4 +2607,5 @@ testCdpRejectsUnverifiableIdentity();
 testCdpAcceptsPortHeldByLaunchedChildProcess();
 testCdpResetSucceedsWhenPortActuallyFrees();
 testCdpIncrementalRefreshCopiesWalAndLocalState();
+testCiweimaoAndCdpArgumentValidation();
 console.log("OK: scan runtime uses shell-safe CDP calls and side-effect-free scraper modules");

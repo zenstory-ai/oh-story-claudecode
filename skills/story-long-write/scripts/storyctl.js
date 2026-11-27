@@ -48,10 +48,18 @@ const HUMAN_BODY_ACTION_SENTENCE_RATIO = 0.12;
 const HUMAN_BODY_ACTION_SENTENCE_RANGE = [0.03, 0.23];
 const HUMAN_THOUGHT_CAUSAL_SENTENCE_RATIO = 0.15;
 const HUMAN_THOUGHT_CAUSAL_SENTENCE_RANGE = [0.04, 0.28];
+const HUMAN_PURE_NARR_MEDIAN = 23;
+const HUMAN_DLG_PARA_MEDIAN = 28;
+const HUMAN_NARR_CONN_PER_1K = 8.2;
+const HUMAN_TC_BA_RATIO = 0.85;
 
 const _STRUCTURAL_DIVIDER_RE = /^[-*_—─━=]{3,}$/;
 const _FRONTMATTER_KEY_RE = /^[A-Za-z_\u3400-\u9FFF][^:\n]{0,80}:/;
 const _QUOTED = /“[^”]*”|「[^」]*」|『[^』]*』|"[^"]*"/g;
+const _HAS_QUOTE_RE = /[“”「」『』"]/;
+const _VIS_CHAR_RE = /[\u4e00-\u9fff\uff21-\uff5aA-Za-z0-9]/g;
+const _COLLOQUIAL_CONN_RE = /但是|可是|不过|虽然|因为|所以|偏偏|干脆|其实|毕竟|竟然|好在|倒也|却|才|便|正要|已经/g;
+const CAMERA_REPORT_WARNING_MESSAGE = '叙述偏摄像头报幕，缺人物内心盘算与口语因果连接';
 const _BODY_ACTION_SENTENCE_RE =
   /指尖|指腹|手指|指节|手背|掌心|拳头|手腕|袖口|衣角|喉结|眼眶|眼底|眸光|目光|视线|眼神|眉头|嘴角|唇角|肩膀|呼吸|伸手|抬手|探手|拿起|拿过|取出|取过|掏出|摸出|抓起|攥住|攥紧|握住|握紧|捏住|按住|压住|扣住|拢住|摩挲|推开|拉开|打开|关上|放下|递给|挑开|掀开|扯开|转身|回头|抬头|低头|弯腰|俯身|走到|走向|坐下|站起|盯着|扫过|看向|望向/;
 const _THOUGHT_CAUSAL_SENTENCE_RE =
@@ -195,21 +203,74 @@ function fragmentation(text) {
 }
 
 function proseBalance(text) {
-  const { sentences } = _narrativeSentences(text);
+  const { paragraphs, sentences } = _narrativeSentences(text);
   const total = sentences.length;
   const actHits = sentences.filter((s) => _BODY_ACTION_SENTENCE_RE.test(s)).length;
   const thoughtHits = sentences.filter((s) => _THOUGHT_CAUSAL_SENTENCE_RE.test(s)).length;
+  const pureNarrLens = [];
+  const dlgParaLens = [];
+  let narrVisChars = 0;
+  let connHits = 0;
+
+  for (const line of paragraphs) {
+    const plen = charLen(line.replace(/\s/g, ''));
+    if (_HAS_QUOTE_RE.test(line)) {
+      dlgParaLens.push(plen);
+    } else {
+      pureNarrLens.push(plen);
+    }
+    const stripped = line.replace(_QUOTED, '').trim();
+    if (!stripped) continue;
+    const vis = stripped.match(_VIS_CHAR_RE);
+    if (vis) narrVisChars += vis.length;
+    _COLLOQUIAL_CONN_RE.lastIndex = 0;
+    while (_COLLOQUIAL_CONN_RE.exec(stripped) !== null) connHits += 1;
+  }
+
+  const actRatioRaw = total ? actHits / total : null;
+  const thoughtRatioRaw = total ? thoughtHits / total : null;
+  const pureNarrMedian = median(pureNarrLens);
+  const dlgParaMedian = median(dlgParaLens);
+  const narrConnPer1k = narrVisChars > 0 ? round3((connHits / narrVisChars) * 1000) : null;
+  const tcBaRatio = total ? round3(thoughtRatioRaw / Math.max(actRatioRaw, 0.01)) : null;
+
+  // 非阻断 advisory 告警（2,450 篇真 9.0+ 长篇标定触发率 ~1.5%，永不变成硬阻断）：
+  // 捕获高肢体报幕 + 低内心盘算 + 低口语连接的剧本分镜失衡章。
+  const cameraReportImbalance =
+    total >= 15 &&
+    narrVisChars >= 400 &&
+    narrConnPer1k !== null &&
+    (
+      (thoughtRatioRaw < 0.04 && actRatioRaw >= 0.15 && narrConnPer1k <= 7.0 && (pureNarrMedian === null || pureNarrMedian >= 26)) ||
+      (actRatioRaw > 0.23 && tcBaRatio < 0.25 && narrConnPer1k <= 7.0)
+    );
+
   return {
     narrative_sentences: total,
     body_action_sentences: actHits,
-    body_action_sentence_ratio: total ? round3(actHits / total) : null,
+    body_action_sentence_ratio: total ? round3(actRatioRaw) : null,
     thought_causal_sentences: thoughtHits,
-    thought_causal_sentence_ratio: total ? round3(thoughtHits / total) : null,
+    thought_causal_sentence_ratio: total ? round3(thoughtRatioRaw) : null,
+    pure_narr_median: pureNarrMedian,
+    dlg_para_median: dlgParaMedian,
+    narr_conn_per_1k: narrConnPer1k,
+    tc_ba_ratio: tcBaRatio,
+    advisory: cameraReportImbalance
+      ? {
+          level: 'advisory',
+          code: 'camera-report-telegraph',
+          message: CAMERA_REPORT_WARNING_MESSAGE,
+        }
+      : null,
     human_reference: {
       body_action_sentence_ratio: HUMAN_BODY_ACTION_SENTENCE_RATIO,
       body_action_sentence_range: [...HUMAN_BODY_ACTION_SENTENCE_RANGE],
       thought_causal_sentence_ratio: HUMAN_THOUGHT_CAUSAL_SENTENCE_RATIO,
       thought_causal_sentence_range: [...HUMAN_THOUGHT_CAUSAL_SENTENCE_RANGE],
+      pure_narr_median: HUMAN_PURE_NARR_MEDIAN,
+      dlg_para_median: HUMAN_DLG_PARA_MEDIAN,
+      narr_conn_per_1k: HUMAN_NARR_CONN_PER_1K,
+      tc_ba_ratio: HUMAN_TC_BA_RATIO,
     },
   };
 }
@@ -338,7 +399,11 @@ function checkBlockingQuality(outline, body) {
       toolErrors.push({ type: 'TOOL_UNAVAILABLE', tool: script, message: `missing ${script}` });
       continue;
     }
-    const completed = _hooks.runNodeScript(scriptPath, ['--check', '--json', '--fail-on=blocking', String(body)]);
+    const scriptArgs =
+      name === 'ai-pattern'
+        ? ['--mode=long', '--check', '--json', '--fail-on=blocking', String(body)]
+        : ['--check', '--json', '--fail-on=blocking', String(body)];
+    const completed = _hooks.runNodeScript(scriptPath, scriptArgs);
     const findings = jsonFindings(completed.stdout || '');
     if (findings === null || (completed.status !== 0 && completed.status !== 1)) {
       toolErrors.push({
@@ -488,7 +553,17 @@ function chapterCheck(project, chapter, authorRange = null) {
   } else {
     actions = ['accept-current-length', 'revise-outline-or-target', 'discard'];
   }
-  const state = trackingCall(tracking.loadState, project);
+  let state = null;
+  let trackingStateMissing = false;
+  try {
+    state = trackingCall(tracking.loadState, project);
+  } catch (err) {
+    if (err instanceof WordcountError && /tracking state is missing/i.test(err.message)) {
+      trackingStateMissing = true;
+    } else {
+      throw err;
+    }
+  }
   let compression = null;
   if (length.status === 'over' && (quality.status === 'pass' || quality.status === 'review_required')) {
     const actual = length.actual;
@@ -504,6 +579,16 @@ function chapterCheck(project, chapter, authorRange = null) {
       },
     };
   }
+  const balance = proseBalance(body);
+  const warnings = [];
+  if (balance.advisory) {
+    warnings.push({
+      level: 'advisory',
+      source: 'prose_balance',
+      code: balance.advisory.code,
+      message: balance.advisory.message,
+    });
+  }
   const payload = {
     schema: CHAPTER_CHECK_SCHEMA,
     status,
@@ -512,13 +597,20 @@ function chapterCheck(project, chapter, authorRange = null) {
     quality,
     review_required_items: reviewItems,
     fragmentation: fragmentation(body),
-    prose_balance: proseBalance(body),
+    prose_balance: balance,
     compression,
-    state_revision: state.state_revision,
-    tracking_committed: state.last_committed_chapter >= chapter,
-    next_chapter_started: state.last_committed_chapter > chapter,
+    state_revision: state ? state.state_revision : null,
+    tracking_committed: state ? state.last_committed_chapter >= chapter : false,
+    next_chapter_started: state ? state.last_committed_chapter > chapter : false,
     available_actions: actions,
   };
+  if (warnings.length) {
+    payload.warnings = warnings;
+  }
+  if (trackingStateMissing) {
+    payload.tracking_state_missing = true;
+    payload.tracking_notice = '尚未初始化追踪状态（追踪/_tracking-state.json 缺失），本次仅完成只读正文与字数体检；提交前请先运行 tracking_commit.js init';
+  }
   if (reviewItems.length) {
     payload.review_guidance = REVIEW_GUIDANCE;
   }
@@ -714,10 +806,10 @@ function plainReport(result) {
     const span = `${band.min} 到 ${band.max} 字`;
     if (length.status === 'under') {
       lines.push(
-        `字数：约 ${actual} 字，比范围（${span}）少了约 ${band.min - actual} 字。欠的不补写，请作者选：收下现在的长度、改细纲或目标后重写、或不要这章。`
+        `可见字数：约 ${actual} 字，比范围（${span}）少了约 ${band.min - actual} 字。欠的不补写，请作者选：收下现在的长度、改细纲或目标后重写、或不要这章。`
       );
     } else if (length.status === 'over') {
-      lines.push(`字数：约 ${actual} 字，比范围（${span}）多了约 ${actual - band.max} 字。`);
+      lines.push(`可见字数：约 ${actual} 字，比范围（${span}）多了约 ${actual - band.max} 字。`);
       const compression = result.compression;
       if (compression) {
         const remove = compression.remove_to_internal_band;
@@ -726,7 +818,7 @@ function plainReport(result) {
         );
       }
     } else {
-      lines.push(`字数：约 ${actual} 字，在范围里（${span}）。`);
+      lines.push(`可见字数：约 ${actual} 字，在范围里（${span}）。`);
     }
   }
   for (const error of quality.tool_errors || []) {
@@ -807,11 +899,24 @@ function plainReport(result) {
       `带盘算或因果的叙述句占 ${Math.round(thoughtRatio * 100)}%` +
         `（真人平均约 ${Math.round(HUMAN_THOUGHT_CAUSAL_SENTENCE_RATIO * 100)}%，多数章在 ${Math.round(thLow * 100)}%–${Math.round(thHigh * 100)}%）`,
     ];
+    if (balance.pure_narr_median !== null && balance.pure_narr_median !== undefined) {
+      bParts.push(`纯叙述段中位 ${balance.pure_narr_median} 字`);
+    }
+    if (balance.dlg_para_median !== null && balance.dlg_para_median !== undefined) {
+      bParts.push(`对白段中位 ${balance.dlg_para_median} 字`);
+    }
+    if (balance.narr_conn_per_1k !== null && balance.narr_conn_per_1k !== undefined) {
+      bParts.push(`叙述口语连接 ${Number(balance.narr_conn_per_1k).toFixed(1)}/千字`);
+    }
     const actionHeavy =
       totalSentences >= 8 && (actRatio > 0.29 || (actRatio > actHigh && thoughtRatio < 0.08));
-    const bTail = actionHeavy
-      ? '。动作偏密、心里账偏少：删掉不改局面的手眼或道具小动作，把角色为什么这么选、图什么直接写出来。'
-      : '。';
+    let bTail = '。';
+    if (balance.advisory && balance.advisory.message) {
+      bTail = `。提醒：${balance.advisory.message}；动作偏密、心里账偏少，推进剧情的硬动作保留，删掉不改局面的道具微动作，把角色为什么这么选、图什么直接写出来。`;
+    } else if (actionHeavy) {
+      bTail =
+        '。动作偏密、心里账偏少：推进剧情的硬动作保留，删掉不改局面的手眼或道具微动作，把角色为什么这么选、图什么直接写出来。';
+    }
     lines.push(`动作和心里话（只作参考，不拦）：${bParts.join('，')}${bTail}`);
   }
   return lines;

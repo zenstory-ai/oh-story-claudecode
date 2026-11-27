@@ -14,7 +14,7 @@ const require = createRequire(import.meta.url)
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const CORE_PATH = path.join(REPO_ROOT, "skills/story-setup/references/templates/hooks/story_hook_core.js")
 const CONTRACT_PATH = path.join(REPO_ROOT, "scripts/current-contract.json")
-const DETECTOR_PATH = path.join(REPO_ROOT, "skills/story-long-write/scripts/check-ai-patterns.js")
+const DETECTOR_PATH = path.join(REPO_ROOT, "skills/story-deslop/scripts/check-ai-patterns.js")
 const STORYCTL_PATH = path.join(REPO_ROOT, "skills/story-long-write/scripts/storyctl.js")
 const TRACKING_PATH = path.join(REPO_ROOT, "skills/story-long-write/scripts/tracking_commit.js")
 
@@ -374,6 +374,18 @@ test("cross-file parity with check-ai-patterns.js across all 6 toxic prose rules
       text: "他放下麦克风朝台下鞠了一躬。\n这一切都结束了。\n",
       expectedRules: ["trailer-summary"],
     },
+    ts_soup_block: {
+      text: "十年后铺子生意红火。\n这就是离开最大的意义。\n",
+      expectedRules: ["trailer-summary"],
+    },
+    ni_period_crossline_block: {
+      text:
+        "不是信号中断。是被切断的。\n" +
+        "不是停的。是被掐断的。\n" +
+        "不是没电。\n" +
+        "是被锁死了发条。\n",
+      expectedRules: ["not-is-comparison"],
+    },
     ts_fate_block: {
       text: "她把账单折好塞回包里。\n这一夜注定无人入眠。\n",
       expectedRules: ["trailer-summary"],
@@ -629,6 +641,19 @@ test("proseBlockReason, outlineIsEmpty, debt gate, trackingCheckpointIssue, and 
     assert.match(core.proseBlockReason(root, path.join(root, "long/正文/第1章_起.md")), /细纲_第001章\.md/)
     assert.equal(core.proseBlockReason(root, path.join(root, "long/正文/第2章_承.md")), null)
 
+    // Range outlines (细纲_第A-B章*.md / 至 / ~ / 第A-第B章): allow chapters inside [A, B], block out-of-range & empty stubs
+    const rangeBook = path.join(root, "range-book")
+    write(path.join(rangeBook, "大纲/细纲_第001-005章_开局.md"), filled)
+    write(path.join(rangeBook, "大纲/细纲_第6至第8章.md"), filled)
+    write(path.join(rangeBook, "大纲/细纲_第009~010章.md"), "# 第9-10章\n")
+    writeCleanState(rangeBook, 0)
+    assert.equal(core.proseBlockReason(root, path.join(rangeBook, "正文/第001章_起.md")), null)
+    assert.equal(core.proseBlockReason(root, path.join(rangeBook, "正文/第003章_转.md")), null)
+    assert.equal(core.proseBlockReason(root, path.join(rangeBook, "正文/第005章_合.md")), null)
+    assert.equal(core.proseBlockReason(root, path.join(rangeBook, "正文/第007章_承.md")), null)
+    assert.match(core.proseBlockReason(root, path.join(rangeBook, "正文/第009章_空.md")), /细纲_第009~010章\.md）是空的/)
+    assert.match(core.proseBlockReason(root, path.join(rangeBook, "正文/第011章_越界.md")), /缺少细纲/)
+
     write(path.join(root, "short/设定.md"), "")
     write(path.join(root, "short2/其他.md"), "")
     assert.match(core.proseBlockReason(root, path.join(root, "short/正文.md")), /小节大纲\.md/)
@@ -825,14 +850,15 @@ test("proseBlockReason, outlineIsEmpty, debt gate, trackingCheckpointIssue, and 
     assert.equal(core.hasHardProseFindings(root, shortFile), true)
     assert.match(core.proseAfterWrite(root, shortFile), /【退化\/工程词\/毒句式】[\s\S]*疑似截断/)
 
-    // Long-form chapter still uses original blocking phrasing for 3 not-is hits & trailer-ending
+    // Long-form chapter uses soft-gate aligned phrasing (no stale 本章须清零后再继续) for 3 not-is hits & trailer-ending
     const longChapter = path.join(shortBook, "正文/第001章_长篇对照.md")
     write(
       longChapter,
       `# 第1章\n\n${pad}\n他不是心软，而是怕曝光。\n那不是巧合，而是设局。\n她不是不懂，而是装傻。\n她关上了门。\n`
     )
     const longWarn = core.proseAfterWrite(root, longChapter)
-    assert.match(longWarn, /本章须清零后再继续/)
+    assert.match(longWarn, /风格软门禁复核提醒（非阻断）/)
+    assert.ok(!longWarn.includes("本章须清零后再继续"), "long mode must use soft-gate aligned wording")
 
     // Long-mode trailer-ending parity: `[他她它]们?不知道的是` must be caught by story_hook_core.js too
     const longSpoiler = path.join(shortBook, "正文/第002章_预告对照.md")
@@ -981,6 +1007,179 @@ test("detectStoryGaps foreshadowing, gaps, incomplete analyses, and protocol/sto
         "..draft/第1章.md"
       )
     }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test("parity with check-degeneration.js on truncation, panels, tier-1 engineering leaks, and signoffs", () => {
+  const degenScript = path.join(REPO_ROOT, "skills/story-deslop/scripts/check-degeneration.js")
+  const degenSrc = fs.readFileSync(degenScript, "utf8")
+  const hookSrc = fs.readFileSync(CORE_PATH, "utf8")
+  const tier1Degen = degenSrc.match(/const META_TIER1_RE = \/(.+?)\//)
+  const tier1Hook = hookSrc.match(/const ENG_WORD_PATTERN = \/\((.+?)\)\//)
+  assert.ok(tier1Degen && tier1Hook, "both files must declare Tier-1 engineering word regexes")
+  assert.equal(tier1Hook[1], tier1Degen[1], "ENG_WORD_PATTERN must match META_TIER1_RE verbatim")
+
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "hook-degen-parity-"))
+  try {
+    const cases = [
+      ["tilde-ending-clean", "## 第1章 试探\n\n他把杯子放回桌上。\n“哥，明天见～”\n", false],
+      ["end-signoff-clean", "## 第1章 尾声\n\n他合上账本，准备离开。\n（全文完）\n", false],
+      ["end-tbc-leak", "## 第1章 尾声\n\n他合上账本，准备离开。\n（未完待续）\n", true],
+      ["panel-task-desc-clean", "## 第1章 系统\n\n【任务描述：三日内凑齐十两银子。】\n他合上账本，推门走入雨夜。\n", false],
+      ["quoted-chant-clean", "## 第1章 仪式\n\n“起阵！起阵！起阵！”祭司高喊。\n铜铃同时炸响。\n", false],
+      ["unquoted-tier1-leak", "## 第1章 事故\n\n这里按卷纲把章尾钩子提前压住，节尾停在哪再看。\n", true],
+      ["markdown-bold-leak", "## 第1章 异常\n\n**第一变。**他推门走了进去。\n", true],
+      ["ascii-period-clean", "## 第1章 尾声\n\n他盯着屏幕回了一句\".....\".\n", false],
+      ["truncated-tail-leak", "## 第1章 截断\n\n他迈步冲过去，一拳重重砸在\n", true],
+    ]
+    for (const [name, content, expectHard] of cases) {
+      const fp = path.join(root, `${name}.md`)
+      fs.writeFileSync(fp, content, "utf8")
+      const findings = core.proseNetFindings(content)
+      const hookHard = findings.some((f) => !f.includes("毒句式"))
+      const run = spawnSync(process.execPath, [degenScript, "--check", "--fail-on=blocking", fp], {
+        encoding: "utf8",
+      })
+      const degenHard = run.status === 1
+      assert.equal(hookHard, expectHard, `${name}: hook hard mismatch (${JSON.stringify(findings)})`)
+      assert.equal(degenHard, expectHard, `${name}: check-degeneration blocking mismatch (status=${run.status})`)
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test("Round 21 + Campaign 4: voice-contrast 语气, zero-width strip, 1k mid-text trailer no FP, whitelist guard", () => {
+  const findings = core.proseNetFindings("她嗓音不高，却压得全屋鸦雀无声。\n他语气不大，但字字带刺。\n")
+  assert.ok(findings.some((f) => f.includes("voice-contrast")), `expected voice-contrast hit, got ${JSON.stringify(findings)}`)
+  const zwspFindings = core.proseNetFindings(
+    "这不\u200b是意外，而是陷阱。\n这不\u200c是巧合，而是算计。\n这不\u200d是退让，而是反击。\n"
+  )
+  assert.ok(zwspFindings.some((f) => f.includes("not-is-comparison")), JSON.stringify(zwspFindings))
+  const midTrailer1k = [
+    ...Array.from({ length: 8 }, () => "院子里的煤炉烧得正旺，他把账簿一页页翻过去，记下每一笔差额。"),
+    "没人知道，这才刚刚开头。",
+    ...Array.from({ length: 10 }, () => "门外飘起细雪，他锁好抽屉，起身替母亲把堂屋窗栓插紧，顺手端来热茶。"),
+  ].join("\n")
+  assert.equal(
+    core.toxicPhraseFindings(midTrailer1k).filter((l) => l.includes("trailer-ending")).length,
+    0,
+    "mid-text trailer in ~600c prose must not trigger hook trailer-ending"
+  )
+  // Non-Array/Set whitelist must never throw
+  assert.doesNotThrow(() => core.toxicPhraseFindings("他关上灯走了。", null))
+  assert.doesNotThrow(() => core.toxicPhraseFindings("他关上灯走了。", 123))
+  assert.doesNotThrow(() => core.toxicPhraseFindings("他关上灯走了。", { bad: true }))
+  assert.equal(core.proseAfterWrite("/tmp", null), "")
+  assert.equal(core.proseAfterWrite("/tmp", { path: "bad" }), "")
+  assert.equal(core.proseAfterWrite(null, ""), "")
+})
+
+test("Wave 5 Track 5C-Core: brace/panel truncation whitelist, bracket name placeholder fix, voice-contrast 很淡, censored-pinyin & author-meta-header", () => {
+  // 1) P0 R227: } / 】 / （完） / 》 must not trigger truncated
+  for (const text of [
+    "江浩辰看着屏幕。\n池元：{无论多晚，我都等您。}",
+    "提示音响起。\n【任务完成】",
+    "她合上日记本。\n（完）",
+    "桌上放着一本《青云志》",
+  ]) {
+    assert.deepEqual(core.proseDegenerationFindings(text), [], `must not flag truncated: ${text}`)
+  }
+
+  // 2) P2 Wave 4A: normal bracketed name / 略显 must not trigger placeholder-leak; genuine omission still blocks
+  assert.deepEqual(core.proseDegenerationFindings("照片里的两人（程煜时）夫妻相十足，她（略显尴尬）地笑了一声。"), [])
+  assert.ok(core.proseDegenerationFindings("大战三百回合（此处省略五百字）后结束。").some((x) => x.includes("占位符")))
+  assert.ok(core.proseDegenerationFindings("其余琐事（略）不再赘述。").some((x) => x.includes("占位符")))
+
+  // 3) P2 Wave 4A: voice-contrast 很淡 matches check-ai-patterns.js
+  const vd = core.proseNetFindings("他语气很淡，却让满屋瞬间安静下来。\n她声音很淡，但字字带刺。\n")
+  assert.ok(vd.some((x) => x.includes("voice-contrast")), JSON.stringify(vd))
+
+  // 4) P1 Wave 3D FN-2: censored-pinyin-leak soft degeneration (review_required, does not trigger proseDegenerationFindings)
+  const pyText = "他咬牙把身ti打磨到极限，对方一脚踹在他大tui上。\n"
+  assert.deepEqual(core.proseDegenerationFindings(pyText), [], "censored-pinyin-leak must not hard-block")
+  const pyNet = core.proseNetFindings(pyText)
+  assert.ok(pyNet.some((x) => x.includes("censored-pinyin-leak")), JSON.stringify(pyNet))
+  const engClean = "VIP包厢里CEO拿着PDF和A4纸看AI与DNA数据，5G手机上NPC打Lv5的BOSS，伤口3cm，OK！\n"
+  assert.deepEqual(core.proseNetFindings(engClean), [], "normal English/abbreviations/units must have 0 FP")
+
+  // 5) P1 Wave 3D FN-1: author-meta-header soft degeneration (first 500 chars only)
+  const hdrText = "帅哥美女们，这里是脑子寄存处。\n作者有话说：本书又名《测试》，求五星好评求催更。\n雨落了下来。\n"
+  assert.deepEqual(core.proseDegenerationFindings(hdrText), [], "author-meta-header must not hard-block")
+  const hdrNet = core.proseNetFindings(hdrText)
+  assert.equal(hdrNet.filter((x) => x.includes("author-meta-header")).length, 2, JSON.stringify(hdrNet))
+  const latePad = "雨夜里的青砖小巷安静得只能听见屋檐滴水声，他紧了紧衣领穿过石桥往城南粮栈走去。".repeat(16)
+  assert.equal(
+    core.proseNetFindings(`${latePad}\n路边摊贩喊了一句求五星好评。\n`).filter((x) => x.includes("author-meta-header")).length,
+    0,
+    "author-meta-header must only scan first 500 visible chars"
+  )
+})
+
+test("R094: proseBlankLineFindings flags >=2 consecutive blank lines and illegal prose blank-line blocks softly without blocking", () => {
+  // 1) >=2 consecutive blank lines between prose paragraphs triggers soft [blank-lines] finding (non-blocking)
+  const multiBlank = "# 第1章 试探\n\n他推开门走进院子。\n\n\n院角炉火还亮着。\n"
+  assert.deepEqual(core.proseDegenerationFindings(multiBlank), [], "blank lines must never hard-block")
+  const multiNet = core.proseNetFindings(multiBlank)
+  assert.equal(multiNet.filter((x) => x.includes("[blank-lines]")).length, 1, JSON.stringify(multiNet))
+  assert.match(multiNet[0], /第4行 正文连续空行\[blank-lines\]/)
+
+  // 2) >=3 illegal single blank lines between prose paragraphs triggers soft [blank-lines] finding
+  const scatteredBlanks = [
+    "# 第2章 对账",
+    "",
+    "第一段写完推开账本。",
+    "",
+    "第二段抬头看向门外。",
+    "",
+    "第三段雨点砸在窗纸上。",
+    "",
+    "第四段他合上箱盖转身离开。",
+  ].join("\n") + "\n"
+  assert.deepEqual(core.proseDegenerationFindings(scatteredBlanks), [])
+  const scatteredNet = core.proseNetFindings(scatteredBlanks)
+  assert.equal(scatteredNet.filter((x) => x.includes("[blank-lines]")).length, 1, JSON.stringify(scatteredNet))
+  assert.match(scatteredNet[0], /正文非法场间空行块\[blank-lines\]/)
+
+  // 3) Clean tight paragraphs + legal single blank lines adjacent to headings / section markers / POV headers / dividers stay silent
+  const cleanLayout = [
+    "",
+    "# 第3章 收网",
+    "",
+    "第一段直接入场。",
+    "第二段紧接对话。",
+    "",
+    "###第2章",
+    "",
+    "第三段开新节。",
+    "",
+    "【段辞视角】",
+    "",
+    "第四段视角切换。",
+    "",
+    "……",
+    "",
+    "第五段收尾落稳。",
+    "",
+    "",
+  ].join("\n")
+  assert.deepEqual(core.proseNetFindings(cleanLayout), [], "legal structural blank lines and trailing edge blanks must stay silent")
+
+  // 4) proseAfterWrite delivers soft reminder while hasHardProseFindings remains false
+  const root = mkTmp("hook-core-blanks-")
+  try {
+    const book = path.join(root, "short-blank")
+    write(path.join(book, "设定.md"), "# 设定\n")
+    write(path.join(book, "小节大纲.md"), "# 大纲\n")
+    const body = path.join(book, "正文.md")
+    const padded = Array.from({ length: 12 }, (_, i) => `第${i + 1}步他拎起账本走出廊下，寒风吹得衣摆作响。`).join("\n") + "\n\n\n门外马车已经备好，他踩上脚凳头也不回。\n"
+    write(body, padded)
+    assert.equal(core.hasHardProseFindings(root, body), false, "blank lines must not trigger hasHardProseFindings")
+    const notice = core.proseAfterWrite(root, body)
+    assert.match(notice, /短篇风格复核提醒（非阻断）/)
+    assert.match(notice, /\[blank-lines\]/)
   } finally {
     fs.rmSync(root, { recursive: true, force: true })
   }

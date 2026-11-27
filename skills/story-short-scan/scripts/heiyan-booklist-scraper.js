@@ -45,7 +45,7 @@ function getToken(port) {
 }
 
 /** 调用后端 API 获取书籍列表 */
-function fetchBookList(port, token, pageNum, lang = "zh_TW") {
+function fetchBookList(port, token, pageNum, lang = "zh_CN") {
   const t = safeStr(token);
   const js =
     "fetch(" + safeStr(API_BASE + "/manage/book/list") + "," +
@@ -93,6 +93,16 @@ function fmtWords(words) {
       : parseInt(String(words == null ? "" : words).replace(/[^0-9]/g, ""), 10);
   if (!Number.isFinite(n) || n <= 0) return "";
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "字";
+}
+
+function normalizeTags(raw) {
+  if (Array.isArray(raw)) {
+    return raw.map((t) => String(t == null ? "" : t).trim()).filter(Boolean);
+  }
+  if (typeof raw === "string") {
+    return raw.split(/[、,，/]+/).map((t) => t.trim()).filter(Boolean);
+  }
+  return [];
 }
 
 function outputFilename(channel, date) {
@@ -166,13 +176,17 @@ function buildAndSave(allBooks, total, filtered, filepath, detail = DETAIL) {
         if (b.createTime) lines.push(`**创建：** ${b.createTime}`);
         if (b.updateTime) lines.push(`**更新：** ${b.updateTime}`);
 
-        if (b.tags && b.tags.length) {
-          lines.push(`**标签：** ${b.tags.join("、")}`);
+        const tags = normalizeTags(b.tags);
+        if (tags.length) {
+          lines.push(`**标签：** ${tags.join("、")}`);
         }
 
         if (b.description) {
-          lines.push("");
-          lines.push(`> ${b.description.substring(0, 200)}${b.description.length > 200 ? "..." : ""}`);
+          const cleanDesc = String(b.description).replace(/\s+/g, " ").trim();
+          if (cleanDesc) {
+            lines.push("");
+            lines.push(`> ${cleanDesc.substring(0, 200)}${cleanDesc.length > 200 ? "..." : ""}`);
+          }
         }
 
         lines.push("");
@@ -191,6 +205,9 @@ function buildAndSave(allBooks, total, filtered, filepath, detail = DETAIL) {
 }
 
 function main() {
+  if (!Number.isInteger(PAGES) || PAGES <= 0) {
+    throw new Error(`无效 --pages: ${getArg(args, "--pages")}（须为正整数）`);
+  }
   console.log("\n→ 采集 黑岩书库列表（API 模式）...");
   console.log(`  计划采集: ${PAGES} 页（每页 ${PAGE_SIZE} 条）`);
 
@@ -226,10 +243,10 @@ function main() {
   }
   console.log("  ✓ 获取到认证 token");
 
-  // 分页采集（默认接口语种 zh_TW；若首页正常返回但为空，自动回退试一次 zh_CN）
+  // 分页采集（默认接口语种 zh_CN；若首页正常返回但为空，自动回退试一次 zh_TW）
   const allBooks = [];
   let total = 0;
-  let activeLang = "zh_TW";
+  let activeLang = "zh_CN";
 
   for (let p = 1; p <= PAGES; p++) {
     try {
@@ -242,7 +259,7 @@ function main() {
         (!resp.data || !resp.data.rows || !resp.data.rows.length) &&
         (resp.code == null || resp.code === 0 || resp.code === 200)
       ) {
-        activeLang = "zh_CN";
+        activeLang = "zh_TW";
         resp = fetchBookList(PORT, token, 1, activeLang);
       }
 
@@ -365,6 +382,7 @@ module.exports = {
   fetchBookList,
   fetchBookDetail,
   fmtWords,
+  normalizeTags,
   outputFilename,
   dataQuality,
   buildAndSave,

@@ -217,25 +217,54 @@ describe("check-degeneration.js", () => {
     assert.equal(blkRes.status, 0);
   });
 
-  test("flags 主角/男主/女主/反派 as tier2 advisory (never tier1 blocking, preserving 穿书/快穿)", () => {
-    const chuanshu = writeFixture("chuanshu-tier2.md", [
+  test("flags 主角/男主/女主/反派 as tier2 advisory (never tier1 blocking) and exempts 穿书/原书 context + 女主播/三天前文创部", () => {
+    // 非穿书语境下，主角/男主/女主/反派仍为 tier2 advisory（绝不 blocking）
+    const plain = writeFixture("plain-tier2.md", [
       "他冷笑一声，打算先把主角除掉。",
-      "穿进这本书后，她决定离男主远一点。",
-      "原书女主此刻正站在走廊尽头。",
+      "推开门后，她决定离男主远一点。",
+      "冷脸女主此刻正站在走廊尽头。",
       "这一世，她绝不替反派背锅。",
     ]);
-    const allRes = runDetector(["--json", chuanshu]);
-    const blkRes = runDetector(["--json", "--fail-on=blocking", chuanshu]);
+    const allRes = runDetector(["--json", plain]);
+    const blkRes = runDetector(["--json", "--fail-on=blocking", plain]);
     assert.equal(allRes.status, 1);
-    assert.equal(blkRes.status, 0, "穿书/快穿主角/男主/女主/反派 must NEVER block");
+    assert.equal(blkRes.status, 0, "主角/男主/女主/反派 must NEVER block");
     const meta = allRes.json().findings.filter((f) => f.type === "meta-leak");
     assert.equal(meta.length, 4, JSON.stringify(meta));
     assert.ok(meta.every((f) => f.severity === "advisory"));
 
-    // 【】弹幕/心声/系统播报里的「主角/男主/女主/反派」跳过 tier2，叙述层照常提示
+    // 穿书/快穿/原书/弹幕语境下豁免 男主/女主/读者/第X章，避免高分女频误报
+    const chuanshu = writeFixture("chuanshu-tier2.md", [
+      "穿书进来第一天，她决定离男主远一点。",
+      "原书女主此刻正站在走廊尽头，连读者都猜不出后续。",
+      "按原剧情第三章的走向，今晚就会退婚。",
+    ]);
+    const csMeta = runDetector(["--json", chuanshu]).json().findings.filter((f) => f.type === "meta-leak");
+    assert.equal(csMeta.length, 0, `穿书语境应豁免男主/女主/读者/第X章: ${JSON.stringify(csMeta)}`);
+
+    // 女主播/三天前文创部 等复合词与跨词边界绝不误报
+    const boundaries = writeFixture("meta-word-boundaries.md", [
+      "女主播把话筒推远，女主持和女主唱紧跟着上台。",
+      "三天前文创部绕过风控，把此前文件和目前文物清单一起递了上去。",
+    ]);
+    const bMeta = runDetector(["--json", boundaries]).json().findings.filter((f) => f.type === "meta-leak");
+    assert.equal(bMeta.length, 0, `女主播/三天前文创部不应误报: ${JSON.stringify(bMeta)}`);
+
+    // 正文残留 [待补充] 与零宽字符 \u200b 必须阻断
+    const zwspAndTodo = writeFixture("zwsp-and-todo.md", [
+      "这里写着 [待补充]，忘了替换正文。",
+      "他把细\u200b纲忘在了桌面上。",
+    ]);
+    const zRes = runDetector(["--json", "--fail-on=blocking", zwspAndTodo]);
+    assert.equal(zRes.status, 1);
+    const zTypes = zRes.json().findings.map((f) => f.type);
+    assert.ok(zTypes.includes("placeholder-leak"), JSON.stringify(zTypes));
+    assert.ok(zTypes.includes("meta-leak"), JSON.stringify(zTypes));
+
+    // 【】弹幕/心声/系统播报里的「主角/男主/女主/反派」跳过 tier2，叙述层非豁免词照常提示
     const danmu = writeFixture("danmu-tier2.md", [
       "【快跑啊！原书女主和反派马上就要联手坑男主了！】",
-      "她端起茶盏，看着走廊尽头的原书主角，没出声。",
+      "她端起茶盏，心想下一章还得继续演，没出声。",
     ]);
     const danmuRes = runDetector(["--json", danmu]);
     const danmuMeta = danmuRes.json().findings.filter((f) => f.type === "meta-leak");
@@ -288,6 +317,176 @@ describe("check-degeneration.js", () => {
     assert.ok(quotedMeta.every((f) => f.severity === "advisory"));
     assert.equal(quotedMeta[0].column, 5);
     assert.equal(quotedMeta[1].column, 12);
+  });
+
+  test("detects markdown-leak (blocking), near-repeat (advisory), and ASCII period endings", () => {
+    const mdLeak = writeFixture("markdown-leak.md", [
+      "## **第1章** 标题允许粗体",
+      "***",
+      "正文里突然冒出**第一变。**这种粗体残留。",
+      "他推门走进雨夜。",
+    ]);
+    const mdRes = runDetector(["--json", "--fail-on=blocking", mdLeak]);
+    assert.equal(mdRes.status, 1);
+    const leaks = mdRes.json().findings.filter((f) => f.type === "markdown-leak");
+    assert.equal(leaks.length, 1, JSON.stringify(leaks));
+    assert.equal(leaks[0].line, 3);
+    assert.equal(leaks[0].severity, "blocking");
+
+    const nearRep = writeFixture("near-repeat.md", [
+      "三婶抹着眼泪一把拉住罗成衣袖，非要借他那八万块钱救救急。",
+      "院子里的老黄狗叫了两声，屋檐滴着冷水。",
+      "罗成没松口，低头翻起了手机里的转账记录。",
+      "三婶抹着眼泪一把拉住罗成衣袖，非要借他那八万块钱救救急。",
+    ]);
+    const nrAll = runDetector(["--json", nearRep]);
+    const nrBlk = runDetector(["--json", "--fail-on=blocking", nearRep]);
+    assert.equal(nrAll.status, 1);
+    assert.equal(nrBlk.status, 0, "near-repeat must be advisory only");
+    const nr = nrAll.json().findings.filter((f) => f.type === "near-repeat");
+    assert.equal(nr.length, 1, JSON.stringify(nr));
+    assert.equal(nr[0].line, 4);
+
+    const asciiDot = writeFixture("ascii-dot.md", [
+      '他盯着屏幕沉默半晌，只回了一句".....".',
+    ]);
+    assert.equal(runDetector([asciiDot]).status, 0, "ASCII period ending should align with story_hook_core");
+  });
+
+  test("Wave 5 Track 5C-Core: truncated closing braces, meta-leak FP cut, placeholder bracket names, censored-pinyin-leak, author-meta-header", () => {
+    // 1) P0 R227: WeChat brace }, system panel 】, signoff （完）, book title 》 must NOT trigger truncated
+    for (const [name, tail] of [
+      ["wechat-brace", "池元：{无论多晚，我都等您。}"],
+      ["panel-bracket", "【任务完成】"],
+      ["signoff-paren", "他转身离去。\n（完）"],
+      ["book-guillemet", "桌上摊着一本《山海录》"],
+    ]) {
+      const f = writeFixture(`trunc-ok-${name}.md`, [tail]);
+      const res = runDetector(["--json", f]);
+      assert.equal(
+        res.json().findings.filter((x) => x.type === "truncated").length,
+        0,
+        `${name} must not trigger truncated: ${res.stdout}`
+      );
+    }
+
+    // 2) P1 Wave 4A + R180: meta-leak skips bare chapter headings, quoted & everyday 主角/反派, and 系统/穿书 context
+    const metaClean = writeFixture("meta-wave5-clean.md", [
+      "",
+      "第89章 难道这是。。夫妻相？",
+      "“……热搜稿，记得换个主角重写。”经纪人敲了敲桌面。",
+      "“你可是今晚的主角。”司仪笑着递上话筒。",
+      "她是全场众星捧月的主角，也是今天的主角，妥妥的古装大女主。",
+      "她学着短剧反派女二的表情翻了个白眼，往后文远侯府才不会被牵连。",
+    ]);
+    assert.equal(
+      runDetector(["--json", metaClean]).json().findings.filter((x) => x.type === "meta-leak").length,
+      0,
+      "bare chapter heading + quoted/everyday 主角/反派 must be exempt"
+    );
+
+    const sysCtx = writeFixture("meta-sys-ctx.md", [
+      "系统叮了一声，弹出救赎任务。",
+      "他扫了一眼站在阶下的主角和反派，转身回了偏殿。",
+    ]);
+    assert.equal(
+      runDetector(["--json", sysCtx]).json().findings.filter((x) => x.type === "meta-leak").length,
+      0,
+      "系统/救赎任务 context must exempt 主角 and 反派"
+    );
+
+    // 3) P2 Wave 4A: placeholder-leak must not false-positive on normal parenthesized names or 略微/略显
+    const phClean = writeFixture("placeholder-bracket-clean.md", [
+      "照片上的两人（程煜时）夫妻相十足。",
+      "她（略显尴尬）地收回手，又（略微点头）示意对方坐下。",
+    ]);
+    assert.equal(
+      runDetector(["--json", phClean]).json().findings.filter((x) => x.type === "placeholder-leak").length,
+      0
+    );
+    const phHit = writeFixture("placeholder-bracket-hit.md", [
+      "两人打得难解难分（此处省略五百字）最终落幕。",
+      "后面细节（略）不再赘述。",
+    ]);
+    assert.equal(
+      runDetector(["--json", "--fail-on=blocking", phHit]).json().findings.filter((x) => x.type === "placeholder-leak").length,
+      2
+    );
+
+    // 4) P1 Wave 3D FN-2: censored-pinyin-leak (review_required) catches censorship pinyin, 0 FP on normal English/units
+    const pinyinPos = writeFixture("pinyin-pos.md", [
+      "他咬牙把身ti打磨到极限。",
+      "醉意上头，他低头亲wen了她额角。",
+      "刀背重重砸在对方大tui上，胸kou一阵发闷。",
+      "黑影冷笑，竟想直接杀si证人。",
+    ]);
+    const pBlk = runDetector(["--json", "--fail-on=blocking", pinyinPos]);
+    const pRev = runDetector(["--json", "--fail-on=review_required", pinyinPos]);
+    assert.equal(pBlk.status, 0, "censored-pinyin-leak is review_required, not blocking");
+    assert.equal(pRev.status, 1, "censored-pinyin-leak must fail --fail-on=review_required");
+    const pHits = pRev.json().findings.filter((x) => x.type === "censored-pinyin-leak");
+    assert.equal(pHits.length, 4, JSON.stringify(pHits));
+    assert.ok(pHits.every((x) => x.severity === "review_required"));
+
+    const pinyinClean = writeFixture("pinyin-clean-english.md", [
+      "VIP包厢里，CEO拿着PDF和A4纸核对AI与DNA检测报告。",
+      "他在APP上连着5G刷iPhone，顺手用NPC账号PK掉Lv5的BOSS，HP和MP刚回满，OK！",
+      "刀口长3cm，伤口距胸口两寸，他打boss从不看攻略。",
+    ]);
+    assert.equal(
+      runDetector(["--json", pinyinClean]).json().findings.filter((x) => x.type === "censored-pinyin-leak").length,
+      0,
+      "normal English/abbreviations/units must have 0 censored-pinyin-leak FP"
+    );
+
+    // 5) P1 Wave 3D FN-1: author-meta-header (review_required, first 500 chars only)
+    const headerPos = writeFixture("author-header-pos.md", [
+      "帅哥美女们，这里是大脑寄存处。",
+      "作者说：本书又名《逆袭》，介意者慎入，求五星好评求催更！",
+      "夜雨砸在青石板上，他推开了客栈木门。",
+    ]);
+    const hBlk = runDetector(["--json", "--fail-on=blocking", headerPos]);
+    const hRev = runDetector(["--json", "--fail-on=review_required", headerPos]);
+    assert.equal(hBlk.status, 0, "author-meta-header is review_required, not blocking");
+    assert.equal(hRev.status, 1, "author-meta-header must fail --fail-on=review_required");
+    assert.equal(hRev.json().findings.filter((x) => x.type === "author-meta-header").length, 2);
+
+    // 6) Full-width ］ and half-width ] closing brackets (WeChat/danmu box endings) must not flag truncated
+    for (const [idx, line] of [
+      "手机屏幕亮起一条微信：［今晚九点老地方见］",
+      "系统提示：[主线任务已触发]",
+    ].entries()) {
+      const f = writeFixture(`bracket-end-${idx}.md`, ["他低头看向屏幕。", line]);
+      const brRes = runDetector(["--json", f]);
+      assert.equal(
+        brRes.json().findings.filter((x) => x.type === "truncated").length,
+        0,
+        `closing bracket should not trigger truncated: ${line}`
+      );
+    }
+
+    const latePad = "雨夜里的青砖小巷安静得只能听见屋檐滴水声，他紧了紧衣领穿过石桥往城南粮栈走去。".repeat(16);
+    const headerLate = writeFixture("author-header-late.md", [
+      latePad,
+      "他在路边茶摊听见说书人随口喊了一句求五星好评。",
+    ]);
+    assert.equal(
+      runDetector(["--json", headerLate]).json().findings.filter((x) => x.type === "author-meta-header").length,
+      0,
+      "author-meta-header must only scan first 500 visible chars"
+    );
+
+    // Space-separated --fail-on and --help documenting review_required
+    const helpRes = runDetector(["--help"]);
+    assert.equal(helpRes.status, 0);
+    assert.match(helpRes.stdout, /--fail-on=blocking\|review_required\|all/);
+    const pinyinOnly = writeFixture("space-fail-on-pinyin.md", [
+      "## 第1章 夜路",
+      "",
+      "他咬牙把身ti打磨到极限，推门走入雨夜。",
+    ]);
+    assert.equal(runDetector(["--fail-on", "blocking", pinyinOnly]).status, 0);
+    assert.equal(runDetector(["--fail-on", "review_required", pinyinOnly]).status, 1);
   });
 
   test("every skill carrying check-degeneration.js invokes it in SKILL.md or references/", () => {

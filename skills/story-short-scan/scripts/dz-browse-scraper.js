@@ -223,13 +223,20 @@ function scrapeChannel(port, channelId) {
   stories.forEach((s, i) => {
     try {
       lines.push(`### #${i + 1} ${s.title || "（书名待解析）"}`);
-      const meta = [s.author, s.tag, s.status, s.words, s.score].filter(Boolean).join(" · ");
+      // 聚合按位置认「作者 · 题材」：缺作者时用「佚名」占位，否则题材会被错认成作者
+      const hasMeta = Boolean(s.author || s.tag || s.status || s.words || s.score);
+      const meta = hasMeta
+        ? [s.author || "佚名", s.tag, s.status, s.words, s.score].filter(Boolean).join(" · ")
+        : "";
       if (meta) lines.push(`*${meta}*`);
       if (s.update) lines.push(`**最新：** ${s.update}`);
       if (s.url) lines.push(`[作品页](${s.url})`);
       if (s.desc) {
-        lines.push("");
-        lines.push(`> ${s.desc.substring(0, 150)}${s.desc.length > 150 ? "..." : ""}`);
+        const cleanDesc = String(s.desc).replace(/\s+/g, " ").trim();
+        if (cleanDesc) {
+          lines.push("");
+          lines.push(`> ${cleanDesc.substring(0, 150)}${cleanDesc.length > 150 ? "..." : ""}`);
+        }
       }
       lines.push("", "---", "");
     } catch (storyErr) {
@@ -242,6 +249,9 @@ function scrapeChannel(port, channelId) {
 }
 
 function main() {
+  if (!["all", "male", "female"].includes(CHANNEL)) {
+    throw new Error(`未知 --channel: ${CHANNEL}（支持 male/female/all）`);
+  }
   const channels = CHANNEL === "all" ? CHANNELS.map((c) => c.id) : [CHANNEL];
   let written = 0;
 

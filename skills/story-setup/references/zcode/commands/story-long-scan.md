@@ -1,5 +1,5 @@
 ---
-description: 长篇网文扫榜，分析起点、番茄、晋江等平台趋势。
+description: 长篇网文扫榜，分析起点、番茄、七猫、晋江等平台趋势。
 skills: story-long-scan
 ---
 

@@ -1576,5 +1576,314 @@ describe("check-ai-patterns.js", () => {
       0,
       "standard quoted onomatopoeia must not trigger quote-emphasis-tic"
     );
+
+    // 6) Round 8: chicken-soup endings in trailer-summary + tightened short-mode not-is threshold (3*scale)
+    const fSoup = writeFixture("short-chicken-soup.md", [
+      "十年后铺子生意红火，我站在窗前吹风。",
+      "这就是离开最大的意义。",
+      "活下来的，是一个更清醒更勇敢的自己。",
+      "我花了十年，才明白这个道理。",
+      "我终于获得了真正的自由。",
+    ]);
+    const soupRes = runDetector(["--mode=short", "--json", "--fail-on=review_required", fSoup]);
+    assert.equal(soupRes.status, 1, "chicken-soup endings must trigger review_required");
+    const soupHits = soupRes.json().findings.filter((f) => f.type === "trailer-summary");
+    assert.equal(soupHits.length, 4, JSON.stringify(soupHits));
+
+    const shortPad = "走廊尽头灯亮着，他拎起公文包朝电梯走去，鞋底踩在水渍上发出一声轻响。\n".repeat(310); // ~10.8k chars -> scale=3 -> threshold=9
+    const nineNotIs = Array.from({ length: 9 }, (_, i) => `不是第${i + 1}次退让。是彻底断了念想。`).join("\n");
+    const fShortNotIs = writeFixture("short-not-is-9.md", `${shortPad}${nineNotIs}\n`);
+    const shortNotIsRes = runDetector(["--mode=short", "--json", "--fail-on=review_required", fShortNotIs]);
+    assert.equal(shortNotIsRes.status, 1, "9 period not-is hits in ~11k short story should trigger review_required at 3*scale");
+
+    // 7) Round 16: romance-cliche-tic (advisory only) catches greasy romance clusters and NEVER flags 轻笑/低笑
+    const fGreasy = writeFixture("romance-greasy.md", [
+      "祝衡眸色一暗，喉结轻滚，骨节分明的大手攥住她手腕抵在墙边。",
+      "他声音低哑，满眼宠溺地笑道：“小女人，招惹了我还想跑？”",
+      "她耳尖发烫，指节泛白，连呼吸都乱了节拍。",
+    ]);
+    const greasyRes = runDetector(["--mode=long", "--json", "--fail-on=review_required", fGreasy]);
+    assert.equal(greasyRes.status, 0, "romance-cliche-tic must be advisory only");
+    const romHits = greasyRes.json().findings.filter((f) => f.type === "romance-cliche-tic");
+    assert.equal(romHits.length, 1, JSON.stringify(romHits));
+    assert.equal(romHits[0].severity, "advisory");
+    assert.equal(romHits[0].review, "semantic");
+
+    const fCleanFemale = writeFixture("romance-clean-qingxiao.md", [
+      "暴雨檐下，祝衡低笑一声，探身递出一把干毛巾：“上车，顺路。”",
+      "舒禾轻笑，歪头戳穿他：“祝律住西郊，我住城东，哪门子顺路？”",
+      "他握着方向盘顿了顿，又低笑一声，视线移向雨刮器：“上周那句不算。”",
+      "舒禾忍不住轻笑出声，抬手接过毛巾，瞥见扶手箱里那枚修好的蓝釉胸针。",
+    ]);
+    assert.equal(
+      runDetector(["--mode=long", "--json", fCleanFemale]).json().findings.filter((f) => f.type === "romance-cliche-tic").length,
+      0,
+      "high-craft female romance with frequent 轻笑/低笑 must have 0 romance-cliche-tic hits"
+    );
+
+    // 8) Round 21 + Campaign 4: voice-contrast covers 嗓音/语调/语气; zero-width stripped; trailer 1k mid-text no FP;
+    //    single high-risk greasy cliché advisory; 哐啷 onomatopoeia exempt
+    const fVoiceVariants = writeFixture("voice-contrast-variants.md", [
+      "她抬眼看着众人，嗓音不高，却每个字都砸在实处。",
+      "男人靠在椅背上，语调不大，但满屋瞬间安静下来。",
+      "他语气不高，却让满座瞬间噤声。",
+    ]);
+    const voiceRes = runDetector(["--mode=long", "--json", fVoiceVariants]);
+    const voiceHits = voiceRes.json().findings.filter((f) => f.type === "voice-contrast");
+    assert.equal(voiceHits.length, 3, JSON.stringify(voiceHits));
+    assert.ok(voiceHits.every((f) => f.severity === "review_required"));
+
+    const fSingleYuqi = writeFixture("voice-single-yuqi.md", [
+      "他语气不高，却把账本拍在了桌上。",
+    ]);
+    const yuqiHits = runDetector(["--mode=long", "--json", fSingleYuqi]).json().findings.filter((f) => f.type === "voice-contrast");
+    assert.equal(yuqiHits.length, 1);
+    assert.equal(yuqiHits[0].severity, "advisory");
+
+    const fZwsp = writeFixture("zwsp-not-is.md", [
+      "这不\u200b是意外，而是蓄谋已久的陷阱。",
+      "这不\u200c是巧合，而是早有预谋的算计。",
+      "这不\u200d是退让，而是反击的开始。",
+    ]);
+    const zwspHits = runDetector(["--mode=long", "--json", fZwsp]).json().findings.filter((f) => f.type === "not-is-comparison");
+    assert.equal(zwspHits.length, 3, JSON.stringify(zwspHits));
+
+    const fMidTrailer1k = writeFixture("mid-trailer-1k.md", [
+      ...Array.from({ length: 8 }, () => "院子里的煤炉烧得正旺，他把账簿一页页翻过去，记下每一笔差额。"),
+      "没人知道他口袋里还攥着那张退回来的汇款单。",
+      ...Array.from({ length: 10 }, () => "门外飘起细雪，他锁好抽屉，起身替母亲把堂屋窗栓插紧，顺手端来热茶。"),
+    ]);
+    const midTrailerHits = runDetector(["--mode=long", "--json", fMidTrailer1k]).json().findings.filter((f) => f.type === "trailer-ending");
+    assert.equal(midTrailerHits.length, 0, `mid-text 没人知道 in ~600c draft should not trigger trailer-ending: ${JSON.stringify(midTrailerHits)}`);
+
+    const fSingleHighRisk = writeFixture("single-high-risk-cliche.md", [
+      "她推开木门，听见对方开口时心跳漏了一拍，却还是把合同推过去。",
+      "他眼底掠过一丝难以察觉的心疼，终究什么也没说。",
+    ]);
+    const hrRes = runDetector(["--mode=long", "--json", "--fail-on=review_required", fSingleHighRisk]);
+    assert.equal(hrRes.status, 0, "single high-risk romance cliché must stay advisory");
+    assert.ok(hrRes.json().findings.some((f) => f.type === "romance-cliche-tic" && f.severity === "advisory"));
+
+    const fKuanglang = writeFixture("kuanglang-onomatopoeia.md", [
+      "铁门哐啷——一声撞开，屋里四个人同时转过头来，只听“哐啷”一声铁链砸在青砖上。",
+    ]);
+    const klFindings = runDetector(["--mode=long", "--json", fKuanglang]).json().findings;
+    assert.equal(klFindings.filter((f) => f.type === "em-dash" || f.type === "quote-emphasis-tic").length, 0, JSON.stringify(klFindings));
+
+    // 9) Wave 5 Track 5C-Core: 微不可察 >=2 cluster, voice-contrast 很淡, cross-sentence 没有…只有…, staccato-paragraph-tic
+    const fWei1 = writeFixture("wei-single.md", [
+      "他听完汇报，微不可察地点了点头，随即把账本合上递回柜台。",
+    ]);
+    assert.equal(
+      runDetector(["--mode=long", "--json", fWei1]).json().findings.filter((f) => f.type === "romance-cliche-tic").length,
+      0,
+      "single standalone 微不可察 must not trigger romance-cliche-tic"
+    );
+    const fWei2 = writeFixture("wei-cluster.md", [
+      "他眉梢微不可察地一动，合上了账本。",
+      "她嘴角也微不可察地挑了一下，没再接话。",
+    ]);
+    const wei2Hits = runDetector(["--mode=long", "--json", fWei2]).json().findings.filter((f) => f.type === "romance-cliche-tic");
+    assert.equal(wei2Hits.length, 1, "2+ 微不可察 in same chapter should trigger romance-cliche-tic advisory");
+    assert.equal(wei2Hits[0].severity, "advisory");
+
+    const fVoiceDan = writeFixture("voice-contrast-hendan.md", [
+      "他语气很淡，却让满屋瞬间安静下来。",
+      "她声音很淡，但每个字都砸在众人耳膜上。",
+    ]);
+    const vdHits = runDetector(["--mode=long", "--json", fVoiceDan]).json().findings.filter((f) => f.type === "voice-contrast");
+    assert.equal(vdHits.length, 2, JSON.stringify(vdHits));
+    assert.ok(vdHits.every((f) => f.severity === "review_required"));
+
+    const fCrossMeiyou = writeFixture("cross-meiyou-zhiyou.md", [
+      "没有皇帝，没有总统。",
+      "只有一位老人坐在空椅前。",
+      "没有退路。也没有援军。只有头顶那盏冷灯。",
+      "没有掌声。",
+      "也没有哭声。",
+      "只有门外刮过一阵冷风。",
+    ]);
+    const cmRes = runDetector(["--mode=long", "--json", "--fail-on=review_required", fCrossMeiyou]);
+    assert.equal(cmRes.status, 0, "cross-sentence 没有…只有… must stay advisory");
+    const cmHits = cmRes.json().findings.filter((f) => f.type === "formulaic-parallelism");
+    assert.equal(cmHits.length, 3, JSON.stringify(cmHits));
+
+    const fStaccato = writeFixture(
+      "staccato-telegraph.md",
+      [
+        ...Array.from({ length: 16 }, (_, i) => `第${i + 1}步踏上石阶，冷风刮过。`),
+        ...Array.from({ length: 12 }, (_, i) => `“第${i + 1}排把东西收拾好立刻撤出去！”他喊道。`),
+      ]
+    );
+    const stRes = runDetector(["--mode=long", "--json", "--fail-on=review_required", fStaccato]);
+    assert.equal(stRes.status, 0, "staccato-paragraph-tic must stay advisory");
+    const stHits = stRes.json().findings.filter((f) => f.type === "staccato-paragraph-tic");
+    assert.equal(stHits.length, 1, JSON.stringify(stHits));
+    assert.equal(stHits[0].severity, "advisory");
+    assert.equal(stHits[0].review, "semantic");
+
+    const fNormalMobile = writeFixture(
+      "staccato-normal-mobile.md",
+      Array.from({ length: 20 }, (_, i) => `第${i + 1}天清晨他推开院门，顺手把水桶提回井台旁边放稳。`)
+    );
+    assert.equal(
+      runDetector(["--mode=long", "--json", fNormalMobile]).json().findings.filter((f) => f.type === "staccato-paragraph-tic").length,
+      0
+    );
+
+    // 10) Wave 7 Track 7D: JSON echoes fail_on, and literal monster 拆吞入腹 is exempt from romance-cliche-tic
+    const rDefaultJson = runDetector(["--mode=long", "--json", fNormalMobile]);
+    assert.equal(rDefaultJson.json().fail_on, "all");
+    const rRevJson = runDetector(["--mode=long", "--json", "--fail-on=review_required", fNormalMobile]);
+    assert.equal(rRevJson.json().fail_on, "review_required");
+    const rSpaceFailOn = runDetector(["--mode", "long", "--json", "--fail-on", "review_required", fNormalMobile]);
+    assert.equal(rSpaceFailOn.status, 0);
+    assert.equal(rSpaceFailOn.json().fail_on, "review_required");
+
+    const fMonsterDevour = writeFixture("monster-devour.md", [
+      "城墙外那头三米高的异兽张开血口，恨不得将防线后的铁皮车整辆拆吞入腹。",
+    ]);
+    assert.equal(
+      runDetector(["--mode=long", "--json", fMonsterDevour]).json().findings.filter((f) => f.type === "romance-cliche-tic").length,
+      0,
+      "apocalypse/monster literal 拆吞入腹 must not trigger romance-cliche-tic"
+    );
+    const fRomanceDevour = writeFixture("romance-devour.md", [
+      "他目光炙热地盯着她发红的唇瓣，恨不得立刻将怀里人拆吞入腹。",
+    ]);
+    assert.equal(
+      runDetector(["--mode=long", "--json", fRomanceDevour]).json().findings.filter((f) => f.type === "romance-cliche-tic").length,
+      1,
+      "romance context 拆吞入腹 must still trigger romance-cliche-tic"
+    );
+
+    // 11) R093: short-plastic-reaction-tic (--mode=short advisory when >=2 plastic reaction clichés appear)
+    const fShortPlastic = writeFixture("short-plastic-reaction.md", [
+      "裴仲言攥紧拳头，眼底闪过一丝阴狠。",
+      "听见地窖两字，他瞳孔猛地一缩，脚步顿在石阶上。",
+      "严氏站在廊下，气得浑身发抖。",
+      "满堂顿时陷入死一般的寂静。",
+    ]);
+    const spRes = runDetector(["--mode=short", "--json", "--fail-on=review_required", fShortPlastic]);
+    assert.equal(spRes.status, 0, "short-plastic-reaction-tic must be advisory only");
+    const spHits = spRes.json().findings.filter((f) => f.type === "short-plastic-reaction-tic");
+    assert.equal(spHits.length, 1, JSON.stringify(spHits));
+    assert.equal(spHits[0].severity, "advisory");
+    assert.equal(spHits[0].review, "semantic");
+    assert.ok(spHits[0].excerpt.includes("眼底闪过一丝") && spHits[0].excerpt.includes("瞳孔猛地一缩"));
+
+    const fShortPlasticBl = writeFixture("short-plastic-bl.md", [
+      "下午测试结束，他握单杠的指节微微泛白。",
+      "凑近那一刻，他喉结猛地一滚，低头吻住我后颈。",
+    ]);
+    const spBlHits = runDetector(["--mode=short", "--json", fShortPlasticBl])
+      .json()
+      .findings.filter((f) => f.type === "short-plastic-reaction-tic");
+    assert.equal(spBlHits.length, 1, JSON.stringify(spBlHits));
+
+    // Single hit, quoted dialogue, or long mode must NOT emit short-plastic-reaction-tic
+    const fShortPlastic1 = writeFixture("short-plastic-one.md", [
+      "他眼底闪过一丝算计，转手把契书折好放回袖里。",
+      "“你气得浑身发抖的样子真难看，瞳孔骤缩吓着谁呢？”他冷笑。",
+    ]);
+    assert.equal(
+      runDetector(["--mode=short", "--json", fShortPlastic1])
+        .json()
+        .findings.filter((f) => f.type === "short-plastic-reaction-tic").length,
+      0,
+      "single narration hit + quoted clichés must stay silent in short-plastic-reaction-tic"
+    );
+    assert.equal(
+      runDetector(["--mode=long", "--json", fShortPlastic])
+        .json()
+        .findings.filter((f) => f.type === "short-plastic-reaction-tic").length,
+      0,
+      "long mode must not emit short-plastic-reaction-tic"
+    );
+
+    // 12) WS4: idle-prop-decoration-tic & calibrated dry-narration branch of low-connective-density-tic
+    const fIdleProps = writeFixture("ws4-idle-props.md", [
+      "茶水间玻璃幕墙映着楼下车流，咖啡机发出低沉嗡鸣，台上摆着两只骨瓷杯。",
+      "梁景行穿着深灰西装走进来，衬衫领口熨得一丝不苟，袖扣在冷白光下泛着微亮。",
+      "他走到紫檀长桌边拉开太师椅坐下，抬手把鳄鱼皮公文包放到红木台面外侧。",
+      "窗外秋雨淅淅沥沥敲在青砖墙沿，檐下石阶留着一圈水渍，屋里只剩钟摆轻响。",
+      "许明棠把报价单推到桌心，指节落在纸角没挪开，目光停在对面腕表表盘上。",
+      "廊下吸顶灯照着大理石地面，秘书端着青漆托盘停在门边，没人先开口打破安静。",
+      "屋里空调外机在墙外低鸣，桌角黄铜镇纸压住半张旧单据，茶水渐渐凉透。",
+      "沈助理弯腰拾起掉落折扇，顺手将文件夹摆齐，转身退到门廊外把门轻轻带严。",
+      "桌边算盘珠子静静排在木框里，百叶窗缝隙透进灰白光线，照见地砖一道旧痕。",
+      "楼下电梯门开了又合，走廊灯光照在黑漆门框上，会议室里依旧没人动弹。",
+      "文件袋口封蜡裂开半道细纹，她抽出一页复印件推过去，指腹按住签字栏末端。",
+      "墙上挂钟走过整点，杯口白雾散尽，两份合同并排摊在胡桃木台面中央。",
+      "门外保洁推车碾过石砖走廊，茶水间百叶窗轻颤两下，桌面瓷盏映着窗外阴云。",
+      "他合上钢笔盖帽放回西装内袋，伸手拉回牛皮椅背起身，迈步走出会议室大门。",
+    ]);
+    const idleRes = runDetector(["--mode=long", "--json", "--fail-on=review_required", fIdleProps]);
+    assert.equal(idleRes.status, 0, "idle-prop-decoration-tic must stay advisory (never fail review_required)");
+    const idleHits = idleRes.json().findings.filter((f) => f.type === "idle-prop-decoration-tic");
+    assert.equal(idleHits.length, 1, JSON.stringify(idleHits));
+    assert.equal(idleHits[0].severity, "advisory");
+    assert.equal(idleHits[0].review, "semantic");
+    assert.ok(idleHits[0].message.includes("刀子物件"));
+
+    // Short mode must NOT trigger idle-prop-decoration-tic
+    assert.equal(
+      runDetector(["--mode=short", "--json", fIdleProps])
+        .json()
+        .findings.filter((f) => f.type === "idle-prop-decoration-tic").length,
+      0
+    );
+
+    // Rich colloquial connectives with functional props must NOT trigger idle-prop-decoration-tic
+    const fIdlePropsNatural = writeFixture("ws4-idle-props-natural.md", [
+      "茶水间玻璃幕墙外面正下雨，不过她其实早就料到对方会拖延，所以干脆先泡了热茶等着。",
+      "梁景行穿着深灰西装进来，虽然表面装得镇定，可是眼角那点焦躁偏偏瞒不过去，毕竟账目已经对不上。",
+      "他拉开太师椅坐下，本来还想拿旧合同压人，好在她提前把原件拍了照，倒也一点不怕他耍赖。",
+      "桌上有只骨瓷杯，但是她根本没碰，因为刚才秘书递茶时手抖得厉害，显然这间屋里早就有人通了气。",
+      "窗外冷雨敲在青砖上，其实她心里明白今天这一步走出去便没回头路，可是既然已经算清了旧账，也就不再犹豫。",
+      "她把红木托盘推到一旁，偏偏对方还装傻充愣，所以她干脆当场把流水单摊开，好在法务已经候在楼下。",
+      "走廊冷白光照进来，虽然局势看着僵持，但是真正慌了神的人已经先沉不住气，竟然伸手想抢回原件。",
+      "不过她反应更快，其实刚才坐下前就留了后手，所以这时候倒也从容，只等他亲口说出那个破绽。",
+    ]);
+    assert.equal(
+      runDetector(["--mode=long", "--json", fIdlePropsNatural])
+        .json()
+        .findings.filter((f) => f.type === "idle-prop-decoration-tic").length,
+      0,
+      "high colloquial connectives must exempt natural prose from idle-prop-decoration-tic"
+    );
+
+    // Calibrated dry-narration branch of low-connective-density-tic (pure_narr_med>=28, conn/1k<=5.5, de/1k<=25)
+    const fDryCamera = writeFixture("ws4-dry-camera-narration.md", [
+      "林远推开院门跨过门槛，脚下青石沾满露水，东屋灯影映在门廊石柱外侧。",
+      "掌柜合上账册放回抽屉，手指按住铜锁扣环，转头看向门口站定不动年轻伙计。",
+      "灶房烟囱冒起灰白炊烟，挑水杂役拎着两只木桶穿过中庭，石阶溅起几串水星。",
+      "管事走出库房关严木栓，顺手抄起竹签插进腰带，迈步朝前院石碑方向走去。",
+      "门房老汉拉起铁链挂上铁钩，转身搬回条凳靠墙摆正，抬头望向巷口马车影子。",
+      "二楼木窗推开半扇缝隙，伙计探身倒掉盆里残茶，水珠顺着瓦檐滴落院中石槽。",
+      "林远走进外堂停在柜台三步前，伸手抽出怀中旧单据摊平在案面，双目直视掌柜。",
+      "账房先生推开算盘取出毛笔，蘸墨在草纸记下三个数字，随后吹干纸面折成四方。",
+      "外院车夫勒住缰绳跳下车辕，掀开麻布帘子搬出两口木箱，稳稳码在廊下石阶旁。",
+      "管事接过单据扫视两遍，抬手叫来门边护院吩咐两句，护院点头转身大步迈出大门。",
+      "后堂门帘晃动两下，东家负手步入前厅停在主位旁，环视满堂众人后坐上高背木椅。",
+      "林远收起单据退后半步，侧身让开过道看向来人，厅内烛火在穿堂风里晃动不停。",
+      "护院押着两个脚夫回到堂前，地上麻绳捆紧木箱四角，堂下众人各自退开两步站定。",
+      "东家敲响桌面镇纸示意众人停手，俯身翻看账房递来折子，眉头拧成一道深沟。",
+    ]);
+    const dryRes = runDetector(["--mode=long", "--json", "--fail-on=review_required", fDryCamera]);
+    assert.equal(dryRes.status, 0, "calibrated low-connective-density-tic must remain advisory");
+    const dryHits = dryRes.json().findings.filter((f) => f.type === "low-connective-density-tic");
+    assert.equal(dryHits.length, 1, JSON.stringify(dryHits));
+    assert.equal(dryHits[0].severity, "advisory");
+    assert.equal(dryHits[0].review, "semantic");
+    assert.ok(dryHits[0].message.includes("剧本报幕体"));
+
+    // Short mode must NOT trigger calibrated dry-narration branch
+    assert.equal(
+      runDetector(["--mode=short", "--json", fDryCamera])
+        .json()
+        .findings.filter((f) => f.type === "low-connective-density-tic").length,
+      0
+    );
   });
 });

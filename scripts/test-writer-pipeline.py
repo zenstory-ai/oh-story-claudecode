@@ -443,23 +443,33 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('召回降档：成立', result.stdout)
         self.assertNotIn('题材正文提示卡（genre_prose_card', result.stdout)
         self.assertIn('——— 语感锚点切片', result.stdout)
-        # 最长匹配优先：「玄幻言情」「仙侠言情」里的「玄幻」「仙侠」是别的包的短别名，不能抢走主包；
-        # 「都市种田」也应命中都市日常神豪而非被短别名「种田」抢走。
-        for line, main, loser in [('玄幻言情', '古言宅斗重生.md', '传统玄幻仙侠.md'),
-                                  ('仙侠言情', '古言宅斗重生.md', '传统玄幻仙侠.md'),
-                                  ('都市种田', '都市日常神豪.md', '年代种田经商.md'),
+        # 最长匹配优先与 20 流派精确路由：
+        # 「玄幻言情」「仙侠言情」独立进 幻想言情仙侠.md，不再落进古言或被短别名「玄幻/仙侠」抢走；
+        # 「都市种田」「西方奇幻 / 领主种田」「男频乡村 / 赶山打猎」不被女频 年代种田经商.md 抢走；
+        # 「古代情缘 / 先婚后爱」「民国旧影 / 督军府宅斗」稳落 古言宅斗重生.md，不串入现代豪门或男频谍战。
+        for line, main, loser in [('玄幻言情', '幻想言情仙侠.md', '传统玄幻仙侠.md'),
+                                  ('玄幻言情', '幻想言情仙侠.md', '古言宅斗重生.md'),
+                                  ('仙侠言情', '幻想言情仙侠.md', '传统玄幻仙侠.md'),
+                                  ('都市种田', '男频年代乡村.md', '年代种田经商.md'),
+                                  ('西方奇幻 / 领主种田', '西幻游戏同人.md', '年代种田经商.md'),
+                                  ('古代情缘 / 先婚后爱', '古言宅斗重生.md', '豪门虐恋追妻.md'),
+                                  ('都市高手 / 强者回归', '都市日常神豪.md', '都市高武异能.md'),
+                                  ('男频乡村 / 赶山打猎', '男频年代乡村.md', '年代种田经商.md'),
+                                  ('民国旧影 / 督军府宅斗', '古言宅斗重生.md', '历史架空权谋.md'),
                                   ('传统玄幻 · 玄幻言情', '传统玄幻仙侠.md', None)]:
-            with self.subTest(genre=line):
+            with self.subTest(genre=line, loser=loser):
                 self.put('设定/题材定位.md', f'# 题材定位\n- 题材类型：{line}\n')
                 out = self.build().stdout
                 self.assertIn(f"主题材 {cards / main}", out)
                 if loser:
                     self.assertNotIn(str(cards / loser), out)
                 else:
-                    self.assertIn(f"辅题材 {cards / '古言宅斗重生.md'}", out)
-        # 高频细分别名可命中对应流派包。
+                    self.assertIn(f"辅题材 {cards / '幻想言情仙侠.md'}", out)
+        # 高频细分别名与 4 个新增流派包可精确命中。
         for alias, expected in [('异能', '都市高武异能.md'), ('虐恋', '豪门虐恋追妻.md'),
-                                ('商战', '都市日常神豪.md'), ('种田', '年代种田经商.md'),
+                                ('商战', '官场商战职场.md'), ('官场', '官场商战职场.md'),
+                                ('种田经商', '年代种田经商.md'), ('赶海', '男频年代乡村.md'),
+                                ('动漫衍生', '动漫男频衍生.md'), ('玄学直播', '幻想言情仙侠.md'),
                                 ('校园', '青春甜宠文娱.md'), ('轻小说', '西幻游戏同人.md')]:
             with self.subTest(alias=alias):
                 self.put('设定/题材定位.md', f'# 题材定位\n- 题材类型：{alias}\n')
@@ -469,7 +479,11 @@ class PipelineTests(unittest.TestCase):
         out = self.build().stdout
         self.assertIn('流派无匹配', out)
         self.assertIn(f"主题材 {cards / '通用长篇.md'}（置信度 low）", out)
-        # 兜底包不参与按名匹配：命中真实题材时不会出现通用长篇。
+        # 兜底包（fallback: true）绝不参与按名匹配：含「跨题材融合」+具体题材时只命中真实题材包。
+        self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：跨题材融合 / 悬疑\n')
+        hybrid_fb = self.build().stdout
+        self.assertIn(f"主题材 {cards / '悬疑灵异.md'}", hybrid_fb)
+        self.assertNotIn('通用长篇.md', hybrid_fb)
         self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：都市日常\n')
         self.assertNotIn('通用长篇.md', self.build().stdout)
 
@@ -639,12 +653,12 @@ class PipelineTests(unittest.TestCase):
                                 encoding='utf-8')
         result = self.build()
         self.assertIn('细纲两行：目标情绪、主角目标/关键选择都有', result.stdout)
-        self.assertIn('单元 L1-01', result.stdout)
+        self.assertIn('剧情段 L1-01', result.stdout)
         # 新细纲只写段名、不写编号：按章号落在卷纲哪段剧情的章节范围里定位。
         self.outline.write_text('### 第 1 章：一封信\n- 属于哪段剧情：第一段剧情：接信，第一步：接下托付\n'
                                 '- 目标情绪：犹疑→决定替朋友保管信件\n- 主角目标/关键选择：决定替朋友保管信件\n',
                                 encoding='utf-8')
-        self.assertIn('单元 L1-01', self.build().stdout)
+        self.assertIn('剧情段 L1-01', self.build().stdout)
 
     def test_chapter_lookup_by_range(self):
         # --chapter：按章号找本章落在哪段剧情的章节范围里，取那一段（同 --unit）；找不到不静默降级。
@@ -729,7 +743,7 @@ class PipelineTests(unittest.TestCase):
         # 设定/题材定位.md 写了题材类型时，自动附带命中的 1 份 genre-styles 流派包。
         self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：都市脑洞\n')
         vol_with_pack = json.loads(self.call('build_architect_brief.py', '--project', self.book, '--task', 'volume', '--volume', 1).stdout)
-        self.assertIn('genre-styles/都市脑洞系统.md', vol_with_pack['includes'])
+        self.assertTrue(any(name.startswith('genre-styles/都市脑洞系统.md') for name in vol_with_pack['includes']), vol_with_pack['includes'])
         # story-architect 不能执行命令：覆盖本批章节的单元闭包由脚本取好放进包里。
         self.volume.write_text(self.volume_text() + '### 剧情单元 L1-02\n> 作用域：单元级 L1-02\n'
                                '- 章节范围：第4-12章\n- 单元情绪引擎：保管→被追查→反将一军\n', encoding='utf-8')
@@ -740,7 +754,7 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('flow-outline.md（排纲方法·含黄金三章）', first['includes'])
         self.assertIn('flow-outline.md（排纲方法）', later['includes'])
         self.assertNotIn('flow-outline.md（排纲方法·含黄金三章）', later['includes'])
-        self.assertIn('genre-styles/都市脑洞系统.md', first['includes'])
+        self.assertTrue(any(name.startswith('genre-styles/都市脑洞系统.md') for name in first['includes']), first['includes'])
         self.assertTrue(any('剧情段 L1-01' in name for name in first['includes']))
         self.assertTrue(any('剧情段 L1-02' in name for name in later['includes']))
         self.assertFalse(any('剧情段 L1-01' in name for name in later['includes']))
@@ -806,6 +820,36 @@ class PipelineTests(unittest.TestCase):
         too_many = self.call('build_architect_brief.py', '--project', self.book, '--task', 'outline', '--chapters', '1-11')
         self.assertEqual(too_many.returncode, 2)
         self.assertIn('一批细纲最多 10 章', too_many.stderr)
+
+    def test_genre_card_routing_channel_priority(self):
+        # Round 5: 女频「玄幻仙侠/幻想言情」不被男频「传统玄幻仙侠」按字符位置抢主卡；「双男主」优先于泛言情标签。
+        self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：玄幻仙侠 / 幻想言情\n- 目标读者：女频（言情仙侠读者）\n')
+        res = self.build()
+        self.assertEqual(res.returncode, 0, res.stderr)
+        prompt = res.stdout.split('以下不进 prompt', 1)[0]
+        self.assertIn('主流派包：agent-references/genre-styles/幻想言情仙侠.md', prompt)
+
+        arch = self.call('build_architect_brief.py', '--project', self.book, '--task', 'world')
+        self.assertEqual(arch.returncode, 0, arch.stderr)
+        arch_text = Path(json.loads(arch.stdout)['brief']).read_text(encoding='utf-8')
+        self.assertIn('幻想言情仙侠', arch_text)
+
+        self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：白月光 · 豪门 · 双男主\n- 目标读者：女频（纯爱读者）\n')
+        res_bl = self.build()
+        self.assertEqual(res_bl.returncode, 0, res_bl.stderr)
+        prompt_bl = res_bl.stdout.split('以下不进 prompt', 1)[0]
+        self.assertIn('主流派包：agent-references/genre-styles/双男主.md', prompt_bl)
+
+        # Round 16: 女频年代军婚 & 女频末世天灾囤货 精准优先，不被男频末世/古代种田/男频乡村抢主卡。
+        self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：七零年代 / 随军军婚\n- 目标读者：女频（年代甜宠读者）\n')
+        res_mil = self.build()
+        self.assertEqual(res_mil.returncode, 0, res_mil.stderr)
+        self.assertIn('主流派包：agent-references/genre-styles/女频年代军婚.md', res_mil.stdout.split('以下不进 prompt', 1)[0])
+
+        self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：末世 / 天灾囤货空间\n- 目标读者：女频（天灾囤货读者）\n')
+        res_apo = self.build()
+        self.assertEqual(res_apo.returncode, 0, res_apo.stderr)
+        self.assertIn('主流派包：agent-references/genre-styles/女频末世天灾囤货.md', res_apo.stdout.split('以下不进 prompt', 1)[0])
 
 
     def test_architect_brief_names_unit_cards_missing_scope_lines(self):
@@ -937,12 +981,27 @@ class PipelineTests(unittest.TestCase):
         self.assertIn(f'对标/{full_title}/文风.md', report_body)
         self.assertIn('召回降档', report_body)
 
-        # BUG-06: 抗战谍战/民国谍战不再命中带古代圣旨切片的 历史架空权谋.md，改落 通用长篇.md。
+        # 2026-11-26: 历史架空权谋.md 已纳入男频抗战/民国谍战专线，不再落入通用长篇；女频民国旧影另走古言宅斗重生。
         self.put('设定/题材定位.md', '- 题材类型：民国谍战\n## 对标登记\n- 主对标书：无\n')
         res_spy = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 1)
         self.assertEqual(res_spy.returncode, 0, res_spy.stderr)
-        self.assertIn('通用长篇.md', res_spy.stdout)
-        self.assertNotIn('历史架空权谋.md', res_spy.stdout)
+        self.assertIn('历史架空权谋.md', res_spy.stdout)
+        self.assertNotIn('通用长篇.md', res_spy.stdout)
+
+        # 本书 设定/文风.md 含原文锚点切片时，优先级必须高于外部主对标与流派包内置切片。
+        self.put(
+            '设定/文风.md',
+            '# 本书文风\n## 原文锚点片段\n### 片段 1：冷峭电报\n```text\n发报键敲下第三声短促滴答，暗门外的皮鞋声停住了。\n```\n',
+        )
+        self.put(
+            '设定/题材定位.md',
+            f'- 题材类型：民国谍战\n## 对标登记\n- 主对标书：{full_title}\n',
+        )
+        res_own = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 1)
+        self.assertEqual(res_own.returncode, 0, res_own.stderr)
+        self.assertIn('发报键敲下第三声短促滴答', res_own.stdout)
+        self.assertIn('本书文风', res_own.stdout)
+        self.assertNotIn('铜铃一响，整条长街的僵尸齐刷刷跪了一地。', res_own.stdout)
 
     def test_secondary_benchmark_style_never_leaks_when_primary_lacks_style_file(self):
         # NEW-BUG-02: 主对标缺 文风.md 时，绝不滑落加载副/参考对标的 文风.md 并错标成主对标。
@@ -1007,20 +1066,90 @@ class PipelineTests(unittest.TestCase):
         self.assertIn('第002章_夜审.md', res_ch2.stdout)
         self.assertIn('细纲_第1-10章.md', res_ch2.stdout)
         self.assertIn('紧绷→反杀', res_ch2.stdout)
-        # Polish #3: 混合标签「民国谍战 / 悬疑」以 通用长篇.md 为主流派包，不落入古代历史权谋。
-        self.assertIn('主流派包：agent-references/genre-styles/通用长篇.md', res_ch2.stdout)
+        # 2026-11-26: 混合标签「民国谍战 / 悬疑」以 历史架空权谋.md 为主流派包、悬疑灵异.md 为辅流派包，不再落 通用长篇.md。
+        self.assertIn('主流派包：agent-references/genre-styles/历史架空权谋.md', res_ch2.stdout)
         self.assertIn('辅流派包：agent-references/genre-styles/悬疑灵异.md', res_ch2.stdout)
-        self.assertNotIn('历史架空权谋.md', res_ch2.stdout)
+        self.assertNotIn('通用长篇.md', res_ch2.stdout)
 
         res_missing = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 3)
         self.assertEqual(res_missing.returncode, 2)
         self.assertIn('未找到第 3 章小节', res_missing.stderr)
 
-        # Polish #3: 规则怪谈可直达 悬疑灵异.md（含悬疑规则怪谈混合标签）。
+        # 规则怪谈归 悬疑灵异.md 独占；班级求生 / 载具求生归 末世规则科幻.md，互不抢包。
         self.put('设定/题材定位.md', '- 题材类型：悬疑灵异 / 规则怪谈\n## 对标登记\n- 主对标书：无\n')
         res_rule = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 2)
         self.assertEqual(res_rule.returncode, 0, res_rule.stderr)
         self.assertIn('主流派包：agent-references/genre-styles/悬疑灵异.md', res_rule.stdout)
+        self.assertNotIn('末世规则科幻.md', res_rule.stdout)
+
+        self.put('设定/题材定位.md', '- 题材类型：班级求生 / 载具求生\n## 对标登记\n- 主对标书：无\n')
+        res_surv = self.call('build_writer_prompt.js', '--project', self.book, '--chapter', 2)
+        self.assertEqual(res_surv.returncode, 0, res_surv.stderr)
+        self.assertIn('主流派包：agent-references/genre-styles/末世规则科幻.md', res_surv.stdout)
+
+        # 全量 22 长篇 + 14 短篇流派包跨包别名唯一性校验，以及 2 个新增短篇流派包过构思契约检查。
+        for kind, directory, expected_count in (
+            ('long', ROOT / 'skills/story-long-write/references/genre-styles', 22),
+            ('short', ROOT / 'skills/story-short-write/references/genre-styles', 14),
+        ):
+            files = sorted(directory.glob('*.md'))
+            self.assertEqual(len(files), expected_count, f'{kind} genre pack count mismatch')
+            seen_aliases = {}
+            for fp in files:
+                text = fp.read_text(encoding='utf-8')
+                parts = text.split('---')
+                self.assertGreaterEqual(len(parts), 3, f'{fp.name} missing frontmatter')
+                meta = parts[1]
+                genre_m = re.search(r'^genre:\s*(.+)$', meta, re.M)
+                aliases_m = re.search(r'^aliases:\s*\[(.*)\]', meta, re.M)
+                self.assertIsNotNone(genre_m, f'{fp.name} missing genre')
+                self.assertIsNotNone(aliases_m, f'{fp.name} missing aliases')
+                names = {genre_m.group(1).strip().lower()}
+                names.update(
+                    a.strip().strip('\'"').lower()
+                    for a in aliases_m.group(1).split(',')
+                    if a.strip().strip('\'"')
+                )
+                for name in names:
+                    self.assertNotIn(
+                        name,
+                        seen_aliases,
+                        f'{kind} duplicate alias {name!r}: {seen_aliases.get(name)} vs {fp.name}',
+                    )
+                    seen_aliases[name] = fp.name
+
+        phase2_script = ROOT / 'skills/story-short-write/scripts/check-phase2-contract.js'
+        for short_genre in ('校园青春暗恋', '仙侠奇幻末世'):
+            short_dir = self.book.parent / f'short-{short_genre}'
+            short_dir.mkdir(parents=True, exist_ok=True)
+            (short_dir / '设定.md').write_text(
+                '## 短篇核心框架\n\n### 基本信息\n'
+                '- 标题（暂定）：测试短篇\n- 目标字数：10000 字\n- 目标平台：知乎盐言\n'
+                '### 导语草稿\n放榜那晚，我把成绩单拍在桌上。\n'
+                '### 这篇用的套路\n- 套路一：第1节立赌注\n- 套路二：第4节翻盘\n'
+                '## 构思要点\n'
+                f'- 题材：{short_genre}\n'
+                '- 反派：\n  - 身份：对头\n  - 动机：嫉妒\n  - 作恶方式：造谣\n  - 致命弱点：贪心\n  - 报应：身败名裂\n'
+                '- 反转类型：身份反转\n- 反转在：第 3 节（共 5 节）\n- 付费点：第 2 节末\n',
+                encoding='utf-8',
+            )
+            (short_dir / '小节大纲.md').write_text(
+                '| 在全篇哪一段 | 这节发生的事 | 情绪 | 节尾停在哪 | 目标字数 |\n'
+                '|---|---|---|---|---|\n'
+                '| 开局入局 | 冲突爆发 | 压 | 钩子 | 2000 |\n'
+                '| 付费卡点 | 亮底牌一角 | 紧 | 付费点 | 2000 |\n'
+                '| 连环反击 | 反转揭底 | 爽 | 钩子 | 2000 |\n'
+                '| 连环反击 | 当众打脸 | 爽 | 钩子 | 2000 |\n'
+                '| 清算收尾 | 回旋镖落幕 | 稳 | 清算 | 2000 |\n',
+                encoding='utf-8',
+            )
+            p2 = subprocess.run(
+                ['node', str(phase2_script), '--json', '--strict', str(short_dir)],
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+            )
+            self.assertEqual(p2.returncode, 0, f'{short_genre} failed phase2 contract: {p2.stdout}\n{p2.stderr}')
 
     def test_all_writing_deslop_review_cli_scripts_support_help(self):
         # 系统性回归：长篇/短篇/去味/审稿全部 CLI 脚本都必须干净支持 --help 与 -h（exit 0、stdout 非空、stderr 为空）。
@@ -1210,7 +1339,12 @@ class ImportOutlineBriefTests(unittest.TestCase):
     def test_legacy_summary_labels_still_extracted(self):
         self.summary(2, '- 关键事件：推门\n\n**出场人物**：\n\n| 角色 | 本章重要性 |\n|---|---|\n| 林雷 | major |\n| 希尔曼 | minor |\n\n'
                         '- **卡点与伏笔**：结尾卡点：信没拆\n')
-        _, text = self.brief('1-12')
+        # 兼容补零摘要文件名（如 第007章_摘要.md），与 inspect_existing_assets.js 一致。
+        padded7 = self.root / '拆文库' / '旧书' / '章节' / '第007章_摘要.md'
+        padded7.write_text(self.SUMMARY.format(n=7), encoding='utf-8')
+        info, text = self.brief('1-12')
+        self.assertEqual(info['missing_summaries'], [])
+        self.assertIn('关键事件：江晨推门7 看见雨', text)
         self.assertIn('关键事件：推门', text)
         self.assertIn('涉及：林雷、希尔曼', text)
         self.assertIn('章尾钩子：结尾卡点：信没拆', text)
@@ -1331,6 +1465,490 @@ class VolumeTemplateContractTests(unittest.TestCase):
             self.assertEqual(unit.returncode, 0, unit.stderr)
             self.assertIn('### 第一段剧情：{一句话} <!-- L1-01 -->', unit.stdout)
             self.assertEqual(unit.stderr, '')
+
+
+class Round21RegressionTests(unittest.TestCase):
+    """Round 21 实战回归：女频末世路由/抑制反向副包、无 # 标题、导入时间锚、文风切片与无双分隔线。"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix='round21-reg-')
+        self.book = Path(self.tmp.name) / '回归书'
+        (self.book / '设定').mkdir(parents=True)
+        (self.book / '大纲').mkdir()
+        (self.book / '正文').mkdir()
+        (self.book / '追踪').mkdir()
+        (self.book / '大纲' / '卷纲_第1卷.md').write_text(
+            '# 第一卷 卷纲\n\n### 第一段剧情：开局 <!-- L1-01 -->\n'
+            '- 章节范围：第1-10章\n- 这段让读者图什么：压迫→反杀\n- 这段怎么排：第1章入局，第2章反打\n',
+            encoding='utf-8',
+        )
+        (self.book / '大纲' / '细纲_第001章.md').write_text(
+            '### 第 1 章：不坐公车办私事，先签潘明的调令\n'
+            '- 属于哪段剧情：L1-01\n- 字数目标：2200 字\n'
+            '- 目标情绪：紧绷→反杀\n- 主角目标/关键选择：拒背黑锅并反压筹码\n',
+            encoding='utf-8',
+        )
+        (self.book / '追踪' / '上下文.md').write_text(
+            '\n'.join(f'## {h}\n无' for h in [
+                '当前位置', '长期约束', '核心角色状态', '活跃伏笔', '近三章速记', '下一章承诺', '连贯性风险',
+            ]),
+            encoding='utf-8',
+        )
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def run_builder(self, chapter=1):
+        return subprocess.run(
+            [NODE, str(SCRIPTS / 'build_writer_prompt.js'), '--project', str(self.book), '--chapter', str(chapter)],
+            capture_output=True, encoding='utf-8',
+        )
+
+    def test_female_apocalypse_routing_and_opposite_secondary_suppression(self):
+        # 七猫女频 幻想言情 / 末世求生 与 末世 / 天灾囤货空间 均稳落女频包，且不注入男频 末世规则科幻.md 辅包
+        for genre_line, audience in [
+            ('幻想言情 / 末世求生', '女频'),
+            ('末世 / 天灾囤货空间', '女频（天灾囤货）'),
+            ('末世 / 天灾囤货空间', ''),
+        ]:
+            with self.subTest(genre=genre_line, audience=audience):
+                profile = f'# 题材定位\n- 题材类型：{genre_line}\n- 主对标书：无\n'
+                if audience:
+                    profile += f'- 目标读者：{audience}\n'
+                (self.book / '设定' / '题材定位.md').write_text(profile, encoding='utf-8')
+                res = self.run_builder(1)
+                self.assertEqual(res.returncode, 0, res.stderr)
+                self.assertIn('主流派包：agent-references/genre-styles/女频末世天灾囤货.md', res.stdout)
+                self.assertNotIn('辅流派包：agent-references/genre-styles/末世规则科幻.md', res.stdout)
+                self.assertIn('本书流派包（女频末世天灾囤货）语感写', res.stdout)
+                self.assertNotIn('单元情绪引擎', res.stdout)
+        # 男频 末世危机 / 异能 稳落 末世规则科幻.md（已纳入 MALE_GENRE_CARDS）
+        (self.book / '设定' / '题材定位.md').write_text(
+            '# 题材定位\n- 题材类型：末世危机 / 异能\n- 目标读者：男频\n- 主对标书：无\n',
+            encoding='utf-8',
+        )
+        male_res = self.run_builder(1)
+        self.assertEqual(male_res.returncode, 0, male_res.stderr)
+        self.assertIn('主流派包：agent-references/genre-styles/末世规则科幻.md', male_res.stdout)
+
+    def test_plain_heading_outline_copy_and_learn_heading_and_import_anchors(self):
+        (self.book / '设定' / '题材定位.md').write_text(
+            '# 题材定位\n- 题材类型：官场商战\n- 目标读者：男频\n- 主对标书：无\n',
+            encoding='utf-8',
+        )
+        (self.book / '设定' / '文风.md').write_text(
+            '# 本书文风\n\n## 原文语感锚点切片\n```text\n冯致远推回茶盒：“公职人员一分礼不碰。”\n```\n',
+            encoding='utf-8',
+        )
+        ch1 = self.book / '正文' / '第001章_不坐公车办私事，先签潘明的调令.md'
+        ch1.write_text('第1章 不坐公车办私事，先签潘明的调令\n周五下午，冯致远合上台账没碰复核表。\n', encoding='utf-8')
+        # 无 # 纯文本长标题不误报细纲照搬
+        copy_res = subprocess.run(
+            [NODE, str(SCRIPTS / 'check-outline-copy.js'), str(ch1)],
+            capture_output=True, encoding='utf-8',
+        )
+        self.assertEqual(copy_res.returncode, 0, copy_res.stdout + copy_res.stderr)
+        # Ch2 能学习无 # 标题形态，导入书时间锚优先用 reveal_chapter，且语感锚点抽自 设定/文风.md
+        (self.book / '大纲' / '细纲_第002章.md').write_text(
+            '### 第 2 章：会议室反将一军\n- 属于哪段剧情：L1-01\n- 字数目标：2200 字\n'
+            '- 目标情绪：建压→爽\n- 主角目标/关键选择：拿出账册\n',
+            encoding='utf-8',
+        )
+        (self.book / '追踪' / '_tracking-state.json').write_text(json.dumps({
+            'last_committed_chapter': 2,
+            'context': {'position': {'story_time': '周六上午'}},
+            'timeline': {
+                'E001': {
+                    'id': 'E001', 'story_time': '周五下午', 'objective_fact': '拒坐公车',
+                    'reader_knowledge': '已揭示', 'reveal_status': '已揭示',
+                    'reveal_chapter': 1, 'first_recorded_chapter': 2, 'updated_chapter': 2,
+                },
+            },
+        }, ensure_ascii=False), encoding='utf-8')
+        res2 = self.run_builder(2)
+        self.assertEqual(res2.returncode, 0, res2.stderr)
+        self.assertIn('标题行（逐字照抄，勿按通用规则推导）：第2章 会议室反将一军', res2.stdout)
+        self.assertIn('E001(第1章揭·周五下午)', res2.stdout)
+        self.assertIn('来源：本书文风', res2.stdout)
+        # build_architect_brief 不再产出双 --- 分隔线
+        brief_run = subprocess.run(
+            [NODE, str(SCRIPTS / 'build_architect_brief.js'), '--project', str(self.book), '--task', 'outline', '--chapters', '1-2'],
+            capture_output=True, encoding='utf-8',
+        )
+        self.assertEqual(brief_run.returncode, 0, brief_run.stderr)
+        brief_path = Path(json.loads(brief_run.stdout)['brief'])
+        self.assertIsNone(re.search(r'---\s*\n\s*---', brief_path.read_text(encoding='utf-8')))
+
+    def test_campaign4_routing_corrupt_state_slices_and_outline_contracts(self):
+        # 1) 西幻游戏同人.md 纳入 MALE_GENRE_CARDS（西方奇幻 + 玄幻 不被传统玄幻抢主包）
+        (self.book / '设定' / '题材定位.md').write_text(
+            '# 题材定位\n- 题材类型：西方奇幻 / 玄幻\n- 目标读者：男频\n- 主对标书：无\n',
+            encoding='utf-8',
+        )
+        r_xf = self.run_builder(1)
+        self.assertEqual(r_xf.returncode, 0, r_xf.stderr)
+        self.assertIn('主流派包：agent-references/genre-styles/西幻游戏同人.md', r_xf.stdout)
+
+        # 2) 悬疑灵异.md 双频 tier=1（女频 悬疑 / 甜宠 与男频 悬疑 / 国运 均稳住主包）
+        (self.book / '设定' / '题材定位.md').write_text(
+            '# 题材定位\n- 题材类型：现代悬疑 / 甜宠\n- 目标读者：女频\n- 主对标书：无\n',
+            encoding='utf-8',
+        )
+        r_susp = self.run_builder(1)
+        self.assertEqual(r_susp.returncode, 0, r_susp.stderr)
+        self.assertIn('主流派包：agent-references/genre-styles/悬疑灵异.md', r_susp.stdout)
+
+        # 3) 男频下禁止 tier=3 跨频包占 hits[0]（年代单标签不误落 女频年代军婚.md）
+        (self.book / '设定' / '题材定位.md').write_text(
+            '# 题材定位\n- 题材类型：年代\n- 目标读者：男频\n- 主对标书：无\n',
+            encoding='utf-8',
+        )
+        r_male_era = self.run_builder(1)
+        self.assertEqual(r_male_era.returncode, 0, r_male_era.stderr)
+        self.assertNotIn('女频年代军婚.md', r_male_era.stdout)
+
+        # 4) 双男主（tier=0）不混载 BG 女频副包
+        (self.book / '设定' / '题材定位.md').write_text(
+            '# 题材定位\n- 题材类型：双男主 / 甜宠 / 娱乐圈\n- 目标读者：女频\n- 主对标书：无\n',
+            encoding='utf-8',
+        )
+        r_bl = self.run_builder(1)
+        self.assertEqual(r_bl.returncode, 0, r_bl.stderr)
+        self.assertIn('主流派包：agent-references/genre-styles/双男主.md', r_bl.stdout)
+        self.assertNotIn('青春甜宠文娱.md', r_bl.stdout)
+
+        # 5) 设定/文风.md 无二级子标题但有 ```text 代码块时仍可抽取语感切片
+        (self.book / '设定' / '文风.md').write_text(
+            '# 本书文风\n\n```text\n雨声砸在石阶上，他把铁匣扣死，只回了一个字：“走。”\n```\n',
+            encoding='utf-8',
+        )
+        r_plain_style = self.run_builder(1)
+        self.assertEqual(r_plain_style.returncode, 0, r_plain_style.stderr)
+        self.assertIn('雨声砸在石阶上', r_plain_style.stdout)
+        (self.book / '设定' / '文风.md').unlink()
+
+        # 6) 损毁 _tracking-state.json 时必须显式报错（禁止 rc=0 静默放行）
+        (self.book / '追踪' / '_tracking-state.json').write_text('{BROKEN_JSON', encoding='utf-8')
+        r_corrupt = self.run_builder(1)
+        self.assertNotEqual(r_corrupt.returncode, 0)
+        self.assertIn('_tracking-state.json', r_corrupt.stderr + r_corrupt.stdout)
+        (self.book / '追踪' / '_tracking-state.json').unlink()
+
+        # 7) check-outline-contract.js 传目录给友好报错而非裸 EISDIR，且 evidence 不拼接布尔值 true
+        oc_dir = subprocess.run(
+            [NODE, str(SCRIPTS / 'check-outline-contract.js'), '--json', str(self.book / '大纲')],
+            capture_output=True, encoding='utf-8',
+        )
+        self.assertEqual(oc_dir.returncode, 1)
+        self.assertNotIn('EISDIR', oc_dir.stdout)
+        self.assertIn('目录', oc_dir.stdout)
+        oc_file = subprocess.run(
+            [NODE, str(SCRIPTS / 'check-outline-contract.js'), '--json', str(self.book / '大纲' / '细纲_第001章.md')],
+            capture_output=True, encoding='utf-8',
+        )
+        self.assertNotIn('）：true', oc_file.stdout)
+
+        # 8) check-outline-copy.js 豁免 细纲「章尾钩子」里的预设原话
+        (self.book / '大纲' / '细纲_第001章.md').write_text(
+            '### 第 1 章：暗账\n- 字数目标：2200 字\n- 目标情绪：压抑→反击\n'
+            '- 主角目标/关键选择：亮账册\n'
+            '- 章尾钩子：“明早九点带着公章去税务局补缴这三百万欠税吧。”\n',
+            encoding='utf-8',
+        )
+        ch1 = self.book / '正文' / '第001章_暗账.md'
+        ch1.write_text(
+            '# 第1章 暗账\n\n他把账簿推回桌面，抬头看着慌了神的经理。\n'
+            '“明早九点带着公章去税务局补缴这三百万欠税吧。”\n',
+            encoding='utf-8',
+        )
+        cp = subprocess.run(
+            [NODE, str(SCRIPTS / 'check-outline-copy.js'), str(ch1)],
+            capture_output=True, encoding='utf-8',
+        )
+        self.assertEqual(cp.returncode, 0, cp.stdout + cp.stderr)
+
+
+        # 9) Wave 5 路由回归：男频 明星娱乐 进 都市日常神豪.md；无同频包时 tier=3 合法回退防跌 通用长篇.md；
+        # 严格 BL 词表防 宿敌/纯爱 误劫男频或女频常规书。
+        for genre, reader, expected_main, forbidden in [
+            ('都市 / 明星娱乐', '男频', '都市日常神豪.md', '通用长篇.md'),
+            ('都市 / 热血校园', '男频', '青春甜宠文娱.md', '通用长篇.md'),
+            ('游戏竞技 / 网游电竞', '女频', '西幻游戏同人.md', '通用长篇.md'),
+            ('动漫衍生', '女频', '动漫男频衍生.md', '通用长篇.md'),
+            ('都市生活 / 纯爱', '男频', '都市日常神豪.md', '双男主.md'),
+            ('古代情缘 / 宿敌 / 纯爱', '女频', '古言宅斗重生.md', '双男主.md'),
+            ('纯爱', '大众', '双男主.md', '通用长篇.md'),
+            ('ABO / 权谋', '女频', '双男主.md', '古言宅斗重生.md'),
+        ]:
+            with self.subTest(genre=genre, reader=reader):
+                (self.book / '设定' / '题材定位.md').write_text(
+                    f'# 题材定位\n- 题材类型：{genre}\n- 目标读者：{reader}\n- 主对标书：无\n',
+                    encoding='utf-8',
+                )
+                r_w5 = self.run_builder(1)
+                self.assertEqual(r_w5.returncode, 0, r_w5.stderr)
+                self.assertIn(f'主流派包：agent-references/genre-styles/{expected_main}', r_w5.stdout)
+                self.assertNotIn(forbidden, r_w5.stdout)
+
+        # 10) Wave 7A 回归：主类型/子类型/题材参考包识别、星际向哨与商战实业切片加权、
+        #     Ch1 无 正文/ 中性提示、白话卷纲段标题降档识别、章首钩子引号豁免。
+        (self.book / '设定' / '题材定位.md').write_text(
+            '# 题材定位\n- 主类型：星际向哨\n- 频道：女频\n- 主对标书：无\n',
+            encoding='utf-8',
+        )
+        (self.book / '大纲' / '卷纲_第一卷.md').write_text(
+            '# 第一卷 卷纲\n\n## 本卷剧情 <!-- 全卷 -->\n\n'
+            '### 第一段：七日狂囤与合闸建堡（第1–3章）\n'
+            '- 这段让读者图什么：倒计时搬空冷库并唤醒精神海\n'
+            '- 这段怎么排：第1章验真立约，第2章狂囤建堡，第3章破冰反杀\n',
+            encoding='utf-8',
+        )
+        (self.book / '大纲' / '细纲_第001章.md').write_text(
+            '### 第 1 章：荒星合闸\n'
+            '- 所属剧情段：第一段（第1–3章）\n'
+            '- 字数目标：2200 字\n'
+            '- 目标情绪：紧迫→掌控\n'
+            '- 主角目标/关键选择：锁死冷库并接管防线\n'
+            '- 章首钩子：“这纸卖身契你留着擦鞋吧，冷库钥匙归我了！”\n',
+            encoding='utf-8',
+        )
+        import shutil
+        if (self.book / '正文').exists():
+            shutil.rmtree(self.book / '正文')
+        r_w7_sci = self.run_builder(1)
+        self.assertEqual(r_w7_sci.returncode, 0, r_w7_sci.stderr)
+        self.assertIn('主流派包：agent-references/genre-styles/女频末世天灾囤货.md', r_w7_sci.stdout)
+        self.assertIn('星际向哨', r_w7_sci.stdout)
+        self.assertIn('首章尚无前文标题参照', r_w7_sci.stdout)
+        self.assertIn('召回降档：成立', r_w7_sci.stdout)
+
+        # R049 回归：build_architect_brief.js 与 build_writer_prompt.js 共用路由（支持主类型/频道/防纯爱误劫持）
+        arch_sci = subprocess.run(
+            [NODE, str(SCRIPTS / 'build_architect_brief.js'), '--project', str(self.book), '--task', 'world'],
+            capture_output=True, encoding='utf-8',
+        )
+        self.assertEqual(arch_sci.returncode, 0, arch_sci.stderr)
+        arch_sci_out = json.loads(arch_sci.stdout)
+        self.assertTrue(any(name.startswith('genre-styles/女频末世天灾囤货.md') for name in arch_sci_out['includes']), arch_sci_out['includes'])
+
+        # 4 字复合词（商战职场 / 实业崛起）命中 官场商战职场.md 的职场博弈切片，且 architect 同路由
+        (self.book / '设定' / '题材定位.md').write_text(
+            '# 题材定位\n- 题材参考包：商战职场\n- 子类型：实业崛起 / 职场博弈\n- 目标读者：男频\n- 主对标书：无\n',
+            encoding='utf-8',
+        )
+        r_w7_ind = self.run_builder(1)
+        self.assertEqual(r_w7_ind.returncode, 0, r_w7_ind.stderr)
+        self.assertIn('主流派包：agent-references/genre-styles/官场商战职场.md', r_w7_ind.stdout)
+        self.assertIn('切片 B：职场博弈', r_w7_ind.stdout)
+        arch_ind = subprocess.run(
+            [NODE, str(SCRIPTS / 'build_architect_brief.js'), '--project', str(self.book), '--task', 'world'],
+            capture_output=True, encoding='utf-8',
+        )
+        self.assertEqual(arch_ind.returncode, 0, arch_ind.stderr)
+        self.assertTrue(any(name.startswith('genre-styles/官场商战职场.md') for name in json.loads(arch_ind.stdout)['includes']))
+
+        # R049 回归：BG 言情带「纯爱」时 build_architect_brief 不再误劫持进 双男主.md
+        (self.book / '设定' / '题材定位.md').write_text(
+            '# 题材定位\n- 题材类型：古代情缘 / 宿敌 / 纯爱\n- 目标读者：女频\n- 主对标书：无\n',
+            encoding='utf-8',
+        )
+        arch_bg = subprocess.run(
+            [NODE, str(SCRIPTS / 'build_architect_brief.js'), '--project', str(self.book), '--task', 'world'],
+            capture_output=True, encoding='utf-8',
+        )
+        self.assertEqual(arch_bg.returncode, 0, arch_bg.stderr)
+        arch_bg_inc = json.loads(arch_bg.stdout)['includes']
+        self.assertTrue(any(name.startswith('genre-styles/古言宅斗重生.md') for name in arch_bg_inc), arch_bg_inc)
+        self.assertFalse(any(name.startswith('genre-styles/双男主.md') for name in arch_bg_inc), arch_bg_inc)
+
+        # R049 回归：author_memory_commit.js --help 列出 --genre 与 --workflow
+        mem_help = subprocess.run(
+            [NODE, str(SCRIPTS / 'author_memory_commit.js'), '--help'],
+            capture_output=True, encoding='utf-8',
+        )
+        self.assertEqual(mem_help.returncode, 0)
+        self.assertIn('--genre', mem_help.stdout)
+        self.assertIn('--workflow', mem_help.stdout)
+
+        # R089 回归 1：genreLine() 识别「流派」标签，不再静默降档为 通用长篇.md
+        (self.book / '设定' / '题材定位.md').write_text(
+            '# 题材定位\n- **书名**：测试书\n- **流派**：豪门虐恋追妻\n- **目标读者**：女频\n- **主对标书**：无\n',
+            encoding='utf-8',
+        )
+        r_r089_genre = self.run_builder(1)
+        self.assertEqual(r_r089_genre.returncode, 0, r_r089_genre.stderr)
+        self.assertIn('主流派包：agent-references/genre-styles/豪门虐恋追妻.md（置信度 high）', r_r089_genre.stdout)
+        self.assertNotIn('主流派包：agent-references/genre-styles/通用长篇.md', r_r089_genre.stdout)
+        arch_r089 = subprocess.run(
+            [NODE, str(SCRIPTS / 'build_architect_brief.js'), '--project', str(self.book), '--task', 'world'],
+            capture_output=True, encoding='utf-8',
+        )
+        self.assertEqual(arch_r089.returncode, 0, arch_r089.stderr)
+        self.assertTrue(any(name.startswith('genre-styles/豪门虐恋追妻.md') for name in json.loads(arch_r089.stdout)['includes']))
+
+        # R089 回归 2：长程时间锚点满载长时间戳时，绝不输出 0 字空摘要条目，宁可少留 1 条也保证每条带可读摘要
+        long_timeline = {}
+        for idx, (st, fact) in enumerate([
+            ('10月8日上午十一点（冷静期第7天）', '梁母携方知韵拍十万支票上门被老藏家打脸'),
+            ('10月10日上午至雨夜（冷静期第9天）', '许明棠提前两天交付册页全票获博物院特聘函'),
+            ('10月13日清晨（冷静期第12天）', '许明棠在恒温库测出加湿器水样十点二强碱'),
+            ('10月16日傍晚（冷静期第15天）', '梁景行递交三百八十万五年劳务补结协议认错'),
+            ('10月19日上午（冷静期第18天）', '梁景行出示红章注销回执反杀亲妈起拍价翻倍'),
+        ], start=5):
+            long_timeline[f'E{idx:03d}'] = {
+                'id': f'E{idx:03d}',
+                'story_time': st,
+                'objective_fact': fact,
+                'reader_knowledge': fact,
+                'reveal_status': '已揭示',
+                'reveal_chapter': idx,
+                'characters': ['许明棠', '梁景行'],
+                'first_recorded_chapter': idx,
+                'updated_chapter': idx,
+            }
+        (self.book / '追踪').mkdir(exist_ok=True)
+        (self.book / '追踪' / '_tracking-state.json').write_text(json.dumps({
+            'schema_version': 1,
+            'last_committed_chapter': 9,
+            'state_revision': 9,
+            'context': {
+                'position': {'volume': '第一卷', 'volume_start_chapter': 1, 'story_time': '10月19日上午十点半（冷静期第18天）', 'scene': '展厅'},
+                'long_term_constraints': [], 'active_character_names': [], 'continuity_risks': [],
+                'recent_chapters': [], 'next_chapter_commitments': [],
+            },
+            'characters': {}, 'foreshadow': {}, 'timeline': long_timeline, 'wordcount_records': {},
+        }, ensure_ascii=False), encoding='utf-8')
+        r_r089_anchor = self.run_builder(1)
+        self.assertEqual(r_r089_anchor.returncode, 0, r_r089_anchor.stderr)
+        prompt_p, _ = r_r089_anchor.stdout.split('以下不进 prompt', 1)
+        anchor_sec = prompt_p.split('——— 近期时间锚点', 1)[1].split('\n\n——— ', 1)[0]
+        anchor_lines = anchor_sec.split('\n')[1:]
+        anchor_body = '\n'.join(anchor_lines).strip()
+        self.assertLessEqual(len(anchor_body.replace('\n', '')), 180, anchor_body)
+        items = [seg for seg in anchor_lines[1].split('；') if seg.strip()]
+        self.assertGreaterEqual(len(items), 2, items)
+        for item in items:
+            after_paren = item.rsplit(')', 1)[-1]
+            self.assertGreaterEqual(len(after_paren), 6, f'空摘要或过度截断的时间锚点条目: {item!r}')
+
+        # WS4 回归：writer prompt 必须注入精炼四条写作硬底线，并更新语感切片引导语
+        self.assertIn('——— 写作硬底线 ———', prompt_p)
+        self.assertIn('叙述保人物内心盘算与口语因果连接', prompt_p)
+        self.assertIn('对白净白短打直接交锋', prompt_p)
+        self.assertIn('刀子物件原则', prompt_p)
+        self.assertIn('反派须按私心反咬设阻', prompt_p)
+        self.assertIn('只学口语连接、句长断行与对话推进感', prompt_p)
+
+    def test_v5_genre_pack_section_split_and_fallback(self):
+        """v5 题材包按节分读：架构师仅拿 1–3 节（不含 4–5 节），写手拿 4–5 节（不含 1–3 节），非标包优雅回退。"""
+        v5_js = r"""
+const assert = require('node:assert/strict');
+const { sliceGenrePack, extractGenreProseTechniques } = require('./skills/story-long-write/scripts/build_writer_prompt.js');
+const { sliceGenrePack: archSlice } = require('./skills/story-long-write/scripts/build_architect_brief.js');
+
+assert.equal(sliceGenrePack, archSlice);
+
+const v5Sample = `---
+genre: 测试题材
+aliases: [测试]
+---
+# 长篇题材包：测试题材
+
+> 核心底线：反派按私心反咬。
+
+## 1. 故事线设计
+主轴推进：先受阻再破局。
+
+## 2. 常见剧情设计
+黄金三章：首章抛硬账单。
+
+## 3. 人物设计
+主角清醒，反派有牙齿。
+
+## 4. 正文技巧
+- 对白净白短打，砍无功能材质贴纸。
+- ✅ 高分改写法：实戏示范文本。
+
+## 5. 案例片段
+### 片段一：测试原文
+\`\`\`text
+“这账怎么算？”
+\`\`\`
+- **学什么**：短打对白推进。
+`;
+
+const archRes = sliceGenrePack(v5Sample, [1, 2, 3]);
+assert.equal(archRes.sliced, true);
+assert.ok(archRes.text.includes('# 长篇题材包：测试题材'));
+assert.ok(archRes.text.includes('> 核心底线：反派按私心反咬。'));
+assert.ok(archRes.text.includes('## 1. 故事线设计'));
+assert.ok(archRes.text.includes('## 2. 常见剧情设计'));
+assert.ok(archRes.text.includes('## 3. 人物设计'));
+assert.ok(!archRes.text.includes('## 4. 正文技巧'));
+assert.ok(!archRes.text.includes('## 5. 案例片段'));
+assert.ok(!archRes.text.includes('genre: 测试题材'));
+
+const tech = extractGenreProseTechniques(v5Sample);
+assert.ok(tech && tech.includes('对白净白短打'));
+assert.ok(!tech.includes('## 1. 故事线设计'));
+assert.ok(!tech.includes('## 5. 案例片段'));
+
+const legacySample = `---
+genre: 旧包
+---
+# 旧版流派包
+
+## 1. 定位、平台与读者期待
+旧内容。
+
+## 6. 真·网文原文语感切片
+### 切片 A
+\`\`\`text
+旧切片。
+\`\`\`
+`;
+
+const fbArch = sliceGenrePack(legacySample, [1, 2, 3]);
+assert.equal(fbArch.sliced, false);
+assert.equal(fbArch.text, legacySample);
+assert.equal(extractGenreProseTechniques(legacySample), null);
+console.log('V5_SLICE_UNIT_OK');
+"""
+        unit_res = subprocess.run([NODE, '-e', v5_js], cwd=str(ROOT), capture_output=True, encoding='utf-8')
+        self.assertEqual(unit_res.returncode, 0, unit_res.stderr + unit_res.stdout)
+        self.assertIn('V5_SLICE_UNIT_OK', unit_res.stdout)
+
+        # 端到端检验：若 豪门虐恋追妻.md 已切为 v5 五段结构，架构师任务包只含 1–3 节、写手 prompt 注入 4. 正文技巧 + 5. 案例片段且不含 1–3 节
+        pack_text = (ROOT / 'skills/story-long-write/references/genre-styles/豪门虐恋追妻.md').read_text(encoding='utf-8')
+        if '## 1. 故事线设计' in pack_text:
+            (self.book / '设定' / '题材定位.md').write_text(
+                '# 题材定位\n- **书名**：测试书\n- **流派**：豪门虐恋追妻\n- **目标读者**：女频\n- **主对标书**：无\n',
+                encoding='utf-8',
+            )
+            arch_r = subprocess.run(
+                [NODE, str(SCRIPTS / 'build_architect_brief.js'), '--project', str(self.book), '--task', 'world'],
+                capture_output=True, encoding='utf-8',
+            )
+            self.assertEqual(arch_r.returncode, 0, arch_r.stderr)
+            arch_payload = json.loads(arch_r.stdout)
+            self.assertIn('genre-styles/豪门虐恋追妻.md（1–3节：故事线/剧情/人物）', arch_payload['includes'])
+            arch_body = Path(arch_payload['brief']).read_text(encoding='utf-8')
+            self.assertIn('## 1. 故事线设计', arch_body)
+            self.assertIn('## 2. 常见剧情设计', arch_body)
+            self.assertIn('## 3. 人物设计', arch_body)
+            self.assertNotIn('## 4. 正文技巧', arch_body)
+            self.assertNotIn('## 5. 案例片段', arch_body)
+
+            writer_r = self.run_builder(1)
+            self.assertEqual(writer_r.returncode, 0, writer_r.stderr)
+            writer_prompt, writer_report = writer_r.stdout.split('以下不进 prompt', 1)
+            self.assertIn('仅读 4. 正文技巧 与 5. 案例片段；已注入下方', writer_prompt)
+            self.assertIn('——— 流派正文技巧（豪门虐恋追妻 · 4. 正文技巧）———', writer_prompt)
+            self.assertIn('——— 语感锚点切片', writer_prompt)
+            self.assertNotIn('## 1. 故事线设计', writer_prompt)
+            self.assertNotIn('## 2. 常见剧情设计', writer_prompt)
+            self.assertNotIn('## 3. 人物设计', writer_prompt)
+            self.assertIn('流派正文技巧：已注入「豪门虐恋追妻」4. 正文技巧', writer_report)
 
 
 if __name__ == '__main__':

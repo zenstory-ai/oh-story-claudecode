@@ -20,24 +20,24 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | 大修、回炉 | `references/flow-revision.md` + `references/flow-drafting.md`「正文笔法与竖屏网感」+ 流派包 | 子代理：`references/agent-calls.md`；追踪报错：`references/tracking-protocol.md` |
 | 管理作者习惯 | `references/author-memory.md`（完成即停，不建书不写正文） | — |
 
-- **16 份流派包（按书只读命中 1 份）**：男频 `references/genre-styles/都市脑洞系统.md`、`references/genre-styles/都市日常神豪.md`、`references/genre-styles/都市高武异能.md`、`references/genre-styles/传统玄幻仙侠.md`、`references/genre-styles/玄幻脑洞反套路.md`、`references/genre-styles/历史架空权谋.md`、`references/genre-styles/末世规则科幻.md`、`references/genre-styles/悬疑灵异.md`、`references/genre-styles/西幻游戏同人.md`；女频与双男主 `references/genre-styles/现言脑洞快穿.md`、`references/genre-styles/豪门虐恋追妻.md`、`references/genre-styles/古言宅斗重生.md`、`references/genre-styles/年代种田经商.md`、`references/genre-styles/青春甜宠文娱.md`、`references/genre-styles/双男主.md`；兜底 `references/genre-styles/通用长篇.md`。
+- **22 份流派包（按书只读命中 1 份）**：男频 `references/genre-styles/都市脑洞系统.md`、`references/genre-styles/都市日常神豪.md`、`references/genre-styles/都市高武异能.md`、`references/genre-styles/传统玄幻仙侠.md`、`references/genre-styles/玄幻脑洞反套路.md`、`references/genre-styles/历史架空权谋.md`、`references/genre-styles/末世规则科幻.md`、`references/genre-styles/悬疑灵异.md`、`references/genre-styles/西幻游戏同人.md`、`references/genre-styles/动漫男频衍生.md`、`references/genre-styles/官场商战职场.md`、`references/genre-styles/男频年代乡村.md`；女频与双男主 `references/genre-styles/现言脑洞快穿.md`、`references/genre-styles/豪门虐恋追妻.md`、`references/genre-styles/古言宅斗重生.md`、`references/genre-styles/幻想言情仙侠.md`、`references/genre-styles/女频年代军婚.md`、`references/genre-styles/年代种田经商.md`、`references/genre-styles/女频末世天灾囤货.md`、`references/genre-styles/青春甜宠文娱.md`、`references/genre-styles/双男主.md`；兜底 `references/genre-styles/通用长篇.md`。
 - 派 `story-architect` 时主会话读对应流程手册与 `agent-calls.md`；派 `narrative-writer` 时由它按自身读取表读，不得用临时 prompt 替代。写正文/改稿前读本书 `设定/文风.md`。
 - **记下本轮约束**：重读请求、细纲与卷纲，原样记下字数范围、必发生、禁发生、时间锚与停笔点；参考文件不覆盖既定事实，作者字数范围写入细纲「字数范围」。
 
 > 专业 agent 只查当前宿主：Claude `.claude/agents`、OpenCode `.opencode/agents`、Codex `.codex/agents` TOML、Antigravity `.agents/agents`（`invoke_subagent` + 同名 `TypeName`）；ZCode 查已启用插件注册角色，用 `Agent` 工具按实际 schema 派发，不要求 `.zcode/agents`。返回 unknown agent 按降级处理，不因他端目录存在而降级。
 >
-> 版本：项目根 `.story-deployed` 的 `agents_version` 与 `agents_version: 46` 不一致时照常检查并 spawn，只提示一句「写作助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」；大于 46 时补充提示先更新 oh-story-claudecode。仅当前宿主角色缺失或无调用能力时降级 solo/direct，对作者只说「这次我自己写」。
+> 版本：项目根 `.story-deployed` 的 `agents_version` 与 `agents_version: 47` 不一致时照常检查并 spawn，只提示一句「写作助手是旧版，运行 /story-setup（ZCode 先更新插件）后新开会话」；大于 47 时补充提示先更新 oh-story-claudecode。仅当前宿主角色缺失或无调用能力时降级 solo/direct，对作者只说「这次我自己写」。
 
 ## 平台与男女频速查
 
 | 平台 | 男频重点 | 女频重点 | 常规单章字数 |
 |---|---|---|---|
-| **番茄** | 强噱头直给；第 1 章 300–400 字入冲突、多数首章即亮金手指；竖屏短段（中位约 22 字），章末强卡点 | 下沉强钩、早给安全感；短段快拉扯、强反转或脑洞系统 | 2000–2500 字（默认 2200） |
-| **七猫** | 免费爽感直推，第 1 章立困局与反击筹码，节奏不拖 | 甜虐交替、极限推拉、宅斗/豪门/年代强情绪，卡点密 | 2000–2400 字（默认 2150） |
-| **起点** | 代入与体系扎实，允许第 1 章立低位压迫、第 2–3 章亮底牌，首章仍须留追读钩 | 长线人设细、文风稳，容忍适度铺垫，主线清晰 | 2800–3500 字（默认 3000） |
-| **晋江** | 非主力 | 人设与情感张力优先，女主主体性强、安全感高，互动不水 | 2800–3500 字（默认 3000） |
+| **番茄** | 强噱头直给；第 1 章 300–400 字入冲突、多数首章亮金手指；竖屏短段（~22 字），章末强卡点 | 下沉强钩、早给安全感；短段快拉扯、强反转或脑洞系统 | 2000–2500（默认 2200） |
+| **七猫** | 免费爽感直推，首章立困局与反击筹码，节奏不拖 | 甜虐交替、极限推拉、宅斗/豪门/年代强情绪，卡点密 | 2000–2400（默认 2150） |
+| **起点** | 代入与体系扎实，可首章立压迫、第 2–3 章亮底牌，仍须留钩 | 长线人设细、文风稳，容忍适度铺垫，主线清晰 | 2800–3500（默认 3000） |
+| **晋江** | 非主力 | 人设与情感张力优先，女主主体性强、安全感高，互动不水 | 2800–3500（默认 3000） |
 
-- **男女频差异**：男频以剧情爽感与实力/地位/资源升级为主轴，感情线辅助；女频以情绪价值与关系/成长双轴咬合，重被珍视、认可与主动权。
+- **男女频差异**：男频以剧情爽感与实力/地位/资源升级为主轴，感情线辅助；女频以情绪价值与关系/成长双轴咬合，重被珍视、认可与主动权。刺猬猫/二次元向参考起点，单章 2500–3000 字，重人设吐槽与设定反差。
 
 ## 写作流程与授权边界
 

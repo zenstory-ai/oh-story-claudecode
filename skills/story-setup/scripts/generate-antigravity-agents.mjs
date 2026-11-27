@@ -30,11 +30,16 @@ function fail(message) {
   process.exit(2)
 }
 
+const USAGE = "Usage: node generate-antigravity-agents.mjs [--source DIR] [--dest DIR] [-h|--help]\n"
+
 function parseArgs(argv) {
   const result = { source: DEFAULT_SOURCE, dest: DEFAULT_DEST }
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index]
-    if (token === "--source" || token === "--dest") {
+    if (token === "-h" || token === "--help") {
+      process.stdout.write(USAGE)
+      process.exit(0)
+    } else if (token === "--source" || token === "--dest") {
       const value = argv[++index]
       if (!value) fail(`${token} requires a path`)
       result[token.slice(2)] = path.resolve(value)

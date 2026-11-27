@@ -10,9 +10,10 @@
 
 ## 单独重建与报告回填
 
-1. 跑检查器确认 `stage_repairs` 含 `stage6_style` 或 `stage6`；`_style-sample.txt` 已有 4–6 段有效原文直接用，不足且缺索引时单建索引（不写 `_progress.md`）：
+1. 跑检查器确认 `stage_repairs` 含 `stage6_style` 或 `stage6`；`_style-sample.txt` 已有 4–6 段有效原文直接用，不足且缺索引时单建索引（不写 `_progress.md`），再跑 `prose-stats` 确定性出数（**严禁目测估算**）：
    ```text
    node "{story-long-analyze skill 根}/scripts/build_chapter_index.js" --source "{拆文目录}/原文/原文.txt" --output "{拆文目录}/chapter_index.csv" --locator-path "原文/原文.txt"
+   node "{story-long-analyze skill 根}/scripts/manage_analysis_run.js" prose-stats --root "{拆文目录}" --file "_style-sample.txt"
    ```
 2. 按模板落盘 `文风.md`（总上限 3,600 字：量化与技法 ≤1,400 字，4–6 段 200–400 字原文锚点 ≤2,100 字，记录与不建议模仿 ≤100 字），再标记完成：
    ```text
@@ -62,7 +63,7 @@
 
 ## 原文锚点片段
 
-> 4–6 段连续原文（每段 200–400 字），保留原始换行、标点与对话，供下游写正文直注校准语感；模仿节奏与声线，禁抄字句。优先复用 Stage 1 预存切片并补齐中后段高频基调。
+> 4–6 段连续原文（每段 200–400 字），保留原始换行、标点与对话，用于校准节奏与声线，禁抄字句。
 
 ### 片段 A — 基调：{开篇钩子/紧张}
 **出处**：第 {K} 章 第 {段号} 段（行 {L1}-{L2}）

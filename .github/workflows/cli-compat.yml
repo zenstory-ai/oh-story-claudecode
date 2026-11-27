@@ -1,23 +1,7 @@
 name: Agent CLI compatibility
 
+# 外部官方 CLI 均按 @latest 安装，仅走每周定时巡检与手动触发，避免上游发版阻断日常功能 PR。
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.agents/**'
-      - '.claude-plugin/**'
-      - '.github/workflows/cli-compat.yml'
-      - 'reasonix-plugin.json'
-      - 'scripts/**'
-      - 'skills/**'
-  pull_request:
-    paths:
-      - '.agents/**'
-      - '.claude-plugin/**'
-      - '.github/workflows/cli-compat.yml'
-      - 'reasonix-plugin.json'
-      - 'scripts/**'
-      - 'skills/**'
   schedule:
     - cron: '23 9 * * 1'
   workflow_dispatch:

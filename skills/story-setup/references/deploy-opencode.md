@@ -37,91 +37,21 @@
 
 ## 配置 Agent 模型
 
-> 子代理不指定模型时继承主模型，低成本 Agent 也耗主模型额度；此步骤自动检测用户模型并写入 `model:` 字段。
+> 子代理不指定 `model:` 时继承主模型，低成本助手也会耗主模型额度；按下面 4 步保留/配置各档模型。
 
-### 保留已有模型配置（必须在 `.opencode/agents/` 的 replace 之前执行）
-
-OpenCode agents 部署是 `replace`，会覆盖上次写入的 `model:`。所以在执行该 replace **之前**先扫描现有 `.opencode/agents/*.md`，缓存每个 agent 的 `model:`（agent 名 → 模型 ID）。后续检测失败/超时、或用户跳过某一级时，用缓存值回填，避免把用户上次配好的低成本模型抹成主模型。若 replace 已先发生、缓存为空，则按全新部署处理，并在安装报告中提示"未能保留上次模型配置"。
-
-### 获取模型列表
-
-优先在项目根执行 `opencode api model.list -H "x-opencode-directory:<项目根绝对路径>"`，输出 JSON：`data[]` 每项的 `providerID/id` 即模型 ID，`cost[]` 为每百万 token 的 input/output 单价（空数组即无成本数据），`limit.context` 为上下文长度；不可用或解析失败时回退到 `opencode models` 纯文本（每行 `provider/model`）。两者都用 60000ms（60 秒）超时，因为首次运行需加载 models.dev 缓存。
-
-- 成功 → 进入「模型分级」
-- 超时 → 重试一次（缓存可能未预热）；仍然超时则按「保留已有模型配置」缓存回填已有 `model:`、跳过自动配置，在安装报告中输出手动配置指南
-- 失败（命令不存在、输出为空等）→ 同上：回填「保留已有模型配置」缓存、跳过自动配置、输出手动配置指南
-
-### 模型分级
-
-**优先按成本分级（有 `model.list` 成本数据时）**：按每模型实际 cost 从低到高分档——低端取最便宜/免费档、中端取中价档、高端取最贵或上下文/能力最强档。免费模型按真实 cost=0 归低端，**不按名字里的营销词**（如 `nemotron-3-ultra-free` 名含 `ultra` 但 cost=0，应归低端）。无 cost 数据的模型也据此进入候选，不被丢弃。
-
-**回退按关键词分级（只有 `opencode models` 或无 cost 时）**：按模型 ID 中最后一个 `/` 之后的模型名按 `-`、`.`、`_` 分割为段，逐段精确匹配关键词（不区分大小写）。例如 `minimax-m3` 拆为 `[minimax, m3]`，不匹配 `mini` 也不匹配 `max`；`claude-haiku-4.5` 拆为 `[claude, haiku, 4, 5]`，匹配 `haiku`。关键词分级是启发式，安装报告中标注 `分级依据：关键词（heuristic）`。
-
-| 等级 | 匹配关键词 | 对应 Agent |
-|------|-----------|-----------|
-| 低端 | `haiku`, `flash`, `mini`, `nano`, `lite` | chapter-extractor, consistency-checker, story-explorer |
-| 中端 | `sonnet`, `plus` | story-researcher, character-designer |
-| 高端 | `opus`, `pro`, `ultra`, `max` | story-architect, narrative-writer |
-
-- 一个模型可能匹配多个等级的关键词，取最高等级
-- 关键词回退下未匹配任何关键词的模型仍列入候选附加建议（按成本分级则一律纳入），并在安装报告列出，提示"可通过自定义输入使用"
-- 同一等级内，如果包含多个模型供应商，优先列出知名供应商（anthropic、openai、google、deepseek）的模型
-
-### 逐级交互选择
-
-按 低端 → 中端 → 高端 顺序，每级用 AskUserQuestion 让用户选择。问题只用作者能懂的角色名；括号里的内部 agent 名只写在部署明细里，不放进问题。
-
-| 等级 | 问作者的话 | 部署明细：对应 agent |
-|------|-----------|---------------------|
-| 低端 | 「拆书助手、资料检索员和校对员做的是翻找和核对，给它们选哪个模型？便宜的就够用。」 | chapter-extractor（拆书助手）、story-explorer（资料检索员）、consistency-checker（校对员） |
-| 中端 | 「人物设计师和资料研究员整理设定与资料，给它们选哪个模型？」 | character-designer（人物设计师）、story-researcher（资料研究员） |
-| 高端 | 「写正文的写手和排大纲、统筹全书的总指挥直接决定正文质量，给它们选哪个模型？」 | narrative-writer（写手）、story-architect（总指挥） |
-
-每级选项结构：
-
-```
-选项：
-  - provider/model-id
-  - provider/model-id
-  - 自定义输入（手动输入完整模型 ID，ID 拼写错误要到运行时才会暴露；高端提示请勿使用低端模型，会影响正文质量）
-  - 保留现有模型（有缓存时才显示）
-  - 跳过，用主模型（低端/高端说明「成本可能较高」；中端说明「主模型质量通常足够」）
-```
-
-规则：
-- 候选最多显示 5 个，超过则截断并提示"更多模型请使用自定义输入"。**每一级无论候选数是否为 0 都用 AskUserQuestion 弹出**，选项至少含：候选模型（如有）、`自定义输入`、`保留现有模型`（「保留已有模型配置」缓存到该 agent 的 model，无则不显示此项）、`跳过，用主模型`。候选为 0 时仍弹窗，并在问题说明里给出对应警告 + 列出未分级/未入档模型供参考——不再直接跳过交互（否则用户够不到自定义输入）。
-- `自定义输入`：用户输入 `provider/model-id` 完整 ID；写入前校验为单行、无控制字符、匹配 `^[A-Za-z0-9._-]+/[A-Za-z0-9._:+-]+$`，不符则提示重输或改选跳过。
-- `保留现有模型`：写回「保留已有模型配置」缓存的该 agent model（重新部署时保住用户上次配置），不算"跳过"。写手的缓存模型按本次分级落在低端或中端时（旧版把写手按中端配），高端这级的问题说明加一句「写手上次配的是中档模型，写正文建议换高端的」，推荐重选。
-- `跳过，用主模型`：显式清除——不写该 agent 的 `model:`，agent 继承主模型。想保留上次配置请选 `保留现有模型`。
-- 各级候选为 0 时在问题说明里给出提示：
-  - 低端："没找到便宜的模型，拆书助手、资料检索员和校对员会用主模型，花费可能较高"
-  - 中端："没找到合适的中档模型，人物设计师和资料研究员会用主模型。主模型质量够的话这样没问题；想省钱可以自定义输入一个不比主模型差的中档模型，或从下面未分级的模型里选。"
-  - 高端："没找到高端模型，写手和总指挥会用主模型"
-
-### 写入 model 字段
-
-对应用户选择的 agent 文件（`.opencode/agents/*.md`，由部署步骤第 2 步在此之前已部署），在 frontmatter 末尾、closing `---` 之前，以**零缩进的顶层字段**插入 `model:`（不要插进 `permissions:` 规则列表等多行块的缩进内部）。值含 YAML 特殊字符时加引号，确保不破坏 frontmatter：
-
-```yaml
----
-description: ...
-mode: subagent
-permissions:
-  - action: "*"
-    resource: "*"
-    effect: deny
-  - action: read
-    resource: "*"
-    effect: allow
-steps: 12
-model: provider/model-id
----
-```
-
-- 如果 agent 文件已有 `model:` 字段（重新部署场景），替换该顶层 `model:` 的值，不新增重复键
-- `保留现有模型`：写回「保留已有模型配置」缓存的该 agent model
-- `跳过，用主模型`：不写入 `model:` 字段
-- 检测失败/超时、没走到本步骤的等级：用「保留已有模型配置」缓存回填 `model:`，避免 replace 抹掉用户上次配置；回填的写手模型按关键词落在低端或中端时，在「你还需要做的事」里提醒作者给写手换高端模型
+1. **先缓存已有模型配置（必须在 `.opencode/agents/` replace 前）**：扫描现有 `.opencode/agents/*.md`，记录每个 agent 当前顶层 `model:`。后续拉取失败、超时或用户选「保留现有模型」时用此缓存回填；若 replace 已先发生致缓存为空，按全新部署处理并在报告注明「未能保留上次模型配置」。
+2. **获取并分级可用模型（60s 超时，超时重试一次）**：优先在项目根执行 `opencode api model.list -H "x-opencode-directory:<项目根绝对路径>"`（取 `data[]` 的 `providerID/id`、`cost[]`、`limit.context`），不可用时回退 `opencode models`（每行 `provider/model`）。仍失败则用第 1 步缓存回填 `model:`、跳过交互并在报告给手动指引。
+   - **优先按成本分级**：有 `cost[]` 时按单价从低到高分低/中/高三档（`cost=0` 免费模型归低端，不看名字营销词如 `ultra-free`），无成本项照常纳入候选。
+   - **回退按关键词分级**（报告标 `分级依据：关键词（heuristic）`）：取 ID 末 `/` 后按 `-`、`.`、`_` 切段精确匹配（不区分大小写，多命中取最高档，同档优先 anthropic/openai/google/deepseek，未匹配项列为附加建议）：
+     - 低端（`haiku`/`flash`/`mini`/`nano`/`lite`）→ `chapter-extractor`、`consistency-checker`、`story-explorer`
+     - 中端（`sonnet`/`plus`）→ `story-researcher`、`character-designer`
+     - 高端（`opus`/`pro`/`ultra`/`max`）→ `story-architect`、`narrative-writer`
+3. **逐级交互（低端 → 中端 → 高端）**：每级无论候选是否为 0 均用 AskUserQuestion 弹窗（候选最多列 5 个，超限提示自定义输入；问题中只用作者懂的角色名，禁出现内部 agent 名）：
+   - 低端：「拆书助手、资料检索员和校对员做的是翻找和核对，给它们选哪个模型？便宜的就够用。」（0 候选提示将用主模型、花费偏高）
+   - 中端：「人物设计师和资料研究员整理设定与资料，给它们选哪个模型？」（0 候选提示可用主模型或自定义/从未分级项选）
+   - 高端：「写正文的写手和排大纲、统筹全书的总指挥直接决定正文质量，给它们选哪个模型？」（写手缓存落在低/中档时提醒换高端；0 候选提示将用主模型）
+   - 每级选项：候选 `provider/model-id`、`自定义输入`（单行无控制字符，须匹配 `^[A-Za-z0-9._-]+/[A-Za-z0-9._:+-]+$`；高端提示勿用低端模型）、`保留现有模型`（仅缓存非空时显示，写回原值）、`跳过，用主模型`（显式清除，不写 `model:`）。
+4. **写入 `model:` 字段**：在对应 `.opencode/agents/*.md` frontmatter 闭合 `---` 前以**零缩进顶层字段**插入或替换 `model: provider/model-id`（禁插进 `permissions:` 缩进块内；含 YAML 特殊字符加引号）。未走到交互的失败等级用缓存回填；若回填的写手模型属低/中档，在「你还需要做的事」提醒换高端模型。
 
 ## 验证
 

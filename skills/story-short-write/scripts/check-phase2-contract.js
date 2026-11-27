@@ -63,7 +63,12 @@ function verify(projectDir, options = {}) {
   const strict = Boolean(options && options.strict)
   const project = path.resolve(projectDir)
   const skillRoot = path.resolve(__dirname, '..')
-  const settingsFile = path.join(project, '设定.md')
+  const primarySettings = path.join(project, '设定.md')
+  const altSettings = path.join(project, '题材与大纲.md')
+  const settingsName = fs.existsSync(primarySettings)
+    ? '设定.md'
+    : (fs.existsSync(altSettings) ? '题材与大纲.md' : '设定.md')
+  const settingsFile = path.join(project, settingsName)
   const outlineFile = path.join(project, '小节大纲.md')
   const charactersFile = path.join(project, '人物表.md')
   const settingsRead = readUtf8(settingsFile)
@@ -73,11 +78,11 @@ function verify(projectDir, options = {}) {
   checks.push(makeCheck(
     'phase2.settings-readable',
     settingsRead.ok,
-    '设定.md',
+    settingsName,
     settingsRead.ok ? '文件存在且非空' : (settingsRead.error || '文件为空'),
-    '项目目录下存在非空的 设定.md',
+    '项目目录下存在非空的 设定.md（或 题材与大纲.md）',
     ['SKILL.md'],
-    '只补建或补全 设定.md，不改动已通过的 小节大纲.md。',
+    '只补建或补全 设定.md（或 题材与大纲.md），不改动已通过的 小节大纲.md。',
     'blocking'
   ))
   checks.push(makeCheck(
@@ -118,22 +123,43 @@ function verify(projectDir, options = {}) {
   checks.push(makeCheck(
     'phase2.platform-declared',
     Boolean(platformMatch),
-    '设定.md',
+    settingsName,
     platformMatch ? `目标平台：${platformMatch[1]}` : '未找到常见平台表内的目标平台字段',
-    '建议写明“目标平台：知乎盐言 / 番茄 / 七猫 / 黑岩 / 小程序”之一；作者没定平台写“未定”',
+    '建议写明“目标平台：知乎盐言 / 番茄 / 七猫 / 黑岩 / 点众 / 小程序”之一；作者没定平台写“未定”',
     ['SKILL.md'],
     '复核目标平台：若是自选其他平台，确认后可保留；否则补进 设定.md 基本信息。',
     'advisory'
   ))
 
-  // 题材：现行写题材名（「题材：追妻火葬场」，冷门写「题材：冷门：公式名」），由脚本对到 genre-styles；
-  // 0.9.x 及更早写的是文件路径（「题材参考：`references/genre-styles/悬疑.md`」），照认。
+  // 题材：现行写题材名或流派别名（「题材：追妻火葬场」「题材：宫斗宅斗」，冷门写「题材：冷门：公式名」），
+  // 由脚本按文件名与 frontmatter aliases 对到 genre-styles；0.9.x 及更早写文件路径照认。
   const genreLine = settings.match(/^[ \t]*[-*]?[ \t]*(?:题材参考|题材包|题材)[ \t]*[：:][ \t]*([^\n]*)$/m)
   const genreValue = genreLine ? genreLine[1].replace(/`/g, '').trim() : ''
   const genreDir = path.join(skillRoot, 'references', 'genre-styles')
-  const genreNames = fs.existsSync(genreDir)
-    ? fs.readdirSync(genreDir).filter((name) => name.endsWith('.md')).map((name) => name.slice(0, -3))
+  const genrePacks = fs.existsSync(genreDir)
+    ? fs.readdirSync(genreDir)
+      .filter((name) => name.endsWith('.md'))
+      .sort()
+      .map((file) => {
+        const name = file.slice(0, -3)
+        let aliases = []
+        try {
+          const text = fs.readFileSync(path.join(genreDir, file), 'utf8')
+          const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---/)
+          const aliasLine = fm ? fm[1].match(/^[ \t]*aliases[ \t]*:[ \t]*\[([^\]]*)\][ \t]*$/m) : null
+          if (aliasLine) {
+            aliases = aliasLine[1]
+              .split(',')
+              .map((item) => item.trim().replace(/^['"]|['"]$/g, '').trim())
+              .filter(Boolean)
+          }
+        } catch {
+          aliases = []
+        }
+        return { name, aliases }
+      })
     : []
+  const genreNames = genrePacks.map((pack) => pack.name)
   let genreEvidence = '未找到「题材：」一行'
   let genreOk = false
   const pathMatch = genreValue.match(/references\/(?:genre-styles\/[^\s|]+\.md|genre-writing-formulas\.md)/)
@@ -151,14 +177,72 @@ function verify(projectDir, options = {}) {
     genreOk = true
     genreEvidence = '导入短篇题材暂标 [待补充]，待续写构思时选流派包'
   } else if (genreValue) {
-    const named = genreNames.filter((name) => genreValue.startsWith(name)).sort((a, b) => b.length - a.length)[0]
-    genreOk = Boolean(named)
-    genreEvidence = named ? `题材：${named}` : `题材「${genreValue}」不是现有题材包（${genreNames.join(' / ')}），未命中细分流派请选「通用短篇」`
+    const tokens = genreValue.split(/[\/、,，+＋（(）)\s]+/).map((s) => s.trim()).filter(Boolean)
+    const hasBgCue = tokens.some((t) => /^(?:言情|女频|现言|古言|男频|男女)$/.test(t)) ||
+      /(?:言情|女频|现言|古言)/.test(genreValue)
+    const strictBlTerms = ['双男主', '耽美', 'ABO', '病娇双男主', '双男主追夫']
+    const blPack = genrePacks.find((pack) => pack.name === '双男主')
+    const blStrictHit = blPack
+      ? strictBlTerms.find((term) => genreValue === term || genreValue.startsWith(term) || tokens.includes(term))
+      : null
+    const blPureLoveHit = !blStrictHit && blPack && !hasBgCue &&
+      (genreValue === '纯爱' || tokens.includes('纯爱'))
+      ? '纯爱'
+      : null
+    const blGenderHit = blStrictHit || blPureLoveHit
+    if (blGenderHit) {
+      genreOk = true
+      genreEvidence = blGenderHit === '双男主' ? '题材：双男主' : `题材：双男主（别名：${blGenderHit}）`
+    } else if (genreNames.includes(genreValue)) {
+      genreOk = true
+      genreEvidence = `题材：${genreValue}`
+    } else {
+      const highConceptTerms = new Set([
+        '脑洞设定流', '脑洞', '弹幕', '系统', '攻略系统', '读心术', '读心', '心声',
+        '恶毒女配', '穿书女配', '无限流短篇', '无限流', '对照组',
+      ])
+      const scenePacks = new Set([
+        '校园青春暗恋', '仙侠奇幻末世', '年代重生打脸', '宅斗宫斗', '悬疑', '男频都市反杀',
+      ])
+      const aliasMatches = []
+      for (const pack of genrePacks) {
+        const candidates = [pack.name, ...pack.aliases]
+        for (const alias of candidates) {
+          if (pack.name === '双男主' && alias === '纯爱' && hasBgCue) continue
+          let rank = 0
+          if (genreValue === alias) rank = 3
+          else if (genreValue.startsWith(alias)) rank = 2
+          else if (tokens.includes(alias)) rank = 1
+          if (!rank) continue
+          const genderTier = pack.name === '双男主' ? 3 : 0
+          const conceptTier = pack.name === '脑洞设定流' && highConceptTerms.has(alias) ? 2 : 0
+          const sceneTier = scenePacks.has(pack.name) ? 1 : 0
+          const priorityTier = Math.max(genderTier, conceptTier, sceneTier)
+          aliasMatches.push({ pack: pack.name, alias, priorityTier, rank, len: alias.length })
+        }
+      }
+      aliasMatches.sort((a, b) =>
+        (b.priorityTier - a.priorityTier) ||
+        (b.rank - a.rank) ||
+        (b.len - a.len) ||
+        a.pack.localeCompare(b.pack)
+      )
+      const matched = aliasMatches[0]
+      if (matched) {
+        genreOk = true
+        genreEvidence = matched.alias === matched.pack
+          ? `题材：${matched.pack}`
+          : `题材：${matched.pack}（别名：${matched.alias}）`
+      } else {
+        genreOk = false
+        genreEvidence = `题材「${genreValue}」不是现有题材包或别名（${genreNames.join(' / ')}），未命中细分流派请选「通用短篇」`
+      }
+    }
   }
   checks.push(makeCheck(
     'phase2.genre-reference-declared',
     genreOk,
-    '设定.md',
+    settingsName,
     genreEvidence,
     `建议在「构思要点」写「题材：题材包名」（${genreNames.join(' / ')} 之一；未命中细分流派选「通用短篇」）`,
     ['SKILL.md', 'references/genre-styles/*.md'],
@@ -184,7 +268,7 @@ function verify(projectDir, options = {}) {
   checks.push(makeCheck(
     'phase2.genre-moves-declared',
     moves.length >= 2 && moves.length <= 3,
-    '设定.md',
+    settingsName,
     moves.length ? `识别到 ${moves.length} 个套路` : '「这篇用的套路」下没有条目',
     '建议「这篇用的套路」下写 2-3 条，一条一行（旧书的「核心招式：招式一；招式二」照认）',
     ['SKILL.md'],
@@ -199,7 +283,7 @@ function verify(projectDir, options = {}) {
   checks.push(makeCheck(
     'phase2.villain-contract',
     villainOk,
-    '设定.md',
+    settingsName,
     villainSkipped ? '已明确反派不适用' : (villainOk ? '反派五字段齐全' : `缺字段：${missingVillainFields.join('、')}`),
     '无反派时建议写“反派：没有（原因）”；有反派时建议填写身份、动机、作恶方式、致命弱点、报应',
     ['SKILL.md'],
@@ -219,7 +303,7 @@ function verify(projectDir, options = {}) {
   checks.push(makeCheck(
     'phase2.no-template-placeholders',
     placeholderLines.length === 0,
-    '设定.md',
+    settingsName,
     placeholderLines.length ? `仍是模板占位符的行：${placeholderLines.map((entry) => entry.line).join('、')}` : '构思要点与套路没有未填写的 {} 占位符',
     '构思要点与「这篇用的套路」写实际设计内容，不保留 {} 模板占位符',
     ['SKILL.md'],
@@ -351,7 +435,7 @@ function verify(projectDir, options = {}) {
   checks.push(makeCheck(
     'phase2.target-wordcount',
     statedTargetOk,
-    '设定.md',
+    settingsName,
     targetPendingOnImport
       ? '导入半成品目标字数暂标 [待补充]，待续写构思确认'
       : (statedTarget === null ? '目标字数未识别或不可解析' : `设定目标：${isRange ? `${targetLow}-${targetHigh}` : statedTarget}`),
@@ -370,7 +454,7 @@ function verify(projectDir, options = {}) {
   checks.push(makeCheck(
     'phase2.target-word-sum',
     targetSumOk,
-    '设定.md、小节大纲.md',
+    `${settingsName}、小节大纲.md`,
     isImportedPartial
       ? `导入半成品已写节大纲合计：${targetSum === null ? '有非数字目标字数' : targetSum}（全篇目标：${targetPendingOnImport ? '[待补充]' : (isRange ? `${targetLow}-${targetHigh}` : statedTarget)}）`
       : `设定目标：${statedTarget === null ? '未识别' : (isRange ? `${targetLow}-${targetHigh}` : statedTarget)}；大纲合计：${targetSum === null ? '有非数字目标字数' : targetSum}`,
@@ -397,7 +481,7 @@ function verify(projectDir, options = {}) {
   checks.push(makeCheck(
     'phase2.reversal-position',
     reversalOk,
-    '设定.md',
+    settingsName,
     reversalEvidence,
     '有反转时建议写“反转在：第 X 节（共 Y 节）”，X 在大纲节数之内；无反转时写“反转类型：无反转”和带原因的“反转在：不适用（…）”',
     ['SKILL.md'],
@@ -405,23 +489,23 @@ function verify(projectDir, options = {}) {
     'advisory'
   ))
 
-  const paywallMatch = settings.match(/付费点\s*[：:]\s*第?\s*(\d+)\s*节末/)
+  const paywallMatch = settings.match(/付费点\s*[：:]\s*第?\s*(\d+)\s*节(?:末)?/)
   const paywallSection = paywallMatch ? Number(paywallMatch[1]) : null
   const paywallRows = rows
     .map((row, index) => ({ section: index + 1, hook: cell(row, 'hook') }))
     .filter((row) => /付费点/.test(row.hook))
   const paywallOk = paywallSection !== null && paywallRows.length === 1 &&
     paywallRows[0].section === paywallSection
-  let paywallEvidence = '设定.md 未按“付费点：第 X 节末”声明'
+  let paywallEvidence = `${settingsName} 未按“付费点：第 X 节末”声明`
   if (paywallSection !== null && paywallRows.length === 0) {
-    paywallEvidence = `设定.md 声明第 ${paywallSection} 节末；大纲“节尾停在哪”列未标出付费点`
+    paywallEvidence = `${settingsName} 声明第 ${paywallSection} 节末；大纲“节尾停在哪”列未标出付费点`
   } else if (paywallSection !== null && paywallRows.length > 0) {
-    paywallEvidence = `设定.md 声明第 ${paywallSection} 节末；大纲标在第 ${paywallRows.map((row) => row.section).join('、')} 节`
+    paywallEvidence = `${settingsName} 声明第 ${paywallSection} 节末；大纲标在第 ${paywallRows.map((row) => row.section).join('、')} 节`
   }
   checks.push(makeCheck(
     'phase2.paywall-in-both',
     paywallOk,
-    '设定.md、小节大纲.md',
+    `${settingsName}、小节大纲.md`,
     paywallEvidence,
     '有付费断点需求的平台建议在 设定.md 写“付费点：第 X 节末”，并在小节大纲.md 对应节「节尾停在哪」标出',
     ['SKILL.md'],
@@ -431,7 +515,7 @@ function verify(projectDir, options = {}) {
 
   // 导语/冷开场声明（advisory）：导入书与 0.9.x 旧版设定跳过以保持严格向后兼容。
   let leadOk = false
-  let leadEvidence = '设定.md 未声明导语或冷开场'
+  let leadEvidence = `${settingsName} 未声明导语或冷开场`
   if (isImportedOrLegacySettings) {
     leadOk = true
     leadEvidence = '导入或旧版设定，跳过导语声明检查'
@@ -465,13 +549,13 @@ function verify(projectDir, options = {}) {
     const hasLeadField = Boolean(leadFieldVal) && !/^\{[^}]*\}$/.test(leadFieldVal) && leadFieldVal !== '[待补充]' && leadFieldVal !== '无'
     if (leadBody.length > 0 || hasLeadField) {
       leadOk = true
-      leadEvidence = leadBody.length > 0 ? '设定.md 已包含导语/冷开场小节' : '设定.md 已声明导语/冷开场字段'
+      leadEvidence = leadBody.length > 0 ? `${settingsName} 已包含导语/冷开场小节` : `${settingsName} 已声明导语/冷开场字段`
     }
   }
   checks.push(makeCheck(
     'phase2.lead-declared',
     leadOk,
-    '设定.md',
+    settingsName,
     leadEvidence,
     '建议在 设定.md 声明导语/冷开场（150-300 字开篇卖点与钩子），便于进入正文即冷开入冲突',
     ['SKILL.md'],
@@ -479,21 +563,32 @@ function verify(projectDir, options = {}) {
     'advisory'
   ))
 
-  // 付费点位置比例（advisory）：大纲 ≥5 节且声明了付费点时，建议落在全文 20%-55% 区间。
+  // 付费点位置比例（advisory）：大纲 ≥5 节且声明了付费点时，建议按节数与目标字数累计均落在全文 20%-55% 区间。
   let paywallRatioOk = true
   let paywallRatioEvidence = '未声明付费点或总节数不足 5 节，跳过付费点位置比例检查'
   if (paywallSection !== null && rows.length >= 5) {
     const ratio = paywallSection / rows.length
     const pct = Math.round(ratio * 100)
-    paywallRatioOk = ratio >= 0.20 && ratio <= 0.55
-    paywallRatioEvidence = `付费点在第 ${paywallSection} 节 / 共 ${rows.length} 节（${pct}%）`
+    const sectionRatioOk = ratio >= 0.20 && ratio <= 0.55
+    const hasValidRowTargets = shapedRows.length === rows.length && targetSum !== null && targetSum > 0 &&
+      paywallSection >= 1 && paywallSection <= rowTargets.length
+    if (hasValidRowTargets) {
+      const cumTarget = rowTargets.slice(0, paywallSection).reduce((sum, val) => sum + val, 0)
+      const charRatio = cumTarget / targetSum
+      const charPct = Math.round(charRatio * 100)
+      paywallRatioOk = sectionRatioOk && charRatio >= 0.20 && charRatio <= 0.55
+      paywallRatioEvidence = `付费点在第 ${paywallSection} 节 / 共 ${rows.length} 节（按节数 ${pct}%，按目标字数 ${cumTarget}/${targetSum} 约 ${charPct}%）`
+    } else {
+      paywallRatioOk = sectionRatioOk
+      paywallRatioEvidence = `付费点在第 ${paywallSection} 节 / 共 ${rows.length} 节（${pct}%）`
+    }
   }
   checks.push(makeCheck(
     'phase2.paywall-position-ratio',
     paywallRatioOk,
-    '设定.md、小节大纲.md',
+    `${settingsName}、小节大纲.md`,
     paywallRatioEvidence,
-    '总节数 ≥5 节时，建议付费点落在全文 20%-55% 区间（通常第 2-4 节末）',
+    '总节数 ≥5 节时，建议付费点按节数与目标字数累计均落在全文 32%–44% 推荐带（宽容区间 20%-55%，通常第 2-4 节末）',
     ['SKILL.md'],
     '复核付费点位置：偏后容易拖慢免费段转折，偏前容易铺垫不足；按平台试读比例微调或确认保留。',
     'advisory'

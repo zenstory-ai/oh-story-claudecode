@@ -142,7 +142,7 @@ def parse_relations(text: str) -> Tuple[List[Dict[str, str]], int]:
             continue
         fields = {
             "id": pick(row, "关系ID", "ID"),
-            "label": pick(row, "关系动作", "类型", "表面关系"),
+            "label": pick(row, "关系动作", "类型", "表面关系") or exact(row, ("关系",)),
             "state": pick(row, "变化后状态", "真实关系", "表面关系"),
             "trigger": pick(row, "触发事件", "触发"),
         }
@@ -377,22 +377,23 @@ def render(root: Path, want_png: bool) -> Dict[str, object]:
     if skipped:
         messages.append("角色/角色关系.md 里有 %s 行没认出是谁和谁的关系，没画进关系图。" % skipped)
     if want_png:
-        drawn = "".join(png_text(value) for relation in relations
-                        for value in (relation["source"], relation["target"], relation["state"],
-                                      relation["label"], relation["trigger"]))
-        font_path, missing = find_cjk_font(drawn)
         if not matplotlib_available():
             messages.append(NO_MATPLOTLIB_MESSAGE)
-        elif not font_path:
-            messages.append(MISSING_GLYPH_MESSAGE % "".join(missing[:5]) if missing else NO_FONT_MESSAGE)
         else:
-            try:
-                png_written = draw_png(relations, font_path, root)
-            except Exception:  # noqa: BLE001 - the Markdown chart is already written
-                messages.append(PNG_FAILED_MESSAGE)
-            if png_written:
-                atomic_write(root / CHART_MD,
-                             render_markdown(root.name, relations, "图片版见同目录的 PNG。").encode("utf-8"))
+            drawn = "".join(png_text(value) for relation in relations
+                            for value in (relation["source"], relation["target"], relation["state"],
+                                          relation["label"], relation["trigger"]))
+            font_path, missing = find_cjk_font(drawn)
+            if not font_path:
+                messages.append(MISSING_GLYPH_MESSAGE % "".join(missing[:5]) if missing else NO_FONT_MESSAGE)
+            else:
+                try:
+                    png_written = draw_png(relations, font_path, root)
+                except Exception:  # noqa: BLE001 - the Markdown chart is already written
+                    messages.append(PNG_FAILED_MESSAGE)
+                if png_written:
+                    atomic_write(root / CHART_MD,
+                                 render_markdown(root.name, relations, "图片版见同目录的 PNG。").encode("utf-8"))
     return {
         "ok": True, "markdown": CHART_MD.as_posix(), "png": png_written,
         "relations": len(relations), "skipped_rows": skipped,

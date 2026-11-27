@@ -4,7 +4,7 @@
 
 ## Skill 路由表
 
-Reasonix 会从项目 `.agents/skills`（部署时创建的指向 `skills/` 的 symlink）发现 `SKILL.md`；也可从安装源仓库根的 `reasonix-plugin.json` 走 `reasonix plugin install`。优先通过 Reasonix 的 skill 入口调用；若当前客户端未显示直接命令，可用自然语言点名 skill。
+Reasonix 会从项目 `.agents/skills`（独立部署时为指向 `skills/` 的 symlink；与 Antigravity 共存部署时保持 `.agents/skills` 为真实目录，Reasonix 照常扫描发现）发现 `SKILL.md`；也可从安装源仓库根的 `reasonix-plugin.json` 走 `reasonix plugin install`。优先通过 Reasonix 的 skill 入口调用；若当前客户端未显示直接命令，可用自然语言点名 skill。
 
 | 意图 | Skill | 说明 |
 |------|-------|------|
@@ -15,7 +15,7 @@ Reasonix 会从项目 `.agents/skills`（部署时创建的指向 `skills/` 的 
 | 长篇扫榜 | story-long-scan | 长篇小说榜单与市场趋势 |
 | 短篇扫榜 | story-short-scan | 短篇小说榜单与情绪风口 |
 | 去 AI 味 | story-deslop | 去除 AI 写作痕迹 |
-| 封面 | story-cover | 生成封面图；需要 `GPT_IMAGE_API_KEY` |
+| 封面 | story-cover | 封面提示词设计；生图需要 `GPT_IMAGE_API_KEY` |
 | 发布资料 | story-publish | 发布准备：整理并核对平台书籍资料 |
 | 审查 | story-review | 多视角审查；Reasonix 默认 solo/direct fallback |
 | 导入 | story-import | 逆向导入已有小说到项目结构 |
@@ -25,11 +25,11 @@ Reasonix 会从项目 `.agents/skills`（部署时创建的指向 `skills/` 的 
 
 ## Reasonix 兼容说明
 
-- 只部署 skills 与本 `AGENTS.md`：Reasonix 原生扫描 `.agents/skills`（部署时创建的指向 `skills/` 的 symlink）发现 `skills/*/SKILL.md`，并把 `AGENTS.md` 作为项目指令加载。也可从安装源仓库根的 `reasonix-plugin.json` 走 `reasonix plugin install`；`reasonix doctor capabilities` 校验 skill 发现。
+- 只部署 skills 与本 `AGENTS.md`：Reasonix 原生扫描 `.agents/skills`（独立部署时为指向 `skills/` 的 symlink；与 Antigravity 共存部署时保持真实目录，Reasonix 照常扫描发现）发现 `SKILL.md`，并把 `AGENTS.md` 作为项目指令加载。也可从安装源仓库根的 `reasonix-plugin.json` 走 `reasonix plugin install`；`reasonix doctor capabilities` 校验 skill 发现。
 - 暂不部署 Reasonix hooks/custom agents：写正文前大纲守卫、commit 提醒、session/compact 自动注入在 Reasonix 下不是硬拦截，只作为 skill 内软约束执行。
 - 涉及专业 Agent 的 Skill（story-review 多视角、story-long-write 的 narrative-writer/story-architect 等）按 solo/direct fallback 执行，并在结果里说明降级。
 - Windows 未启用 symlink 时，从安装源仓库根的 `reasonix-plugin.json` 走原生 plugin 安装。
-- `story-cover` 依赖 `GPT_IMAGE_API_KEY`，未配置时该 skill 不可用。
+- `story-cover` 生图需要 `GPT_IMAGE_API_KEY`；仅设计封面提示词不依赖该密钥。
 
 ## 文件结构
 
@@ -44,10 +44,10 @@ Reasonix 会从项目 `.agents/skills`（部署时创建的指向 `skills/` 的 
 
 ## 写作约束
 
-- 写正文前必须先有对应大纲：长篇 `大纲/细纲_第N章*.md`，短篇 `小节大纲.md`。
+- 写正文前必须先有对应大纲：长篇 `大纲/细纲_第N章*.md`（或区间细纲 `大纲/细纲_第A-B章*.md`），短篇 `小节大纲.md`。
 - Reasonix 未部署硬 hook 拦截；执行写作 skill 时必须由 skill 流程自行检查大纲、上下文和追踪文件，不得跳过。
 - 无 custom agents 时按 solo/direct 执行；遇到 skill 要求调用 story-architect、narrative-writer 等 agent 时，改由当前 Agent 直接完成，并在结果里说明降级。
-- **每章写完先去 AI 味**（没有 hook 替你检查）：正文落盘后同一轮内按写作 skill 的去味流程复核 `review_required` 机械套式（词表仅作语境定位线索，不逐词清零）；能运行 node 时跑写作 skill 的 `scripts/check-ai-patterns.js --check --respect-skip --fail-on=review_required {正文文件}`。命中 `review_required` 优先改写，确需保留须附简短理由（长篇用 `--ack <规则>:<理由>` 放行）；作者明确说「这章不去味」时仍可在标题行下加 `<!-- 去味:跳过 -->` 跳过。
+- **每章写完先去 AI 味**（没有 hook 替你检查）：正文落盘后同一轮内按写作 skill 的去味流程复核 `review_required` 机械套式（词表仅作语境定位线索，不逐词清零）；能运行 node 时跑写作 skill 的 `scripts/check-ai-patterns.js --check --mode=auto --respect-skip --fail-on=review_required {正文文件}`。命中 `review_required` 优先改写，确需保留须附简短理由（长篇用 `--ack <规则>:<理由>` 放行）；作者明确说「这章不去味」时仍可在标题行下加 `<!-- 去味:跳过 -->` 跳过。
 
 ## 与作者协作
 

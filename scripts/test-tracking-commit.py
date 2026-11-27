@@ -1484,15 +1484,25 @@ class TrackingCommitTests(unittest.TestCase):
         self.assertEqual(gap_payload["last_committed_chapter"], 3)
         self.assertTrue(any("跳章提交" in w for w in gap_payload["warnings"]))
 
-        # Default check exits 0 with missing_delta drift warning; --strict fails exit 2.
+        # Intentional --allow-gap records skipped_chapters so both check and check --strict stay clean.
+        state_after_gap = json.loads((self.project / "追踪/_tracking-state.json").read_text(encoding="utf-8"))
+        self.assertEqual(state_after_gap.get("skipped_chapters"), [2])
         soft_check = json.loads(self.run_tool("check", expect=0).stdout)
-        self.assertTrue(any(w["type"] == "missing_delta" and w["chapter"] == 2 for w in soft_check["drift_warnings"]))
-        self.run_tool("check", extra=["--strict"], expect=2)
+        self.assertFalse(any(w["type"] == "missing_delta" and w["chapter"] == 2 for w in soft_check["drift_warnings"]))
+        self.run_tool("check", extra=["--strict"], expect=0)
 
-        # Backfilling skipped chapter 2 via --allow-gap restores strict check cleanliness.
+        # Backfilling skipped chapter 2 via --allow-gap clears skipped_chapters cleanly.
         backfill = self.run_tool("commit", transaction(2), extra=["--allow-gap"], expect=0)
         self.assertEqual(json.loads(backfill.stdout)["last_committed_chapter"], 3)
+        state_after_backfill = json.loads((self.project / "追踪/_tracking-state.json").read_text(encoding="utf-8"))
+        self.assertNotIn("skipped_chapters", state_after_backfill)
         self.run_tool("check", extra=["--strict"])
+
+        # Deleting an unskipped committed delta still raises missing_delta drift and fails --strict.
+        (self.project / "追踪" / "逐章记录" / "第002章.md").unlink()
+        drift_check = json.loads(self.run_tool("check", expect=0).stdout)
+        self.assertTrue(any(w["type"] == "missing_delta" and w["chapter"] == 2 for w in drift_check["drift_warnings"]))
+        self.run_tool("check", extra=["--strict"], expect=2)
 
     def test_init_archives_all_legacy_unmanaged_tracking_files_without_overwriting(self) -> None:
         # NEW-BUG-01: legacy hand-written 追踪/上下文.md, 追踪/伏笔.md, 追踪/角色状态/*.md (even without 角色状态.md)
@@ -1512,6 +1522,137 @@ class TrackingCommitTests(unittest.TestCase):
         self.assertNotIn("绝不能被覆盖丢失", (tracking / "上下文.md").read_text(encoding="utf-8"))
         self.assertFalse((archive / ".tracking-commit.lock").exists())
         self.run_tool("check", extra=["--strict"])
+
+    def test_wave7a_empty_managed_subdir_help_and_retired_guidance(self) -> None:
+        # 1) Pre-created empty 追踪/逐章记录/ must NOT trigger _旧追踪存档/.
+        tracking = self.project / "追踪"
+        (tracking / "逐章记录").mkdir(parents=True)
+        res = self.run_tool("init", initial_document())
+        self.assertNotIn("_旧追踪存档", res.stderr)
+        self.assertFalse((tracking / "_旧追踪存档").exists())
+
+        # 2) --help shows per-subcommand usage and init --force gives clear draft-only error.
+        help_res = subprocess.run(
+            [NODE, str(TOOL), "--help"],
+            text=True, capture_output=True, check=False, encoding="utf-8",
+        )
+        self.assertEqual(help_res.returncode, 0)
+        self.assertIn("init   --project DIR --input FILE", help_res.stdout)
+        self.assertIn("draft  --project DIR --chapter N", help_res.stdout)
+
+        init_force = subprocess.run(
+            [NODE, str(TOOL), "init", "--project", str(self.project), "--input", "x.json", "--force"],
+            text=True, capture_output=True, check=False, encoding="utf-8",
+        )
+        self.assertEqual(init_force.returncode, 2)
+        self.assertIn("only supported by draft", init_force.stderr)
+
+        # 3) Undeclared dropped constraint keeps English prefix and appends draft guidance.
+        tx1 = transaction(1)
+        tx1["context"]["long_term_constraints"] = []
+        drop_res = self.run_tool("commit", tx1, expect=2)
+        self.assertIn("retired_context_items", drop_res.stderr)
+        self.assertIn("draft", drop_res.stderr)
+
+    def test_r091_init_aggregates_all_schema_errors_and_init_draft_template_works(self) -> None:
+        # 1) Hand-written init JSON with multiple typos & missing fields reports ALL issues at once.
+        bad_init = {
+            "schema_version": 1,
+            "book": "药渣铺里的长生账",
+            "context": {
+                "position": {
+                    "volume": "第一卷",
+                    "chapter": 0,
+                    "story_time": "仲秋初三",
+                },
+                "extra_ctx_key": True,
+            },
+        }
+        res = self.run_tool("init", bad_init, expect=2)
+        for expected in [
+            "init input contains unsupported fields: book",
+            "missing required field book_title",
+            "missing required field last_chapter",
+            "context contains unsupported fields: extra_ctx_key",
+            "context.position contains unsupported fields: chapter",
+            "missing required field context.position.volume_start_chapter",
+            "missing required field context.position.scene",
+            "init-draft",
+        ]:
+            self.assertIn(expected, res.stderr)
+
+        # 2) init --init-example prints a minimal valid template without --project/--input.
+        ex = subprocess.run(
+            [NODE, str(TOOL), "init", "--init-example"],
+            text=True, capture_output=True, check=False, encoding="utf-8",
+        )
+        self.assertEqual(ex.returncode, 0, ex.stderr)
+        ex_doc = json.loads(ex.stdout)
+        self.assertEqual(ex_doc["schema_version"], 1)
+        self.assertEqual(ex_doc["last_chapter"], 0)
+        self.assertIn("volume_start_chapter", ex_doc["context"]["position"])
+
+        # 3) init-draft --project --out prefills book_title from 设定/题材定位.md and passes init cleanly.
+        (self.project / "设定").mkdir(parents=True, exist_ok=True)
+        (self.project / "设定" / "题材定位.md").write_text("- **书名**：《药渣铺里的长生账》\n", encoding="utf-8")
+        out_path = self.project / ".story" / "work" / "init.json"
+        draft_res = subprocess.run(
+            [NODE, str(TOOL), "init-draft", "--project", str(self.project), "--out", str(out_path)],
+            text=True, capture_output=True, check=False, encoding="utf-8",
+        )
+        self.assertEqual(draft_res.returncode, 0, draft_res.stderr)
+        draft_payload = json.loads(draft_res.stdout)
+        self.assertEqual(draft_payload["template"]["book_title"], "药渣铺里的长生账")
+        self.assertTrue(out_path.is_file())
+
+        init_res = subprocess.run(
+            [NODE, str(TOOL), "init", "--project", str(self.project), "--input", str(out_path)],
+            text=True, capture_output=True, check=False, encoding="utf-8",
+        )
+        self.assertEqual(init_res.returncode, 0, init_res.stderr)
+        self.assertEqual(self.read_state()["book_title"], "药渣铺里的长生账")
+
+    def test_r092_check_strict_detects_body_sha256_drift_and_delta_compression_guidance(self) -> None:
+        self.init()
+        # 1) Legacy committed chapter without wordcount_records / body_sha256 -> 0 false-positive drift warnings.
+        self.run_tool("commit", transaction(1))
+        legacy_chk = json.loads(self.run_tool("check", extra=["--strict"], expect=0).stdout)
+        self.assertEqual(legacy_chk["drift_warnings"], [])
+
+        # 2) Draft append fill guidance includes multi-character compression priority hint.
+        draft2 = subprocess.run(
+            [NODE, str(TOOL), "draft", "--project", str(self.project), "--chapter", "2"],
+            text=True, capture_output=True, check=False, encoding="utf-8",
+        )
+        self.assertEqual(draft2.returncode, 0, draft2.stderr)
+        self.assertIn("先压已退场配角与已结算伏笔", json.loads(draft2.stdout)["fill"])
+
+        # 3) Commit Ch2 with wordcount record (body_sha256); unmodified prose stays clean.
+        body = self.write_chapter_contract(2, actual=1000, target=1000)
+        tx2 = self.bind_wordcount(transaction(2), resolution="within_user_band")
+        tx2["delta"]["result"] = "江" * 800  # also trigger >2048B soft warning with compression guidance
+        commit2 = self.run_tool("commit", tx2, expect=0)
+        commit2_warnings = json.loads(commit2.stdout)["warnings"]
+        self.assertTrue(any("先压已退场配角与已结算伏笔" in w for w in commit2_warnings), commit2_warnings)
+
+        clean_chk = json.loads(self.run_tool("check", extra=["--strict"], expect=0).stdout)
+        self.assertEqual(clean_chk["drift_warnings"], [])
+
+        # 4) Edit Ch2 prose after commit -> check --strict reports explicit body_sha256_drift warning.
+        body_path = self.project / "正文/第002章_测试.md"
+        body_path.write_bytes(body + "补丁修改".encode("utf-8"))
+        drift_res = self.run_tool("check", extra=["--strict"], expect=0)
+        drift_payload = json.loads(drift_res.stdout)
+        sha_drifts = [w for w in drift_payload["drift_warnings"] if w["type"] == "body_sha256_drift"]
+        self.assertEqual(len(sha_drifts), 1, drift_payload)
+        self.assertEqual(sha_drifts[0]["chapter"], 2)
+        self.assertEqual(sha_drifts[0]["current_sha256"], hashlib.sha256(body_path.read_bytes()).hexdigest())
+        self.assertIn("body_sha256", drift_res.stderr)
+
+        # 5) Re-committing Ch2 in revision mode recounts body_sha256 and clears drift_warnings.
+        self.run_tool("commit", transaction(2, mode="revision"), expect=0)
+        cleared_chk = json.loads(self.run_tool("check", extra=["--strict"], expect=0).stdout)
+        self.assertEqual(cleared_chk["drift_warnings"], [])
 
 
 if __name__ == "__main__":

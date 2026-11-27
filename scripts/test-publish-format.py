@@ -100,7 +100,7 @@ LONG = """> 格式版本：1
 
 ## 作品简介
 
-江晨穿越到平行世界，靠一部手机整顿军宣。
+江晨穿越到平行世界，靠一部能连通旧时代信号的手机整顿军宣，从最偏远的边防宣传站起步，一步步拍出震动全网的硬核纪录片。
 
 ## 待作者确认
 
@@ -170,23 +170,28 @@ class ContractTests(unittest.TestCase):
         self.assertTrue(errors(LONG.replace("## 作品简介\n", "")))
 
     def test_placeholders_never_in_values(self):
+        long_syn = "江晨穿越到平行世界，靠一部能连通旧时代信号的手机整顿军宣，从最偏远的边防宣传站起步，一步步拍出震动全网的硬核纪录片。"
         for before, after in (("- 主角1：江晨", "- 主角1：待作者确认"),
                               ("- 主角1：江晨", "- 主角1：未定"),
                               ("- 主角1：江晨", "- 主角1：江晨（建议）"),
                               ("- 人设：皇叔", "- 人设：建议皇叔"),
                               ("# 书本名称：春风：第2年", "# 书本名称：待确认"),
-                              ("江晨穿越到平行世界，靠一部手机整顿军宣。", "待作者确认"),
-                              ("江晨穿越到平行世界，靠一部手机整顿军宣。", "暂无")):
+                              ("- 图片：", "- 图片：待作者确认"),
+                              ("- 状态：提示词已生成，图片未生成", "- 状态：待定"),
+                              (long_syn, "待作者确认"),
+                              (long_syn, "暂无")):
             with self.subTest(after=after):
                 self.assertTrue(errors(LONG.replace(before, after)))
+        self.assertEqual(check_text(LONG.replace("# 书本名称：春风：第2年", "# 书本名称：（不填）")), ([], []))
 
     def test_legitimate_words_and_inline_cover_fields_not_false_flagged(self):
+        long_syn = "江晨穿越到平行世界，靠一部能连通旧时代信号的手机整顿军宣，从最偏远的边防宣传站起步，一步步拍出震动全网的硬核纪录片。"
         natural_title = SHORT.replace("春风：第2年", "离婚后，律师建议我继承百亿家产")
         self.assertEqual(errors(natural_title), [])
         self.assertEqual(errors(SHORT.replace("春风：第2年", "婚期未定")), [])
         natural_synopsis = LONG.replace(
-            "江晨穿越到平行世界，靠一部手机整顿军宣。",
-            "前路未定，手头暂无现钱的江晨推门进来，建议立刻封锁消息并重拟并购草案。",
+            long_syn,
+            "前路未定，手头暂无现钱的江晨推门进来，建议立刻封锁消息并重拟并购草案，在董事会召开前把全部核心资产稳稳收进囊中。",
         )
         self.assertEqual(errors(natural_synopsis), [])
         inline_cover = LONG.replace(
@@ -203,6 +208,11 @@ class ContractTests(unittest.TestCase):
     def test_section_order_and_fenced_prompt_headings(self):
         self.assertTrue(errors(LONG.replace("## 封面", "## 来源说明", 1)))
         self.assertEqual(errors(LONG.replace("````text", "~~~~text").replace("````", "~~~~")), [])
+        # Decorative tilde dividers inside synopsis must not be treated as unclosed code fences
+        # that swallow subsequent ## headings (regression for W4B-02).
+        long_syn = "江晨穿越到平行世界，靠一部能连通旧时代信号的手机整顿军宣，从最偏远的边防宣传站起步，一步步拍出震动全网的硬核纪录片。"
+        self.assertEqual(errors(LONG.replace(long_syn, long_syn + "\n~~~~~·")), [])
+        self.assertEqual(errors(LONG.replace(long_syn, long_syn + "\n~~~~~")), [])
 
     def test_field_lines(self):
         self.assertTrue(errors(LONG.replace("- 主题：\n- 角色：", "- 主题：国运；角色：全能")))
@@ -230,15 +240,19 @@ class PlatformRuleTests(unittest.TestCase):
         self.assertTrue(errors(SHORT.replace("是否使用AI：否", "是否使用AI：用了一点")))
 
     def test_platform_limits_warn_without_failing(self):
+        long_syn = "江晨穿越到平行世界，靠一部能连通旧时代信号的手机整顿军宣，从最偏远的边防宣传站起步，一步步拍出震动全网的硬核纪录片。"
         for text in (LONG.replace("春风：第2年", "春风:归来"),
                      LONG.replace("春风：第2年", "春风……又一年"),
                      LONG.replace("春风：第2年", "春" * 16),
                      LONG.replace("主角1：江晨", "主角1：欧阳江晨之子"),
-                     LONG.replace("江晨穿越到平行世界，靠一部手机整顿军宣。", "长" * 501),
+                     LONG.replace(long_syn, "太短了只有十个字。"),
+                     LONG.replace(long_syn, "长" * 501),
                      SHORT.replace("春风：第2年", "春" * 26)):
             with self.subTest(text=text[90:130]):
                 self.assertTrue(warnings(text))
                 self.assertEqual(errors(text), [])
+        # Empty synopsis stays valid with 0 warnings (preparation draft)
+        self.assertEqual(check_text(LONG.replace(long_syn, "")), ([], []))
         self.assertEqual(warnings(SHORT.replace("春风：第2年", "春" * 20 + "abcdefghij")), [])
 
     def test_reference_candidates_and_limits(self):

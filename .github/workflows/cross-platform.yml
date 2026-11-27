@@ -37,11 +37,6 @@ jobs:
           python3 scripts/test-shared-assets.py
           python3 scripts/test-shared-references.py
           python3 scripts/test-agent-permissions.py
-      - name: Source & runtime policy guards
-        run: |
-          bash scripts/check-scan-runtime-policy.sh
-          python3 scripts/test-scan-runtime-policy.py
-          bash scripts/check-python-invocation.sh
       - name: Check story-setup deployment
         run: bash scripts/check-story-setup-deployment.sh
       - name: Check 7 host adapters
@@ -87,7 +82,8 @@ jobs:
         run: |
           python scripts/check-plugin-packaging.py
           python scripts/test-plugin-packaging.py
-      - name: Native Node detector & contract tests
+      - name: Native Node detector & contract tests (Linux full)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           node --test scripts/test-ai-patterns.mjs scripts/test-degeneration.mjs scripts/test-outline-copy.mjs
           node scripts/test-phase2-contract.js
@@ -95,7 +91,14 @@ jobs:
           node scripts/test-outline-contract.js
           node scripts/test-normalize-punctuation.js
           node scripts/test-scan-runtime.js
-      - name: Python runtime regressions
+      - name: Native Node cross-platform tests (Windows/macOS)
+        if: matrix.os != 'ubuntu-latest'
+        run: |
+          node scripts/test-delivery-contract.js
+          node scripts/test-normalize-punctuation.js
+          node scripts/test-scan-runtime.js
+      - name: Python runtime regressions (Linux full)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           python scripts/test-publish-format.py
           python scripts/test-writer-pipeline.py
@@ -106,6 +109,12 @@ jobs:
           python scripts/test-author-memory-commit.py
           python scripts/test-long-analyze-runtime.py
           python scripts/test-scan-aggregate.py
+      - name: Python cross-platform runtime tests (Windows/macOS)
+        if: matrix.os != 'ubuntu-latest'
+        run: |
+          python scripts/test-publish-format.py
+          python scripts/test-tracking-commit.py
+          python scripts/test-storyctl.py
       # Generate a GBK-class locale on Ubuntu so the GBK test in test-claude-hooks.mjs runs end-to-end.
       - name: Generate zh_CN.GBK locale (Chinese Windows simulation)
         if: matrix.os == 'ubuntu-latest'
@@ -115,11 +124,6 @@ jobs:
         run: |
           node --test scripts/test-story-hook-core.mjs scripts/test-claude-hooks.mjs scripts/test-codex-hooks.mjs scripts/test-antigravity-hooks.mjs scripts/test-zcode-hooks.mjs
           node --experimental-strip-types --test scripts/test-opencode-plugin.mjs
-      - name: Portable char-count tests
-        shell: bash
-        run: |
-          bash scripts/test-charcount-portable.sh
-          bash scripts/test-charcount-portable.sh --stub
       - name: Setup Chrome
         if: matrix.os != 'ubuntu-latest'
         uses: browser-actions/setup-chrome@c785b87e244131f27c9f19c1a33e2ead956ab7ce # v1

@@ -4,7 +4,7 @@ const fs = require("node:fs")
 const path = require("node:path")
 const { spawnSync } = require("node:child_process")
 
-const CURRENT_AGENTS_VERSION = 46
+const CURRENT_AGENTS_VERSION = 47
 
 function readSentinel(root) {
   const file = path.join(root, ".story-deployed")
@@ -813,15 +813,23 @@ function proseBlockReason(root, absolute) {
   const outlineDir = path.join(book, "大纲")
   let found = false
   if (!exists) {
+    const chapterNum = Number(chapter)
     let outlines = []
     try {
       outlines = fs.readdirSync(outlineDir).filter((file) => {
-        const candidate = file.match(/^细纲_第0*(\d+)章.*\.md$/)
-        return candidate && candidate[1] === chapter
+        const single = file.match(/^细纲_第0*(\d+)章.*\.md$/)
+        if (single) return Number(single[1]) === chapterNum
+        const range = file.match(/^细纲_第0*(\d+)[-–—~～至到]第?0*(\d+)章.*\.md$/)
+        if (range) {
+          const start = Number(range[1])
+          const end = Number(range[2])
+          return start <= end && chapterNum >= start && chapterNum <= end
+        }
+        return false
       }).sort()
     } catch {}
     found = outlines.length > 0
-    // 同章有多份细纲（补零差异/带标题）时任一份写了内容就放行。
+    // 同章有多份细纲（单章/区间、补零差异/带标题）时任一份写了内容就放行。
     if (found && outlines.every((file) => outlineIsEmpty(path.join(outlineDir, file)))) {
       return `⛔ 写正文被拦截：第 ${chapter} 章的细纲（${safeRelative(root, path.join(outlineDir, outlines[0]))}）是空的（不计 # 号和空白不到 ${OUTLINE_MIN_CHARS} 字）。先按 story-long-write 单章流程把细纲写完整（这章发生什么、主角做什么选择），再写正文。`
     }
@@ -905,10 +913,9 @@ function formatPreWriteAdvisory(warnings) {
   return `=== 写正文前软门禁提醒（非阻断，请重点复核）===\n${unique.join("\n\n")}\n=== 本次写入已放行；如属作者有意安排可继续，否则请顺手处理 ===`
 }
 
-// 收尾标点集与深扫 oracle check-degeneration.js 的 findTruncation 对齐（[。！？!?…”"』」）)】]）：
-// 】 是章尾系统播报/面板的收束符（见 flow-drafting.md / genre-styles/），ASCII "
-// 是 normalize-punctuation.js --quote-mode ascii 的合法收引号，两者都不该被判「疑似截断」。
-const TERMINAL = new Set(Array.from("。！？…”』」）)!?.~—】\""))
+// 收尾标点集与深扫 oracle check-degeneration.js 的 findTruncation 对齐（[。！？!?…~～—”"’'』」）)】}》.]）：
+// 】/}/》/）是章尾系统面板、微信短讯、书名号或括号收束符，不该被判「疑似截断」。
+const TERMINAL = new Set(Array.from("。！？…”』」）)!?.~～—】］]}》\"’'"))
 // 保留导出以兼容 adapter。
 const QUOTE_OPENERS = new Set(["「", "“", "‘", "『", '"'])
 const SOFT_PATTERNS = [
@@ -918,17 +925,25 @@ const SOFT_PATTERNS = [
   [/^(Sure|Certainly|Here'?s|As an AI|I (?:cannot|can't|am unable|apologize))/, "英文 AI 腔"],
   [/我(无法|不能)(继续(写|创作|生成|下去|输出)?|生成(内容|文本|正文)?|创作|续写|写作|完成(这个|本)?(章|篇|创作|请求)?)/, "生成拒绝语"],
 ]
+// 纯写作流水线 Tier-1 工程词：与 check-degeneration.js META_TIER1_RE 对齐，扫描引号与【】面板外，
+// 避免系统流【任务描述：…】或写手题材台词被硬拦截（任务描述已下沉至 check-degeneration.js tier2 advisory）。
+const ENG_WORD_PATTERN = /(细纲|(?<!剧)情节点|卷纲|功能标签|目标情绪|字数目标|字数口径|章首钩子|章尾钩子|这章不能说破|本章禁止提前释放|排纲笔记|排纲底稿|节尾停在哪|结尾承接)/
 const HARD_PATTERNS = [
-  [/[（(](此处|以下|这里|下文|后续)?[^）)]{0,10}(省略|略去|略过)[^）)]{0,10}[）)]/, "占位符（括号省略）"],
-  [/(TODO|占位符|placeholder|待补充|此处待填|此处待补)/, "占位符"],
-  [/(细纲|(?<!剧)情节点|卷纲|功能标签|目标情绪|字数目标|章首钩子|章尾钩子|任务描述)/, "工程词泄漏"],
+  [/[（(](?:(?:此处|以下|这里|下文|后续)\s*(?:省略|略(?:去|过)?)|(?:省略|略去|略过|下略)|略(?=[）)]|[\s。，,、]))[^）)]{0,12}[）)]/, "占位符（括号省略）"],
+  [/(未完待续|TODO|占位符|placeholder|待补充|此处待填|此处待补)/, "占位符"],
+  [/\*\*[^*\n]{2,80}\*\*/, "Markdown 粗体残留"],
   [/�/, "乱码（替换字符）"],
 ]
 
 const TOXIC_END_SIGNOFF = /^[-—~～＜<【\[（(《\s]*(?:全文完|正文完|全书完|本卷完|完结|完|END|End|end|THE\s+END|The\s+End|the\s+end)[-—~～＞>】\]）)》.。！!\s]*$/
 
+// 与 check-degeneration.js 保持逐字一致的软复核退化规则（review_required，不阻断 hasHardProseFindings）。
+const CENSORED_PINYIN_RE = /(?:身ti|亲wen|大tui|小tui|胸kou|胸bu|裤dang|屁gu|腰zhi|锁gu|肚qi|大xiong|小fu|私chu|下ti|敏gan|诱huo|娇chuan|喘xi|暧mei|缠mian|情yu|欲wang|性gan|裸lu|春guang|赤luo|失shen|破chu|怀yun|流chan|堕tai|强bao|强jian|猥xie|轮jian|嫖chang|卖yin|杀si|杀ren|杀lu|自sha|死wang|死shi|尸ti|血xing|鲜xue|血rou|暴li|虐dai|毒pin|吸du|赌bo|诈pian|走si|贪wu|贿lu|黑bang|枪zhi|子dan|炸dan|军huo|政zhi|官chang|造fan|谋fan|反pan|腐bai|警cha|法ting|监yu|看shou所|脑can|傻bi|妈de|草ni|滚dan|贱ren|婊zi|狗ri|卧cao|他ma|两sui|三sui|几sui)(?![A-Za-z0-9_])|(?<![A-Za-z0-9_])(?:sha人|sha死|si亡|shi体|xue腥|qin吻|shen体|xiong口|da腿|ku裆|pi股|qiang奸|qiang暴|zi杀|du品|qiang支|zha弹|sha逼|wo草|ta妈)(?=[\u4e00-\u9fff，,。！？!?、；;：:\s]|$)/
+const AUTHOR_META_HEADER_RE = /脑子寄存处|大脑寄存处|交出你的大脑|作者有话说|作者说[:：]|(?:^|[【\[（(])作者说(?=\s|$)|作者菌|求(?:五星|一点)?好评|求催更|求(?:推荐票|月票|打赏|收藏|追读)|本书又名|新书求(?:支持|收藏|追读)|评分刚出|不爱看就划走|介意者?慎入|避个雷[，,。！!]?\s*(?:不爱看|介意|慎入)/
+const AUTHOR_META_HEADER_MAX_CHARS = 500
+
 function skippableLine(line) {
-  return !line || line.startsWith("#") || line === "---" || /^[-—=*·•\s]+$/.test(line) || TOXIC_END_SIGNOFF.test(line)
+  return !line || line.startsWith("#") || line === "---" || /^[-—─=*·•.~～…\s]+$/.test(line) || TOXIC_END_SIGNOFF.test(line)
 }
 
 // ── 毒句式（确定性 AI 句式指纹，写后正文网热路径）─────────────────────────────
@@ -948,7 +963,9 @@ const TOXIC_CLAUSE_BOUNDARY = new Set(Array.from("，,。.！!？?；;：:、…
 // 排除逻辑移植自 check-ai-patterns.js 的 TAG_PARTICLES / AFFIRMATION_TAG_PARTICLES。
 const TOXIC_TAG_PARTICLES = new Set(["吗", "吧", "嘛"])
 const TOXIC_AFFIRM_PARTICLES = new Set(["的", "啊", "呀", "呢"])
-const TOXIC_TRAILER_WINDOW = 600
+const TOXIC_TRAILER_WINDOW = 250
+const TOXIC_TRAILER_MAX_LINES = 4
+const TOXIC_TRAILER_LINE_CAP_MIN_DOC_CHARS = 500
 const TOXIC_SCALE_UNIT_CHARS = 4500
 const TOXIC_NOT_IS_MIN_HITS = 3
 const TOXIC_VOICE_MIN_HITS = 2
@@ -958,10 +975,10 @@ const TOXIC_TRAILER_MIN_HITS = 2
 // 畸形破折号由 normalize-punctuation.js 确定性统一为 ——；这张网只推回需要模型动笔改写的句式，
 // 且单章计数门槛与 check-ai-patterns.js 的 review_required 线逐项一致。
 const TOXIC_SENTENCE_PATTERNS = [
-  [/声音(?:并)?不[大高响亮][^。！？!?\n]{0,16}[却但偏]/g, "voice-contrast", "删「不X…却Y」反差腔，直接写台词分量、利害后果或在场反应。"],
+  [/(?:声音|嗓音|语调|语气)(?:(?:并)?不[大高响亮]|很淡)[^。！？!?\n]{0,16}[却但偏]/g, "voice-contrast", "删「不X…却Y」反差腔，直接写台词分量、利害后果或在场反应。"],
   [/(?:没有[^。！？!?\n，,]{1,12}[，,]){2}/g, "negation-parade", "「没有…，没有…」排比删到只剩一个或全删，改写正面在场的细节。"],
   [/是[^。！？!?\n，,]{1,12}[，,]\s*(?:而)?不是[^。！？!?\n]{1,20}/g, "reverse-not-is", "删否定铺垫，直接写后项（直白情绪、判断、对话或具体细节皆可）。"],
-  [/不是[^。！？!?\n]{1,16}[，,]\s*(?:而)?是/g, "not-is-comparison", "删否定铺垫，直接写后项（直白情绪、判断、对话或具体细节皆可）。"],
+  [/不是[^。！？!?\n]{1,16}[，,。！？!?]\s*(?:(?:也|还)?不是[^。！？!?\n]{1,16}[，,。！？!?]\s*)*(?:而)?是/g, "not-is-comparison", "删否定铺垫，直接写后项（直白情绪、判断、对话或具体细节皆可）。"],
 ]
 // 「正式拉开序幕/帷幕」是场内事件的报幕式陈述，不是叙述者预告，lookbehind 排除（同 check-ai-patterns.js）。
 const TOXIC_TRAILER_CLICHE_PATTERN = /(?:这)?才刚刚开(?:始|头)|正(?:朝着|向着)[^。！？!?\n]{0,24}(?:压|涌|袭|逼)(?:了?过去|了?过来|来)|(?<!正式)拉开(?:序幕|帷幕)|即将(?:开始|来临|降临)/
@@ -970,7 +987,7 @@ const TOXIC_SHORT_TRAILER_MIN_CHARS = 6000
 // 章尾状态总结体：与 trailer-ending 共用文末窗口，盖章过去而非预告将来（同 check-ai-patterns.js）。
 // 收的都是 banned-words 已按名禁掉的形态；不收「(这|那)一刻…终于明白」——真人叙述里那是正常认知
 // 节拍，短篇第一人称审判句还是卖点。各分支要求落在句末断言位，避免吃进条件从句/动补/成语/及物用法/否定认知。
-const TOXIC_TRAILER_SUMMARY_PATTERN = /这一(?:夜|天|刻|战|年|局|役)[，,]?[^。！？!?，,\n]{0,6}(?<!命中)(?<!是)注定[^。！？!?\n]{0,8}[。！]|就这样[，,][^。！？!?，,\n]{0,8}(?:一切|全部)[^。！？!?，,\n]{0,4}(?:结束了|落幕|收场)[。！]|这一切[，,]?[^。！？!?，,\n]{0,6}(?:都)?(?:说明|意味着|结束了)(?!的)(?:(?!什么)[^。！？!?\n]){0,6}[。！]|(?:新的篇章|新的旅程|崭新的篇章|新的人生)[^。！？!?\n]{0,6}(?:开始|拉开|展开)|命运[^。！？!?\n]{0,6}齿轮/
+const TOXIC_TRAILER_SUMMARY_PATTERN = /这一(?:夜|天|刻|战|年|局|役)[，,]?[^。！？!?，,\n]{0,6}(?<!命中)(?<!是)注定[^。！？!?\n]{0,8}[。！]|就这样[，,][^。！？!?，,\n]{0,8}(?:一切|全部)[^。！？!?，,\n]{0,4}(?:结束了|落幕|收场)[。！]|这一切[，,]?[^。！？!?，,\n]{0,6}(?:都)?(?:说明|意味着|结束了)(?!的)(?:(?!什么)[^。！？!?\n]){0,6}[。！]|(?:新的篇章|新的旅程|崭新的篇章|新的人生)[^。！？!?\n]{0,6}(?:开始|拉开|展开)|命运[^。！？!?\n]{0,6}齿轮|(?:这就是|这才是)[^。！？!?\n]{1,10}(?:最大的)?意义|活下来的[，,]?是一个更|花了[一二三四五六七八九十百千万0-9]+年[，,]?才明白这个道理|获得了[^。！？!?\n]{0,12}(?:真正的自由|解脱)/
 // 「是A，不是B」的反问尾巴（…，不是吗/么/吧）不算对比句；取匹配段最后一个「不是」后的首字判断。
 const TOXIC_REVERSE_TAIL = /.*[，,]\s*(?:而)?不是([^。！？!?\n]*)$/
 
@@ -984,9 +1001,16 @@ function maskQuotedSpans(line) {
   return out
 }
 
-// 「是不是」疑问、翻转「是」后跟疑问尾/确认语 → 不算「不是A，(而)是B」对比句。
+function stripQuotedSpans(line) {
+  let out = line
+  for (const spans of TOXIC_QUOTE_SPANS) out = out.replace(spans, "")
+  return out
+}
+
+// 「是不是」疑问、反事实条件句（要不是/若不是/如果不是）、翻转「是」后跟疑问尾/确认语 → 不算「不是A，(而)是B」对比句。
 function toxicNotIsExcluded(line, matched, start) {
-  if (start > 0 && line[start - 1] === "是") return true
+  if (start > 0 && (line[start - 1] === "是" || line[start - 1] === "要" || line[start - 1] === "若")) return true
+  if (start >= 2 && (line.slice(start - 2, start) === "如果" || line.slice(start - 2, start) === "倘若" || line.slice(start - 2, start) === "假如")) return true
   const end = start + matched.length
   const c1 = line[end] || ""
   const c2 = line[end + 1] || ""
@@ -1055,8 +1079,10 @@ function loadStyleWhitelist(file) {
 }
 
 function styleSpans(text, whitelist) {
+  if (!Array.isArray(whitelist) && !(whitelist instanceof Set)) return [];
   const spans = [];
   for (const literal of whitelist) {
+    if (typeof literal !== 'string' || !literal) continue;
     for (let at = text.indexOf(literal); at !== -1; at = text.indexOf(literal, at + 1)) {
       spans.push([at, at + literal.length]);
     }
@@ -1124,12 +1150,16 @@ function maskHtmlCommentLines(lines) {
   }
 }
 
+function stripZeroWidth(text) {
+  return String(text || "").replace(/[\u200B-\u200D\uFEFF]/g, "")
+}
+
 function toxicPhraseFindings(text, whitelist = [], rescan = toxicRescanHint(""), options = {}) {
   const mode = options && options.mode === "short" ? "short" : "long"
   const findings = []
   const content = []
   let docChars = 0
-  maskHtmlCommentLines(text.split("\n")).forEach((raw, index) => {
+  maskHtmlCommentLines(stripZeroWidth(text).split("\n")).forEach((raw, index) => {
     const line = raw.trim()
     if (skippableLine(line)) return
     docChars += Array.from(line.replace(/[ \t\r\n\f\v\u3000]+/g, "")).length
@@ -1141,14 +1171,38 @@ function toxicPhraseFindings(text, whitelist = [], rescan = toxicRescanHint(""),
   })
   const scale = Math.max(1, Math.floor((docChars + Math.floor(TOXIC_SCALE_UNIT_CHARS / 2)) / TOXIC_SCALE_UNIT_CHARS))
   const notIsThreshold = mode === "short"
-    ? Math.max(6, Math.round(5 * scale))
+    ? Math.max(6, Math.round(3 * scale))
     : TOXIC_NOT_IS_MIN_HITS * scale
   const sentenceHits = []
   const counts = new Map()
-  for (const [lineNo, masked] of content) {
-    for (const [label, fix, matched] of matchToxicSentences(masked)) {
+  const crossLineNotIsEnd = /不是[^。！？!?\n，,]{1,18}[。！？!?]$/
+  const crossLineYesStart = /^(?:而)?是/
+  for (let i = 0; i < content.length; i++) {
+    const [lineNo, masked] = content[i]
+    const lineHits = matchToxicSentences(masked)
+    for (const [label, fix, matched] of lineHits) {
       sentenceHits.push([lineNo, label, fix, matched])
       counts.set(label, (counts.get(label) || 0) + 1)
+    }
+    // 跨行断句「不是A。\n是B。」与 check-ai-patterns.js parity 对齐（跳过行内已闭合或下行为 reverse-not-is 的情况）。
+    if (lineHits.length === 0 && i + 1 < content.length) {
+      const mEnd = masked.match(crossLineNotIsEnd)
+      const nextMasked = content[i + 1][1]
+      const mStart = mEnd ? nextMasked.match(crossLineYesStart) : null
+      if (mEnd && mStart && !matchToxicSentences(nextMasked).some(([lbl]) => lbl === "reverse-not-is")) {
+        const joined = `${masked}\n${nextMasked}`
+        const negStart = masked.length - mEnd[0].length
+        const span = `${mEnd[0]}\n${mStart[0]}`
+        if (!toxicNotIsExcluded(joined, span, negStart)) {
+          sentenceHits.push([
+            lineNo,
+            "not-is-comparison",
+            "删否定铺垫，直接写后项（直白情绪、判断、对话或具体细节皆可）。",
+            `${mEnd[0]}${codePointSlice(nextMasked, 0, 10)}`,
+          ])
+          counts.set("not-is-comparison", (counts.get("not-is-comparison") || 0) + 1)
+        }
+      }
     }
   }
   const notIsCombined = (counts.get("not-is-comparison") || 0) + (counts.get("reverse-not-is") || 0)
@@ -1158,12 +1212,15 @@ function toxicPhraseFindings(text, whitelist = [], rescan = toxicRescanHint(""),
     if (label === "negation-parade" && (counts.get("negation-parade") || 0) < TOXIC_PARADE_MIN_HITS * scale) continue
     findings.push(`第${lineNo}行 毒句式[${label}]：『${codePointSlice(matched, 0, 20)}』——${fix}`)
   }
-  // trailer-ending 只扫文末 600 字窗口（引号占位后按行累计，边界行整行计入）。
+  // trailer-ending 只扫文末窗口（正文 ≥500 字时收紧为 min(末 4 行, 末 250 字)，与 check-ai-patterns.js parity 对齐）。
   // 短篇模式分批写作时文末常是中段小节/付费卡点，字数不足 6000 时跳过 trailer-ending；达到后也只拦 AI 预告腔，不拦信息差剧透钩。
+  const maxWindowLines = docChars >= TOXIC_TRAILER_LINE_CAP_MIN_DOC_CHARS ? TOXIC_TRAILER_MAX_LINES : Infinity
   let acc = 0
+  let linesTaken = 0
   let cut = content.length
-  while (cut > 0 && acc < TOXIC_TRAILER_WINDOW) {
+  while (cut > 0 && acc < TOXIC_TRAILER_WINDOW && linesTaken < maxWindowLines) {
     cut -= 1
+    linesTaken += 1
     acc += Array.from(content[cut][1]).length
   }
   const checkTrailerEnding = mode !== "short" || docChars >= TOXIC_SHORT_TRAILER_MIN_CHARS
@@ -1199,7 +1256,7 @@ function toxicPhraseFindings(text, whitelist = [], rescan = toxicRescanHint(""),
     if (mode === "short") {
       findings.push(`短篇风格复核提醒（非阻断；确属情绪或节奏需要可保留）。${rescan}`)
     } else {
-      findings.push(`毒句式是确定性 AI 指纹：本章须清零后再继续。${rescan}`)
+      findings.push(`风格软门禁复核提醒（非阻断）：优先自然改写，确属剧情需要可保留并在提交时用 --ack 说明理由。${rescan}`)
     }
   }
   return findings
@@ -1208,13 +1265,13 @@ function toxicPhraseFindings(text, whitelist = [], rescan = toxicRescanHint(""),
 function proseDegenerationFindings(text) {
   const findings = []
   const content = []
-  text.split("\n").forEach((raw, index) => {
+  stripZeroWidth(text).split("\n").forEach((raw, index) => {
     const line = raw.trim()
     if (skippableLine(line)) return
     const lineNo = index + 1
     content.push([lineNo, line])
     let hit = false
-    // 只豁免成对引号内的内容，继续检查引号外叙述。
+    // 只豁免成对引号/【】面板内的内容，继续检查引号外叙述。
     const outsideQuotes = maskQuotedSpans(line)
     for (const [regex, label] of SOFT_PATTERNS) {
       const match = outsideQuotes.match(regex)
@@ -1225,6 +1282,11 @@ function proseDegenerationFindings(text) {
       }
     }
     if (hit) return
+    const engMatch = outsideQuotes.match(ENG_WORD_PATTERN)
+    if (engMatch) {
+      findings.push(`第${lineNo}行 工程词泄漏：「${codePointSlice(engMatch[0], 0, 20)}」`)
+      return
+    }
     for (const [regex, label] of HARD_PATTERNS) {
       const match = line.match(regex)
       if (match) {
@@ -1236,8 +1298,12 @@ function proseDegenerationFindings(text) {
   for (let i = 1; i < content.length; i++) {
     const previous = content[i - 1][1]
     const [lineNo, current] = content[i]
-    const characters = Array.from(current)
-    if (previous === current && characters.length >= 8) findings.push(`第${lineNo}行 紧邻复读：整行与上一行完全相同「${characters.slice(0, 20).join("")}」`)
+    // 剥离成对引号与【】面板后再判复读，避免误拦齐呼口号与系统连播（与 check-degeneration.js 对齐）
+    const narChars = Array.from(stripQuotedSpans(current).trim())
+    if (previous === current && narChars.length >= 8) {
+      const characters = Array.from(current)
+      findings.push(`第${lineNo}行 紧邻复读：整行与上一行完全相同「${characters.slice(0, 20).join("")}」`)
+    }
   }
   if (content.length) {
     const [lineNo, last] = content[content.length - 1]
@@ -1246,10 +1312,115 @@ function proseDegenerationFindings(text) {
   return findings
 }
 
+const BLANK_LINE_STRUCTURAL_RE = /^(?:#{1,6}(?:\s|\d)|(?:[—\-]{2,}|(?:…\s*){2,}|(?:\.\s*){3,}|(?:·\s*){3,}|[*_=~]{3,})$|\d+\.$|【[^】]{1,20}(?:视角|番外|后记|尾声)(?:[（(][^）)】]{1,16}[）)])?】$|<!--)/
+
+function proseBlankLineFindings(text) {
+  const lines = stripZeroWidth(text).replace(/\r\n?/g, "\n").split("\n")
+  let firstNonEmpty = -1
+  let lastNonEmpty = -1
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() !== "") {
+      if (firstNonEmpty === -1) firstNonEmpty = i
+      lastNonEmpty = i
+    }
+  }
+  if (firstNonEmpty === -1 || firstNonEmpty === lastNonEmpty) return []
+
+  let inFence = false
+  let inComment = false
+  let runLen = 0
+  let runStart = -1
+  let multiRunCount = 0
+  let firstMultiLine = null
+  const illegalSingleLines = []
+
+  const flushRun = (nextIdx) => {
+    if (runLen === 0) return
+    const prevLine = runStart > 0 ? lines[runStart - 1].trim() : ""
+    const nextLine = nextIdx < lines.length ? lines[nextIdx].trim() : ""
+    if (runLen >= 2) {
+      multiRunCount += 1
+      if (firstMultiLine === null) firstMultiLine = runStart + 1
+    } else if (
+      prevLine &&
+      nextLine &&
+      !BLANK_LINE_STRUCTURAL_RE.test(prevLine) &&
+      !BLANK_LINE_STRUCTURAL_RE.test(nextLine) &&
+      !prevLine.endsWith("-->")
+    ) {
+      illegalSingleLines.push(runStart + 1)
+    }
+    runLen = 0
+    runStart = -1
+  }
+
+  for (let i = firstNonEmpty; i <= lastNonEmpty; i++) {
+    const trimmed = lines[i].trim()
+    if (/^(?:`{3,}|~{3,})/.test(trimmed)) {
+      flushRun(i)
+      inFence = !inFence
+      continue
+    }
+    if (inFence) continue
+    if (inComment) {
+      if (trimmed.includes("-->")) inComment = false
+      continue
+    }
+    if (trimmed.startsWith("<!--") && !trimmed.includes("-->")) {
+      flushRun(i)
+      inComment = true
+      continue
+    }
+    if (trimmed === "") {
+      if (runLen === 0) runStart = i
+      runLen += 1
+    } else {
+      flushRun(i)
+    }
+  }
+
+  const findings = []
+  if (multiRunCount > 0) {
+    findings.push(
+      `第${firstMultiLine}行 正文连续空行[blank-lines]：检测到 ${multiRunCount} 处 ≥2 行连续空行——删去多余连续空行，保持网文段落紧凑单换行（仅标题/小节标/切镜标头相邻处可留 1 行）。`
+    )
+  } else if (illegalSingleLines.length >= 3) {
+    findings.push(
+      `第${illegalSingleLines[0]}行 正文非法场间空行块[blank-lines]：正文段落间检测到 ${illegalSingleLines.length} 处多余空行（行 ${illegalSingleLines.slice(0, 5).join("、")}${illegalSingleLines.length > 5 ? " 等" : ""}）——按单换行紧排段落，避免大段空行断层。`
+    )
+  }
+  return findings
+}
+
+function proseSoftDegenerationFindings(text) {
+  const findings = []
+  let scannedChars = 0
+  stripZeroWidth(text).split("\n").forEach((raw, index) => {
+    const line = raw.trim()
+    if (skippableLine(line)) return
+    const lineNo = index + 1
+    const pinyinMatch = line.match(CENSORED_PINYIN_RE)
+    if (pinyinMatch) {
+      findings.push(`第${lineNo}行 审查拼音泄漏[censored-pinyin-leak]：「${codePointSlice(pinyinMatch[0], 0, 20)}」——改为正常中文表达或自然动作/意象替代。`)
+    }
+    if (scannedChars < AUTHOR_META_HEADER_MAX_CHARS) {
+      const headerMatch = line.match(AUTHOR_META_HEADER_RE)
+      if (headerMatch) {
+        findings.push(`第${lineNo}行 开篇作者元声明[author-meta-header]：「${codePointSlice(headerMatch[0], 0, 20)}」——正文首 500 字不应残留作者碎碎念/脑子寄存处/求好评头注。`)
+      }
+    }
+    const vis = line.match(/[一-鿿Ａ-ｚA-Za-z0-9]/g)
+    scannedChars += vis ? vis.length : 0
+  })
+  findings.push(...proseBlankLineFindings(text))
+  return findings
+}
+
 function proseNetFindings(text, whitelist = [], rescan = toxicRescanHint(""), options = {}) {
   const findings = proseDegenerationFindings(text)
+  findings.push(...proseSoftDegenerationFindings(text))
   // 「去味:跳过」豁免（文件首 6 行）：标记在场时跳过毒句式提示，
-  // 其余网（元信息/占位/复读/截断）照常。
+  // 其余网（元信息/占位/复读/截断/审查拼音/开篇作者头注）照常。
   if (!hasDeslopSkipMarker(text)) {
     findings.push(...toxicPhraseFindings(text, whitelist, rescan, options))
   }
@@ -1270,7 +1441,10 @@ function hasHardProseFindings(root, absolute) {
 function isProsePath(absolute) {
   const base = path.basename(absolute)
   const parent = path.basename(path.dirname(absolute))
-  if (base === "正文.md") return fs.existsSync(path.join(path.dirname(absolute), "设定.md"))
+  if (base === "正文.md") {
+    const dir = path.dirname(absolute)
+    return fs.existsSync(path.join(dir, "设定.md")) || fs.existsSync(path.join(dir, "小节大纲.md"))
+  }
   if (parent !== "正文" || !/^第.*章.*\.md$/.test(base)) return false
   const book = path.dirname(path.dirname(absolute))
   // 大纲/追踪/设定 must be directories; 设定.md a file — matches the bash oracle
@@ -1298,6 +1472,8 @@ function duplicateTitleFindings(absolute) {
 }
 
 function proseAfterWrite(root, absolute) {
+  if (typeof absolute !== "string" || !absolute) return ""
+  const safeRoot = typeof root === "string" ? root : ""
   if (!fs.existsSync(absolute) || !isProsePath(absolute)) return ""
   const isShort = path.basename(absolute) === "正文.md"
   const findings = []
@@ -1330,7 +1506,7 @@ function proseAfterWrite(root, absolute) {
   const lead = isShort && !hasHard
     ? "轻量确定性网自动复扫（短篇软提醒，非阻断）："
     : "轻量确定性网自动复扫（模型无关，防主会话漏跑收尾）。按类型处理后复扫到净："
-  return `=== 正文兜底检测（${safeRelative(root, absolute)}）===\n${lead}\n${findings.join("\n")}`
+  return `=== 正文兜底检测（${safeRelative(safeRoot, absolute)}）===\n${lead}\n${findings.join("\n")}`
 }
 
 // 线性手写分词，不用带歧义交替的正则：旧式 /"(?:\\.|[^"])*"|'[^']*'|[^\s]+/ 里 \\. 与 [^"] 都能吃
@@ -1688,6 +1864,8 @@ module.exports = {
   HARD_PATTERNS,
   skippableLine,
   proseDegenerationFindings,
+  proseBlankLineFindings,
+  proseSoftDegenerationFindings,
   proseNetFindings,
   maskQuotedSpans,
   toxicPhraseFindings,

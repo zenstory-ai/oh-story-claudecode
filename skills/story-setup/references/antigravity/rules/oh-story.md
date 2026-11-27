@@ -30,11 +30,15 @@ Read the selected skill's `SKILL.md` first, then load references as it directs.
   other directory outside the workspace unless the user explicitly names that
   external destination.
 - Before writing prose, long-form projects require the matching
-  `大纲/细纲_第N章*.md`; short-form projects require `小节大纲.md`.
+  `大纲/细纲_第N章*.md` (or range outline `大纲/细纲_第A-B章*.md`); short-form
+  projects require `小节大纲.md`.
 - Treat `追踪/_tracking-state.json` as the structured source of truth. Do not
   hand-edit its derived Markdown views.
-- After prose is written, resolve every deterministic finding injected by the
-  oh-story Antigravity hooks before continuing to another chapter.
+- After prose is written, resolve every hard finding injected by the oh-story
+  Antigravity hooks (truncation, placeholders, meta-leak, consecutive
+  duplication) before continuing to another chapter, and review any style
+  `review_required` / `advisory` finding (fix or acknowledge with a brief
+  reason).
 - Prefer the seven deployed custom agents in `.agents/agents/` for specialist
   work. Call `invoke_subagent` with `TypeName`, a concise `Role`, and `Prompt`
   (include concrete file paths in `Prompt` so read-only subagents in `agy` CLI

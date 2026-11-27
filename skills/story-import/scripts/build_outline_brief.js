@@ -235,9 +235,30 @@ function isFile(p) {
   }
 }
 
+function findSummaryFile(analysis, chapter) {
+  const chapterDir = path.join(analysis, '章节');
+  const exact = path.join(chapterDir, `第${chapter}章_摘要.md`);
+  if (isFile(exact)) return exact;
+  let entries;
+  try {
+    entries = fs.readdirSync(chapterDir).sort();
+  } catch {
+    return null;
+  }
+  for (const name of entries) {
+    const m = /^第0*(\d+)章_摘要\.md$/.exec(name);
+    if (m && Number(m[1]) === chapter) {
+      const candidate = path.join(chapterDir, name);
+      if (isFile(candidate)) return candidate;
+    }
+  }
+  return null;
+}
+
 function previousHook(analysis, chapter) {
-  const summary = path.join(analysis, '章节', `第${chapter - 1}章_摘要.md`);
-  if (chapter <= 1 || !isFile(summary)) return null;
+  if (chapter <= 1) return null;
+  const summary = findSummaryFile(analysis, chapter - 1);
+  if (!summary) return null;
   const text = fs.readFileSync(summary, 'utf8').replace(/^\ufeff/, '');
   const blocks = labelBlocks(text);
   const keys = ['章尾钩子', ...SUMMARY_FIELD_MAP['章尾钩子']];
@@ -259,8 +280,8 @@ function chapterBlock(project, analysis, chapter, first) {
   if (hook) {
     head.push(`- 上一章（第${chapter - 1}章）章尾钩子：${hook}`);
   }
-  const summary = path.join(analysis, '章节', `第${chapter}章_摘要.md`);
-  if (isFile(summary)) {
+  const summary = findSummaryFile(analysis, chapter);
+  if (summary) {
     const summaryText = fs.readFileSync(summary, 'utf8').replace(/^\ufeff/, '');
     const lines = [
       `- 摘要要点（抽自 \`${shownPath(summary, projectParent)}\`）：`,
@@ -366,10 +387,17 @@ function build(project, analysis, first, last) {
   };
 }
 
+const USAGE =
+  '用法：node build_outline_brief.js --project <书目录> --chapters <A-B> [--analysis <拆文目录>]\n' +
+  '说明：按拆文摘要与卷纲剧情单元打包逐批反推细纲任务包（输出到 <书目录>/.story/work/排纲/）。\n';
+
 function parseCliArgs(argv) {
-  const args = { project: null, chapters: null, analysis: null };
+  const args = { project: null, chapters: null, analysis: null, help: false };
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i];
+    if (token === '-h' || token === '--help') {
+      return { help: true };
+    }
     if (token === '--project') {
       if (i + 1 >= argv.length) return { error: '--project requires a value' };
       args.project = argv[++i];
@@ -396,6 +424,10 @@ function parseCliArgs(argv) {
 
 function main(argv = process.argv.slice(2)) {
   const args = parseCliArgs(argv);
+  if (args.help) {
+    process.stdout.write(USAGE);
+    return 0;
+  }
   if (args.error) {
     process.stderr.write(`ERROR: ${args.error}\n`);
     return 2;

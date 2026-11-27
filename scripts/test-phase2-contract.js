@@ -486,12 +486,155 @@ try {
     assert.strictEqual(importedRes.status, 0, `${label}: ${importedRes.stdout}${importedRes.stderr}`)
   }
 
+  // 别名解析与双男主性别向最高优先层回归
+  const aliasCases = [
+    ['题材：宫斗宅斗', '题材：宅斗宫斗（别名：宫斗宅斗）'],
+    ['题材：豪门霸总 双男主', '题材：双男主'],
+    ['题材：甜宠 / 纯爱', '题材：双男主（别名：纯爱）'],
+    ['题材：总裁豪门 ABO', '题材：双男主（别名：ABO）'],
+    ['题材：言情/脑洞/豪门霸总/弹幕/甜宠', '题材：脑洞设定流（别名：脑洞）'],
+    ['题材：言情/学霸/校园/甜宠', '题材：校园青春暗恋（别名：校园）'],
+    ['题材：病娇/豪门霸总/双男主/甜宠/暗恋', '题材：双男主'],
+  ]
+  for (const [idx, [genreLine, expectedEv]] of aliasCases.entries()) {
+    const res = run(writeCase(`genre-alias-${idx}`, validSettings({ genre: genreLine }), validOutline()), ['--strict'])
+    assert.strictEqual(res.status, 0, `${genreLine}: ${res.stdout}${res.stderr}`)
+    const gchk = res.report.checks.find((c) => c.id === 'phase2.genre-reference-declared')
+    assert.strictEqual(gchk.evidence, expectedEv)
+  }
+
+  // BG 言情带「纯爱」标签不得被误劫持进「双男主」
+  const bgPureLove = run(writeCase('bg-pure-love', validSettings({ genre: '题材：言情/虐恋/纯爱' }), validOutline()), ['--strict'])
+  assert.strictEqual(bgPureLove.status, 0, bgPureLove.stdout + bgPureLove.stderr)
+  assert.strictEqual(
+    bgPureLove.report.checks.find((c) => c.id === 'phase2.genre-reference-declared').evidence,
+    '题材：追妻火葬场（别名：虐恋）'
+  )
+
+  // 兼容 题材与大纲.md 命名双轨 + 平台提示语含「点众」+ 付费点兼容无「末」字 + 所有检查项文件名为 题材与大纲.md
+  const altDir = path.join(tmpRoot, 'alt-settings-filename')
+  fs.mkdirSync(altDir, { recursive: true })
+  fs.writeFileSync(path.join(altDir, '题材与大纲.md'), validSettings({ platform: '点众', paywall: '付费点：第 4 节' }), 'utf8')
+  fs.writeFileSync(path.join(altDir, '小节大纲.md'), validOutline(), 'utf8')
+  const altRes = run(altDir, ['--strict'])
+  assert.strictEqual(altRes.status, 0, altRes.stdout + altRes.stderr)
+  assert.match(
+    altRes.report.checks.find((c) => c.id === 'phase2.platform-declared').expected,
+    /点众/
+  )
+  assert.match(
+    altRes.report.checks.find((c) => c.id === 'phase2.paywall-position-ratio').evidence,
+    /按目标字数/
+  )
+  for (const chk of altRes.report.checks) {
+    assert(!chk.file.includes('设定.md'), `expected 题材与大纲.md instead of 设定.md in ${chk.id}: ${chk.file}`)
+  }
+
+  // 目标字数严重前倾时（节数 3/8=38% 正常，但前 3 节目标字数占 5600/8000=70% > 55%）应触发 paywall-position-ratio 软提醒
+  const skewedRows = [
+    ['开局', '冲突开场', '紧张', '卡点1', '2000'],
+    ['铺垫', '矛盾升级', '压抑', '卡点2', '1800'],
+    ['卡点', '反转前夜', '蓄势', '亮牌（付费点）', '1800'],
+    ['反击', '首轮打脸', '解气', '卡点4', '500'],
+    ['升级', '二次反杀', '爽感', '卡点5', '500'],
+    ['反转', '真相揭晓', '震撼', '卡点6', '500'],
+    ['高潮', '彻底清算', '痛快', '卡点7', '500'],
+    ['结尾', '硬动作收刀', '余韵', '转身离开', '400'],
+  ]
+  const skewedOutline = [
+    '# 小节大纲',
+    `| ${headers.join(' | ')} |`,
+    `| ${headers.map(() => '---').join(' | ')} |`,
+    ...skewedRows.map((row) => `| ${row.join(' | ')} |`),
+    '',
+  ].join('\n')
+  const skewedPaywall = assertSoftOnly(
+    writeCase('skewed-paywall-target-words', validSettings({ paywall: '付费点：第 3 节末' }), skewedOutline),
+    'phase2.paywall-position-ratio'
+  )
+  assert.match(skewedPaywall.normal.report.soft_warnings[0].evidence, /按目标字数 5600\/8000 约 70%/)
+
   const invalidInvocation = spawnSync(process.execPath, [verifier, '--unknown'], {
     cwd: repoRoot,
     encoding: 'utf8',
   })
   assert.strictEqual(invalidInvocation.status, 2)
   assert.match(invalidInvocation.stderr, /用法/)
+
+  // ── slice-genre-pack.js：短篇题材包脚本级按节分读（plan 1–3 / write 4–5 / 优雅回退）──
+  const slicer = path.join(repoRoot, 'skills/story-short-write/scripts/slice-genre-pack.js')
+  const runSlicer = (args) => {
+    const res = spawnSync(process.execPath, [slicer, ...args], { cwd: repoRoot, encoding: 'utf8' })
+    return { status: res.status, stdout: res.stdout, stderr: res.stderr, json: res.status === 0 && args.includes('--json') ? JSON.parse(res.stdout) : null }
+  }
+
+  // 1) --stage plan 只出 1–3 节，不含 4–5 节；--stage write 只出 4–5 节，不含 1–3 节
+  const planZhaidou = runSlicer(['--stage', 'plan', '--genre', '宅斗宫斗', '--json'])
+  assert.strictEqual(planZhaidou.status, 0, planZhaidou.stderr)
+  assert.strictEqual(planZhaidou.json.pack, '宅斗宫斗')
+  assert.strictEqual(planZhaidou.json.sliced, true)
+  assert.deepStrictEqual(planZhaidou.json.sections, ['1. 故事线设计', '2. 常见剧情设计', '3. 人物设计'])
+  assert.match(planZhaidou.json.content, /## 1\. 故事线设计/)
+  assert.match(planZhaidou.json.content, /## 3\. 人物设计/)
+  assert(!/## 4\. 正文技巧/.test(planZhaidou.json.content), 'plan slice must exclude section 4')
+  assert(!/## 5\. 案例片段/.test(planZhaidou.json.content), 'plan slice must exclude section 5')
+  assert(planZhaidou.json.saved_pct > 30, `expected >30% savings, got ${planZhaidou.json.saved_pct}`)
+
+  const writeZhaidou = runSlicer(['--stage', 'write', '--genre', '宅斗宫斗', '--json'])
+  assert.strictEqual(writeZhaidou.status, 0, writeZhaidou.stderr)
+  assert.deepStrictEqual(writeZhaidou.json.sections, ['4. 正文技巧', '5. 案例片段'])
+  assert.match(writeZhaidou.json.content, /## 4\. 正文技巧/)
+  assert.match(writeZhaidou.json.content, /## 5\. 案例片段/)
+  assert(!/## 1\. 故事线设计/.test(writeZhaidou.json.content), 'write slice must exclude section 1')
+  assert(!/## 3\. 人物设计/.test(writeZhaidou.json.content), 'write slice must exclude section 3')
+  assert(writeZhaidou.json.saved_pct > 40, `expected >40% savings, got ${writeZhaidou.json.saved_pct}`)
+
+  // 2) --project 从 设定.md 自动读「题材：」并解析别名 + 言情纯爱不误判双男主 + 冷门兜底通用短篇
+  const projSliceDir = writeCase('slice-from-project', validSettings({ genre: '题材：白月光替身' }), validOutline())
+  const fromProj = runSlicer(['--stage', 'write', '--project', projSliceDir, '--json'])
+  assert.strictEqual(fromProj.status, 0, fromProj.stderr)
+  assert.strictEqual(fromProj.json.pack, '追妻火葬场')
+  assert.strictEqual(fromProj.json.sliced, true)
+
+  const pureLoveBg = runSlicer(['--stage', 'plan', '--genre', '现言纯爱', '--json'])
+  assert.strictEqual(pureLoveBg.status, 0)
+  assert.notStrictEqual(pureLoveBg.json.pack, '双男主', '现言纯爱不得误路由双男主')
+
+  const strictBl = runSlicer(['--stage', 'plan', '--genre', '双男主追夫', '--json'])
+  assert.strictEqual(strictBl.status, 0)
+  assert.strictEqual(strictBl.json.pack, '双男主')
+
+  const coldGenre = runSlicer(['--stage', 'plan', '--genre', '冷门：深海考古', '--json'])
+  assert.strictEqual(coldGenre.status, 0)
+  assert.strictEqual(coldGenre.json.pack, '通用短篇')
+
+  // 3) 非 v5 自定义旧包优雅回退全文（sliced: false），不崩溃
+  const customPackPath = path.join(tmpRoot, 'legacy-custom.md')
+  fs.writeFileSync(customPackPath, '---\ngenre: 自定义\n---\n# 自定义流派\n\n## 老结构\n内容照常保留。\n', 'utf8')
+  const legacyRes = runSlicer(['--stage', 'write', '--file', customPackPath, '--json'])
+  assert.strictEqual(legacyRes.status, 0, legacyRes.stderr)
+  assert.strictEqual(legacyRes.json.sliced, false)
+  assert.match(legacyRes.json.content, /老结构/)
+
+  // 4) 全 14 份现行短篇题材包均能干净分切 plan (1-3) 与 write (4-5)
+  const shortGenreDir = path.join(repoRoot, 'skills/story-short-write/references/genre-styles')
+  const shortFiles = fs.readdirSync(shortGenreDir).filter((f) => f.endsWith('.md')).sort()
+  assert.strictEqual(shortFiles.length, 14)
+  for (const file of shortFiles) {
+    const g = file.slice(0, -3)
+    const p = runSlicer(['--stage', 'plan', '--genre', g, '--json'])
+    const w = runSlicer(['--stage', 'write', '--genre', g, '--json'])
+    assert.strictEqual(p.status, 0, `${g} plan failed`)
+    assert.strictEqual(w.status, 0, `${g} write failed`)
+    assert.strictEqual(p.json.sliced, true, `${g} plan should be v5 sliced`)
+    assert.strictEqual(w.json.sliced, true, `${g} write should be v5 sliced`)
+    assert.strictEqual(p.json.sections.length, 3, `${g} plan should have 3 sections`)
+    assert.strictEqual(w.json.sections.length, 2, `${g} write should have 2 sections`)
+  }
+
+  // 5) 非法参数返回 exit 2
+  const badSlicer = runSlicer(['--stage', 'invalid'])
+  assert.strictEqual(badSlicer.status, 2)
 
   process.stdout.write('phase2-contract: all tests passed\n')
 } finally {
