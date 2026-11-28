@@ -7,7 +7,7 @@ Each skill includes a `references/` knowledge base loaded on demand to keep cont
 | Topic | Contents | Skill |
 |:------|:---------|:------|
 | Outline Layout | Volume structure · Plot-unit design · Genre unit loops · Progression axis · Outline scale | long-write |
-| Opening Design | Opening types · Three anchors and chapter slots · What the first 3 chapters establish · Opening prose | long-write / short-write |
+| Opening Design | Four Golden-3-Chapter opening patterns · What the first 3 chapters establish · Direct short-form lead-in | long-write / short-write |
 | Character Design | Character profiles · Character extraction · Relationship mapping · Motivation chains · Ensemble casts | long-write / short-write / short-analyze |
 | Hook Techniques | Chapter-start entries · Hard chapter-end hooks · Suspense pacing & expectation chains | long-write / short-write / short-analyze |
 | Emotion Design | Volume emotion flow · Expectation chain · Emotion modules & tension/release | long-write / short-write |

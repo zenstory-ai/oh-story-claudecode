@@ -7,7 +7,7 @@
 | 主题 | 内容 | 所在 skill |
 |:-----|:-----|:-----------|
 | 大纲排布 | 卷结构选型 · 剧情单元设计 · 题材单元循环 · 升级轴 · 排纲刻度 | long-write |
-| 开头设计 | 开局类型 · 三基点与章位 · 前三章交代什么 · 开篇落笔 | long-write / short-write |
+| 开头设计 | 黄金三章四种开篇套路 · 前三章交代什么 · 开门见山导语 | long-write / short-write |
 | 人物设计 | 角色设定 · 人物提取 · 关系映射 · 动机链 · 群像 | long-write / short-write / short-analyze |
 | 钩子技法 | 实战章首切入 · 章尾硬钩子 · 悬念错开与期待链 | long-write / short-write / short-analyze |
 | 情绪设计 | 卷情绪走势 · 期待链 · 情绪模块与松紧调节 | long-write / short-write |

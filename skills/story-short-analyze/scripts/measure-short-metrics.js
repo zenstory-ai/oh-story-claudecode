@@ -587,7 +587,7 @@ function formatMarkdownTable(m) {
     `| 单句成段率 | ${pct(m.paragraphs.single_sentence_rate)} | 共 ${m.paragraphs.count} 段 |`,
     `| 对话占比 | ${pct(m.dialogue.ratio)}（≤15字短对白占 ${pct(m.dialogue.short_15_ratio)}，引号：${m.dialogue.quote_style}） | ${m.dialogue.bracket_chars > 0 ? `含【】心声/弹幕 ${m.dialogue.bracket_chars} 字` : '纯引号对白'} |`,
     `| 叙述人称 | ${m.pov.label} | 叙述「我」${m.pov.first_person_per_k}/千字 |`,
-    `| 首冲突字位 | 第 {待确认} 字（首对话${firstDial}） | 标点：「！+？」${m.punctuation.exclaim_question_per_k}/千字，旁白「——」${m.punctuation.em_dash_narration_count} 处（${m.punctuation.em_dash_narration_per_10k}/万字） |`,
+    `| 首冲突位置 | {语义定位，如导语首句/第1节前段}（首对话${firstDial}） | 标点：「！+？」${m.punctuation.exclaim_question_per_k}/千字，旁白「——」${m.punctuation.em_dash_narration_count} 处（${m.punctuation.em_dash_narration_per_10k}/万字） |`,
     `| 非末节节尾卡点率 | {待分析师统计}%（{M}/{N-1} 节带硬钩子） | ${paywallCell} |`,
     '| 收尾类型 | {明账清算 / 火葬场追悔 / HE发糖 / 细思极恐留白 / 克制回甘 / 开放式} | {是否写足实质代价或首尾呼应} |',
   ]

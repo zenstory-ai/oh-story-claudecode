@@ -16,7 +16,7 @@ The 14 skills in Oh Story, grouped by writing task:
 | Route | `story` | Routes natural-language requests and preference management to the relevant writing skill; starts the local dashboard |
 | Research | `story-long-scan`, `story-short-scan` | Scan 起点/番茄/晋江/七猫/刺猬猫 and short-fiction charts for repeated patterns, not single rankings |
 | Deconstruct | `story-long-analyze`, `story-short-analyze` | Long-form Stages 0–6 cover chapter indexing, golden opening, block extraction, rhythm, settings, report and style; short-form Stages 2–6 produce its own analysis assets |
-| Draft | `story-long-write`, `story-short-write` | Outline to prose; long-form uses file-first tracking (`_tracking-state.json`, compact per-chapter deltas with a 3072B soft target and 64 KiB hard cap), while short-form uses its own setting, outline and story files |
+| Draft | `story-long-write`, `story-short-write` | Outline to prose; long-form uses file-first tracking (`_tracking-state.json`, compact per-chapter deltas with a 2048B target / 3584B soft cap and 64 KiB hard cap), while short-form uses its own setting, outline and story files |
 | Revise | `story-deslop` | Diagnoses expression, narrative emphasis and story causality, then revises within the author's scope and authorization |
 | Review | `story-review` | Multi-perspective review with parallel reviewer agents, falls back to single-thread |
 | Import | `story-import` | Reverse-parse an existing manuscript into the project structure |

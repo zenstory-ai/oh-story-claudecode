@@ -64,7 +64,7 @@ Only preferences the author states explicitly are recorded; nothing is inferred 
 │   └── Genre_Positioning.md # Core trope + benchmark analysis
 ├── Outline/
 │   ├── Outline.md          # Full-book volume-level structure
-│   ├── Volume_1.md         # One per volume: payoff pacing + emotion arc + character arc + foreshadowing + twists
+│   ├── Volume_1.md         # One per volume: volume expectations + plotlines + story units + emotion arc + foreshadowing
 │   ├── Chapter_001.md      # One per chapter: chapter flow + scene split + plotlines + cast order + beats & hooks
 │   └── ...
 ├── Prose/
@@ -72,7 +72,7 @@ Only preferences the author states explicitly are recorded; nothing is inferred 
 │   └── ...
 ├── Benchmark/                # Benchmark reference (structured subdirs synced from deconstruction)
 │   └── {Benchmark Book}/
-│       ├── Source/              # Benchmark book original chapters
+│       ├── Chapters/           # Benchmark chapter summaries & deep dives
 │       ├── Characters/         # Structured character profiles (synced from analyze)
 │       ├── Plotlines/          # Structured plot lines/pacing/emotion modules (synced from analyze)
 │       ├── Settings/           # Structured world settings (synced from analyze)
