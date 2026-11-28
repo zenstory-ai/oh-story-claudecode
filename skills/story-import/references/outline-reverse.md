@@ -7,8 +7,9 @@
 用 Node.js 18+ 请求第 B+1 章起的 20 章（剩下不足 20 章就到最后一章；已生成细纲的局部返修直接传对应章范围）：
 
 ```text
-node {story-import skill 根}/scripts/build_outline_brief.js --project {书目录} --chapters {A-B}
+node {story-import skill 根}/scripts/build_outline_brief.js --project {书目录} --chapters {A-B} [--analysis {拆文目录}]
 ```
+> 书目录名与 `拆文库/{导入书名}/` 不同名时须显式传 `--analysis`，避免找不到摘要退回读原文。
 
 脚本将反推规则与模板（[outline-reverse-rules.md](outline-reverse-rules.md) 全文）、测好的历史长度、摘要要点和覆盖本批的卷纲剧情单元卡，拼成 `{书目录}/.story/work/排纲/导入细纲_第AAA-BBB章.md`。历史长度按 `visible_chars_v1` 计算；执行者要读的总量超过约 25K 字时脚本自动少排几章（可少于 10 章）。以 stdout JSON 的 `chapters` 为实际范围、`next` 为下一批起点，`null` 表示已到最后一章。缺摘要的章改读正文，所需正文量也计入总量。
 
