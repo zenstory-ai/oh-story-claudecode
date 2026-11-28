@@ -380,7 +380,7 @@ function recentTimelineAnchors(project) {
     const sepLen = picked.length > 0 ? 1 : 0;
     const baseLen = Array.from(baseTag).length;
     if (ev.fact) {
-      const fullFact = truncateChars(ev.fact, 10);
+      const fullFact = truncateChars(ev.fact, 22);
       const withFact = `${baseTag}${fullFact}`;
       const withFactLen = Array.from(withFact).length;
       const availForFact = TIMELINE_ANCHOR_MAX_CHARS - used - sepLen - baseLen;
