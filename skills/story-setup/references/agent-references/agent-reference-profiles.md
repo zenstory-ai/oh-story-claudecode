@@ -34,7 +34,7 @@ Long profile 禁止读取 `short-*` 文件，不得采用“6 章”“每节 50
 
 | 文件 | 读取条件 |
 |---|---|
-| [short-quality.md](short-quality.md) | 设计或审查短篇导语冷开场、付费卡点、连环反击/反转节奏与明账清算收尾 |
+| [short-quality.md](short-quality.md) | 设计或审查短篇开门见山导语、付费卡点、连环反击/反转节奏与明账清算收尾 |
 | [short-deslop.md](short-deslop.md) | 短篇写作、去味或审查时的卖点保护与长篇默认规则覆盖 |
 
 Short profile 禁止读取 `long-*`、`flow-*`、`benchmark-recall.md` 或 `genre-styles/*`（长篇流派包）；不得把卷级、日更或跨十几章指标当硬门槛。

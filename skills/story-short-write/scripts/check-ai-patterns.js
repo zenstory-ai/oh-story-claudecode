@@ -36,7 +36,7 @@ Detect high-risk AI-flavor prose patterns that need human rewrite:
   - 戏剧套词刷屏 (死寂同章重复或死寂/轰然/骤然/猛地/瞬间高密度聚集，advisory)
   - 女频油腻/言情套词聚集 (指节泛白/宠溺/喉结轻滚/眸色一暗/声音低哑/小女人聚集，豁免轻笑/低笑，advisory)
   - 短篇塑料反应套词聚集 (--mode=short 眼底闪过一丝/瞳孔骤缩|猛地一缩|失焦/喉结滚/指节泛白/气得浑身发抖/死一般寂静合计 ≥2 处，advisory)
-  - 闲笔道具贴纸过密 (--mode=long 无功能材质/服饰/光影/环境音效贴纸聚集且叙述口语连接词偏低，advisory)
+  - 闲笔道具摆设过密 (--mode=long 没用的材质/服饰/光影/环境音效摆设聚集且叙述口语连接词偏低，advisory)
 
 Book-local .deslop-whitelist literal spans are excluded from style scanning (no regex or ancestor inheritance).
 Each finding carries severity: review_required for high-risk stylistic patterns (not-is-comparison / em-dash / voice-contrast / negation-parade / reverse-not-is / trailer-ending / trailer-summary), where single/low-count hits of rhetorical patterns (or moderate narration em-dash density, and all short-mode narration em-dash density) downgrade to semantic advisory and high-density clusters (or long-mode dense narration em-dash / trailer-summary) require explicit review-and-ack. This is a local style/readability soft-gate, not an AIGC detector score; functional human text can be kept with explicit acknowledgement instead of hard-blocked.
@@ -150,7 +150,7 @@ const CLICHE_DENSITY_PER_KILO = 12;
 // 比喻密度：单个生活化比喻可服务画面；“像/好像/仿佛/如同”成片复现时，
 // 容易变成 AI 式修辞堆叠。只做 advisory，修法是删到必要数量并回到具体画面，
 // 不是把“像”换成另一组比喻词。
-const METAPHOR_MARKER_PATTERN = /好像|像是|仿佛|宛如|如同|犹如|(?<![不头图画影录摄肖])像(?![头像素])/g;
+const METAPHOR_MARKER_PATTERN = /好像|像是|仿佛|宛如|如同|犹如|(?<![不头图画影录摄肖])像(?![头像素样话])/g;
 const METAPHOR_COMPOUND_NOUN_PATTERN = /遗像|炭精像|画像|雕像|铜像|佛像|塑像|神像|头像|人像|肖像|蜡像|录像|影像|偶像|假像|表像|现象|印象|迹象|气象|星象|万象/g;
 const METAPHOR_LIKE_PHRASE_PATTERN = /(?:死|水|冰|火|潮水|石头|木头|机器|纸|铁|鬼|死人|刀|针|网|墙)一样/g;
 const METAPHOR_DENSITY_MIN_HITS = 7;
@@ -2078,7 +2078,7 @@ function findIdlePropDecorationTic(proseLines, mode = 'long') {
     column: 1,
     type: 'idle-prop-decoration-tic',
     severity: 'advisory',
-    message: `闲笔材质/道具贴纸过密：引号外叙述出现 ${uniqueProps.size} 种材质/服饰/光影/声效贴纸（${uniquePerKilo.toFixed(1)}/千字），且口语连接仅 ${connPerKilo.toFixed(1)}/千字；按刀子物件原则只留改变局势或露破绽的实证物，删掉无功能静物贴纸并补足人物盘算。`,
+    message: `闲笔材质/道具摆设过密：引号外叙述出现 ${uniqueProps.size} 种材质/服饰/光影/声效摆设（${uniquePerKilo.toFixed(1)}/千字），且口语连接仅 ${connPerKilo.toFixed(1)}/千字；只留改变局势或露破绽的关键道具和证物，删掉没用的环境摆设并补足人物盘算。`,
     excerpt: compact([...uniqueProps].slice(0, 8).join(' | ')),
   }];
 }

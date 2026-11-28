@@ -586,7 +586,7 @@ function formatMarkdownTable(m) {
     `| 叙述人称 | ${m.pov.label} | 叙述「我」${m.pov.first_person_per_k}/千字 |`,
     `| 首冲突字位 | 第 {待确认} 字（首对话${firstDial}） | 标点：「！+？」${m.punctuation.exclaim_question_per_k}/千字，旁白「——」${m.punctuation.em_dash_narration_count} 处（${m.punctuation.em_dash_narration_per_10k}/万字） |`,
     `| 非末节节尾卡点率 | {待分析师统计}%（{M}/{N-1} 节带硬钩子） | ${paywallCell} |`,
-    '| 收尾类型 | {明账清算 / 火葬场追悔 / HE发糖 / 细思极恐留白 / 克制回甘 / 开放式} | {是否写足实质代价或首尾回旋镖} |',
+    '| 收尾类型 | {明账清算 / 火葬场追悔 / HE发糖 / 细思极恐留白 / 克制回甘 / 开放式} | {是否写足实质代价或首尾呼应} |',
   ]
   return lines.join('\n')
 }

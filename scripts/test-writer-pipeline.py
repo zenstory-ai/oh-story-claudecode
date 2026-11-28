@@ -1831,11 +1831,11 @@ class Round21RegressionTests(unittest.TestCase):
             after_paren = item.rsplit(')', 1)[-1]
             self.assertGreaterEqual(len(after_paren), 6, f'空摘要或过度截断的时间锚点条目: {item!r}')
 
-        # WS4 回归：writer prompt 必须注入精炼四条写作硬底线，并更新语感切片引导语
+        # WS4 回归：writer prompt 必须注入精炼写作硬底线，并更新语感切片引导语
         self.assertIn('——— 写作硬底线 ———', prompt_p)
         self.assertIn('叙述保人物内心盘算与口语因果连接', prompt_p)
-        self.assertIn('对白净白短打直接交锋', prompt_p)
-        self.assertIn('刀子物件原则', prompt_p)
+        self.assertIn('短对话直接交锋', prompt_p)
+        self.assertIn('关键道具和证物', prompt_p)
         self.assertIn('反派须按私心反咬设阻', prompt_p)
         self.assertIn('只学口语连接、句长断行与对话推进感', prompt_p)
 

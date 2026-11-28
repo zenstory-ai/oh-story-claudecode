@@ -578,7 +578,8 @@ try {
   assert.match(planZhaidou.json.content, /## 3\. 人物设计/)
   assert(!/## 4\. 正文技巧/.test(planZhaidou.json.content), 'plan slice must exclude section 4')
   assert(!/## 5\. 案例片段/.test(planZhaidou.json.content), 'plan slice must exclude section 5')
-  assert(planZhaidou.json.saved_pct > 30, `expected >30% savings, got ${planZhaidou.json.saved_pct}`)
+  // Section 2 carries the expanded 9-type plot library (~77% of pack), so plan saves >20% and write saves >70%.
+  assert(planZhaidou.json.saved_pct > 20, `expected >20% savings, got ${planZhaidou.json.saved_pct}`)
 
   const writeZhaidou = runSlicer(['--stage', 'write', '--genre', '宅斗宫斗', '--json'])
   assert.strictEqual(writeZhaidou.status, 0, writeZhaidou.stderr)

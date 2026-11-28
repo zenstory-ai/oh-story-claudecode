@@ -59,7 +59,7 @@ const _QUOTED = /“[^”]*”|「[^」]*」|『[^』]*』|"[^"]*"/g;
 const _HAS_QUOTE_RE = /[“”「」『』"]/;
 const _VIS_CHAR_RE = /[\u4e00-\u9fff\uff21-\uff5aA-Za-z0-9]/g;
 const _COLLOQUIAL_CONN_RE = /但是|可是|不过|虽然|因为|所以|偏偏|干脆|其实|毕竟|竟然|好在|倒也|却|才|便|正要|已经/g;
-const CAMERA_REPORT_WARNING_MESSAGE = '叙述偏摄像头报幕，缺人物内心盘算与口语因果连接';
+const CAMERA_REPORT_WARNING_MESSAGE = '叙述偏纯动作碎句，缺人物内心盘算与口语因果连接';
 const _BODY_ACTION_SENTENCE_RE =
   /指尖|指腹|手指|指节|手背|掌心|拳头|手腕|袖口|衣角|喉结|眼眶|眼底|眸光|目光|视线|眼神|眉头|嘴角|唇角|肩膀|呼吸|伸手|抬手|探手|拿起|拿过|取出|取过|掏出|摸出|抓起|攥住|攥紧|握住|握紧|捏住|按住|压住|扣住|拢住|摩挲|推开|拉开|打开|关上|放下|递给|挑开|掀开|扯开|转身|回头|抬头|低头|弯腰|俯身|走到|走向|坐下|站起|盯着|扫过|看向|望向/;
 const _THOUGHT_CAUSAL_SENTENCE_RE =

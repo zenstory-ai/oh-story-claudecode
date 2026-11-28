@@ -1824,7 +1824,7 @@ describe("check-ai-patterns.js", () => {
     assert.equal(idleHits.length, 1, JSON.stringify(idleHits));
     assert.equal(idleHits[0].severity, "advisory");
     assert.equal(idleHits[0].review, "semantic");
-    assert.ok(idleHits[0].message.includes("刀子物件"));
+    assert.ok(idleHits[0].message.includes("关键道具和证物"));
 
     // Short mode must NOT trigger idle-prop-decoration-tic
     assert.equal(
