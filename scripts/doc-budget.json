@@ -62,17 +62,17 @@
     },
     {
       "path": "skills/story-long-write/references/flow-opening-plan.md",
-      "budget": 5050,
+      "budget": 5300,
       "why": "长篇立项、定设定与出卷纲唯一手册（合并原 workflow-setup/workflow-volume/outline-methods/character-basics/character-relations/long-genre-*）。（2026-11-27 结合 noveldb 与端到端实战校准男女频卷纲分轨、2200字单章1–2场容量与免费段控字规则）"
     },
     {
       "path": "skills/story-long-write/references/flow-outline.md",
-      "budget": 4350,
+      "budget": 4500,
       "why": "长篇细纲规划、黄金三章、钩子节奏与白话模板（合并原 workflow-outline/outline-template/opening-design/plot-core-methods/long-chapter-hooks/long-suspense/long-reversal）。（2026-11-27 结合 noveldb 与端到端实战校准男女频卷纲分轨、2200字单章1–2场容量与免费段控字规则）"
     },
     {
       "path": "skills/story-long-write/references/flow-drafting.md",
-      "budget": 4450,
+      "budget": 4550,
       "why": "长篇单章与日更调度、正文竖屏网感笔法（合并原 workflow-chapter/workflow-daily/writing-craft/long-format/style-combat-face/dialogue-mastery）。"
     },
     {
@@ -207,7 +207,7 @@
     },
     {
       "path": "skills/story-short-write/SKILL.md",
-      "budget": 7100,
+      "budget": 7250,
       "why": "短篇自包含主入口：核心笔法、竖屏排版、平台表、Phase 1–4 流程、白话模板与计字命令（折叠原 15 份非流派参考文件，整篇热路径从 33K 降至 ~10K）。（2026-11-27 结合 noveldb 与端到端实战校准男女频卷纲分轨、2200字单章1–2场容量与免费段控字规则）"
     },
     {
@@ -770,116 +770,116 @@
           "files": [
             "skills/story-short-write/references/genre-styles/世情打脸.md"
           ],
-          "budget": 12750
+          "budget": 12900
         },
         {
           "label": "仙侠奇幻末世",
           "files": [
             "skills/story-short-write/references/genre-styles/仙侠奇幻末世.md"
           ],
-          "budget": 12800
+          "budget": 12950
         },
         {
           "label": "双男主",
           "files": [
             "skills/story-short-write/references/genre-styles/双男主.md"
           ],
-          "budget": 12450
+          "budget": 12600
         },
         {
           "label": "复仇打脸",
           "files": [
             "skills/story-short-write/references/genre-styles/复仇打脸.md"
           ],
-          "budget": 12600
+          "budget": 12750
         },
         {
           "label": "宅斗宫斗",
           "files": [
             "skills/story-short-write/references/genre-styles/宅斗宫斗.md"
           ],
-          "budget": 12550
+          "budget": 12700
         },
         {
           "label": "年代重生打脸",
           "files": [
             "skills/story-short-write/references/genre-styles/年代重生打脸.md"
           ],
-          "budget": 12600
+          "budget": 12750
         },
         {
           "label": "总裁豪门",
           "files": [
             "skills/story-short-write/references/genre-styles/总裁豪门.md"
           ],
-          "budget": 12650
+          "budget": 12800
         },
         {
           "label": "悬疑",
           "files": [
             "skills/story-short-write/references/genre-styles/悬疑.md"
           ],
-          "budget": 12750
+          "budget": 12900
         },
         {
           "label": "校园青春暗恋",
           "files": [
             "skills/story-short-write/references/genre-styles/校园青春暗恋.md"
           ],
-          "budget": 12800
+          "budget": 12900
         },
         {
           "label": "甜宠",
           "files": [
             "skills/story-short-write/references/genre-styles/甜宠.md"
           ],
-          "budget": 12650
+          "budget": 12800
         },
         {
           "label": "男频都市反杀",
           "files": [
             "skills/story-short-write/references/genre-styles/男频都市反杀.md"
           ],
-          "budget": 12700
+          "budget": 12850
         },
         {
           "label": "脑洞设定流",
           "files": [
             "skills/story-short-write/references/genre-styles/脑洞设定流.md"
           ],
-          "budget": 12650
+          "budget": 12750
         },
         {
           "label": "追妻火葬场",
           "files": [
             "skills/story-short-write/references/genre-styles/追妻火葬场.md"
           ],
-          "budget": 12700
+          "budget": 12800
         },
         {
           "label": "通用短篇",
           "files": [
             "skills/story-short-write/references/genre-styles/通用短篇.md"
           ],
-          "budget": 11350
+          "budget": 11450
         },
         {
           "label": "有对标",
           "files": [
             "skills/story-short-write/references/benchmark-recall.md"
           ],
-          "budget": 8450
+          "budget": 8600
         },
         {
           "label": "交给写手（写正文或去味）",
           "files": [
             "skills/story-short-write/references/agent-calls.md"
           ],
-          "budget": 8000
+          "budget": 8150
         }
       ],
       "stacking": {
-        "budget": 15150,
+        "budget": 15250,
         "slots": [
           [
             "世情打脸",
@@ -927,25 +927,25 @@
         {
           "label": "常规",
           "files": [],
-          "budget": 15900
+          "budget": 16150
         },
         {
           "label": "有对标",
           "files": [
             "skills/story-long-write/references/benchmark-recall.md"
           ],
-          "budget": 17600
+          "budget": 17850
         },
         {
           "label": "派子代理",
           "files": [
             "skills/story-long-write/references/agent-calls.md"
           ],
-          "budget": 18100
+          "budget": 18350
         }
       ],
       "stacking": {
-        "budget": 19800,
+        "budget": 20050,
         "slots": [
           [
             "有对标"
@@ -968,25 +968,25 @@
         {
           "label": "常规",
           "files": [],
-          "budget": 15150
+          "budget": 15300
         },
         {
           "label": "有对标",
           "files": [
             "skills/story-long-write/references/benchmark-recall.md"
           ],
-          "budget": 16850
+          "budget": 17000
         },
         {
           "label": "派子代理",
           "files": [
             "skills/story-long-write/references/agent-calls.md"
           ],
-          "budget": 17400
+          "budget": 17550
         }
       ],
       "stacking": {
-        "budget": 19100,
+        "budget": 19250,
         "slots": [
           [
             "有对标"
@@ -1023,7 +1023,7 @@
           "files": [
             "skills/story-long-write/references/agent-calls.md"
           ],
-          "budget": 17500
+          "budget": 17600
         },
         {
           "label": "首章初始化或追踪报错",
@@ -1034,7 +1034,7 @@
         }
       ],
       "stacking": {
-        "budget": 23300,
+        "budget": 23400,
         "slots": [
           [
             "对标召回"
@@ -1111,14 +1111,14 @@
         {
           "label": "常规",
           "files": [],
-          "budget": 12800
+          "budget": 12950
         },
         {
           "label": "有对标",
           "files": [
             "skills/story-long-write/references/benchmark-recall.md"
           ],
-          "budget": 14500
+          "budget": 14650
         }
       ],
       "why": "2026-11-27：补算运行时 build_architect_brief 必拼入的最重流派包（豪门虐恋追妻.md），消除 --rules-only 空目录漏计盲区。"
@@ -1143,14 +1143,14 @@
         {
           "label": "常规",
           "files": [],
-          "budget": 12600
+          "budget": 12750
         },
         {
           "label": "有对标",
           "files": [
             "skills/story-long-write/references/benchmark-recall.md"
           ],
-          "budget": 14300
+          "budget": 14450
         }
       ],
       "why": "2026-11-27：补算运行时 build_architect_brief 必拼入的最重流派包（豪门虐恋追妻.md），账面与真实上下文一致。"
@@ -1177,14 +1177,14 @@
         {
           "label": "首批含前 3 章（最重的包）",
           "files": [],
-          "budget": 14400
+          "budget": 14600
         },
         {
           "label": "有对标",
           "files": [
             "skills/story-long-write/references/benchmark-recall.md"
           ],
-          "budget": 16100
+          "budget": 16300
         }
       ],
       "why": "2026-11-27：补算运行时 build_architect_brief 必拼入的最重流派包（豪门虐恋追妻.md），账面与真实上下文一致。"
@@ -1203,7 +1203,7 @@
             "skills/story-setup/references/agent-references/genre-readers.md",
             "skills/story-setup/references/agent-references/genre-styles/豪门虐恋追妻.md"
           ],
-          "budget": 19950
+          "budget": 20200
         },
         {
           "label": "长篇细纲与结构审查",
@@ -1212,7 +1212,7 @@
             "skills/story-setup/references/agent-references/agent-quality.md",
             "skills/story-setup/references/agent-references/long-quality.md"
           ],
-          "budget": 12750
+          "budget": 12900
         },
         {
           "label": "短篇审查（short profile）",
@@ -1237,7 +1237,7 @@
             "skills/story-setup/references/agent-references/flow-drafting.md#正文笔法与竖屏网感",
             "skills/story-setup/references/agent-references/genre-styles/豪门虐恋追妻.md"
           ],
-          "budget": 14450
+          "budget": 14550
         },
         {
           "label": "短篇正文",
@@ -1260,7 +1260,7 @@
           "files": [
             "skills/story-setup/references/agent-references/flow-opening-plan.md"
           ],
-          "budget": 7600
+          "budget": 8050
         },
         {
           "label": "对话与审查（短篇含卖点保护）",

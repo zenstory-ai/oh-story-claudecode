@@ -242,9 +242,9 @@ describe("check-degeneration.js", () => {
     const csMeta = runDetector(["--json", chuanshu]).json().findings.filter((f) => f.type === "meta-leak");
     assert.equal(csMeta.length, 0, `穿书语境应豁免男主/女主/读者/第X章: ${JSON.stringify(csMeta)}`);
 
-    // 女主播/三天前文创部 等复合词与跨词边界绝不误报
+    // 女主播/男主播/三天前文创部 等复合词与跨词边界绝不误报
     const boundaries = writeFixture("meta-word-boundaries.md", [
-      "女主播把话筒推远，女主持和女主唱紧跟着上台。",
+      "女主播把话筒推远，男主播、女主持和男主唱紧跟着上台，男主厨在后台端菜。",
       "三天前文创部绕过风控，把此前文件和目前文物清单一起递了上去。",
     ]);
     const bMeta = runDetector(["--json", boundaries]).json().findings.filter((f) => f.type === "meta-leak");
