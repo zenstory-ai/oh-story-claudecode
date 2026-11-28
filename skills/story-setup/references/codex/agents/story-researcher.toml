@@ -69,10 +69,10 @@ CDP 可打开实际页面提取正文，搜索摘要用于定位来源；下方�
 node -e "require('http').get('http://127.0.0.1:'+process.argv[1]+'/json/version',{timeout:3000},r=>console.log(r.statusCode===200?'CDP_AVAILABLE':'CDP_UNAVAILABLE')).on('timeout',function(){this.destroy()}).on('error',()=>console.log('CDP_UNAVAILABLE'))" {cdp_port}
 ```
 
-- `CDP_AVAILABLE` → 使用 CDP 主链路
-- `CDP_UNAVAILABLE` → 不自己启动或重启浏览器（会关掉作者正在用的 Chrome，须作者同意）；直接降级到 WebSearch/webReader
+- `CDP_AVAILABLE` → 优先用 CDP 搜索
+- `CDP_UNAVAILABLE` → 不自己启动或重启浏览器（会关掉作者正在用的 Chrome，须作者同意）；直接改用 WebSearch/webReader
 
-### 第二步：CDP 研究（主链路）
+### 第二步：CDP 搜索
 
 #### 构建搜索词
 
@@ -140,10 +140,10 @@ CDP 不可用且宿主实际提供 WebSearch/webReader 时使用；当前工具�
 2. 从搜索结果中选择权威来源
 3. webReader 读取完整页面内容
 4. 至少读取 2 个不同域名的页面
-5. 输出文件中标注 "工具路径：WebSearch 兜底"，置信度上限为 medium
+5. 返回 JSON 时把置信度上限记为 medium
 ```
 
-#### 全链路不可用时的降级
+#### 两条途径均不可用时
 
 如果 CDP 和 WebSearch 均不可用（如 WebSearch 配额耗尽、webReader 返回错误）：
 1. 返回 `status: "failed"`，在 `gaps` 中说明失败原因；浏览器调试端口没开时写 `cdp_unavailable`，由主会话征得作者同意后启动浏览器再派你，或主会话自己检索
@@ -196,11 +196,6 @@ CDP 不可用且宿主实际提供 WebSearch/webReader 时使用；当前工具�
 
 ## 关键事实提炼
 {提炼 3-5 个最实用的写作素材点}
-
-## 工具路径
-- 搜索引擎：{google | bing | websearch}
-- CDP 使用：{是 | 否}
-- 独立来源数：{N}
 ```
 
 ---

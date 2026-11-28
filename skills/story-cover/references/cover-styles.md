@@ -6,7 +6,7 @@
 
 | 平台 | 特点 | 关键词串 |
 |:-----|:-----|:---------|
-| 番茄 | 高饱和对比，主体60%+，金/红/白粗体发光 | `vibrant saturated colors, bold high-contrast design, clear focal subject, mass-market cover` |
+| 番茄 | 高饱和对比，大主体居中突出，金/红/白粗体发光 | `vibrant saturated colors, bold high-contrast design, clear focal subject, mass-market cover` |
 | 起点 | 写实插画电影感，毛笔楷体 | `refined cinematic illustration, detailed epic atmosphere, mature quality` |
 | 晋江 | 粉紫浅蓝柔调，花瓣光斑，行书/圆体 | `dreamy soft pastel aesthetic, elegant romantic, flower petals and bokeh` |
 | 知乎盐言 | 冷暗极简留白，场景/物象，无衬线 | `minimalist literary style, clean negative space, moody indie film poster` |

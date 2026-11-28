@@ -25,7 +25,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 由正文路径定书目录与篇幅：单个 `正文.md` 为短篇，`正文/` 下逐章文件为长篇（优先作者/项目明确说明）。短篇必读 [references/short-deslop.md](references/short-deslop.md)，其规则覆盖表优先于通用默认值。
 
-读取 [references/deslop-guide.md](references/deslop-guide.md)（含表达/用笔/故事三层方法、deslop-guide.md「按检测类别或问题限定范围」与 28 类脚本信号索引）；需核对具体词条时再查 [references/banned-words.md](references/banned-words.md)。通读本次正文并按需查相关前文/已定设计，不整读无关全书；资料缺失标明未知。多章时逐章跑完 Phase 1–4 再进下一章。
+读取 [references/deslop-guide.md](references/deslop-guide.md)（含表达/用笔/故事三层方法、deslop-guide.md「按检测类别或问题限定范围」与 29 类脚本信号索引）；需核对具体词条时再查 [references/banned-words.md](references/banned-words.md)。通读本次正文并按需查相关前文/已定设计，不整读无关全书；资料缺失标明未知。多章时逐章跑完 Phase 1–4 再进下一章。
 
 本地正文先跑确定性预检（从本 skill 根执行，正文用绝对路径；`--mode=auto` 对 `正文.md` 自动走 short 模式，非 `正文.md` 的短篇文件传 `--mode=short`）：
 

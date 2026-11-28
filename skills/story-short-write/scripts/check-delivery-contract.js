@@ -375,9 +375,14 @@ function countSections(text, projectDir = null) {
   const bodyLines = collectBodyLines(cleanLines, markers, lead)
 
   const sections = markers.map((entry, index) => {
+    const start = entry.line
     const end = index + 1 < markers.length ? markers[index + 1].line - 1 : cleanLines.length
-    const chars = visibleChars(cleanLines.slice(entry.line, end).join('\n'))
-    return { section: index + 1, marker: entry.text, chars }
+    const chars = visibleChars(cleanLines.slice(start, end).join('\n'))
+    const secBody = bodyLines.filter((b) => b.index >= start && b.index < end)
+    const secLines = secBody.length
+    const secBodyChars = secBody.reduce((sum, b) => sum + visibleChars(b.line), 0)
+    const avgChars = secLines > 0 ? Number((secBodyChars / secLines).toFixed(1)) : 0
+    return { section: index + 1, marker: entry.text, chars, lines: secLines, avg_chars: avgChars }
   })
 
   const paraLengths = bodyLines.map(({ line }) => visibleChars(line)).filter((len) => len > 0)
