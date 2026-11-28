@@ -45,7 +45,7 @@ node {skill 根}/scripts/storyctl.js chapter accept-current-length --project {�
 
 - **`chapter check`**：`ready`（exit 0）/ `review_required`（exit 0，有风格复核项）/ `needs_decision`（exit 0，字数出带，超字附净删区间）/ `blocked`（exit 1，退化或硬伤）/ `invalid`（exit 1）/ `tool_unavailable`（exit 3）。
 - **`chapter commit`**：有未确认 `review_required` 报 `REVIEW_ACK_REQUIRED`，改净或附 `--ack <id>:<理由>` / `--ack-all <理由>`；带外字数可 `--ack length:<理由>` 或走 `accept-current-length`（低于目标一半报 `BELOW_ACCEPT_FLOOR`，仅作者坚持加 `--force`）。
-- **`check` 漂移**：手改派生视图默认 exit 0 报 `drift_warnings`（问作者 `mode=revision` 吸回还是按 JSON 重建），`--strict` 才 exit 2。遇 `chapter delta N already exists with different content` 时删掉手写逐章记录再重跑。
+- **`check` 漂移**：手改派生视图默认 exit 0 报 `drift_warnings`（微调已提交章正文后跑 `draft --force` 走 `mode=revision` 再 commit 即消 `body_sha256` 漂移），`--strict` 才 exit 2。遇 `chapter delta N already exists with different content` 时删掉手写逐章记录再重跑。
 
 ## 四、逐章事务 JSON 与约束
 
