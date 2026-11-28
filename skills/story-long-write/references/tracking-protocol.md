@@ -74,6 +74,6 @@ node {skill 根}/scripts/storyctl.js chapter accept-current-length --project {�
 
 - `draft` 预填 `expected_state_revision` 并导出快照到 `work/第NNN章/snapshots/`；`append` 填 `delta` 与变化快照，`revision` 在预填记录上修订（禁交 `retired_characters`）。
 - `context`：`init` 收 6 项；`commit` 收前 4 项（`recent_chapters`/`next_chapter_commitments` 脚本自算，手填 exit 2）。
-- `character_snapshots` 角色须同见 `character_changes`；`active_character_names` 仅列已有快照者（≤20）。移除或改写旧约束/风险写 `delta.retired_context_items: ["旧原句"]`，退场写 `delta.retired_characters: ["角色名"]`（仅 `append`，禁同笔更新快照）。
+- `character_snapshots` 角色须同见 `character_changes`（单句过场配角可免；单章 `delta` 2048–3584B 为非阻断提醒）；`active_character_names` 仅列已有快照者（≤20）。删改约束写 `delta.retired_context_items`，退场写 `delta.retired_characters`（仅 `append`，禁同笔改快照）。
 - `timeline_events`：`reveal_status` 取 `未揭示|部分揭示|已揭示`，未揭示时 `reveal_chapter` 须为 `null`。单视图上限 65536B（`上下文.md` 7 栏：`当前位置/长期约束/核心角色状态/活跃伏笔/近三章速记/下一章承诺/连贯性风险`）。
 - **长跑防漂**：① 核心角色年龄/职级锚进 `identity`，易混人名称谓进 `continuity_risks`；② 跨卷或每 50 章盘点 `long_term_constraints`（留随迁老配角 ≥2、未结旧账 ≥1、当前上限），超 40 章未出场记进 `continuity_risks` 或退场。
