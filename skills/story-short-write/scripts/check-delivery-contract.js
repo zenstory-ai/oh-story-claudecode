@@ -23,7 +23,7 @@ const fs = require('fs')
 const path = require('path')
 
 const MARKERS = [
-  { style: 'numeric-heading', pattern: /^###\s*\d+\.$/ },
+  { style: 'numeric-heading', pattern: /^###\s*\d+\.?$/ },
   { style: 'chapter-heading', pattern: /^###\s*第[一二三四五六七八九十百千万两〇零0-9]+章(?:[\s\u3000].{1,30})?$/ },
   { style: 'zhihu-numeric', pattern: /^\d+\.$/ },
 ]

@@ -553,6 +553,14 @@ try {
   assert.strictEqual(spacelessCounts.lead_chars, spacedCounts.lead_chars)
   assert.strictEqual(spacelessCounts.body_chars, spacedCounts.body_chars)
 
+  // Dotless numeric-heading markers (###1 / ###2, common in real Heiyan commercial shorts) must match measure-short-metrics.js
+  const dotlessDir = writeCase('dotless-numeric-markers', `###1\n${sectionChunk(1000)}\n###2\n${sectionChunk(1000)}\n`)
+  const dotlessCounts = JSON.parse(spawnSync(process.execPath, [verifier, '--counts', '--json', dotlessDir], { cwd: repoRoot, encoding: 'utf8' }).stdout)
+  const dotlessMetrics = JSON.parse(spawnSync(process.execPath, [metricsScript, '--json', path.join(dotlessDir, '正文.md')], { cwd: repoRoot, encoding: 'utf8' }).stdout)
+  assert.strictEqual(dotlessCounts.sections.length, 2)
+  assert.strictEqual(dotlessCounts.sections.length, dotlessMetrics.sections.length)
+  assert.strictEqual(dotlessCounts.body_chars, dotlessMetrics.sections.reduce((s, x) => s + x.chars, 0))
+
   const invalid = spawnSync(process.execPath, [verifier, '--json', '--min-chars', '8000'], {
     cwd: repoRoot,
     encoding: 'utf8',
