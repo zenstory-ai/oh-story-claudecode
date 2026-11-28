@@ -152,7 +152,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ## 5. Phase 4：快检、短篇去味与交付
 
-1. **网感与一致快检**：自查首百字冲突、无整块长段、导语兑现、无间接引语与前 3 节纯回忆，并做**前后一致检查**（可派 `consistency-checker`，否则自查动机、时间线、伏笔、人名金额日期加减守恒及警方/司法与物理常理零穿帮）。
+1. **网感与一致快检**：自查首百字冲突、无整块长段、导语兑现、无间接引语与前 3 节纯回忆，并做**前后一致检查**（可派 `consistency-checker`，否则自查动机、时间线、伏笔、人名出身与金额日期守恒、**道具经手链零瞬移、存量贷款禁单方发函撤保〔改到期拒续/撤未放款授信/实控人变更违约条款〕、工业量产与经侦法拍留足真实跨度、大员须前埋伏笔禁天降**）。
 2. **短篇去味**：只砍①公文/长段说教腔②鸡汤与电影旁白抒情尾③没用的材质穿搭环境摆设与油腻词（空气发烫/声音又冷又哑）④纯动作碎句与复述⑤工程词。**放行**直写情绪反应（`脸色一变/心口一沉`）、剧透、围观、吐槽与自然 `！`/`？`。`.deslop-whitelist`（一行一句，上行 `# 来源：…`）**只记作者明确写法，禁自行放行**。
 3. **短篇模式验收**（脚本位于 `{skill 根}/scripts/`）：依次跑 `node …/normalize-punctuation.js --mode=short {短篇目录}/正文.md`（盐言混用加 `--quote-mode=yan`，其余加 `--quote-mode=curly`）、`node …/check-ai-patterns.js --mode=short --check --fail-on=review_required {短篇目录}/正文.md`、`node …/check-degeneration.js --check --fail-on=blocking {短篇目录}/正文.md`、`node …/check-outline-copy.js --outline {短篇目录}/小节大纲.md {短篇目录}/正文.md`（刻意前后呼应、要原样重复的句子记在大纲末 `原样出现的原话：`，逐行缩进写）与 `node …/check-delivery-contract.js --json --min-chars {MIN} --max-chars {MAX} --sections {N} {短篇目录}`。硬错（exit 1）最多修 2 轮，仍不过停告作者；exit 2 或未跑成不得声称通过；正文禁留 `<!-- 自检 -->`。
 4. **白话交付**：只报字数、节数、亮点与下步，禁提脚本名与编号。

@@ -806,7 +806,7 @@ function plainReport(result) {
     const span = `${band.min} 到 ${band.max} 字`;
     const lineSummary =
       typeof length.line_count === 'number' && length.line_count > 0
-        ? `（共 ${length.line_count} 行，均 ${length.mean_line_chars} 字/行，超 35 字长行 ${length.gt35_line_count} 行${length.gt35_line_count > 15 ? '，长行偏多可按第 2 个逗号断行' : ''}）`
+        ? `（共 ${length.line_count} 行，均 ${length.mean_line_chars} 字/行${length.mean_line_chars > 55 ? '，段落偏厚注意拆分文字墙' : length.line_count > 115 && length.mean_line_chars < 24 ? '，碎行偏密注意长短段错落呼吸' : ''}）`
         : '';
     if (length.status === 'under') {
       lines.push(
