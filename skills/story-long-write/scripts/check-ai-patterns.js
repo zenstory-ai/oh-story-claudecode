@@ -71,8 +71,8 @@ const EM_DASH_ADVISORY_MIN_HITS = 6;
 const EM_DASH_ADVISORY_PER_KILO = 1.5;
 const LONG_EM_DASH_REVIEW_MIN_HITS = 10;
 const LONG_EM_DASH_REVIEW_PER_KILO = 2.5;
-const ONOMATOPOEIA_BEFORE_DASH_RE = /(?:^|[\s，,。！？!?：:；;、—]|[声响一阵])[轰砰咚咔嗡吱嘟哗铮啪叮嘶呼唰呜嗷吼哒嚓啦咯嘎哐咣隆]{1,4}$/;
-const ONOMATOPOEIA_PAIR_BEFORE_DASH_RE = /(?:轰隆隆?|铮铮|咔嚓|咔哒|哗啦|叮咚|嘎吱|哐当|哐啷|咣当|咕噜|嗡嗡|嘶嘶|呼呼|嘟嘟|砰砰|咚咚|啪啪|嗷呜)$/;
+const ONOMATOPOEIA_BEFORE_DASH_RE = /(?:^|[\s，,。！？!?：:；;、—]|[声响一阵])[轰砰咚咔嗡吱嘟哗铮啪叮滴嘶呼唰呜嗷吼哒嚓啦咯嘎哐咣隆]{1,4}$/;
+const ONOMATOPOEIA_PAIR_BEFORE_DASH_RE = /(?:轰隆隆?|铮铮|咔嚓|咔哒|哗啦|叮咚|嘎吱|哐当|哐啷|咣当|咕噜|嗡嗡|嘶嘶|呼呼|嘟嘟|滴滴|滋啦|刺啦|砰砰|咚咚|啪啪|嗷呜)$/;
 const OPEN_TO_CLOSE_QUOTE = { '“': '”', '「': '」', '『': '』' };
 // 短篇套式反应细节门槛：短篇情绪与生理速记频率高于长篇，抬高到 8 处且 3.0/千字。
 const SHORT_STOCK_REACTION_MIN_HITS = 8;
@@ -80,8 +80,8 @@ const SHORT_STOCK_REACTION_PER_KILO = 3.0;
 
 // 微动作复读：「V了下 / V了一下 / 拍了两下 / 松了半圈」式轻量补语在叙述里高密度复现，
 // 容易形成删减过头的电报体指纹。只扫引号外叙述；密度与次数双门槛同时达标才报，
-// 单次出现是正常中文。
-const MICRO_TIC_PATTERN = /了(?:[一两三几半])?[下阵圈道声眼口气会]/g;
+// 单次出现是正常中文。「了口气」（叹/喘/松了口气）计入，「了口」（喝了口茶/咬了口包子）属实义饮食动作不误伤。
+const MICRO_TIC_PATTERN = /了(?:[一两三几半])?(?:口气|[下阵圈道声眼气会])/g;
 const MICRO_TIC_MIN_HITS = 5;
 // 「没A，也没B」「不A，也不B」否定对偶：七猫人类长篇约 0.07 处/千字，模型稿 0.4-1.5 处/千字；
 // 写人物没做什么是英文式节奏，一章 3 处以上报一条提示。
@@ -207,7 +207,7 @@ const LOW_CONNECTIVE_LONG_SENTENCE_CHARS = 25;
 const LOW_CONNECTIVE_LONG_SENTENCE_RATIO = 0.05;
 // 长篇干硬镜头叙述分支（2,450 篇真 9.0+ 长篇标定，误报 0.33%）：纯叙述段偏长（中位 ≥28 字）却同时缺口语连接词（≤5.5/千字）
 // 与自然「的」（≤25.0/千字），即抽干人物内心盘算的剧本报幕体；绝不误伤正常手机竖屏短段（中位 ~23 字）。
-const COLLOQUIAL_CONNECTIVE_PATTERN = /但是|可是|不过|虽然|因为|所以|偏偏|干脆|其实|毕竟|竟然|好在|倒也|却|才|便|正要|已经/g;
+const COLLOQUIAL_CONNECTIVE_PATTERN = /但是|可是|不过|虽然|因为|所以|偏偏|干脆|其实|毕竟|竟然|好在|幸好|倒也|哪知道|省得|免得|结果|反正|关键是|要不然|怪不得|难怪|却|才|便|正要|已经/g;
 const DRY_NARRATION_MIN_CHARS = 400;
 const DRY_NARRATION_MIN_UNIQUE_PARAS = 8;
 const DRY_NARRATION_MAX_CONN_PER_KILO = 5.5;
@@ -218,7 +218,7 @@ const PURE_NARRATION_QUOTE_RE = /[“”「」『』"]/;
 // 闲笔材质/道具/光影贴纸过密（advisory only；2,450 篇真 9.0+ 长篇标定，误报 0.00%）：
 // 仅在 --mode=long 扫描引号外叙述（≥400 字），同时要求命中 ≥3 种不同装饰贴纸、唯一密度 ≥1.8/千字，
 // 且口语连接词 ≤7.0/千字（写专业器物但带活人口语因果的真人类自动放行）。
-const IDLE_PROP_DECORATION_PATTERN = /磨砂|骨瓷|紫檀|红木|黄铜|青漆|红漆(?!封条|官印|火漆)|黑漆|漆面|太师椅|酸枝|花梨|珐琅|青砖|青石板|玻璃幕墙|落地窗|百叶窗|大理石|胡桃木|亚光|鎏金|描金|雕花|算盘珠|水渍|茶渍|烟炱|(?:深灰|藏青|炭黑|烟灰|定制|高定)(?:西装|西服|大衣|羊绒|风衣|旗袍|礼服)|熨得|一丝不苟|袖扣|领带夹|鳄鱼皮|公文包|腕表|表盘|白炽灯|日光灯|吸顶灯|冷白光|暖黄光|咖啡机|嗡鸣|低鸣|空调外机|淅淅沥沥|滴答作响|钟摆|窗霜|瓷盏|茶盏|折扇|油灯/g;
+const IDLE_PROP_DECORATION_PATTERN = /磨砂|骨瓷|紫檀|红木|黄铜|青漆|红漆(?!封条|官印|火漆)|黑漆(?!漆)|漆面|太师椅|酸枝|花梨|珐琅|青砖|青石板|玻璃幕墙|落地窗|百叶窗|大理石|胡桃木|亚光|鎏金|描金|雕花|算盘珠|水渍|茶渍|烟炱|(?:深灰|藏青|炭黑|烟灰|定制|高定)(?:西装|西服|大衣|羊绒|风衣|旗袍|礼服)|熨得|一丝不苟|袖扣|领带夹|鳄鱼皮|公文包|腕表|表盘|白炽灯|日光灯|吸顶灯|冷白光|暖黄光|咖啡机|嗡鸣|低鸣|空调外机|淅淅沥沥|滴答作响|钟摆|窗霜|瓷盏|茶盏|折扇|油灯/g;
 const IDLE_PROP_MIN_CHARS = 400;
 const IDLE_PROP_MIN_UNIQUE = 3;
 const IDLE_PROP_MIN_UNIQUE_PER_KILO = 1.8;
@@ -313,7 +313,7 @@ const REVERSE_NOT_IS_PREV_EXCLUDE = new Set([...COMPACT_EITHER_OR_PREV, '还', '
 // 「他/她/它(们)不知道的是」是全知旁白跳出视角预告后事（banned-words 抽象收束、预告行）；
 // 必须带「的是」，「她不知道该说什么」这类普通叙述不计。
 // 校准：《万疆》20 章排除「正式拉开序幕」2 处报幕句后 0 命中，demo 前 20 章 0 命中。
-const TRAILER_SPOILER_PATTERN = /没人知道|谁也不知道|谁也没想到|[他她它]们?不知道的是|殊不知/g;
+const TRAILER_SPOILER_PATTERN = /没人知道(?!怎么|哪|谁|啥|什么|的)|谁也不知道(?!怎么|哪|谁|啥|什么|的)|谁也没想到|[他她它]们?不知道的是|殊不知/g;
 const TRAILER_CLICHE_PATTERN = /(?:这)?才刚刚开(?:始|头)|正(?:朝着|向着)[^。！？!?\n]{0,24}(?:压|涌|袭|逼)(?:了?过去|了?过来|来)|(?<!正式)拉开(?:序幕|帷幕)|即将(?:开始|来临|降临)/g;
 const TRAILER_ENDING_PATTERN = new RegExp(`${TRAILER_SPOILER_PATTERN.source}|${TRAILER_CLICHE_PATTERN.source}`, 'g');
 const TRAILER_ENDING_WINDOW_CHARS = 250;

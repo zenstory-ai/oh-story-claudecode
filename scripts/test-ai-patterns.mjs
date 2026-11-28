@@ -1885,5 +1885,21 @@ describe("check-ai-patterns.js", () => {
         .findings.filter((f) => f.type === "low-connective-density-tic").length,
       0
     );
+
+    // 13) Round 6 live-combat FP fixes: 黑漆漆, 滴/滋啦——, attributive 没人知道怎么, everyday 喝了口茶/咬了口包子
+    const fR6Fixes = writeFixture("round6-fp-fixes.md", [
+      "门缝里黑漆漆一片，手电光扫过去只照见半截生锈铁门栓。",
+      "他坐下喝了口浓茶，又咬了口凉包子，接着抿了口温水，顺手剥了个橘子咽了口果汁，末了又喝了口热汤。",
+      "仪器突然滴——！滴——！响起来，电线滋啦——！冒出蓝火花，门外刺啦——！一声铁皮擦过护栏。",
+      "今晚零下二十八度，进服务区还得交一枚没人知道怎么弄的灰雾晶芯，这笔账怎么算都亏。",
+    ]);
+    const r6Findings = runDetector(["--mode=long", "--json", fR6Fixes]).json().findings;
+    assert.equal(
+      r6Findings.filter((f) =>
+        ["idle-prop-decoration-tic", "micro-action-tic", "em-dash", "trailer-ending"].includes(f.type)
+      ).length,
+      0,
+      `Round 6 FP fixes failed: ${JSON.stringify(r6Findings)}`
+    );
   });
 });

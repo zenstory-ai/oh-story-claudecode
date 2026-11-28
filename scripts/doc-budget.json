@@ -72,7 +72,7 @@
     },
     {
       "path": "skills/story-long-write/references/flow-drafting.md",
-      "budget": 4550,
+      "budget": 4650,
       "why": "长篇单章与日更调度、正文竖屏网感笔法（合并原 workflow-chapter/workflow-daily/writing-craft/long-format/style-combat-face/dialogue-mastery）。"
     },
     {
@@ -826,14 +826,14 @@
           "files": [
             "skills/story-short-write/references/genre-styles/校园青春暗恋.md"
           ],
-          "budget": 12900
+          "budget": 13000
         },
         {
           "label": "甜宠",
           "files": [
             "skills/story-short-write/references/genre-styles/甜宠.md"
           ],
-          "budget": 12800
+          "budget": 12900
         },
         {
           "label": "男频都市反杀",
@@ -847,28 +847,28 @@
           "files": [
             "skills/story-short-write/references/genre-styles/脑洞设定流.md"
           ],
-          "budget": 12750
+          "budget": 12850
         },
         {
           "label": "追妻火葬场",
           "files": [
             "skills/story-short-write/references/genre-styles/追妻火葬场.md"
           ],
-          "budget": 12800
+          "budget": 12900
         },
         {
           "label": "通用短篇",
           "files": [
             "skills/story-short-write/references/genre-styles/通用短篇.md"
           ],
-          "budget": 11450
+          "budget": 11600
         },
         {
           "label": "有对标",
           "files": [
             "skills/story-short-write/references/benchmark-recall.md"
           ],
-          "budget": 8600
+          "budget": 8700
         },
         {
           "label": "交给写手（写正文或去味）",
@@ -879,7 +879,7 @@
         }
       ],
       "stacking": {
-        "budget": 15250,
+        "budget": 15350,
         "slots": [
           [
             "世情打脸",
@@ -1009,32 +1009,32 @@
         {
           "label": "常规",
           "files": [],
-          "budget": 15300
+          "budget": 15500
         },
         {
           "label": "对标召回",
           "files": [
             "skills/story-long-write/references/benchmark-recall.md"
           ],
-          "budget": 17000
+          "budget": 17200
         },
         {
           "label": "派写手代写",
           "files": [
             "skills/story-long-write/references/agent-calls.md"
           ],
-          "budget": 17600
+          "budget": 17700
         },
         {
           "label": "首章初始化或追踪报错",
           "files": [
             "skills/story-long-write/references/tracking-protocol.md"
           ],
-          "budget": 19400
+          "budget": 19600
         }
       ],
       "stacking": {
-        "budget": 23400,
+        "budget": 23500,
         "slots": [
           [
             "对标召回"
@@ -1061,25 +1061,25 @@
         {
           "label": "常规",
           "files": [],
-          "budget": 16350
+          "budget": 16550
         },
         {
           "label": "派写手改写",
           "files": [
             "skills/story-long-write/references/agent-calls.md"
           ],
-          "budget": 18600
+          "budget": 18800
         },
         {
           "label": "追踪报错",
           "files": [
             "skills/story-long-write/references/tracking-protocol.md"
           ],
-          "budget": 20450
+          "budget": 20650
         }
       ],
       "stacking": {
-        "budget": 22700,
+        "budget": 22900,
         "slots": [
           [
             "派写手改写"
@@ -1237,7 +1237,7 @@
             "skills/story-setup/references/agent-references/flow-drafting.md#正文笔法与竖屏网感",
             "skills/story-setup/references/agent-references/genre-styles/豪门虐恋追妻.md"
           ],
-          "budget": 14550
+          "budget": 14700
         },
         {
           "label": "短篇正文",
@@ -1268,7 +1268,7 @@
             "skills/story-setup/references/agent-references/flow-drafting.md#正文笔法与竖屏网感",
             "skills/story-setup/references/agent-references/short-deslop.md"
           ],
-          "budget": 6000
+          "budget": 6200
         }
       ],
       "why": "2026-11-26：补齐第 6 个专业助手预算监控。"
