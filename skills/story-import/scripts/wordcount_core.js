@@ -575,7 +575,7 @@ function readProjectChapter(project, chapter, authorRange = null) {
   };
 }
 
-function buildProjectWordcountRecord(project, chapter, { resolution, authorRange = null }) {
+function buildProjectWordcountRecord(project, chapter, { resolution, authorRange = null } = {}) {
   requireCondition(RESOLUTIONS.has(resolution), `unsupported wordcount resolution: ${resolution}`);
   const { bodyPath, target, authorRange: author } = readProjectChapter(project, chapter, authorRange);
   let rawBytes;

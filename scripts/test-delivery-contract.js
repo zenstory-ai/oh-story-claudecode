@@ -503,6 +503,26 @@ try {
     `paywall parity mismatch: delivery="${delivPwCheck.evidence}" vs metrics=${parityMetrics.paywall.cumulative_chars}/${parityMetrics.total_chars} (${expectedPct})`
   )
 
+  // Standalone onomatopoeia lines (e.g. 砰——！ / 轰——！) must not count as narration em-dashes
+  const onoBody = [
+    DEFAULT_LEAD,
+    '###1.',
+    '砰——！',
+    sectionChunk(1000),
+    '###2.',
+    '咚——！',
+    sectionChunk(1000),
+    '###3.',
+    '轰——！',
+    sectionChunk(1000),
+    '###4.',
+    sectionChunk(1000),
+  ].join('\n') + '\n'
+  const onoRes = run(writeCase('short-onomatopoeia-em-dash', onoBody), ['3500', '5500', '4'], undefined, false, ['--strict'])
+  assert.strictEqual(onoRes.status, 0, onoRes.stdout + onoRes.stderr)
+  const onoCheck = onoRes.report.checks.find((c) => c.id === 'delivery.short-em-dash')
+  assert.match(onoCheck.evidence, /0 处/)
+
   const invalid = spawnSync(process.execPath, [verifier, '--json', '--min-chars', '8000'], {
     cwd: repoRoot,
     encoding: 'utf8',
