@@ -1902,5 +1902,25 @@ describe("check-ai-patterns.js", () => {
       0,
       `Round 6/8 FP fixes failed: ${JSON.stringify(r6Findings)}`
     );
+
+    // 14) Round 14B live-combat FP fix: natural-breathing narrative using spoken connectives (只是/倒是/反倒/索性/压根/硬是/只好) without textbook 因为/毕竟/所以 must NOT trigger low-connective-density-tic
+    const fNaturalSpoken = writeFixture("round14b-natural-spoken-breathing.md", [
+      "灵堂门外挤着七八个看热闹的旁支亲戚，只是没人敢先迈过门槛半步，倒是二房那个管家先探出脑袋张望。",
+      "她压根没理会门外议论，索性把收据折成方块揣进兜里，反倒顺手拎起竹竿把门帘挑开一角。",
+      "谢明轩原本算准她今早不敢进门，谁知她愣是踩着十点整撞开大门，只好硬着头皮给保镖使眼色。",
+      "厅里两位叔伯本来还想装聋作哑，哪料灵柩盖板真掀了半尺，终究按捺不住站起身往后退开两步。",
+      "她倒是沉得住气，哪怕四周目光全压过来也压根不退，硬是把尾款单拍在供桌角上，只等对方先松口。",
+      "管事原本想拖到午时再报丧，谁料老宅门禁被人从里头反锁，只好压低声催促律师先拿印章出来。",
+      "方佩兰本来藏在屏风后头听动静，反倒被满屋子檀香呛出声咳嗽，索性借口去倒茶悄悄往偏厅绕。",
+      "众人原本还以为这单白事能悄悄压下去，谁知门外车灯一道接一道打进前院，愣是把整条巷子照亮。",
+      "她压根懒得再跟这帮人绕弯子，只是伸手扣住桌沿敲了两下，倒要看看今天到底谁先签字结账。",
+    ]);
+    assert.equal(
+      runDetector(["--mode=long", "--json", fNaturalSpoken])
+        .json()
+        .findings.filter((f) => f.type === "low-connective-density-tic").length,
+      0,
+      "natural spoken breathing without 因为/毕竟/所以 must not trigger low-connective-density-tic"
+    );
   });
 });

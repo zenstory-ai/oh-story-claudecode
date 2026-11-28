@@ -53,7 +53,7 @@ function markerFor(line) {
 }
 
 function isStructuralNonProse(trimmed) {
-  return /^#{1,6}\s/.test(trimmed) || /^-{3,}$/.test(trimmed) || /^[*_]{3,}$/.test(trimmed)
+  return /^#{1,6}\s/.test(trimmed) || LEAD_HEADING_RE.test(trimmed) || /^-{3,}$/.test(trimmed) || /^[*_]{3,}$/.test(trimmed)
 }
 
 function stripHtmlCommentsFromLines(rawLines) {
@@ -169,14 +169,17 @@ function detectLead(cleanLines, markers) {
     const trimmed = cleanLines[i].trim()
     if (!trimmed || isStructuralNonProse(trimmed)) continue
     if (seenProse && LEAD_SEP_RE.test(trimmed)) {
-      return {
-        placement: 'ch1-top-embedded',
-        chars: embeddedChars,
-        separator: trimmed,
-        separatorLine: i + 1,
-        leadText: embeddedLines.join('\n'),
-        sec1StartIdx: i + 1,
+      if (embeddedChars > 0 && embeddedChars <= 600) {
+        return {
+          placement: 'ch1-top-embedded',
+          chars: embeddedChars,
+          separator: trimmed,
+          separatorLine: i + 1,
+          leadText: embeddedLines.join('\n'),
+          sec1StartIdx: i + 1,
+        }
       }
+      break
     }
     if (DIVIDER_LINE_RE.test(trimmed)) continue
     seenProse = true
@@ -380,12 +383,11 @@ function countSections(text, projectDir = null) {
   const sections = markers.map((entry, index) => {
     const start = entry.line
     const end = index + 1 < markers.length ? markers[index + 1].line - 1 : cleanLines.length
-    const chars = visibleChars(cleanLines.slice(start, end).join('\n'))
     const secBody = bodyLines.filter((b) => b.index >= start && b.index < end)
     const secLines = secBody.length
     const secBodyChars = secBody.reduce((sum, b) => sum + visibleChars(b.line), 0)
     const avgChars = secLines > 0 ? Number((secBodyChars / secLines).toFixed(1)) : 0
-    return { section: index + 1, marker: entry.text, chars, lines: secLines, avg_chars: avgChars }
+    return { section: index + 1, marker: entry.text, chars: secBodyChars, lines: secLines, avg_chars: avgChars }
   })
 
   const paraLengths = bodyLines.map(({ line }) => visibleChars(line)).filter((len) => len > 0)
@@ -502,12 +504,11 @@ function verify(projectDir, contract, options = {}) {
   const sectionCounts = markers.map((entry, index) => {
     const start = entry.line
     const end = index + 1 < markers.length ? markers[index + 1].line - 1 : cleanLines.length
-    const count = visibleChars(cleanLines.slice(start, end).join('\n'))
     const secBody = bodyLines.filter((b) => b.index >= start && b.index < end)
     const secLines = secBody.length
     const secBodyChars = secBody.reduce((sum, b) => sum + visibleChars(b.line), 0)
     const avgChars = secLines > 0 ? Number((secBodyChars / secLines).toFixed(1)) : 0
-    return { section: index + 1, marker: entry.text, chars: count, lines: secLines, avg_chars: avgChars }
+    return { section: index + 1, marker: entry.text, chars: secBodyChars, lines: secLines, avg_chars: avgChars }
   })
 
   checks.push(makeCheck(

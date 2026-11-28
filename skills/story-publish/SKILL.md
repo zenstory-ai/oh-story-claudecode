@@ -75,7 +75,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 ## 封面
 
 - 模式：<直接生成/仅提示词/暂缓；未选时留空>
-- 状态：<提示词与图片的状态分开写>
+- 状态：<分开写，如「提示词已生成，图片未生成」，勿写「暂无」>
 - 提示词：<完整提示词原文>
 - 图片：<已保存的图片路径>
 
@@ -102,7 +102,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 ## 来源说明
 ```
 
-长提示词可以放进代码块。不列完整候选清单，除非作者要。
+长提示词可放进代码块（紧接 `- 提示词：` 下一行）。不列完整候选清单，除非作者要。
 
 ## 格式检查
 

@@ -42,7 +42,7 @@ node scripts/measure-short-metrics.js --json 拆文库/{书名}/原文/{原文�
 
 ### Step 3：题材识别
 
-读 [references/analysis-short-genres.md](references/analysis-short-genres.md)，按「题材路由」表结合全文证据定主类型，`genre_detected` 取表内类型名，扫不到写「通用短篇」。题材只作观察标尺，不套长篇卷纲或黄金三章模型。
+读 [references/analysis-short-genres.md](references/analysis-short-genres.md)，按「题材路由」表结合全文证据定主类型，`genre_detected` 取表内类型名，扫不到写「通用短篇」。题材只作观察参考，不套长篇卷纲或黄金三章模型。
 
 ### Step 4：续跑检查与初始化
 
@@ -71,7 +71,7 @@ node scripts/measure-short-metrics.js --json 拆文库/{书名}/原文/{原文�
 
 ## Stage 2–6：按时刻串行拆解
 
-输出固定落盘 `拆文库/{书名}/`（`原文/`、`拆文报告.md`、`情节节点.md`、`写作手法.md`、`_meta.json`，下游 `story-short-write` 按固定文件名读取，不可改名）。管道按 `2 → 3 → 4 → 5 → 6` 严格串行，分两个时刻按需读取参考；标尺只观察实况，不跨技能读长篇资料。
+输出固定落盘 `拆文库/{书名}/`（`原文/`、`拆文报告.md`、`情节节点.md`、`写作手法.md`、`_meta.json`，下游 `story-short-write` 按固定文件名读取，不可改名）。管道按 `2 → 3 → 4 → 5 → 6` 严格串行，分两个时刻按需读取参考；题材参考只观察实况，不跨技能读长篇资料。
 
 | 时刻 | 必读参考 | 按条件加读 | 阶段交接 |
 |---|---|---|---|

@@ -287,11 +287,14 @@ function isSingleSentencePara(line) {
   return !matches || matches.length === 0
 }
 
+const ONOMATOPOEIA_EM_DASH_RE = /^[砰咚轰哐啪嘭呼呜嗡吱嘎叮铛滋哗噼啪哗啦咔嚓]+——[！？。]?$/
+
 function countNarrationEmDashes(proseLines) {
   const speechRe = /(?:“[^”\n]*”|「[^」\n]*」|『[^』\n]*』|"[^"\n]*"|【[^】\n]*】)/g
   let count = 0
   for (const line of proseLines) {
     if (DIVIDER_LINE_RE.test(line)) continue
+    if (ONOMATOPOEIA_EM_DASH_RE.test(line.trim())) continue
     const narration = line.replace(speechRe, '')
     const matches = narration.match(/(?<!—)——(?!—)/g)
     if (matches) count += matches.length

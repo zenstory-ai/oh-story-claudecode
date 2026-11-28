@@ -28,7 +28,7 @@ metadata: {"openclaw":{"requires":{"env":["GPT_IMAGE_API_KEY"],"bins":["curl","j
 
 已有或调用方传入的已确认字段不再问；笔名没有明确提供时才问。没有书目录或缺项时，用宿主可用的提问方式一次问齐缺少的书名、笔名、目标平台。
 
-> **书名和笔名是封面必需信息**：缺任一时先请作者补全，不得编造或留空。
+> **书名和笔名必填**：缺任一时先问作者，不编造或留空（`story-publish` 仅提示词草案可用 `{笔名}` 占位并列待确认，进 Step 4 生图前补齐）。
 
 选填：参考图 `REF_IMAGE`（本地路径或 URL）、风格偏好；参考图的用法见 Step 4。
 
@@ -64,16 +64,12 @@ Title text '{书名}' at top center in [书名字体].
 Author name '{笔名}' at bottom center in [笔名字体].
 [题材风格标签]. [构图关键词]. [人物描述]. [背景描述].
 [色彩指令]. [光效指令].
-Professional book cover, high detail digital painting, portrait [平台比例：如 3:4 / 5:7 / 2:3] ratio, keep title and author name inside the central safe area away from edges (inner ~85%), no watermark
+Professional book cover, high detail digital painting, portrait [平台比例：如 3:4 / 5:7 / 2:3] ratio, keep title and author name inside the central safe area away from edges (inner ~85%), no watermark, no plastic AI sheen, no cheap neon flare
 ```
 
 仅提示词模式在这里交付 1-3 个完整提示词方案后结束；还没确认的画面细节写成可选方向，不当成小说里的事实。
 
-写法要点：
-- 人物描述写清服饰、姿态、发型、表情、道具，不要只写 `a man`；
-- 背景分三层：前景人物或道具，中景场景，远景氛围；
-- 光效写清光源方向和颜色，如 `dramatic golden light from above`；
-- 用 `digital painting style`，不用 `photo`，避免真人照片感。
+写法要点：人物写清服饰、姿态、发型、表情、道具（勿只写 `a man`）；背景分前景/中景/远景三层；光效写清方向和颜色；用 `digital painting style` 不用 `photo`。
 
 ### Step 4：选方案并生成
 

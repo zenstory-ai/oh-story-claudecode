@@ -207,7 +207,7 @@ const LOW_CONNECTIVE_LONG_SENTENCE_CHARS = 25;
 const LOW_CONNECTIVE_LONG_SENTENCE_RATIO = 0.05;
 // 长篇干硬镜头叙述分支（2,450 篇真 9.0+ 长篇标定，误报 0.33%）：纯叙述段偏长（中位 ≥28 字）却同时缺口语连接词（≤5.5/千字）
 // 与自然「的」（≤25.0/千字），即抽干人物内心盘算的剧本报幕体；绝不误伤正常手机竖屏短段（中位 ~23 字）。
-const COLLOQUIAL_CONNECTIVE_PATTERN = /但是|可是|不过|虽然|因为|所以|偏偏|干脆|其实|毕竟|竟然|好在|幸好|倒也|哪知道|省得|免得|结果|反正|关键是|要不然|怪不得|难怪|却|才|便|正要|已经/g;
+const COLLOQUIAL_CONNECTIVE_PATTERN = /但是|可是|不过|虽然|因为|所以|偏偏|干脆|其实|毕竟|竟然|居然|好在|幸好|倒也|哪知道|省得|免得|结果|反正|关键是|要不然|怪不得|难怪|只是|倒是|反倒|反而|索性|压根|谁知|谁料|原本|本来|终究|总归|哪怕|就算|只好|只得|愣是|硬是|却|才|便|正要|已经/g;
 const DRY_NARRATION_MIN_CHARS = 400;
 const DRY_NARRATION_MIN_UNIQUE_PARAS = 8;
 const DRY_NARRATION_MAX_CONN_PER_KILO = 5.5;

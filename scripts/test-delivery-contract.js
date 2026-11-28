@@ -523,6 +523,36 @@ try {
   const onoCheck = onoRes.report.checks.find((c) => c.id === 'delivery.short-em-dash')
   assert.match(onoCheck.evidence, /0 处/)
 
+  // Parity: measure-short-metrics.js must also exempt standalone onomatopoeia em-dashes
+  const onoMetrics = JSON.parse(spawnSync(process.execPath, [metricsScript, '--json', path.join(tmpRoot, 'short-onomatopoeia-em-dash', '正文.md')], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  }).stdout)
+  assert.strictEqual(onoMetrics.punctuation.em_dash_narration_count, 0)
+
+  // Parity: embedded-lead section[0].chars excludes …… separator (matching measure-short-metrics.js & body_chars)
+  const embParityBody = [
+    '###第1章 开场',
+    DEFAULT_LEAD,
+    '……',
+    sectionChunk(1000),
+    '###第2章 续接',
+    sectionChunk(1000),
+  ].join('\n') + '\n'
+  const embDir = writeCase('embedded-sec1-parity', embParityBody)
+  const embCounts = JSON.parse(spawnSync(process.execPath, [verifier, '--counts', '--json', embDir], { cwd: repoRoot, encoding: 'utf8' }).stdout)
+  const embMetrics = JSON.parse(spawnSync(process.execPath, [metricsScript, '--json', path.join(embDir, '正文.md')], { cwd: repoRoot, encoding: 'utf8' }).stdout)
+  assert.strictEqual(embCounts.sections[0].chars, embMetrics.sections[0].chars)
+  assert.strictEqual(embCounts.sections.reduce((s, x) => s + x.chars, 0), embCounts.body_chars)
+
+  // Spaceless ###导语 heading must be treated as structural non-prose (excluded from lead_chars & body_chars)
+  const spacelessLeadDir = writeCase('spaceless-lead-heading', `###导语\n${DEFAULT_LEAD}\n###1.\n${sectionChunk(1000)}\n###2.\n${sectionChunk(1000)}\n`)
+  const spacedLeadDir = writeCase('spaced-lead-heading', `### 导语\n${DEFAULT_LEAD}\n###1.\n${sectionChunk(1000)}\n###2.\n${sectionChunk(1000)}\n`)
+  const spacelessCounts = JSON.parse(spawnSync(process.execPath, [verifier, '--counts', '--json', spacelessLeadDir], { cwd: repoRoot, encoding: 'utf8' }).stdout)
+  const spacedCounts = JSON.parse(spawnSync(process.execPath, [verifier, '--counts', '--json', spacedLeadDir], { cwd: repoRoot, encoding: 'utf8' }).stdout)
+  assert.strictEqual(spacelessCounts.lead_chars, spacedCounts.lead_chars)
+  assert.strictEqual(spacelessCounts.body_chars, spacedCounts.body_chars)
+
   const invalid = spawnSync(process.execPath, [verifier, '--json', '--min-chars', '8000'], {
     cwd: repoRoot,
     encoding: 'utf8',

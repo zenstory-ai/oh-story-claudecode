@@ -1167,7 +1167,8 @@ function learnHeadingForm(project, chapter, title) {
   };
 }
 
-function build(project, chapter, report) {
+function build(project, chapter, report, options = {}) {
+  const allowGap = Boolean(options && options.allowGap);
   const errors = [];
   const outlineDir = path.join(project, '大纲');
   const outlineHit = findOutlineFile(outlineDir, chapter);
@@ -1264,7 +1265,11 @@ function build(project, chapter, report) {
   if (chapter > 1) {
     const { prev: prevFile, tail } = previousChapterTail(project, chapter);
     if (prevFile === null || !tail) {
-      errors.push(`必在块缺失：找不到或读不到第 ${chapter - 1} 章正文（如有意跳章写作且前章未落盘，提交时请配合 --allow-gap）`);
+      if (allowGap) {
+        report.push(`上一章结尾：未找到第 ${chapter - 1} 章正文（已启用 --allow-gap，跳过前章尾部注入）`);
+      } else {
+        errors.push(`必在块缺失：找不到或读不到第 ${chapter - 1} 章正文（如有意跳章写作且前章未落盘，可传 --allow-gap；提交时同样配合 --allow-gap）`);
+      }
     } else {
       parts.push(`——— 上一章结尾（承接用，不重写；不给全章路径）———\n${tail}`);
       report.push(`上一章结尾：${path.basename(prevFile)} 末 ${Array.from(tail).length} 字（按整行回退）`);
@@ -1532,9 +1537,9 @@ function build(project, chapter, report) {
   parts.push(
     `——— 作者偏好（作者记下的写作习惯，低优先级倾向，不逐条追求命中）———\n${memoryBlock}`,
     '——— 写作硬底线 ———\n' +
-      '1. 叙述保人物内心盘算与口语因果连接，严禁抽干内心写成干巴巴的纯动作碎句。\n' +
+      '1. 叙述保人物内心盘算与口语因果连接（1–3 句自然段与短孤句/短对白错落呼吸），禁通篇 20 字节拍器、纯动作碎句、连刷「因为/毕竟/所以」解释句及旁白人设考点标签。\n' +
       '2. 短对话直接交锋，严禁每句台词捆绑端杯、摸袖口、看表盘等道具微动作。\n' +
-      '3. 只留改局势或露破绽的关键道具和证物，删没用的材质/服饰/天气光影/声效摆设；反派须按私心反咬设阻，禁走过场。',
+      '3. 只留改局势或露破绽的关键道具和证物，删没用的材质/服饰/天气光影/声效摆设；反派须按私心反咬设阻，禁走过场；道具经手与工时物理须前后自洽。',
     '检查分工：写手负责编排、内容覆盖和格式自检；主会话质量阶段负责语义去味及最终文件扫描，写手不重复整轮去味。',
     '本次照你的铁律 1-8 与被调用协议执行（细纲边界、正文形状、新增物三级、交付三附件均以你的定义为准）。',
     `字数目标按细纲执行；整章一次写完，直接写到最终输出路径（临时文件只放 ${chapterWorkDir(project, chapter)}，不写 /tmp）；不拆逐点配额、不自测字数。`
@@ -1546,14 +1551,16 @@ function build(project, chapter, report) {
   return { prompt: `${parts.join('\n\n')}\n`, errors: [] };
 }
 
-const USAGE = 'Usage: node build_writer_prompt.js --project DIR --chapter N [--out [FILE]]\n';
+const USAGE = 'Usage: node build_writer_prompt.js --project DIR --chapter N [--out [FILE]] [--allow-gap]\n';
 
 function parseCliArgs(argv) {
-  const args = { project: null, chapter: null, out: null, help: false };
+  const args = { project: null, chapter: null, out: null, allowGap: false, help: false };
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i];
     if (token === '--help' || token === '-h') {
       return { help: true };
+    } else if (token === '--allow-gap') {
+      args.allowGap = true;
     } else if (token === '--project') {
       if (i + 1 >= argv.length) return { error: '--project requires a value' };
       args.project = argv[++i];
@@ -1615,7 +1622,7 @@ function main(argv = process.argv.slice(2)) {
   }
 
   const report = [];
-  const { prompt, errors } = build(project, args.chapter, report);
+  const { prompt, errors } = build(project, args.chapter, report, { allowGap: args.allowGap });
   if (prompt === null) {
     process.stderr.write('组装中止，先修数据再重跑（这不是回落手拼的理由）：\n');
     for (const item of errors) {
