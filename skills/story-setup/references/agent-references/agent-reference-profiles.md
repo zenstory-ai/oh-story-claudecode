@@ -28,7 +28,7 @@
 | [benchmark-recall.md](benchmark-recall.md) | 有外部对标或任务包点名召回时读；无对标时不读 |
 | [long-quality.md](long-quality.md) | 黄金三章、连载节奏、读者期待与后手储备审查 |
 
-Long profile 禁止读取 `short-*` 文件，不得采用“6 章”“每节 500–800 字”“每两节一钩”“全文 70–85% 必须高潮”等短篇默认口径。
+Long profile 禁止读取 `short-*` 文件，不得套用短篇固定小节数、全文百分比付费卡点或万字一次清算等短篇写法。
 
 ## Short profile
 

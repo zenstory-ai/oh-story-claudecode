@@ -65,7 +65,7 @@ Only preferences the author states explicitly are recorded; nothing is inferred 
 ├── Outline/
 │   ├── Outline.md          # Full-book volume-level structure
 │   ├── Volume_1.md         # One per volume: payoff pacing + emotion arc + character arc + foreshadowing + twists
-│   ├── Chapter_001.md      # One per chapter: summary + multi-line plot + relationships/order + hooks
+│   ├── Chapter_001.md      # One per chapter: chapter flow + scene split + plotlines + cast order + beats & hooks
 │   └── ...
 ├── Prose/
 │   ├── Chapter_001_Title.md
