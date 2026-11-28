@@ -258,6 +258,13 @@ function main() {
     }
   }
   if (!proseFiles.length) return reportUsageError('缺少正文路径')
+  if (
+    !explicitOutline &&
+    proseFiles.length >= 2 &&
+    /^(?:小节大纲|细纲_.*)\.md$/.test(path.basename(proseFiles[0]))
+  ) {
+    return reportUsageError(`首个位置参数 "${proseFiles[0]}" 是大纲/细纲文件，请显式使用 --outline "${proseFiles[0]}"`)
+  }
 
   // 逐个文件独立判定；输入错误优先于重合发现
   let status = 0
