@@ -404,6 +404,9 @@ function countSections(text, projectDir = null) {
 
   const totalChars = visibleChars(text)
   const preMarkerLeadChars = lead.placement === 'before-first-marker' ? lead.chars : 0
+  const denseSections = sections
+    .filter((s) => s.lines > 0 && s.avg_chars > 26)
+    .map((s) => ({ section: s.section, lines: s.lines, avg_chars: s.avg_chars }))
   return {
     total_chars: totalChars,
     raw_visible_chars: totalChars,
@@ -415,6 +418,7 @@ function countSections(text, projectDir = null) {
     long_dialogue_45_ratio: dialogue.longDialogue45Ratio,
     paywall_preview_ratio: paywallPreviewRatio,
     section_count: sections.length,
+    dense_sections: denseSections,
     sections,
   }
 }
@@ -493,9 +497,14 @@ function verify(projectDir, contract, options = {}) {
   })
 
   const sectionCounts = markers.map((entry, index) => {
+    const start = entry.line
     const end = index + 1 < markers.length ? markers[index + 1].line - 1 : cleanLines.length
-    const count = visibleChars(cleanLines.slice(entry.line, end).join('\n'))
-    return { section: index + 1, marker: entry.text, chars: count }
+    const count = visibleChars(cleanLines.slice(start, end).join('\n'))
+    const secBody = bodyLines.filter((b) => b.index >= start && b.index < end)
+    const secLines = secBody.length
+    const secBodyChars = secBody.reduce((sum, b) => sum + visibleChars(b.line), 0)
+    const avgChars = secLines > 0 ? Number((secBodyChars / secLines).toFixed(1)) : 0
+    return { section: index + 1, marker: entry.text, chars: count, lines: secLines, avg_chars: avgChars }
   })
 
   checks.push(makeCheck(
