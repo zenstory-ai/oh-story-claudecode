@@ -30,7 +30,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | 工作台 | dashboard、工作台、看拆文库、浏览项目文件、打开项目面板 | 见下方「工作台与版本更新」 |
 | 检查/更新版本 | 检查更新、有新版本吗、升级、更新工具箱 | 见下方「工作台与版本更新」 |
 | 切换/列出书目 | 切书、换书、列出我的书、我在写哪几本、切换项目 | 见下方「多书切换」 |
-| 管理作者习惯 | 记住我的写作习惯、作者画像、待确认偏好、忘掉这个偏好 | 见下方「作者习惯管理」 |
+| 管理作者习惯 | 记住我的写作习惯、作者画像、整理作者记忆、忘掉这个偏好 | 见下方「作者习惯管理」 |
 | 查故事资料 | 查角色、查伏笔、查进度、查设定、什么状态、写到哪了 | 见下方「查询」 |
 | 查资料 | 查资料、帮我查资料、调研、搜索一下、搜一下 | 见下方「查询」 |
 
@@ -102,7 +102,7 @@ cdp_port：{可选：Chrome 调试端口不是 9222 时写}
 
 走助手前只做本端可用性检查：当前不在子代理内、有本端调用工具，且对应角色可用（Claude `.claude/agents/*.md`、OpenCode `.opencode/agents/*.md`、Codex `.codex/agents/*.toml`、Antigravity `.agents/agents/agent-name/agent.md`；ZCode 查插件注册的同名角色，不要求 `.zcode/agents`）→ 可尝试 spawn。Antigravity 用 `invoke_subagent` + 同名 `TypeName`，ZCode 用 `Agent` 按实际 schema 派发，不跨端误判。任一不满足或返回 unknown agent，则降级处理：
 
-- `story-explorer` 不可用 → 主会话直接用 Read/Grep 从书目录检索（角色状态、伏笔、进度、设定），回答前说一句「查资料助手没启用，这次我直接翻项目文件」；项目尚未部署时提示先 `/story-setup`。
+- `story-explorer` 不可用 → 主会话直接用文件读取与检索工具从书目录检索（角色状态、伏笔、进度、设定），回答前说一句「查资料助手没启用，这次我直接翻项目文件」；项目尚未部署时提示先 `/story-setup`。
 - `story-researcher` 不可用 → 主会话用当前可用的搜索能力回答，回答前说一句「查资料助手没启用，这次我直接搜」；搜不到就如实说明。
 
 ### 怎么回答作者

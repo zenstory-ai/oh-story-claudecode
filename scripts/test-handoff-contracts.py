@@ -13,7 +13,7 @@
   导入短篇读的拆文报告小节存在；写作端和导入读的 `_meta.json` 键在 output-contract 的 schema 里。
 - 短篇扫榜：选题匹配推荐的目标平台要被写作端的设计模板和 check-phase2-contract.js 接受，
   扫榜支持的每个平台都在对照表里；写作端 Phase 1 读结论文件点名的小节和「复扫日期」在模板里，
-  扫榜情绪对照表与选题匹配的目标情绪只用写作端情绪表的六种，难度与写作端一致。
+  扫榜情绪对照表与选题匹配的目标情绪只用写作端情绪表的六种。
 - 长篇扫榜：拆文回填和写作开书点名的选题决策小节、字段在模板里；「待拆文验证」和「能爆的原因」同一行；
   文件落在拆文端会去找的 `扫榜/{YYYYMMDD}/`。
 - 派助手：路由派 story-explorer / story-researcher 的 prompt 字段和查询类型在助手模板里；
@@ -548,13 +548,12 @@ def check_short_platforms(repo: Repo) -> list[str]:
 SHORT_WRITE_SKILL = "skills/story-short-write/SKILL.md"
 
 
-def short_write_emotions(repo: Repo) -> dict[str, str]:
-    """写作端 Phase 1 情绪表：情绪 → 难度。"""
+def short_write_emotions(repo: Repo) -> list[str]:
+    """写作端 Phase 1 情绪表：六种情绪名称。"""
     for header, rows in tables(repo.text(SHORT_WRITE_SKILL)):
-        if header and header[0] == "情绪类型" and "难度" in header:
-            col = header.index("难度")
-            return {row[0]: row[col] for row in rows if len(row) > col}
-    return {}
+        if header and header[0] == "情绪类型" and "常见流派" in header:
+            return [row[0] for row in rows if row]
+    return []
 
 
 def check_short_scan_handoff(repo: Repo) -> list[str]:
@@ -585,27 +584,24 @@ def check_short_scan_handoff(repo: Repo) -> list[str]:
     if "`征稿要求.md`" in skill and not re.search(r"^.*存进.*`征稿要求\.md`.*$", skill, re.M):
         failures.append(f"{SHORT_SCAN_SKILL}: 选题时读 `征稿要求.md`，SKILL 里没写把征稿要求存进这个文件")
 
-    # 目标情绪与难度以写作端 Phase 1 情绪表为准。
+    # 目标情绪以写作端 Phase 1 情绪表为准。
     emotions = short_write_emotions(repo)
     if not emotions:
-        return failures + [f"{SHORT_WRITE_SKILL}: 没解析出 Phase 1 情绪表（表头「情绪类型 … 难度」），确认写法后更新本测试"]
+        return failures + [f"{SHORT_WRITE_SKILL}: 没解析出 Phase 1 情绪表（表头「情绪类型 … 常见流派」），确认写法后更新本测试"]
     scan_table = None
     for header, rows in tables(repo.text(SHORT_SCAN_SKILL)):
-        if header and header[0] == "情绪" and "难度" in header:
-            scan_table = (rows, header.index("难度"))
+        if header and header[0] == "情绪":
+            scan_table = rows
             break
     if scan_table is None:
-        failures.append(f"{SHORT_SCAN_SKILL}: 缺少情绪对照表（表头「情绪 … 难度」）")
+        failures.append(f"{SHORT_SCAN_SKILL}: 缺少情绪对照表（表头「情绪 …」）")
     else:
-        rows, col = scan_table
         seen = set()
-        for row in rows:
+        for row in scan_table:
             name = row[0]
             seen.add(name)
             if name not in emotions:
                 failures.append(f"{SHORT_SCAN_SKILL}: 情绪对照表的「{name}」不在写作端情绪表里（{' / '.join(emotions)}）")
-            elif len(row) > col and row[col] != emotions[name]:
-                failures.append(f"{SHORT_SCAN_SKILL}: 「{name}」难度写成「{row[col]}」，写作端是「{emotions[name]}」")
         for name in emotions:
             if name not in seen:
                 failures.append(f"{SHORT_SCAN_SKILL}: 情绪对照表缺写作端的「{name}」")
@@ -632,8 +628,8 @@ LONG_WRITE_SETUP = "skills/story-long-write/references/flow-opening-plan.md"
 TOPIC_READS = (
     (LONG_WRITE_SETUP, "「推荐选题」", "推荐选题"),
     (LONG_WRITE_SETUP, "`扫榜日期`", "扫榜日期"),
-    (LONG_WRITE_SETUP, "能爆的原因 Y", "能爆的原因"),
-    (LONG_WRITE_SETUP, "差异化 Z", "差异化定位"),
+    (LONG_WRITE_SETUP, "能爆的原因", "能爆的原因"),
+    (LONG_WRITE_SETUP, "差异化", "差异化定位"),
     (STAGE5, "「推荐选题」", "推荐选题"),
     (STAGE5, "「能爆的原因」", "能爆的原因"),
     (STAGE5, "「题材组合」", "题材组合"),
@@ -1060,8 +1056,8 @@ NEGATIVE_CASES = (
     ("征稿要求只在平台参考里落盘", SHORT_SCAN_SKILL,
      "5. 作者发来征稿要求：原文存进输出目录的 `征稿要求.md`，题材、字数、截止日期当硬条件。\n", "", "征稿要求.md"),
     ("选题匹配目标情绪写成题材名", TOPIC_MATCH, "{意难平 / 反转震撼", "{虐恋 / 反转震撼", "虐恋"),
-    ("扫榜情绪表难度和写作端相反", SHORT_SCAN_SKILL, "| 反转震撼 | 悬疑、身份错位、反转 | 高 |",
-     "| 反转震撼 | 悬疑、身份错位、反转 | 低 |", "反转震撼"),
+    ("扫榜情绪表写进写作端不存在的情绪", SHORT_SCAN_SKILL, "| 反转震撼 |",
+     "| 震撼反转 |", "震撼反转"),
     ("选题决策模板丢了题材组合", TOPIC_DECISION, "- 题材组合：", "- 题材：", "题材组合"),
     ("待拆文验证挪出能爆的原因那一行", TOPIC_DECISION,
      "（假设，`待拆文验证`）\n", "\n- 拆文状态：`待拆文验证`\n", "待拆文验证"),

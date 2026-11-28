@@ -21,8 +21,8 @@ A long-form project in Oh Story looks like this (from the README's project struc
 ├── 正文/          # chapter prose
 └── 追踪/          # file-first continuity state
     ├── _tracking-state.json   # the only structured source of truth
-    ├── 上下文.md              # derived state card, fixed 7 sections (12 KiB soft target, 64 KiB hard cap)
-    ├── 逐章记录/              # per-chapter delta (3072B soft target, 64 KiB hard cap)
+    ├── 上下文.md              # derived state card, fixed 7 sections (8 KiB target / 12 KiB soft warning, 64 KiB hard cap)
+    ├── 逐章记录/              # per-chapter delta (2048B target / 3584B soft warning, 64 KiB hard cap)
     ├── 角色状态/              # current snapshot per core character
     ├── 伏笔.md                # open and paid-off setups
     └── 时间线/                # author-truth.md + reader-known.md
@@ -30,9 +30,9 @@ A long-form project in Oh Story looks like this (from the README's project struc
 
 Three design rules do the work:
 
-1. **One authority, everything else derived.** `_tracking-state.json` is the only writable truth. The state card, character snapshots, setup list and both timelines are generated from it deterministically. Normal writes go through `scripts/tracking_commit.js`. `tracking_commit.js check` re-renders from state and compares each derived file: if a derived file was hand-edited, default `check` exits `0` with non-blocking `drift_warnings` prompting whether to absorb the edits into JSON or rebuild (pass `--strict` to fail on drift). A transaction’s expected revision separately prevents stale writes.
+1. **One authority, everything else derived.** `_tracking-state.json` is the only writable truth. The state card, character snapshots, setup list and both timelines are generated from it deterministically. Normal writes go through `skills/story-long-write/scripts/tracking_commit.js`. `tracking_commit.js check` re-renders from state and compares each derived file: if a derived file was hand-edited, default `check` exits `0` with non-blocking `drift_warnings` prompting whether to absorb the edits into JSON or rebuild (pass `--strict` to fail on drift). A transaction’s expected revision separately prevents stale writes.
 2. **Author truth and reader knowledge are separate timelines.** `时间线/作者真相.md` records what actually happened in the story. `时间线/读者已知.md` records what the reader has seen so far. When the model writes chapter 40 it can see who the murderer is, and also that the protagonist does not know yet, so it will not let a character blurt out the answer.
-3. **Per-chapter writes are compact deltas.** Each `逐章记录/第NNN章.md` targets ≤1536 bytes (soft warning above 3072 bytes) and records only changes that affect later chapters. Historical records continue to grow, while the current state card targets ≤12 KiB (soft warning above 12 KiB); both views share a **64 KiB (65,536-byte) hard safety cap**. Older information is queried when needed; the full history stays out of prose prompts.
+3. **Per-chapter writes are compact deltas.** Each `逐章记录/第NNN章.md` targets ≤2048 bytes (soft warning above 3584 bytes) and records only changes that affect later chapters. Historical records continue to grow, while the current state card targets ≤8 KiB (soft warning above 12 KiB); both views share a **64 KiB (65,536-byte) hard safety cap**. Older information is queried when needed; the full history stays out of prose prompts.
 
 ## What one chapter actually does
 

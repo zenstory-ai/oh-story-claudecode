@@ -224,6 +224,28 @@ function countVisibleChars(value) {
   return count;
 }
 
+function measureLineMetrics(value) {
+  const body = visibleBody(value);
+  let lineCount = 0;
+  let totalVisible = 0;
+  let gt35LineCount = 0;
+  for (const rawLine of body.split('\n')) {
+    let len = 0;
+    for (const ch of rawLine) {
+      if (!_WHITE_SPACE_CODEPOINTS.has(ch.codePointAt(0))) len += 1;
+    }
+    if (len === 0) continue;
+    lineCount += 1;
+    totalVisible += len;
+    if (len > 35) gt35LineCount += 1;
+  }
+  return {
+    line_count: lineCount,
+    mean_line_chars: lineCount > 0 ? Number((totalVisible / lineCount).toFixed(1)) : 0,
+    gt35_line_count: gt35LineCount,
+  };
+}
+
 function parseTarget(value) {
   const raw = value === null || value === undefined ? '' : String(value);
   if (!_POSITIVE_INTEGER_RE.test(raw)) {
@@ -309,12 +331,14 @@ function measureWordcount(value, opts = {}) {
       invalid_reason: 'INVALID_BODY',
     };
   }
+  const lineMetrics = measureLineMetrics(value);
   return {
     schema: MEASUREMENT_SCHEMA,
     metric: METRIC,
     chapter,
     case_id: caseId,
     actual,
+    ...lineMetrics,
     status: 'measured',
     invalid_reason: null,
   };
@@ -354,6 +378,7 @@ function evaluateWordcount(value, targetValue, opts = {}) {
         ? 'under'
         : 'over';
   const signedError = (actual - target) / target;
+  const lineMetrics = measureLineMetrics(value);
   return {
     schema: WORDCOUNT_SCHEMA,
     metric: METRIC,
@@ -361,6 +386,7 @@ function evaluateWordcount(value, targetValue, opts = {}) {
     case_id: caseId,
     target,
     actual,
+    ...lineMetrics,
     internal_band: { ...bands.internal, status: internalPass ? 'pass' : 'fail' },
     user_band: { ...bands.user, status: userPass ? 'pass' : 'fail' },
     signed_error_pct: signedError,
@@ -549,7 +575,7 @@ function readProjectChapter(project, chapter, authorRange = null) {
   };
 }
 
-function buildProjectWordcountRecord(project, chapter, { resolution, authorRange = null }) {
+function buildProjectWordcountRecord(project, chapter, { resolution, authorRange = null } = {}) {
   requireCondition(RESOLUTIONS.has(resolution), `unsupported wordcount resolution: ${resolution}`);
   const { bodyPath, target, authorRange: author } = readProjectChapter(project, chapter, authorRange);
   let rawBytes;

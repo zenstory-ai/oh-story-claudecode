@@ -205,6 +205,10 @@ function buildAndSave(allBooks, total, filtered, filepath, detail = DETAIL) {
 }
 
 function main() {
+  if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    console.log("用法：node heiyan-booklist-scraper.js [--pages 5] [--channel male|female|all] [--detail] [--port 9222] [--outdir 扫榜/YYYYMMDD]");
+    return 1;
+  }
   if (!Number.isInteger(PAGES) || PAGES <= 0) {
     throw new Error(`无效 --pages: ${getArg(args, "--pages")}（须为正整数）`);
   }

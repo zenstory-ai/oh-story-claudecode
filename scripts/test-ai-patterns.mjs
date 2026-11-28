@@ -1824,7 +1824,7 @@ describe("check-ai-patterns.js", () => {
     assert.equal(idleHits.length, 1, JSON.stringify(idleHits));
     assert.equal(idleHits[0].severity, "advisory");
     assert.equal(idleHits[0].review, "semantic");
-    assert.ok(idleHits[0].message.includes("刀子物件"));
+    assert.ok(idleHits[0].message.includes("关键道具和证物"));
 
     // Short mode must NOT trigger idle-prop-decoration-tic
     assert.equal(
@@ -1884,6 +1884,43 @@ describe("check-ai-patterns.js", () => {
         .json()
         .findings.filter((f) => f.type === "low-connective-density-tic").length,
       0
+    );
+
+    // 13) Round 6 live-combat FP fixes: 黑漆漆, 滴/滋啦——, attributive 没人知道怎么, everyday 喝了口茶/咬了口包子
+    const fR6Fixes = writeFixture("round6-fp-fixes.md", [
+      "门缝里黑漆漆一片，手电光扫过去只照见半截生锈铁门栓。",
+      "他指尖捻起一点暗红粉末凑近细看，又指尖捻起案角碎纸片核对折痕，接着手指捻起一粒铜屑，末了指尖捻起灰烬放回证物袋。",
+      "他坐下喝了口浓茶，又咬了口凉包子，接着抿了口温水，顺手剥了个橘子咽了口果汁，末了又喝了口热汤。",
+      "仪器突然滴——！滴——！响起来，电线滋啦——！冒出蓝火花，门外刺啦——！一声铁皮擦过护栏。",
+      "今晚零下二十八度，进服务区还得交一枚没人知道怎么弄的灰雾晶芯，这笔账怎么算都亏。",
+    ]);
+    const r6Findings = runDetector(["--mode=long", "--json", fR6Fixes]).json().findings;
+    assert.equal(
+      r6Findings.filter((f) =>
+        ["idle-prop-decoration-tic", "micro-action-tic", "em-dash", "trailer-ending", "stock-reaction-tic"].includes(f.type)
+      ).length,
+      0,
+      `Round 6/8 FP fixes failed: ${JSON.stringify(r6Findings)}`
+    );
+
+    // 14) Round 14B live-combat FP fix: natural-breathing narrative using spoken connectives (只是/倒是/反倒/索性/压根/硬是/只好) without textbook 因为/毕竟/所以 must NOT trigger low-connective-density-tic
+    const fNaturalSpoken = writeFixture("round14b-natural-spoken-breathing.md", [
+      "灵堂门外挤着七八个看热闹的旁支亲戚，只是没人敢先迈过门槛半步，倒是二房那个管家先探出脑袋张望。",
+      "她压根没理会门外议论，索性把收据折成方块揣进兜里，反倒顺手拎起竹竿把门帘挑开一角。",
+      "谢明轩原本算准她今早不敢进门，谁知她愣是踩着十点整撞开大门，只好硬着头皮给保镖使眼色。",
+      "厅里两位叔伯本来还想装聋作哑，哪料灵柩盖板真掀了半尺，终究按捺不住站起身往后退开两步。",
+      "她倒是沉得住气，哪怕四周目光全压过来也压根不退，硬是把尾款单拍在供桌角上，只等对方先松口。",
+      "管事原本想拖到午时再报丧，谁料老宅门禁被人从里头反锁，只好压低声催促律师先拿印章出来。",
+      "方佩兰本来藏在屏风后头听动静，反倒被满屋子檀香呛出声咳嗽，索性借口去倒茶悄悄往偏厅绕。",
+      "众人原本还以为这单白事能悄悄压下去，谁知门外车灯一道接一道打进前院，愣是把整条巷子照亮。",
+      "她压根懒得再跟这帮人绕弯子，只是伸手扣住桌沿敲了两下，倒要看看今天到底谁先签字结账。",
+    ]);
+    assert.equal(
+      runDetector(["--mode=long", "--json", fNaturalSpoken])
+        .json()
+        .findings.filter((f) => f.type === "low-connective-density-tic").length,
+      0,
+      "natural spoken breathing without 因为/毕竟/所以 must not trigger low-connective-density-tic"
     );
   });
 });

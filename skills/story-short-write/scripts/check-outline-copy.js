@@ -61,7 +61,7 @@ function reportInputError(kind, file, reason) {
 
 function reportUsageError(message) {
   process.stderr.write(`错误: ${message}。\n`)
-  process.stderr.write('用法: node check-outline-copy.js [--outline <细纲路径>] <正文路径...>\n')
+  process.stderr.write('用法: node check-outline-copy.js [--json] [--outline <细纲路径>] <正文路径...>\n')
   return 2
 }
 
@@ -233,6 +233,7 @@ function findOutline(proseFile) {
 function main() {
   const proseFiles = []
   let explicitOutline = null
+  let jsonOutput = false
   const argv = process.argv.slice(2)
   let positionalOnly = false
   for (let k = 0; k < argv.length; k++) {
@@ -240,8 +241,10 @@ function main() {
     if (!positionalOnly && arg === '--') {
       positionalOnly = true
     } else if (!positionalOnly && (arg === '--help' || arg === '-h')) {
-      process.stdout.write('用法: node check-outline-copy.js [--outline <细纲路径>] <正文路径...>\n')
+      process.stdout.write('用法: node check-outline-copy.js [--json] [--outline <细纲路径>] <正文路径...>\n')
       return 0
+    } else if (!positionalOnly && arg === '--json') {
+      jsonOutput = true
     } else if (!positionalOnly && arg === '--outline') {
       if (explicitOutline !== null) return reportUsageError('--outline 不能重复指定')
       const value = argv[k + 1]
@@ -255,20 +258,43 @@ function main() {
     }
   }
   if (!proseFiles.length) return reportUsageError('缺少正文路径')
+  if (
+    !explicitOutline &&
+    proseFiles.length >= 2 &&
+    /^(?:小节大纲|细纲_.*)\.md$/.test(path.basename(proseFiles[0]))
+  ) {
+    return reportUsageError(`首个位置参数 "${proseFiles[0]}" 是大纲/细纲文件，请显式使用 --outline "${proseFiles[0]}"`)
+  }
 
   // 逐个文件独立判定；输入错误优先于重合发现
   let status = 0
+  const results = []
   for (const proseFile of proseFiles) {
-    status = Math.max(status, checkOne(proseFile, explicitOutline))
+    const item = checkOne(proseFile, explicitOutline, { quiet: jsonOutput })
+    status = Math.max(status, item.status)
+    results.push(item)
+  }
+  if (jsonOutput) {
+    process.stdout.write(
+      JSON.stringify(
+        {
+          ok: status === 0,
+          status,
+          files: results,
+        },
+        null,
+        2
+      ) + '\n'
+    )
   }
   return status
 }
 
-function checkOne(proseFile, explicitOutline) {
+function checkOne(proseFile, explicitOutline, { quiet = false } = {}) {
   const proseResult = readTextFile(proseFile)
   if (!proseResult.ok) {
-    reportInputError('正文', proseFile, proseResult.reason)
-    return 2
+    if (!quiet) reportInputError('正文', proseFile, proseResult.reason)
+    return { prose_file: proseFile, outline_file: explicitOutline, status: 2, error: `无法读取正文 "${proseFile}"：${proseResult.reason}` }
   }
   const prose = proseResult.text
 
@@ -279,14 +305,18 @@ function checkOne(proseFile, explicitOutline) {
     path.basename(proseFile) === '正文.md'
   const detectLabel = isShortContext ? '小节大纲照搬检测' : '细纲照搬检测'
   if (!outlineFile) {
-    process.stdout.write(`${detectLabel}：跳过 "${proseFile}"（未自动发现${isShortContext ? '小节大纲' : '细纲'}）。\n`)
-    return 0
+    if (!quiet) {
+      process.stdout.write(`${detectLabel}：跳过 "${proseFile}"（未自动发现${isShortContext ? '小节大纲' : '细纲'}）。\n`)
+    }
+    return { prose_file: proseFile, outline_file: null, status: 0, skipped: true, reason: 'outline_not_found', hits: [] }
   }
   const outlineResult = readTextFile(outlineFile)
   if (!outlineResult.ok) {
     const kindName = isShortContext ? '小节大纲' : '细纲'
-    reportInputError(explicitOutline ? `显式${kindName}` : `自动发现的${kindName}`, outlineFile, outlineResult.reason)
-    return 2
+    if (!quiet) {
+      reportInputError(explicitOutline ? `显式${kindName}` : `自动发现的${kindName}`, outlineFile, outlineResult.reason)
+    }
+    return { prose_file: proseFile, outline_file: outlineFile, status: 2, error: `无法读取${kindName} "${outlineFile}"：${outlineResult.reason}` }
   }
   let outline = outlineResult.text
   const chapter = discovered ? discovered.chapter : parseProseChapter(proseFile)
@@ -296,10 +326,12 @@ function checkOne(proseFile, explicitOutline) {
   if (fromRangeFile && chapter) {
     const slice = extractChapterSlice(outline, chapter)
     if (slice === null) {
-      process.stdout.write(
-        `${detectLabel}：跳过 "${proseFile}"（范围细纲 "${path.basename(outlineFile)}" 中未找到第 ${chapter} 章小节）。\n`
-      )
-      return 0
+      if (!quiet) {
+        process.stdout.write(
+          `${detectLabel}：跳过 "${proseFile}"（范围细纲 "${path.basename(outlineFile)}" 中未找到第 ${chapter} 章小节）。\n`
+        )
+      }
+      return { prose_file: proseFile, outline_file: outlineFile, status: 0, skipped: true, reason: 'chapter_slice_not_found', hits: [] }
     }
     outline = slice
   }
@@ -311,7 +343,9 @@ function checkOne(proseFile, explicitOutline) {
       .replace(/^[ \t]*第[0-9０-９零一二三四五六七八九十百千万两]+章(?:[ \t　：:][^\n]*)?$/gm, '')
   )
   const O = hanOnly(stripCompletionRecord(outline))
-  if (P.length < MIN_RUN || O.length < MIN_RUN) return 0
+  if (P.length < MIN_RUN || O.length < MIN_RUN) {
+    return { prose_file: proseFile, outline_file: outlineFile, status: 0, skipped: false, han_chars: P.length, copied_chars: 0, copy_rate: 0, hit_count: 0, hits: [], anchored_count: 0, anchored_chars: 0 }
+  }
 
   // 登记的原话允许逐字落地，命中后计入豁免、不判誊抄
   const anchors = extractAnchors(outline)
@@ -355,35 +389,61 @@ function checkOne(proseFile, explicitOutline) {
   }
   if (!hits.length) {
     // 全部命中都是锚句豁免：静默放行，但把豁免量报出来供人工复核滥用
-    if (anchoredCount) {
+    if (anchoredCount && !quiet) {
       process.stdout.write(
         `${detectLabel}（${path.basename(proseFile)}）：无未授权誊抄；` +
           `另有 ${anchoredCount} 处 ${anchored} 字为登记原话的逐字落地。\n`
       )
     }
-    return 0
+    return {
+      prose_file: proseFile,
+      outline_file: outlineFile,
+      status: 0,
+      skipped: false,
+      han_chars: P.length,
+      copied_chars: 0,
+      copy_rate: 0,
+      hit_count: 0,
+      hits: [],
+      anchored_count: anchoredCount,
+      anchored_chars: anchored,
+    }
   }
 
   const rate = ((copied * 100) / P.length).toFixed(1)
-  // 短篇没有细纲：原话登记在 小节大纲.md 表格下方，措辞按短篇说，长篇原文不变。
-  // 这一分支的提示文字归短篇写作维护：改短篇的小节大纲字段名时同改这里，再同步副本。
-  const isShort = path.basename(outlineFile) === '小节大纲.md'
-  const guidance = isShort
-    ? `逐条对照原文判断：确属把小节大纲叙述搬进正文就重写——大纲只锁功能与结果，句子在正文现场写；誓词、关键原话、固定专名等功能性重合可保留。每条都要有结论，不为归零机械改写。保留项由主会话登记进小节大纲.md 表格下方「原样出现的原话：」行下（每行一条原话，缩进写；旧书叫「复沓锚句」，照认）再复检——子代理只重写正文或标 \`[需复核]\` 交回，不改小节大纲。`
-    : `逐条对照原文判断：确属把细纲叙述搬进正文就重写——细纲只锁功能与结果，句子在正文现场写；系统面板、誓词、案卷原话、固定专名等功能性重合可保留。每条都要有结论，不为归零机械改写。保留项由主会话补进细纲「原样出现的原话」——子代理只重写正文或标 \`[需复核]\` 交回，不改大纲细纲。`
-  const out = [
-    `=== ${isShort ? '小节大纲' : '细纲'}照搬检测（${path.basename(proseFile)}）===`,
-    `去标点正文 ${P.length} 字（按汉字比对），与 ${path.basename(outlineFile)} 连续重合 >${MIN_RUN - 1} 字的片段 ${hits.length} 处，共 ${copied} 字（${rate}%）。`,
-    guidance,
-  ]
-  hits
-    .sort((a, b) => b.len - a.len)
-    .slice(0, REPORT_TOP)
-    .forEach((h) => out.push(`  · ${h.len} 字「${h.frag}」`))
-  if (hits.length > REPORT_TOP) out.push(`  · …另有 ${hits.length - REPORT_TOP} 处`)
-  if (anchoredCount) out.push(`（另有 ${anchoredCount} 处 ${anchored} 字为登记原话的逐字落地，不计入誊抄）`)
-  process.stdout.write(out.join('\n') + '\n')
-  return 1
+  const sortedHits = hits.slice().sort((a, b) => b.len - a.len)
+  if (!quiet) {
+    // 短篇没有细纲：原话登记在 小节大纲.md 表格下方，措辞按短篇说，长篇原文不变。
+    // 这一分支的提示文字归短篇写作维护：改短篇的小节大纲字段名时同改这里，再同步副本。
+    const isShort = path.basename(outlineFile) === '小节大纲.md'
+    const guidance = isShort
+      ? `逐条对照原文判断：确属把小节大纲叙述搬进正文就重写——大纲只锁功能与结果，句子在正文现场写；誓词、关键原话、固定专名等功能性重合可保留。每条都要有结论，不为归零机械改写。保留项由主会话登记进小节大纲.md 表格下方「原样出现的原话：」行下（每行一条原话，缩进写；旧书叫「复沓锚句」，照认）再复检——子代理只重写正文或标 \`[需复核]\` 交回，不改小节大纲。`
+      : `逐条对照原文判断：确属把细纲叙述搬进正文就重写——细纲只锁功能与结果，句子在正文现场写；系统面板、誓词、案卷原话、固定专名等功能性重合可保留。每条都要有结论，不为归零机械改写。保留项由主会话补进细纲「原样出现的原话」——子代理只重写正文或标 \`[需复核]\` 交回，不改大纲细纲。`
+    const out = [
+      `=== ${isShort ? '小节大纲' : '细纲'}照搬检测（${path.basename(proseFile)}）===`,
+      `去标点正文 ${P.length} 字（按汉字比对），与 ${path.basename(outlineFile)} 连续重合 >${MIN_RUN - 1} 字的片段 ${hits.length} 处，共 ${copied} 字（${rate}%）。`,
+      guidance,
+    ]
+    sortedHits
+      .slice(0, REPORT_TOP)
+      .forEach((h) => out.push(`  · ${h.len} 字「${h.frag}」`))
+    if (hits.length > REPORT_TOP) out.push(`  · …另有 ${hits.length - REPORT_TOP} 处`)
+    if (anchoredCount) out.push(`（另有 ${anchoredCount} 处 ${anchored} 字为登记原话的逐字落地，不计入誊抄）`)
+    process.stdout.write(out.join('\n') + '\n')
+  }
+  return {
+    prose_file: proseFile,
+    outline_file: outlineFile,
+    status: 1,
+    skipped: false,
+    han_chars: P.length,
+    copied_chars: copied,
+    copy_rate: Number(rate),
+    hit_count: hits.length,
+    hits: sortedHits.slice(0, REPORT_TOP),
+    anchored_count: anchoredCount,
+    anchored_chars: anchored,
+  }
 }
 
 try {

@@ -24,17 +24,17 @@
 |---|---|
 | [flow-opening-plan.md](flow-opening-plan.md) | 长篇立项、定设定、人设关系与出卷纲（任务包已切片时优先以任务包为准） |
 | [flow-outline.md](flow-outline.md) | 排或审长篇细纲、黄金三章、钩子与悬念反转节奏 |
-| [flow-drafting.md](flow-drafting.md) | 核对长篇正文笔法、竖屏网感、对话与爽点围观分层 |
+| [flow-drafting.md](flow-drafting.md) | 核对长篇正文笔法、竖屏网感、对话与爽点反应层 |
 | [benchmark-recall.md](benchmark-recall.md) | 有外部对标或任务包点名召回时读；无对标时不读 |
 | [long-quality.md](long-quality.md) | 黄金三章、连载节奏、读者期待与后手储备审查 |
 
-Long profile 禁止读取 `short-*` 文件，不得采用“6 章”“每节 500–800 字”“每两节一钩”“全文 70–85% 必须高潮”等短篇默认口径。
+Long profile 禁止读取 `short-*` 文件，不得套用短篇固定小节数、全文百分比付费卡点或万字一次清算等短篇写法。
 
 ## Short profile
 
 | 文件 | 读取条件 |
 |---|---|
-| [short-quality.md](short-quality.md) | 设计或审查短篇导语冷开场、付费卡点、连环反击/反转节奏与明账清算收尾 |
+| [short-quality.md](short-quality.md) | 设计或审查短篇开门见山导语、付费卡点、连环反击/反转节奏与明账清算收尾 |
 | [short-deslop.md](short-deslop.md) | 短篇写作、去味或审查时的卖点保护与长篇默认规则覆盖 |
 
 Short profile 禁止读取 `long-*`、`flow-*`、`benchmark-recall.md` 或 `genre-styles/*`（长篇流派包）；不得把卷级、日更或跨十几章指标当硬门槛。

@@ -1038,7 +1038,7 @@ class FragmentationTests(unittest.TestCase):
         self.assertLess(skew_bal["tc_ba_ratio"], 0.25)
         self.assertIsNotNone(skew_bal["advisory"])
         self.assertEqual(skew_bal["advisory"]["level"], "advisory")
-        self.assertIn("叙述偏摄像头报幕，缺人物内心盘算与口语因果连接", skew_bal["advisory"]["message"])
+        self.assertIn("叙述偏纯动作碎句，缺人物内心盘算与口语因果连接", skew_bal["advisory"]["message"])
 
         with tempfile.TemporaryDirectory(prefix="storyctl-ws4-") as directory:
             project = Path(directory)
@@ -1053,9 +1053,9 @@ class FragmentationTests(unittest.TestCase):
             self.assertEqual(result["status"], "ready")
             self.assertEqual(len(result.get("warnings", [])), 1)
             self.assertEqual(result["warnings"][0]["level"], "advisory")
-            self.assertIn("叙述偏摄像头报幕，缺人物内心盘算与口语因果连接", result["warnings"][0]["message"])
+            self.assertIn("叙述偏纯动作碎句，缺人物内心盘算与口语因果连接", result["warnings"][0]["message"])
             plain = "\n".join(storyctl.plain_report(result))
-            self.assertIn("叙述偏摄像头报幕，缺人物内心盘算与口语因果连接", plain)
+            self.assertIn("叙述偏纯动作碎句，缺人物内心盘算与口语因果连接", plain)
             self.assertIn("纯叙述段中位", plain)
             self.assertIn("对白段中位", plain)
             for jargon in ("advisory", "prose_balance", "tc_ba_ratio", "camera-report-telegraph"):

@@ -289,6 +289,11 @@ def replace_claude_paths(body: str) -> str:
     for old, new in replacements:
         if old in body:
             body = body.replace(old, new)
+    body = re.sub(
+        r'`Agent\(subagent_type:\s*"([A-Za-z0-9_-]+)"\)`',
+        r'OpenCode 子代理 `\1`',
+        body,
+    )
     return body
 
 

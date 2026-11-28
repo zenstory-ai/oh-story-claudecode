@@ -36,7 +36,7 @@ Detect high-risk AI-flavor prose patterns that need human rewrite:
   - 戏剧套词刷屏 (死寂同章重复或死寂/轰然/骤然/猛地/瞬间高密度聚集，advisory)
   - 女频油腻/言情套词聚集 (指节泛白/宠溺/喉结轻滚/眸色一暗/声音低哑/小女人聚集，豁免轻笑/低笑，advisory)
   - 短篇塑料反应套词聚集 (--mode=short 眼底闪过一丝/瞳孔骤缩|猛地一缩|失焦/喉结滚/指节泛白/气得浑身发抖/死一般寂静合计 ≥2 处，advisory)
-  - 闲笔道具贴纸过密 (--mode=long 无功能材质/服饰/光影/环境音效贴纸聚集且叙述口语连接词偏低，advisory)
+  - 闲笔道具摆设过密 (--mode=long 没用的材质/服饰/光影/环境音效摆设聚集且叙述口语连接词偏低，advisory)
 
 Book-local .deslop-whitelist literal spans are excluded from style scanning (no regex or ancestor inheritance).
 Each finding carries severity: review_required for high-risk stylistic patterns (not-is-comparison / em-dash / voice-contrast / negation-parade / reverse-not-is / trailer-ending / trailer-summary), where single/low-count hits of rhetorical patterns (or moderate narration em-dash density, and all short-mode narration em-dash density) downgrade to semantic advisory and high-density clusters (or long-mode dense narration em-dash / trailer-summary) require explicit review-and-ack. This is a local style/readability soft-gate, not an AIGC detector score; functional human text can be kept with explicit acknowledgement instead of hard-blocked.
@@ -71,8 +71,8 @@ const EM_DASH_ADVISORY_MIN_HITS = 6;
 const EM_DASH_ADVISORY_PER_KILO = 1.5;
 const LONG_EM_DASH_REVIEW_MIN_HITS = 10;
 const LONG_EM_DASH_REVIEW_PER_KILO = 2.5;
-const ONOMATOPOEIA_BEFORE_DASH_RE = /(?:^|[\s，,。！？!?：:；;、—]|[声响一阵])[轰砰咚咔嗡吱嘟哗铮啪叮嘶呼唰呜嗷吼哒嚓啦咯嘎哐咣隆]{1,4}$/;
-const ONOMATOPOEIA_PAIR_BEFORE_DASH_RE = /(?:轰隆隆?|铮铮|咔嚓|咔哒|哗啦|叮咚|嘎吱|哐当|哐啷|咣当|咕噜|嗡嗡|嘶嘶|呼呼|嘟嘟|砰砰|咚咚|啪啪|嗷呜)$/;
+const ONOMATOPOEIA_BEFORE_DASH_RE = /(?:^|[\s，,。！？!?：:；;、—]|[声响一阵])[轰砰咚咔嗡吱嘟哗铮啪叮滴嘶呼唰呜嗷吼哒嚓啦咯嘎哐咣隆]{1,4}$/;
+const ONOMATOPOEIA_PAIR_BEFORE_DASH_RE = /(?:轰隆隆?|铮铮|咔嚓|咔哒|哗啦|叮咚|嘎吱|哐当|哐啷|咣当|咕噜|嗡嗡|嘶嘶|呼呼|嘟嘟|滴滴|滋啦|刺啦|砰砰|咚咚|啪啪|嗷呜)$/;
 const OPEN_TO_CLOSE_QUOTE = { '“': '”', '「': '」', '『': '』' };
 // 短篇套式反应细节门槛：短篇情绪与生理速记频率高于长篇，抬高到 8 处且 3.0/千字。
 const SHORT_STOCK_REACTION_MIN_HITS = 8;
@@ -80,8 +80,8 @@ const SHORT_STOCK_REACTION_PER_KILO = 3.0;
 
 // 微动作复读：「V了下 / V了一下 / 拍了两下 / 松了半圈」式轻量补语在叙述里高密度复现，
 // 容易形成删减过头的电报体指纹。只扫引号外叙述；密度与次数双门槛同时达标才报，
-// 单次出现是正常中文。
-const MICRO_TIC_PATTERN = /了(?:[一两三几半])?[下阵圈道声眼口气会]/g;
+// 单次出现是正常中文。「了口气」（叹/喘/松了口气）计入，「了口」（喝了口茶/咬了口包子）属实义饮食动作不误伤。
+const MICRO_TIC_PATTERN = /了(?:[一两三几半])?(?:口气|[下阵圈道声眼气会])/g;
 const MICRO_TIC_MIN_HITS = 5;
 // 「没A，也没B」「不A，也不B」否定对偶：七猫人类长篇约 0.07 处/千字，模型稿 0.4-1.5 处/千字；
 // 写人物没做什么是英文式节奏，一章 3 处以上报一条提示。
@@ -94,7 +94,7 @@ const MICRO_TIC_PER_KILO = 6;
 // 像在念/宣判”模板。此类句子词面变化大，不能逐词 blocking；按章聚集到 4 处才
 // advisory，要求逐处做删除测试。正常受伤、打斗、生理反应若承担物理后果可保留。
 const STOCK_REACTION_PATTERNS = [
-  /(?:指尖|指腹|手指|指节|手背|掌心|拳头|袖口|衣角|裙角|下唇|嘴唇|唇角|嘴角|眉头|眼底|眸光|目光|视线|肩膀|呼吸)[^。！？!?\n]{0,16}(?:轻轻|微微|缓缓|慢慢|悄然|不自觉|无意识|下意识|攥紧|握紧|收紧|绞紧|拢住|按住|压住|扣住|捻|泛白|发白|叩|敲|摩挲|抿紧|抿成|移开|垂下|躲开|落[在到][^，。！？!?\n]{1,10}(?:停|顿)|一颤|颤了?一下|停了?一下|顿了?一下)/g,
+  /(?:指尖|指腹|手指|指节|手背|掌心|拳头|袖口|衣角|裙角|下唇|嘴唇|唇角|嘴角|眉头|眼底|眸光|目光|视线|肩膀|呼吸)[^。！？!?\n]{0,16}(?:轻轻|微微|缓缓|慢慢|悄然|不自觉|无意识|下意识|攥紧|握紧|收紧|绞紧|拢住|按住|压住|扣住|捻(?!起)|泛白|发白|叩|敲|摩挲|抿紧|抿成|移开|垂下|躲开|落[在到][^，。！？!?\n]{1,10}(?:停|顿)|一颤|颤了?一下|停了?一下|顿了?一下)/g,
   /(?:手|指尖|手指)往(?:袖口?|怀|兜|口袋|身后|背后)里?一?(?:缩|揣|收|藏)/g,
   /(?:语气|声音)[^。！？!?\n]{0,12}(?:平静|冷静|平淡|冷淡|淡漠|平直)[^。！？!?\n]{0,12}(?:像|仿佛|如同|好像)[^。！？!?\n]{0,16}(?:念|读|报|说|陈述|宣判|背诵)/g,
   /(?:胸口|心口)[^。！？!?\n]{0,16}(?:像|仿佛|如同|好像)[^。！？!?\n]{0,16}(?:撞|锤|压|攥|堵)[^。！？!?\n]{0,8}(?:一下|一记|一拳)?|(?:心跳|心头)漏跳?了?一拍/g,
@@ -150,7 +150,7 @@ const CLICHE_DENSITY_PER_KILO = 12;
 // 比喻密度：单个生活化比喻可服务画面；“像/好像/仿佛/如同”成片复现时，
 // 容易变成 AI 式修辞堆叠。只做 advisory，修法是删到必要数量并回到具体画面，
 // 不是把“像”换成另一组比喻词。
-const METAPHOR_MARKER_PATTERN = /好像|像是|仿佛|宛如|如同|犹如|(?<![不头图画影录摄肖])像(?![头像素])/g;
+const METAPHOR_MARKER_PATTERN = /好像|像是|仿佛|宛如|如同|犹如|(?<![不头图画影录摄肖])像(?![头像素样话])/g;
 const METAPHOR_COMPOUND_NOUN_PATTERN = /遗像|炭精像|画像|雕像|铜像|佛像|塑像|神像|头像|人像|肖像|蜡像|录像|影像|偶像|假像|表像|现象|印象|迹象|气象|星象|万象/g;
 const METAPHOR_LIKE_PHRASE_PATTERN = /(?:死|水|冰|火|潮水|石头|木头|机器|纸|铁|鬼|死人|刀|针|网|墙)一样/g;
 const METAPHOR_DENSITY_MIN_HITS = 7;
@@ -207,7 +207,7 @@ const LOW_CONNECTIVE_LONG_SENTENCE_CHARS = 25;
 const LOW_CONNECTIVE_LONG_SENTENCE_RATIO = 0.05;
 // 长篇干硬镜头叙述分支（2,450 篇真 9.0+ 长篇标定，误报 0.33%）：纯叙述段偏长（中位 ≥28 字）却同时缺口语连接词（≤5.5/千字）
 // 与自然「的」（≤25.0/千字），即抽干人物内心盘算的剧本报幕体；绝不误伤正常手机竖屏短段（中位 ~23 字）。
-const COLLOQUIAL_CONNECTIVE_PATTERN = /但是|可是|不过|虽然|因为|所以|偏偏|干脆|其实|毕竟|竟然|好在|倒也|却|才|便|正要|已经/g;
+const COLLOQUIAL_CONNECTIVE_PATTERN = /但是|可是|不过|虽然|因为|所以|偏偏|干脆|其实|毕竟|竟然|居然|好在|幸好|倒也|哪知道|省得|免得|结果|反正|关键是|要不然|怪不得|难怪|只是|倒是|反倒|反而|索性|压根|谁知|谁料|原本|本来|终究|总归|哪怕|就算|只好|只得|愣是|硬是|却|才|便|正要|已经/g;
 const DRY_NARRATION_MIN_CHARS = 400;
 const DRY_NARRATION_MIN_UNIQUE_PARAS = 8;
 const DRY_NARRATION_MAX_CONN_PER_KILO = 5.5;
@@ -218,7 +218,7 @@ const PURE_NARRATION_QUOTE_RE = /[“”「」『』"]/;
 // 闲笔材质/道具/光影贴纸过密（advisory only；2,450 篇真 9.0+ 长篇标定，误报 0.00%）：
 // 仅在 --mode=long 扫描引号外叙述（≥400 字），同时要求命中 ≥3 种不同装饰贴纸、唯一密度 ≥1.8/千字，
 // 且口语连接词 ≤7.0/千字（写专业器物但带活人口语因果的真人类自动放行）。
-const IDLE_PROP_DECORATION_PATTERN = /磨砂|骨瓷|紫檀|红木|黄铜|青漆|红漆|黑漆|漆面|太师椅|酸枝|花梨|珐琅|青砖|青石板|玻璃幕墙|落地窗|百叶窗|大理石|胡桃木|亚光|鎏金|描金|雕花|算盘珠|水渍|茶渍|烟炱|(?:深灰|藏青|炭黑|烟灰|定制|高定)(?:西装|西服|大衣|羊绒|风衣|旗袍|礼服)|熨得|一丝不苟|袖扣|领带夹|鳄鱼皮|公文包|腕表|表盘|白炽灯|日光灯|吸顶灯|冷白光|暖黄光|咖啡机|嗡鸣|低鸣|空调外机|淅淅沥沥|滴答作响|钟摆|窗霜|瓷盏|茶盏|折扇|油灯/g;
+const IDLE_PROP_DECORATION_PATTERN = /磨砂|骨瓷|紫檀|红木|黄铜|青漆|红漆(?!封条|官印|火漆)|黑漆(?!漆)|漆面|太师椅|酸枝|花梨|珐琅|青砖|青石板|玻璃幕墙|落地窗|百叶窗|大理石|胡桃木|亚光|鎏金|描金|雕花|算盘珠|水渍|茶渍|烟炱|(?:深灰|藏青|炭黑|烟灰|定制|高定)(?:西装|西服|大衣|羊绒|风衣|旗袍|礼服)|熨得|一丝不苟|袖扣|领带夹|鳄鱼皮|公文包|腕表|表盘|白炽灯|日光灯|吸顶灯|冷白光|暖黄光|咖啡机|嗡鸣|低鸣|空调外机|淅淅沥沥|滴答作响|钟摆|窗霜|瓷盏|茶盏|折扇|油灯/g;
 const IDLE_PROP_MIN_CHARS = 400;
 const IDLE_PROP_MIN_UNIQUE = 3;
 const IDLE_PROP_MIN_UNIQUE_PER_KILO = 1.8;
@@ -313,7 +313,7 @@ const REVERSE_NOT_IS_PREV_EXCLUDE = new Set([...COMPACT_EITHER_OR_PREV, '还', '
 // 「他/她/它(们)不知道的是」是全知旁白跳出视角预告后事（banned-words 抽象收束、预告行）；
 // 必须带「的是」，「她不知道该说什么」这类普通叙述不计。
 // 校准：《万疆》20 章排除「正式拉开序幕」2 处报幕句后 0 命中，demo 前 20 章 0 命中。
-const TRAILER_SPOILER_PATTERN = /没人知道|谁也不知道|谁也没想到|[他她它]们?不知道的是|殊不知/g;
+const TRAILER_SPOILER_PATTERN = /没人知道(?!怎么|哪|谁|啥|什么|的)|谁也不知道(?!怎么|哪|谁|啥|什么|的)|谁也没想到|[他她它]们?不知道的是|殊不知/g;
 const TRAILER_CLICHE_PATTERN = /(?:这)?才刚刚开(?:始|头)|正(?:朝着|向着)[^。！？!?\n]{0,24}(?:压|涌|袭|逼)(?:了?过去|了?过来|来)|(?<!正式)拉开(?:序幕|帷幕)|即将(?:开始|来临|降临)/g;
 const TRAILER_ENDING_PATTERN = new RegExp(`${TRAILER_SPOILER_PATTERN.source}|${TRAILER_CLICHE_PATTERN.source}`, 'g');
 const TRAILER_ENDING_WINDOW_CHARS = 250;
@@ -1620,7 +1620,7 @@ function findMicroActionTic(proseLines) {
     column: 1,
     type: 'micro-action-tic',
     severity: 'advisory',
-    message: `微动作复读：「了下/了一下」式轻量补语 ${hits} 处（${perKilo.toFixed(1)}/千字）；同一反应模板高密度复现是机械指纹，合并动作 beat、换具体细节，别每个动作都补一个轻反应尾巴。`,
+    message: `微动作复读：「了下/了一下」式轻量补语 ${hits} 处（${perKilo.toFixed(1)}/千字）；同一反应模板高密度复现是机械指纹，合并连串小动作、换具体细节，别每个动作都补一个轻反应尾巴。`,
     excerpt: compact(samples.join(' ')),
   }];
 }
@@ -2078,7 +2078,7 @@ function findIdlePropDecorationTic(proseLines, mode = 'long') {
     column: 1,
     type: 'idle-prop-decoration-tic',
     severity: 'advisory',
-    message: `闲笔材质/道具贴纸过密：引号外叙述出现 ${uniqueProps.size} 种材质/服饰/光影/声效贴纸（${uniquePerKilo.toFixed(1)}/千字），且口语连接仅 ${connPerKilo.toFixed(1)}/千字；按刀子物件原则只留改变局势或露破绽的实证物，删掉无功能静物贴纸并补足人物盘算。`,
+    message: `闲笔材质/道具摆设过密：引号外叙述出现 ${uniqueProps.size} 种材质/服饰/光影/声效摆设（${uniquePerKilo.toFixed(1)}/千字），且口语连接仅 ${connPerKilo.toFixed(1)}/千字；只留改变局势或露破绽的关键道具和证物，删掉没用的环境摆设并补足人物盘算。`,
     excerpt: compact([...uniqueProps].slice(0, 8).join(' | ')),
   }];
 }

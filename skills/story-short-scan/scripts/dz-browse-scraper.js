@@ -249,6 +249,10 @@ function scrapeChannel(port, channelId) {
 }
 
 function main() {
+  if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    console.log("用法：node dz-browse-scraper.js [--channel male|female|all] [--port 9222] [--outdir 扫榜/YYYYMMDD]");
+    return 1;
+  }
   if (!["all", "male", "female"].includes(CHANNEL)) {
     throw new Error(`未知 --channel: ${CHANNEL}（支持 male/female/all）`);
   }

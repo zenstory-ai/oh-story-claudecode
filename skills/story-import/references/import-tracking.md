@@ -36,7 +36,7 @@ node {story-import skill 根}/scripts/tracking_commit.js check --project {书目
 }
 ```
 
-**容量**：软提醒（`warnings`，不阻断）——角色列表单项 ≤600B、单角色快照 ≤16384B、`active_character_names`（仅下章活跃且已有快照者）≤20 人、`long_term_constraints` ≤6 条、`上下文.md` ≤12288B（固定 7 栏，活跃伏笔 ≤8 条）；单视图硬上限 **65536B**（超限拒绝写入）。报错改 `init.json` 重跑。
+**容量**：软提醒（`warnings`，不阻断）——`recent_chapters[].summary` ≤360B（约 120 字）、角色列表单项 ≤600B、单角色快照 ≤16384B、`active_character_names`（仅下章活跃且已有快照者）≤20 人、`long_term_constraints` ≤6 条、`上下文.md` ≤12288B（固定 7 栏，活跃伏笔 ≤8 条）；单视图硬上限 **65536B**（超限拒绝写入）。可先跑 `tracking_commit.js init-draft` 生成模板骨架，报错改 `init.json` 重跑。
 
 ## 三、验收
 

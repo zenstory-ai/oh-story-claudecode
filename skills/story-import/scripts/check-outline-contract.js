@@ -231,7 +231,7 @@ function verify(file, projectRoot = null, options = {}) {
   checks.push(makeCheck(
     'outline.plotpoint-table', headerOk, name,
     header ? `表头：${header.join(' | ')}` : '未找到 | # | 情节点 | 作用 | 表头',
-    '情节细化建议使用表格：# / 情节点（谁做了什么） / 作用；需要时可加「分辨率」列，表末可加「分寸」列',
+    '情节细化建议使用三列表：# / 情节点（谁做了什么） / 作用（兼容旧细纲附带「分辨率」「分寸」列）',
     '复核情节点是否清晰可执行；需要规范时改成三列表，若现有写法已够清晰可保留。',
     'advisory'
   ))

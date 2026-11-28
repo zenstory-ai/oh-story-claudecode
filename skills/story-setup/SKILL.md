@@ -27,10 +27,10 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 1. 检查当前目录是否已部署过（存在 `.story-deployed`）
    - `agents_version` 缺失、非整数或小于 `47` → 标记为待更新，继续执行当前部署
-   - `agents_version: 47` → 使用 AskUserQuestion 确认是否重新部署；提示里写明重新部署只用**当前本地 skill 包**刷新项目文件，要拿 skill 本身的新版本得先更新 oh-story-claudecode（`npx skills add` 或 marketplace），再回来重跑
+   - `agents_version: 47` → 用宿主可用的提问方式确认是否重新部署；提示里写明重新部署只用**当前本地 skill 包**刷新项目文件，要拿 skill 本身的新版本得先更新 oh-story-claudecode（`npx skills add` 或 marketplace），再回来重跑
    - `agents_version` 大于 `47` → 当前 story-setup 比项目部署旧；停止以避免降级覆盖，提示先更新 oh-story-claudecode，不写任何部署文件
-   - 同时读 `target_cli` 字段。**已部署项目以 sentinel 里的值为准**：非空时（逗号分隔的多端组合原样保留）这些端照常重新部署，不再让作者选；第 4 步仍判断当前宿主：判断出来且不在其中（作者换了软件）→ AskUserQuestion 问「这个文件夹之前是给 {已部署宿主名} 装的，你现在用的是 {当前宿主名}，要一起装上吗？」（「一起装上（推荐）」「只更新原来的」），选前者就加进 `target_cli`；判断不出不问。字段缺失或为空才走第 4-6 步。用户明确要求增删目标端时，用 AskUserQuestion 在现有值基础上改，改完的值写回 sentinel。
-   - `target_cli` 不含 opencode、但项目里有 `.opencode/plugins/story-hooks.ts` 或 `.opencode/agents/`（多端部署时 OpenCode 曾被版本门拦下）→ 用 AskUserQuestion 问是否把 OpenCode 加回来；选加回则先过 [references/deploy-opencode.md](references/deploy-opencode.md) 的「部署前置」，通过后写回 `target_cli`
+   - 同时读 `target_cli` 字段。**已部署项目以 sentinel 里的值为准**：非空时（逗号分隔的多端组合原样保留）这些端照常重新部署，不再让作者选；第 4 步仍判断当前宿主：判断出来且不在其中（作者换了软件）→ 用宿主可用的提问方式问「这个文件夹之前是给 {已部署宿主名} 装的，你现在用的是 {当前宿主名}，要一起装上吗？」（「一起装上（推荐）」「只更新原来的」），选前者就加进 `target_cli`；判断不出不问。字段缺失或为空才走第 4-6 步。用户明确要求增删目标端时，用宿主可用的提问方式在现有值基础上改，改完的值写回 sentinel。
+   - `target_cli` 不含 opencode、但项目里有 `.opencode/plugins/story-hooks.ts` 或 `.opencode/agents/`（多端部署时 OpenCode 曾被版本门拦下）→ 用宿主可用的提问方式问是否把 OpenCode 加回来；选加回则先过 [references/deploy-opencode.md](references/deploy-opencode.md) 的「部署前置」，通过后写回 `target_cli`
 2. 检查是否有书名目录（包含 `追踪/` 子目录的目录，或用户自定义结构）
    - 有 → 识别为长篇项目，显示当前项目信息
    - 无 → 识别为新项目或短篇项目
@@ -52,9 +52,9 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
    > 后三类只认各端**互斥**的标记：`skills/*/SKILL.md` 的 `metadata.openclaw` 不作 OpenClaw 信号（14 个 skill 都带，三条 skills-only 路径部署出的 `skills/` 一样）；`.agents/skills/` 由 Antigravity、Codex 与 Reasonix 共用，也不单独作准。
 6. 定下 `target_cli`：
-   - 第 4 步定出了当前宿主 → `target_cli` 就是它。项目里另有其他宿主的标记时，用 AskUserQuestion 问一句白话：「这个文件夹之前也给 {其他宿主名} 装过写作工具，这次要一起更新吗？」选项：「只装 {当前宿主名}（推荐）」「一起更新」。作者一开始就说要装多个时照办。
-   - 定不出、项目标记恰好只有一个宿主 → AskUserQuestion 问「上次是给 {宿主名} 装的，这次还是它吗？」，是就用它，不是按下一条问。
-   - 定不出、其余情况 → 用 AskUserQuestion 问：「你现在是在哪个软件里跟我对话？」选项用产品名加一句说明：Claude Code（Anthropic 的命令行 / 桌面版）、Codex（OpenAI 的命令行）、OpenCode、Google Antigravity（含命令行 agy）、ZCode、OpenClaw、Reasonix（DeepSeek 的命令行）、网页版 AI 或其他工具（NarraFork、自建 Agent 等）、好几个都要用。提问工具一次放不下这么多选项时，把项目标记里出现过的放前面，其余让作者在「其他」里直接写名字。
+   - 第 4 步定出了当前宿主 → `target_cli` 就是它。项目里另有其他宿主的标记时，用宿主可用的提问方式问一句白话：「这个文件夹之前也给 {其他宿主名} 装过写作工具，这次要一起更新吗？」选项：「只装 {当前宿主名}（推荐）」「一起更新」。作者一开始就说要装多个时照办。
+   - 定不出、项目标记恰好只有一个宿主 → 用宿主可用的提问方式问「上次是给 {宿主名} 装的，这次还是它吗？」，是就用它，不是按下一条问。
+   - 定不出、其余情况 → 用宿主可用的提问方式问：「你现在是在哪个软件里跟我对话？」选项用产品名加一句说明：Claude Code（Anthropic 的命令行 / 桌面版）、Codex（OpenAI 的命令行）、OpenCode、Google Antigravity（含命令行 agy）、ZCode、OpenClaw、Reasonix（DeepSeek 的命令行）、网页版 AI 或其他工具（NarraFork、自建 Agent 等）、好几个都要用。提问工具一次放不下这么多选项时，把项目标记里出现过的放前面，其余让作者在「其他」里直接写名字。
    - 作者的答案按「Claude Code → `claude-code`、网页版 AI 或其他工具 → `generic`、其余取小写产品名」换成 `target_cli`；多端为 `claude-code,opencode,codex,antigravity,zcode,openclaw,reasonix,generic` 中选中的端。
 7. **确认项目根（通常不问）**：项目根就是当前工作目录。只有当前目录是用户主目录、磁盘根目录、系统目录，或就是本 skill 包自身的安装/源码目录时，才用一句白话问作者：「写作工具要装在哪个文件夹？一般就是放书稿的那个文件夹。」其他情况直接部署，在安装报告的「部署明细」里写明装在哪。
 

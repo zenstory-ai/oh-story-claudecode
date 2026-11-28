@@ -6,7 +6,7 @@
 
 ## 边界与优先级
 
-从高到低：1. 安全、授权、平台交付、字数与文件协议（句长/视角/修辞/标点偏好不算硬门禁） → 2. 当前请求明确要求 → 3. 本书 `设定/文风.md`、题材定位、细纲与设定 → 4. 本书作者记忆 → 5. 题材/流程/全局作者记忆 → 6. 对标与通用方法。低优先级只补缺项，不改小说事实、审稿标准或剧情意图。
+从高到低：1. 安全、授权、平台交付、字数与文件协议（句长/视角/修辞/标点偏好不算硬性限制） → 2. 当前请求明确要求 → 3. 本书 `设定/文风.md`、题材定位、细纲与设定 → 4. 本书作者记忆 → 5. 题材/流程/全局作者记忆 → 6. 对标与通用方法。低优先级只补缺项，不改小说事实、审稿标准或剧情意图。
 
 ## 存放与路由
 
@@ -55,7 +55,7 @@
 
 ```text
 node {当前 skill 根}/scripts/author_memory_commit.js record  --workspace {工作区} [--book-root {书目录}] --input {工作区}/.story/work/作者记忆-事件.json
-node {当前 skill 根}/scripts/author_memory_commit.js query   --workspace {工作区} --book-root {书目录} --kind {类型}（必传，可重复） [--genre {题材}] [--workflow {流程}]
+node {当前 skill 根}/scripts/author_memory_commit.js query   --workspace {工作区} [--book-root {书目录}] --kind {类型}（必传，可重复） [--genre {题材}] [--workflow {流程}]
 node {当前 skill 根}/scripts/author_memory_commit.js migrate --workspace {工作区} --book-root {书目录}
 node {当前 skill 根}/scripts/author_memory_commit.js check   --workspace {工作区} [--book-root {书目录}] [--strict]
 ```

@@ -23,7 +23,7 @@ const fs = require('fs')
 const path = require('path')
 
 const MARKERS = [
-  { style: 'numeric-heading', pattern: /^###\s*\d+\.$/ },
+  { style: 'numeric-heading', pattern: /^###\s*\d+\.?$/ },
   { style: 'chapter-heading', pattern: /^###\s*第[一二三四五六七八九十百千万两〇零0-9]+章(?:[\s\u3000].{1,30})?$/ },
   { style: 'zhihu-numeric', pattern: /^\d+\.$/ },
 ]
@@ -53,7 +53,7 @@ function markerFor(line) {
 }
 
 function isStructuralNonProse(trimmed) {
-  return /^#{1,6}\s/.test(trimmed) || /^-{3,}$/.test(trimmed) || /^[*_]{3,}$/.test(trimmed)
+  return /^#{1,6}\s/.test(trimmed) || LEAD_HEADING_RE.test(trimmed) || /^-{3,}$/.test(trimmed) || /^[*_]{3,}$/.test(trimmed)
 }
 
 function stripHtmlCommentsFromLines(rawLines) {
@@ -169,14 +169,17 @@ function detectLead(cleanLines, markers) {
     const trimmed = cleanLines[i].trim()
     if (!trimmed || isStructuralNonProse(trimmed)) continue
     if (seenProse && LEAD_SEP_RE.test(trimmed)) {
-      return {
-        placement: 'ch1-top-embedded',
-        chars: embeddedChars,
-        separator: trimmed,
-        separatorLine: i + 1,
-        leadText: embeddedLines.join('\n'),
-        sec1StartIdx: i + 1,
+      if (embeddedChars > 0 && embeddedChars <= 600) {
+        return {
+          placement: 'ch1-top-embedded',
+          chars: embeddedChars,
+          separator: trimmed,
+          separatorLine: i + 1,
+          leadText: embeddedLines.join('\n'),
+          sec1StartIdx: i + 1,
+        }
       }
+      break
     }
     if (DIVIDER_LINE_RE.test(trimmed)) continue
     seenProse = true
@@ -238,11 +241,14 @@ function findLeadRewind(leadText, sec1HeadText, minRun = 12) {
   return { length: bestLen, excerpt }
 }
 
+const ONOMATOPOEIA_EM_DASH_RE = /^[砰咚轰哐啪嘭呼呜嗡吱嘎叮铛滋哗噼啪哗啦咔嚓]+——[！？。]?$/
+
 function countNarrationEmDashes(bodyLines) {
   const speechRe = /(?:“[^”\n]*”|「[^」\n]*」|『[^』\n]*』|"[^"\n]*"|【[^】\n]*】)/g
   let count = 0
   for (const { line } of bodyLines) {
     if (DIVIDER_LINE_RE.test(line)) continue
+    if (ONOMATOPOEIA_EM_DASH_RE.test(line.trim())) continue
     const narration = line.replace(speechRe, '')
     const matches = narration.match(/(?<!—)——(?!—)/g)
     if (matches) count += matches.length
@@ -375,9 +381,13 @@ function countSections(text, projectDir = null) {
   const bodyLines = collectBodyLines(cleanLines, markers, lead)
 
   const sections = markers.map((entry, index) => {
+    const start = entry.line
     const end = index + 1 < markers.length ? markers[index + 1].line - 1 : cleanLines.length
-    const chars = visibleChars(cleanLines.slice(entry.line, end).join('\n'))
-    return { section: index + 1, marker: entry.text, chars }
+    const secBody = bodyLines.filter((b) => b.index >= start && b.index < end)
+    const secLines = secBody.length
+    const secBodyChars = secBody.reduce((sum, b) => sum + visibleChars(b.line), 0)
+    const avgChars = secLines > 0 ? Number((secBodyChars / secLines).toFixed(1)) : 0
+    return { section: index + 1, marker: entry.text, chars: secBodyChars, lines: secLines, avg_chars: avgChars }
   })
 
   const paraLengths = bodyLines.map(({ line }) => visibleChars(line)).filter((len) => len > 0)
@@ -399,6 +409,9 @@ function countSections(text, projectDir = null) {
 
   const totalChars = visibleChars(text)
   const preMarkerLeadChars = lead.placement === 'before-first-marker' ? lead.chars : 0
+  const denseSections = sections
+    .filter((s) => s.lines > 0 && s.avg_chars > 26)
+    .map((s) => ({ section: s.section, lines: s.lines, avg_chars: s.avg_chars }))
   return {
     total_chars: totalChars,
     raw_visible_chars: totalChars,
@@ -410,6 +423,7 @@ function countSections(text, projectDir = null) {
     long_dialogue_45_ratio: dialogue.longDialogue45Ratio,
     paywall_preview_ratio: paywallPreviewRatio,
     section_count: sections.length,
+    dense_sections: denseSections,
     sections,
   }
 }
@@ -488,9 +502,13 @@ function verify(projectDir, contract, options = {}) {
   })
 
   const sectionCounts = markers.map((entry, index) => {
+    const start = entry.line
     const end = index + 1 < markers.length ? markers[index + 1].line - 1 : cleanLines.length
-    const count = visibleChars(cleanLines.slice(entry.line, end).join('\n'))
-    return { section: index + 1, marker: entry.text, chars: count }
+    const secBody = bodyLines.filter((b) => b.index >= start && b.index < end)
+    const secLines = secBody.length
+    const secBodyChars = secBody.reduce((sum, b) => sum + visibleChars(b.line), 0)
+    const avgChars = secLines > 0 ? Number((secBodyChars / secLines).toFixed(1)) : 0
+    return { section: index + 1, marker: entry.text, chars: secBodyChars, lines: secLines, avg_chars: avgChars }
   })
 
   checks.push(makeCheck(
@@ -612,8 +630,8 @@ function verify(projectDir, contract, options = {}) {
     'delivery.short-dialogue-share',
     dialogueOk,
     dialogueEvidence,
-    '建议常规短篇对话/心声弹幕占比 25%-35%（第一人称悬疑/吐槽独白流允许 15%-22%，软检底线 ≥15%）',
-    '复核对话占比：常规题材若偏低且中段大段旁白转述冲突，改成当面对质或短促台词交锋；第一人称悬疑/吐槽独白流允许 15%-22%，更低时确认是否有意为之。',
+    '建议强冲突短篇多靠引号对白推剧情，吐槽/悬疑独白流可略少（软检底线 ≥15%）',
+    '复核对话占比：常规强冲突题材若偏低且中段大段旁白转述冲突，改成当面对质或短促台词交锋；第一人称悬疑/吐槽独白流低于 15% 时确认是否有意为之。',
     'advisory'
   ))
   checks.push(makeCheck(
@@ -629,15 +647,16 @@ function verify(projectDir, contract, options = {}) {
   let emDashEvidence = '正文不足 200 字，跳过旁白破折号检查'
   if (bodyChars >= 200) {
     const narrationEmDash = countNarrationEmDashes(bodyLines)
-    const per10k = (narrationEmDash / bodyChars) * 10000
-    emDashOk = narrationEmDash <= 2 || per10k <= 2
+    const perK = (narrationEmDash / bodyChars) * 1000
+    const per10k = perK * 10
+    emDashOk = narrationEmDash < 6 || perK < 1.5
     emDashEvidence = `叙述旁白破折号「——」${narrationEmDash} 处（约 ${per10k.toFixed(1)} 处/万字）`
   }
   checks.push(makeCheck(
     'delivery.short-em-dash',
     emDashOk,
     emDashEvidence,
-    '建议短篇叙述旁白破折号「——」≤2 处/万字（实测真人短篇中位 0 处/万字；对话打断不计）',
+    '短篇叙述旁白尽量少用破折号「——」（达到 ≥6 处且 ≥1.5 处/千字提醒；对话打断不计）',
     '复核旁白破折号：将解释补充型「——」拆成两句短段或直接删去冗余解释，仅保留必要停顿。',
     'advisory'
   ))
@@ -659,8 +678,8 @@ function verify(projectDir, contract, options = {}) {
     'delivery.short-lead-present',
     leadOk,
     leadEvidence,
-    '建议多节短篇设置 1-500 字冷开场导语（知乎置于首节标记前；七猫/黑岩/点众可内嵌于首节开头至……/1.前）',
-    '复核导语：若投稿平台需要冷开场导语，在首个小节标记前或首节开头补 150-300 字导语（或压短过长导语）；刻意直入第 1 节可保留。',
+    '建议多节短篇设置 1-500 字开门见山导语（知乎置于首节标记前；七猫/黑岩/点众可内嵌于首节开头至……/1.前）',
+    '复核导语：若投稿平台需要开门见山导语，在首个小节标记前或首节开头补 150-300 字导语（或压短过长导语）；刻意直入第 1 节可保留。',
     'advisory'
   ))
 
@@ -690,8 +709,8 @@ function verify(projectDir, contract, options = {}) {
     'delivery.short-lead-rewind',
     rewindOk,
     rewindEvidence,
-    '建议导语与第 1 节首 400 字零秒续接，避免连续 ≥12 字原句倒带复述',
-    '删去第 1 节开头复述导语的原句，改用刀口微距接拍、冷吐槽撕局、赌注扩容或微细节秒验零秒续接。',
+    '建议导语与第 1 节首 400 字直接续接，避免连续 ≥12 字原句倒带复述',
+    '删去第 1 节开头复述导语的原句，改用顺着末句往下演、冷吐槽破局、把赌注翻倍或细节秒验直接续接。',
     'advisory'
   ))
 
@@ -718,7 +737,7 @@ function verify(projectDir, contract, options = {}) {
     paywallRatioOk,
     paywallRatioEvidence,
     '建议付费卡点节末累计实际正文落在全文 30%–45% 区间（知乎盐言中位约 38%）',
-    '复核免费段篇幅：偏高时压缩前段铺垫或前移卡点，偏低时补足前段赌注；若属意难平/死人文学蓄压轨可确认保留。',
+    '复核免费段篇幅：偏高时压缩前段铺垫或前移卡点，偏低时补足前段赌注；若属意难平/死人文学慢蓄压写法（可蓄压至 50%–55% 爆发）可确认保留。',
     'advisory'
   ))
 

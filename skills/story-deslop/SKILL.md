@@ -13,10 +13,10 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 ## 执行边界
 
 - 未限定范围时完整查表达、用笔、故事三层；用户指定词句、段落或某类问题时只查指定范围。
-- 可直接修表达、恢复已有承接、删无功能冗余或调详略，但须保护伏笔、因果、人物选择、情绪体验与揭露顺序。改变事件、动机、结果或新增成立条件，须先出设计提案获授权；不靠加微动作、无功能材质/服饰/天气声效贴纸或硬造冲突制造「真人感」。
+- 可直接修表达、恢复已有承接、删无功能冗余或调详略，但须保护伏笔、因果、人物选择、情绪体验与揭露顺序。改变事件、动机、结果或新增成立条件，须先出设计提案获授权；不靠加微动作、没用的材质穿搭和空镜摆设或硬造冲突制造「真人感」。
 - 文风裁决只管表达，不改事实与信息边界。准确直写情绪、角色算账判断、带立场叙述与功能性停顿均可保留，不机械套「只展示不说明」、固定句长或删减率。
 - 只要求检测时只出诊断、不改正文；说「去AI味」「这篇太AI了」按改稿处理（表达与用笔直接改，故事层缺口给选项待授权）。作者报告用白话、原文位置与读感后果，不写检测类别名或脚本字段。
-- 长篇项目（有 `正文/` 与 `追踪/`）涉及事件、关系、人物所知或结果修改时，即使已授权也带诊断转 `/story-long-write`「修改第X章」执行以同步追踪；本流程只改表达、用笔与已有依据的承接。
+- 长篇项目（有 `正文/` 与 `追踪/`）涉及核心事件、结局或关系走向修改时，即使已授权也带诊断转 `/story-long-write`「修改第X章」以同步追踪；仅修表达、用笔或不改结局的局部细节与事实自洽补洞且获授权时可直接改，有追踪字段变动再补提交。
 - 接收外部报告或 `/story-review` 结论时，只提取可定位到正文的问题。只复用调用方已有的作者偏好，独立调用不查不记作者记忆。
 
 ## 去味流程
@@ -25,7 +25,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 由正文路径定书目录与篇幅：单个 `正文.md` 为短篇，`正文/` 下逐章文件为长篇（优先作者/项目明确说明）。短篇必读 [references/short-deslop.md](references/short-deslop.md)，其规则覆盖表优先于通用默认值。
 
-读取 [references/deslop-guide.md](references/deslop-guide.md)（含表达/用笔/故事三层方法、deslop-guide.md「按检测类别或问题限定范围」与 28 类脚本信号索引）；需核对具体词条时再查 [references/banned-words.md](references/banned-words.md)。通读本次正文并按需查相关前文/已定设计，不整读无关全书；资料缺失标明未知。多章时逐章跑完 Phase 1–4 再进下一章。
+读取 [references/deslop-guide.md](references/deslop-guide.md)（含表达/用笔/故事三层方法、deslop-guide.md「按检测类别或问题限定范围」与 29 类脚本信号索引）；需核对具体词条时再查 [references/banned-words.md](references/banned-words.md)。通读本次正文并按需查相关前文/已定设计，不整读无关全书；资料缺失标明未知。多章时逐章跑完 Phase 1–4 再进下一章。
 
 本地正文先跑确定性预检（从本 skill 根执行，正文用绝对路径；`--mode=auto` 对 `正文.md` 自动走 short 模式，非 `正文.md` 的短篇文件传 `--mode=short`）：
 
@@ -81,11 +81,11 @@ style_resolution：{生效要求及来源、覆盖的默认条款、事实与信
 
 ```bash
 node scripts/check-ai-patterns.js --check --fail-on=review_required --mode=auto <正文文件...>
-node scripts/check-degeneration.js --check --fail-on=blocking <正文文件...>
+node scripts/check-degeneration.js --check --fail-on=review_required <正文文件...>
 ```
 
-- 退出 1 为有 `review_required`（句式）或 `blocking`（退化），退出 2 为命令/文件错。
-- 句式 `review_required` 优先自然改写，确需保留可说明理由（长篇提交传 `--ack <rule-id>:<理由>`）或登记白名单；退化 `blocking`（复读/打转/截断/工程词）必须重写受损段再核对事实。
+- 退出 1 为有 `review_required` 或 `blocking`，退出 2 为命令/文件错。
+- 句式与退化 `review_required`（含屏蔽拼音/作者元信息行）优先自然改写，确需保留可说明理由（长篇提交传 `--ack <rule-id>:<理由>`）或登记白名单；退化 `blocking`（复读/打转/截断/占位符/粗体残留/工程词）必须重写受损段再核对事实。
 - 语义改完且无硬阻断后整理标点（完整去味跑脚本；局部修改只在范围内人工修）：
 
 ```bash

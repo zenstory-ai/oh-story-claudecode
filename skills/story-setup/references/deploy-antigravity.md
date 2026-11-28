@@ -27,7 +27,7 @@
 Antigravity 2.0 使用项目 `.agents/` 根，部署时创建 `.agents/skills`、`.agents/agents`、`.agents/rules`、`.agents/hooks` 并合并 `.agents/hooks.json`，部署 Skills、Always-On Rule、7 个 subagents 与 Hooks；不改 `~/.gemini/`。
 
 1. 找到当前包 14 个已知 skill 目录（`browser-cdp` 与 `story*`），调用 `node "{story-setup skill目录}/scripts/deploy-antigravity-skills.js" --source "{当前 skill 包根}" --dest "{项目}/.agents/skills"` 原子物化。helper 只替换 14 个已知名称、保留用户其他 skills，源目标同 realpath 时 no-op。目标须为**真实目录**，不建 `.agents/skills → ../skills` symlink；与 `reasonix` 多端共存时，由 Antigravity 维护该真实目录（Reasonix 原生扫描 `.agents/skills` 真实目录照常生效，不另建 symlink）。
-   - 若 `.agents/skills` 已是 symlink，helper 先停止且不沿链接写入。用 AskUserQuestion 说明：迁移会把链接可见 skills 复制到项目内真实目录、只更新 14 个 oh-story 名称、保留链接目标原样，但把 symlink 换成目录（可能产生较大 git diff）。仅在用户明确同意后加 `--migrate-symlink` 重跑，拒绝则停止部署并报告未获完整支持；多端部署或已有 Codex/Reasonix symlink 不得跳过此确认。
+   - 若 `.agents/skills` 已是 symlink，helper 先停止且不沿链接写入。用宿主可用的提问方式说明：迁移会把链接可见 skills 复制到项目内真实目录、只更新 14 个 oh-story 名称、保留链接目标原样，但把 symlink 换成目录（可能产生较大 git diff）。仅在用户明确同意后加 `--migrate-symlink` 重跑，拒绝则停止部署并报告未获完整支持；多端部署或已有 Codex/Reasonix symlink 不得跳过此确认。
 2. 按上方「部署 Antigravity Agents」运行生成器，原子更新 `.agents/agents/` 下 7 个已知定义并保留其他用户 agent；不从 home 搬运。
 3. 复制 `references/antigravity/rules/oh-story.md` 到 `.agents/rules/oh-story.md`，验证 `trigger: always_on` 且小于 12,000 字符。该 rule 负责路由、硬约束与 compact 恢复；不用根 `AGENTS.md` 代替。
 4. 复制 `references/antigravity/hooks/story_antigravity_hook.js` 与 `story_hook_core.js` 到 `.agents/hooks/`，验证 `node --check`。hook 命令以 `.agents/` 为工作目录，须写 `hooks/story_antigravity_hook.js`（勿写 `.agents/hooks/...`）；共享 core 须与 Claude/Codex/OpenCode/ZCode 副本字节一致。

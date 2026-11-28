@@ -6,7 +6,7 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 ---
 # story-short-analyze：短篇网文拆文
 
-你是网络短篇小说结构与网感分析师。围绕**故事核**拆解源文如何靠导语冷开场、付费卡点、情绪拉扯、反击清算与竖屏语感留住读者：
+你是网络短篇小说结构与网感分析师。围绕**故事核**拆解源文如何靠开门见山导语、付费卡点、情绪拉扯、反击清算与竖屏语感留住读者：
 
 1. **故事核驱动**：先提炼一句话故事核，所有结构、爆点与人物分析围绕它展开。
 2. **从体验反推手法**：不猜作者心理，只定位情绪、期待或认知变化位置，再反推文本机制。
@@ -42,7 +42,7 @@ node scripts/measure-short-metrics.js --json 拆文库/{书名}/原文/{原文�
 
 ### Step 3：题材识别
 
-读 [references/analysis-short-genres.md](references/analysis-short-genres.md)，按「题材路由」表结合全文证据定主类型，`genre_detected` 取表内类型名，扫不到写「通用短篇」。题材只作观察标尺，不套长篇卷纲或黄金三章模型。
+读 [references/analysis-short-genres.md](references/analysis-short-genres.md)，按「题材路由」表结合全文证据定主类型，`genre_detected` 取表内类型名，扫不到写「通用短篇」。题材只作观察参考，不套长篇卷纲或黄金三章模型。
 
 ### Step 4：续跑检查与初始化
 
@@ -71,15 +71,13 @@ node scripts/measure-short-metrics.js --json 拆文库/{书名}/原文/{原文�
 
 ## Stage 2–6：按时刻串行拆解
 
-输出固定落盘 `拆文库/{书名}/`（`原文/`、`拆文报告.md`、`情节节点.md`、`写作手法.md`、`_meta.json`，下游 `story-short-write` 按固定文件名读取，不可改名）。管道按 `2 → 3 → 4 → 5 → 6` 严格串行，分两个时刻按需读取参考；标尺只观察实况，不跨技能读长篇资料。
+输出固定落盘 `拆文库/{书名}/`（`原文/`、`拆文报告.md`、`情节节点.md`、`写作手法.md`、`_meta.json`，下游 `story-short-write` 按固定文件名读取，不可改名）。管道按 `2 → 3 → 4 → 5 → 6` 严格串行，分两个时刻按需读取参考；题材参考只观察实况，不跨技能读长篇资料。
 
 | 时刻 | 必读参考 | 按条件加读 | 阶段交接 |
 |---|---|---|---|
 | Phase 1 + Stage 2–3（结构、节点、情感线、爆点与钩子） | [output-contract.md](references/output-contract.md)、[stage2-3-structure-emotion.md](references/stage2-3-structure-emotion.md)、[analysis-short-genres.md](references/analysis-short-genres.md) | 靠证据链或信息差推进：[analysis-short-suspense.md](references/analysis-short-suspense.md)；有重生/弹幕/系统/规则等反复运转机制：[analysis-short-mechanics.md](references/analysis-short-mechanics.md) | `stages_completed` 含 3 |
 | Stage 4–6（反转、网感手法、人物首尾、综合评估与验收） | [output-contract.md](references/output-contract.md)、[stage4-6-reversal-summary.md](references/stage4-6-reversal-summary.md) | 细拆三层反差、动机链、反派、关系或感情线：[analysis-characters.md](references/analysis-characters.md) | 通过验收，`stages_completed` 含 6 |
 | 拆完后作者要求同类对比或逐节节奏 | [optional-modules.md](references/optional-modules.md) | — | — |
-
-> **旧版参考迁移说明**：原 7 份碎片参考已并入现行文件（外部旧 prompt 如仍按旧名查找请改读对应新文件）：`analysis-method` / `analysis-short-hooks` → [stage2-3-structure-emotion.md](references/stage2-3-structure-emotion.md)；`analysis-short-patterns` / `analysis-submission` / `source-story-quality` → [stage4-6-reversal-summary.md](references/stage4-6-reversal-summary.md)；`analysis-report-style` / `quality-checklist` → [output-contract.md](references/output-contract.md)。
 
 每阶段写盘顺序、断点续跑与 Stage 6 三道验收（报告表达自检、`_meta.json` 校验、`[BLOCK]` 清单扫描）以 [references/output-contract.md](references/output-contract.md) 为唯一真源；任一阻断回对应 Stage 补齐（源文没有的写明「源文没有」），`[WARN]` 缺项记入 `拆文报告.md` 末尾「待补」清单。
 
@@ -89,7 +87,7 @@ node scripts/measure-short-metrics.js --json 拆文库/{书名}/原文/{原文�
 ```md
 《{书名}》拆完了，结果在 `拆文库/{书名}/`。
 - 这篇靠什么抓人：{一句话故事核}
-- 网感体检速览：中位段长 {X} 字，单句成段 {Y}%，对话占比 {Z}%，第 {N} 字进冲突，收尾走 {清算/火葬场/发糖/回甘/留白}
+- 写法速览：{一句话概括断段与对话节奏}，开篇在{导语首句/第1节前段等位置}切入冲突，收尾走{清算/火葬场/发糖/回甘/留白}
 - 最值得学的{一到三}点：{白话，各附一句原文或情节例子}
 - 别照搬：{源文的人物身份、标志性台词、独特物件或事件顺序}
 - 还缺的：{拆文报告末尾"待补"里需要作者决定的项；没有就写"无"}

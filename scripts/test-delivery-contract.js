@@ -503,6 +503,64 @@ try {
     `paywall parity mismatch: delivery="${delivPwCheck.evidence}" vs metrics=${parityMetrics.paywall.cumulative_chars}/${parityMetrics.total_chars} (${expectedPct})`
   )
 
+  // Standalone onomatopoeia lines (e.g. 砰——！ / 轰——！) must not count as narration em-dashes
+  const onoBody = [
+    DEFAULT_LEAD,
+    '###1.',
+    '砰——！',
+    sectionChunk(1000),
+    '###2.',
+    '咚——！',
+    sectionChunk(1000),
+    '###3.',
+    '轰——！',
+    sectionChunk(1000),
+    '###4.',
+    sectionChunk(1000),
+  ].join('\n') + '\n'
+  const onoRes = run(writeCase('short-onomatopoeia-em-dash', onoBody), ['3500', '5500', '4'], undefined, false, ['--strict'])
+  assert.strictEqual(onoRes.status, 0, onoRes.stdout + onoRes.stderr)
+  const onoCheck = onoRes.report.checks.find((c) => c.id === 'delivery.short-em-dash')
+  assert.match(onoCheck.evidence, /0 处/)
+
+  // Parity: measure-short-metrics.js must also exempt standalone onomatopoeia em-dashes
+  const onoMetrics = JSON.parse(spawnSync(process.execPath, [metricsScript, '--json', path.join(tmpRoot, 'short-onomatopoeia-em-dash', '正文.md')], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  }).stdout)
+  assert.strictEqual(onoMetrics.punctuation.em_dash_narration_count, 0)
+
+  // Parity: embedded-lead section[0].chars excludes …… separator (matching measure-short-metrics.js & body_chars)
+  const embParityBody = [
+    '###第1章 开场',
+    DEFAULT_LEAD,
+    '……',
+    sectionChunk(1000),
+    '###第2章 续接',
+    sectionChunk(1000),
+  ].join('\n') + '\n'
+  const embDir = writeCase('embedded-sec1-parity', embParityBody)
+  const embCounts = JSON.parse(spawnSync(process.execPath, [verifier, '--counts', '--json', embDir], { cwd: repoRoot, encoding: 'utf8' }).stdout)
+  const embMetrics = JSON.parse(spawnSync(process.execPath, [metricsScript, '--json', path.join(embDir, '正文.md')], { cwd: repoRoot, encoding: 'utf8' }).stdout)
+  assert.strictEqual(embCounts.sections[0].chars, embMetrics.sections[0].chars)
+  assert.strictEqual(embCounts.sections.reduce((s, x) => s + x.chars, 0), embCounts.body_chars)
+
+  // Spaceless ###导语 heading must be treated as structural non-prose (excluded from lead_chars & body_chars)
+  const spacelessLeadDir = writeCase('spaceless-lead-heading', `###导语\n${DEFAULT_LEAD}\n###1.\n${sectionChunk(1000)}\n###2.\n${sectionChunk(1000)}\n`)
+  const spacedLeadDir = writeCase('spaced-lead-heading', `### 导语\n${DEFAULT_LEAD}\n###1.\n${sectionChunk(1000)}\n###2.\n${sectionChunk(1000)}\n`)
+  const spacelessCounts = JSON.parse(spawnSync(process.execPath, [verifier, '--counts', '--json', spacelessLeadDir], { cwd: repoRoot, encoding: 'utf8' }).stdout)
+  const spacedCounts = JSON.parse(spawnSync(process.execPath, [verifier, '--counts', '--json', spacedLeadDir], { cwd: repoRoot, encoding: 'utf8' }).stdout)
+  assert.strictEqual(spacelessCounts.lead_chars, spacedCounts.lead_chars)
+  assert.strictEqual(spacelessCounts.body_chars, spacedCounts.body_chars)
+
+  // Dotless numeric-heading markers (###1 / ###2, common in real Heiyan commercial shorts) must match measure-short-metrics.js
+  const dotlessDir = writeCase('dotless-numeric-markers', `###1\n${sectionChunk(1000)}\n###2\n${sectionChunk(1000)}\n`)
+  const dotlessCounts = JSON.parse(spawnSync(process.execPath, [verifier, '--counts', '--json', dotlessDir], { cwd: repoRoot, encoding: 'utf8' }).stdout)
+  const dotlessMetrics = JSON.parse(spawnSync(process.execPath, [metricsScript, '--json', path.join(dotlessDir, '正文.md')], { cwd: repoRoot, encoding: 'utf8' }).stdout)
+  assert.strictEqual(dotlessCounts.sections.length, 2)
+  assert.strictEqual(dotlessCounts.sections.length, dotlessMetrics.sections.length)
+  assert.strictEqual(dotlessCounts.body_chars, dotlessMetrics.sections.reduce((s, x) => s + x.chars, 0))
+
   const invalid = spawnSync(process.execPath, [verifier, '--json', '--min-chars', '8000'], {
     cwd: repoRoot,
     encoding: 'utf8',

@@ -287,11 +287,14 @@ function isSingleSentencePara(line) {
   return !matches || matches.length === 0
 }
 
+const ONOMATOPOEIA_EM_DASH_RE = /^[砰咚轰哐啪嘭呼呜嗡吱嘎叮铛滋哗噼啪哗啦咔嚓]+——[！？。]?$/
+
 function countNarrationEmDashes(proseLines) {
   const speechRe = /(?:“[^”\n]*”|「[^」\n]*」|『[^』\n]*』|"[^"\n]*"|【[^】\n]*】)/g
   let count = 0
   for (const line of proseLines) {
     if (DIVIDER_LINE_RE.test(line)) continue
+    if (ONOMATOPOEIA_EM_DASH_RE.test(line.trim())) continue
     const narration = line.replace(speechRe, '')
     const matches = narration.match(/(?<!—)——(?!—)/g)
     if (matches) count += matches.length
@@ -544,7 +547,6 @@ function measureShortMetrics(rawText, filePath = null, options = {}) {
       median_para_chars: Math.round(medianParaChars),
       single_sentence_para_rate: singleSentenceRate,
       dialogue_ratio: dialogueRatio,
-      first_conflict_char: null,
       first_dialogue_char: firstDialogueChar,
       hook_rate: null,
       ending_type: null,
@@ -584,9 +586,9 @@ function formatMarkdownTable(m) {
     `| 单句成段率 | ${pct(m.paragraphs.single_sentence_rate)} | 共 ${m.paragraphs.count} 段 |`,
     `| 对话占比 | ${pct(m.dialogue.ratio)}（≤15字短对白占 ${pct(m.dialogue.short_15_ratio)}，引号：${m.dialogue.quote_style}） | ${m.dialogue.bracket_chars > 0 ? `含【】心声/弹幕 ${m.dialogue.bracket_chars} 字` : '纯引号对白'} |`,
     `| 叙述人称 | ${m.pov.label} | 叙述「我」${m.pov.first_person_per_k}/千字 |`,
-    `| 首冲突字位 | 第 {待确认} 字（首对话${firstDial}） | 标点：「！+？」${m.punctuation.exclaim_question_per_k}/千字，旁白「——」${m.punctuation.em_dash_narration_count} 处（${m.punctuation.em_dash_narration_per_10k}/万字） |`,
+    `| 首冲突位置 | {语义定位，如导语首句/第1节前段}（首对话${firstDial}） | 标点：「！+？」${m.punctuation.exclaim_question_per_k}/千字，旁白「——」${m.punctuation.em_dash_narration_count} 处（${m.punctuation.em_dash_narration_per_10k}/万字） |`,
     `| 非末节节尾卡点率 | {待分析师统计}%（{M}/{N-1} 节带硬钩子） | ${paywallCell} |`,
-    '| 收尾类型 | {明账清算 / 火葬场追悔 / HE发糖 / 细思极恐留白 / 克制回甘 / 开放式} | {是否写足实质代价或首尾回旋镖} |',
+    '| 收尾类型 | {明账清算 / 火葬场追悔 / HE发糖 / 细思极恐留白 / 克制回甘 / 开放式} | {是否写足实质代价或首尾呼应} |',
   ]
   return lines.join('\n')
 }

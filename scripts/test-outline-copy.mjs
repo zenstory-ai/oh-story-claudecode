@@ -360,4 +360,26 @@ fs.readFileSync = function (file, ...args) {
     assert.equal(rNarr.status, 1, rNarr.output);
     assert.ok(rNarr.output.includes(COPIED), rNarr.output);
   });
+
+  test("34. --json outputs structured results for both clean and copied chapters", () => {
+    const oJson = writeFile("json-outline.md", `### 第 1 章：夜查\n- 点1：${COPIED}。\n`);
+    const pClean = writeFile("json-clean.md", "# 第1章 夜查\n\n雨势渐小，他收起账册转身出了大门。\n");
+    const pHit = writeFile("json-hit.md", `# 第1章 夜查\n\n${COPIED}。\n`);
+
+    const rClean = runDetector(["--json", "--outline", oJson, pClean]);
+    assert.equal(rClean.status, 0, rClean.output);
+    const cleanData = JSON.parse(rClean.output);
+    assert.equal(cleanData.ok, true);
+    assert.equal(cleanData.status, 0);
+    assert.equal(cleanData.files.length, 1);
+    assert.equal(cleanData.files[0].hit_count, 0);
+
+    const rHit = runDetector(["--json", "--outline", oJson, pHit]);
+    assert.equal(rHit.status, 1, rHit.output);
+    const hitData = JSON.parse(rHit.output);
+    assert.equal(hitData.ok, false);
+    assert.equal(hitData.status, 1);
+    assert.equal(hitData.files[0].hit_count, 1);
+    assert.equal(hitData.files[0].hits[0].frag, COPIED);
+  });
 });

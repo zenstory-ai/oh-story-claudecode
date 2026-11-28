@@ -1831,11 +1831,11 @@ class Round21RegressionTests(unittest.TestCase):
             after_paren = item.rsplit(')', 1)[-1]
             self.assertGreaterEqual(len(after_paren), 6, f'空摘要或过度截断的时间锚点条目: {item!r}')
 
-        # WS4 回归：writer prompt 必须注入精炼四条写作硬底线，并更新语感切片引导语
+        # WS4 回归：writer prompt 必须注入精炼写作硬底线，并更新语感切片引导语
         self.assertIn('——— 写作硬底线 ———', prompt_p)
         self.assertIn('叙述保人物内心盘算与口语因果连接', prompt_p)
-        self.assertIn('对白净白短打直接交锋', prompt_p)
-        self.assertIn('刀子物件原则', prompt_p)
+        self.assertIn('短对话直接交锋', prompt_p)
+        self.assertIn('关键道具和证物', prompt_p)
         self.assertIn('反派须按私心反咬设阻', prompt_p)
         self.assertIn('只学口语连接、句长断行与对话推进感', prompt_p)
 
@@ -1949,6 +1949,86 @@ console.log('V5_SLICE_UNIT_OK');
             self.assertNotIn('## 2. 常见剧情设计', writer_prompt)
             self.assertNotIn('## 3. 人物设计', writer_prompt)
             self.assertIn('流派正文技巧：已注入「豪门虐恋追妻」4. 正文技巧', writer_report)
+
+    def test_benchmark_auto_recalls_emotion_rhythm_guardrails_and_high_strength(self):
+        # 拆文→写作增强：表格填「引用强度：高」也可识别主对标；即便召回降档成立且 设定/文风.md 含普通代码块，
+        # 仍自动注入主对标 情绪模块(EM-xxx)、节奏循环(RH-xxx)、不建议模仿/分层模仿要点 与 基调匹配原文切片。
+        bench = '对标拆文样板书'
+        (self.book / '设定' / '题材定位.md').write_text(
+            '# 题材定位\n'
+            '- 题材类型：都市高武异能\n'
+            '## 对标登记\n'
+            '| 书名 | 题材类型 | 引用强度 | 用途 |\n'
+            '|---|---|---|---|\n'
+            f'| {bench} | 都市高武异能 | 高 | 节奏与语感主对标 |\n',
+            encoding='utf-8',
+        )
+        (self.book / '设定' / '文风.md').write_text(
+            '# 本书文风\n竖屏自然呼吸。\n```text\n示例面板：气血+10\n```\n',
+            encoding='utf-8',
+        )
+        bdir = self.book / '对标' / bench
+        (bdir / '剧情').mkdir(parents=True, exist_ok=True)
+        (bdir / '文风.md').write_text(
+            f'# {bench} 文风\n\n'
+            '## 分层模仿建议\n'
+            '- 基础层（必学）：短对白快推，叙述默认句号\n'
+            '- 适配层（当前项目）：保留三级参照，不搬道士僵尸专名\n\n'
+            '## 原文锚点片段\n\n'
+            '### 片段 A — 基调：开篇钩子/紧张\n```text\n开篇钩子原文切片测试文本。\n```\n\n'
+            '### 片段 B — 基调：爽点/打脸\n```text\n爽点打脸原文切片测试文本。\n```\n\n'
+            '### 片段 C — 基调：轻松日常\n```text\n日常换气原文切片测试文本。\n```\n\n'
+            '## 不建议模仿\n'
+            '- 感叹号刷屏过密。\n'
+            '- 配角围观三连呼降智且反复报流水账；\n',
+            encoding='utf-8',
+        )
+        (bdir / '剧情' / '情绪模块.md').write_text(
+            '# 情绪模块\n\n'
+            '## 可复现模块卡\n\n'
+            '### EM-001 三级参照打脸\n'
+            '| 字段 | 内容 |\n|---|---|\n'
+            '| 读者想看什么 | 冷门专精越级破限 |\n'
+            '| 情绪链 | 群嘲 → 三级垫脚 → 一击碾穿 → 权威重评 |\n'
+            '| 戏剧单元 | 公开考核反杀 |\n'
+            '| 不可照搬 | 原书人名与道具 |\n',
+            encoding='utf-8',
+        )
+        (bdir / '剧情' / '节奏.md').write_text(
+            '# 节奏索引\n\n'
+            '## 爽点循环索引\n'
+            '| 循环ID | 章节范围 | 铺垫层 | 释放层 | 反应层 | 衔接层/新钩子 | 强度递进 |\n'
+            '|---|---|---|---|---|---|---|\n'
+            '| RH-001 | 第1-2章 | 选冷门遭嘲 | 越级一击破限 | 权威失态重评 | 触发新能力 | 首轮强 |\n',
+            encoding='utf-8',
+        )
+        res = self.run_builder(1)
+        self.assertEqual(res.returncode, 0, res.stderr)
+        prompt_body, report_body = res.stdout.split('以下不进 prompt', 1)
+        self.assertIn('EM-001 三级参照打脸', prompt_body)
+        self.assertIn('RH-001', prompt_body)
+        self.assertIn(f'——— 主对标「{bench}」避坑与写法要点', prompt_body)
+        self.assertIn('感叹号刷屏过密；配角围观三连呼降智且反复报流水账', prompt_body)
+        self.assertNotIn('。；', prompt_body)
+        self.assertNotIn('；；', prompt_body)
+        self.assertIn('适配层（当前项目）', prompt_body)
+        self.assertIn(f'主对标「{bench}」文风原文锚点', report_body)
+        self.assertIn('主对标结构参考：已从', report_body)
+        self.assertIn('主对标避坑：已从', report_body)
+
+        # 验证细纲自然中文基调词可精准命中对应切片（而非因 4 字硬拆落空）
+        (self.book / '大纲' / '细纲_第001章.md').write_text(
+            '### 第 1 章：炖肉换气\n'
+            '- 所属剧情段：U1-1\n'
+            '- 目标情绪：轻松日常烟火暖意\n'
+            '- 主角目标/关键选择：回屋炖肉换气，化开家里紧绷气氛\n'
+            '- 核心事件：买肉回家做晚饭，日常换气\n',
+            encoding='utf-8',
+        )
+        res2 = self.run_builder(1)
+        self.assertEqual(res2.returncode, 0, res2.stderr)
+        prompt2, _ = res2.stdout.split('以下不进 prompt', 1)
+        self.assertIn('【片段 C — 基调：轻松日常】', prompt2)
 
 
 if __name__ == '__main__':

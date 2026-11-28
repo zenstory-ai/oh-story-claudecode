@@ -58,12 +58,12 @@ const _FRONTMATTER_KEY_RE = /^[A-Za-z_\u3400-\u9FFF][^:\n]{0,80}:/;
 const _QUOTED = /“[^”]*”|「[^」]*」|『[^』]*』|"[^"]*"/g;
 const _HAS_QUOTE_RE = /[“”「」『』"]/;
 const _VIS_CHAR_RE = /[\u4e00-\u9fff\uff21-\uff5aA-Za-z0-9]/g;
-const _COLLOQUIAL_CONN_RE = /但是|可是|不过|虽然|因为|所以|偏偏|干脆|其实|毕竟|竟然|好在|倒也|却|才|便|正要|已经/g;
-const CAMERA_REPORT_WARNING_MESSAGE = '叙述偏摄像头报幕，缺人物内心盘算与口语因果连接';
+const _COLLOQUIAL_CONN_RE = /但是|可是|不过|虽然|因为|所以|偏偏|干脆|其实|毕竟|竟然|居然|好在|幸好|倒也|哪知道|省得|免得|结果|反正|关键是|要不然|怪不得|难怪|只是|倒是|反倒|反而|索性|压根|谁知|谁料|原本|本来|终究|总归|哪怕|就算|只好|只得|愣是|硬是|却|才|便|正要|已经/g;
+const CAMERA_REPORT_WARNING_MESSAGE = '叙述偏纯动作碎句，缺人物内心盘算与口语因果连接';
 const _BODY_ACTION_SENTENCE_RE =
   /指尖|指腹|手指|指节|手背|掌心|拳头|手腕|袖口|衣角|喉结|眼眶|眼底|眸光|目光|视线|眼神|眉头|嘴角|唇角|肩膀|呼吸|伸手|抬手|探手|拿起|拿过|取出|取过|掏出|摸出|抓起|攥住|攥紧|握住|握紧|捏住|按住|压住|扣住|拢住|摩挲|推开|拉开|打开|关上|放下|递给|挑开|掀开|扯开|转身|回头|抬头|低头|弯腰|俯身|走到|走向|坐下|站起|盯着|扫过|看向|望向/;
 const _THOUGHT_CAUSAL_SENTENCE_RE =
-  /因为|所以|既然|省得|免得|要不然|否则|怪不得|难怪|偏偏|明明|反正|横竖|索性|干脆|好在|幸亏|毕竟|本来|原本|其实|说白了|说到底|知道|明白|清楚|觉得|以为|盘算|寻思|估摸|琢磨|怀疑|担心|害怕|后悔|心想|暗想|暗道|暗骂|腹诽|犯不着|舍不得|懒得|巴不得/;
+  /因为|所以|既然|省得|免得|要不然|否则|怪不得|难怪|偏偏|明明|反正|横竖|索性|干脆|好在|幸亏|毕竟|本来|原本|其实|说白了|说到底|知道|明白|清楚|觉得|以为|盘算|寻思|估摸|琢磨|怀疑|担心|害怕|后悔|心想|暗想|暗道|暗骂|腹诽|犯不着|舍不得|懒得|巴不得|跟明镜似的|没算到|哪料|谁料|谁知|打定主意|暗松|暗忖|思忖|心知肚明|心里有数|打的主意|料定|算准|压根|终究|总归|反倒|倒是/;
 
 // 与 hooks（JS core DESLOP_SKIP_MARKER）同一语法：注释内只认 ASCII 空格/Tab，冒号全角半角都认。
 const DESLOP_SKIP = /<!--[ \t]*去味[ \t]*(：|:)[ \t]*跳过[ \t]*-->/;
@@ -804,12 +804,16 @@ function plainReport(result) {
   const band = length.user_band || null;
   if (actual !== null && actual !== undefined && band) {
     const span = `${band.min} 到 ${band.max} 字`;
+    const lineSummary =
+      typeof length.line_count === 'number' && length.line_count > 0
+        ? `（共 ${length.line_count} 行，均 ${length.mean_line_chars} 字/行${length.mean_line_chars > 55 ? '，段落偏厚注意拆分文字墙' : length.line_count > 115 && length.mean_line_chars < 24 ? '，碎行偏密注意长短段错落呼吸' : ''}）`
+        : '';
     if (length.status === 'under') {
       lines.push(
-        `可见字数：约 ${actual} 字，比范围（${span}）少了约 ${band.min - actual} 字。欠的不补写，请作者选：收下现在的长度、改细纲或目标后重写、或不要这章。`
+        `可见字数：约 ${actual} 字${lineSummary}，比范围（${span}）少了约 ${band.min - actual} 字。欠的不补写，请作者选：收下现在的长度、改细纲或目标后重写、或不要这章。`
       );
     } else if (length.status === 'over') {
-      lines.push(`可见字数：约 ${actual} 字，比范围（${span}）多了约 ${actual - band.max} 字。`);
+      lines.push(`可见字数：约 ${actual} 字${lineSummary}，比范围（${span}）多了约 ${actual - band.max} 字。`);
       const compression = result.compression;
       if (compression) {
         const remove = compression.remove_to_internal_band;
@@ -818,7 +822,7 @@ function plainReport(result) {
         );
       }
     } else {
-      lines.push(`可见字数：约 ${actual} 字，在范围里（${span}）。`);
+      lines.push(`可见字数：约 ${actual} 字${lineSummary}，在范围里（${span}）。`);
     }
   }
   for (const error of quality.tool_errors || []) {

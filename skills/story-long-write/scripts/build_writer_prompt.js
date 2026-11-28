@@ -354,7 +354,7 @@ function recentTimelineAnchors(project) {
         : (typeof ev.objective_fact === 'string' && ev.objective_fact.trim()
             ? ev.objective_fact
             : (typeof ev.reader_knowledge === 'string' ? ev.reader_knowledge : ''));
-      return { id, ch, storyTime, fact: rawFact.trim().replace(/\s+/g, ' ') };
+      return { id, ch, unrevealed, storyTime, fact: rawFact.trim().replace(/\s+/g, ' ') };
     })
     .sort((a, b) => (a.ch !== b.ch ? a.ch - b.ch : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   if (!valid.length) return null;
@@ -375,11 +375,12 @@ function recentTimelineAnchors(project) {
   let used = Array.from(headerPrefix).length;
   for (let i = recent.length - 1; i >= 0; i -= 1) {
     const ev = recent[i];
-    const baseTag = `${ev.id ? `${ev.id}` : ''}(${ev.ch > 0 ? `第${ev.ch}章揭·` : ''}${truncateChars(ev.storyTime, 22)})`;
+    const chLabel = ev.unrevealed ? '未揭·' : ev.ch > 0 ? `第${ev.ch}章揭·` : '';
+    const baseTag = `${ev.id ? `${ev.id}` : ''}(${chLabel}${truncateChars(ev.storyTime, 22)})`;
     const sepLen = picked.length > 0 ? 1 : 0;
     const baseLen = Array.from(baseTag).length;
     if (ev.fact) {
-      const fullFact = truncateChars(ev.fact, 10);
+      const fullFact = truncateChars(ev.fact, 22);
       const withFact = `${baseTag}${fullFact}`;
       const withFactLen = Array.from(withFact).length;
       const availForFact = TIMELINE_ANCHOR_MAX_CHARS - used - sepLen - baseLen;
@@ -728,7 +729,7 @@ function rawPrimaryBenchmarkValues(project) {
       if (cells[0] === '书名' || cells[0].startsWith('{')) continue;
       if (strengthCol >= 0) {
         const strength = cells[strengthCol] || '';
-        if (!/^主/.test(strength)) continue;
+        if (!/^(?:主|高)/.test(strength)) continue;
       } else if (cells.length >= 3) {
         const fallbackStrength = cells[2] || '';
         if (/^(?:辅|副|参考)/.test(fallbackStrength)) continue;
@@ -756,19 +757,185 @@ function findPrimaryBenchmarkName(project) {
   return fallbackName;
 }
 
-function findBenchmarkStyleFile(project) {
+function findPrimaryBenchmarkDir(project) {
   const mine = ownNames(project);
   const roots = benchmarkSearchRoots(project);
   for (const raw of rawPrimaryBenchmarkValues(project)) {
     const candidates = benchmarkNameCandidates(raw).filter((name) => name && !mine.has(name));
     for (const name of candidates) {
       for (const root of roots) {
-        const file = path.join(root, name, '文风.md');
-        if (isFile(file)) return { file, name };
+        const dir = path.join(root, name);
+        if (isDir(dir)) {
+          const styleFile = path.join(dir, '文风.md');
+          return { dir, name, file: isFile(styleFile) ? styleFile : null };
+        }
       }
     }
   }
   return null;
+}
+
+function findBenchmarkStyleFile(project) {
+  const hit = findPrimaryBenchmarkDir(project);
+  return hit && hit.file ? { file: hit.file, name: hit.name, dir: hit.dir } : null;
+}
+
+function extractMarkdownSection(text, headingRe) {
+  if (!text) return '';
+  const lines = text.split(/\r?\n/);
+  let start = -1;
+  let level = 2;
+  for (let i = 0; i < lines.length; i += 1) {
+    const m = /^(#{1,4})\s+(.+)$/.exec(lines[i]);
+    if (m && headingRe.test(m[2].trim())) {
+      start = i + 1;
+      level = m[1].length;
+      break;
+    }
+  }
+  if (start < 0) return '';
+  const out = [];
+  for (let i = start; i < lines.length; i += 1) {
+    const m = /^(#{1,4})\s+/.exec(lines[i]);
+    if (m && m[1].length <= level) break;
+    out.push(lines[i]);
+  }
+  return out.join('\n').trim();
+}
+
+function trimCap(text, maxChars) {
+  const arr = Array.from(String(text || '').trim());
+  if (arr.length <= maxChars) return arr.join('');
+  return `${arr.slice(0, maxChars).join('').replace(/[，。；、\s]+$/, '')}……`;
+}
+
+function cleanBulletLines(block, maxItems = 4) {
+  if (!block) return [];
+  return block
+    .split(/\r?\n/)
+    .map((ln) => ln.trim())
+    .filter((ln) => ln && !ln.startsWith('>') && !ln.startsWith('<!--') && !/^\s*[-*+]?\s*\{.*\}\s*$/.test(ln) && !/^(?:无|暂无|可空)$/.test(ln.replace(/^[-*+\d.)、\s]+/, '')))
+    .slice(0, maxItems);
+}
+
+function extractBenchmarkGuardrails(benchDir, styleText) {
+  const parts = [];
+  let avoidBlock = extractMarkdownSection(styleText, /^不建议模仿/);
+  if (!avoidBlock && benchDir) {
+    const reportText = readText(path.join(benchDir, '拆文报告.md'));
+    avoidBlock = extractMarkdownSection(reportText, /^不建议模仿/);
+  }
+  const cleanOne = (l) => l.replace(/^[-*+\d.)、\s]+/, '').replace(/[；。;]+$/, '').trim();
+  const avoidLines = cleanBulletLines(avoidBlock, 3).map(cleanOne).filter(Boolean);
+  if (avoidLines.length) {
+    parts.push(trimCap(`不建议模仿：${avoidLines.join('；')}`, 220));
+  }
+  const suggestBlock = extractMarkdownSection(styleText, /^分层模仿建议/);
+  const suggestLines = cleanBulletLines(suggestBlock, 3)
+    .filter((l) => /基础层|适配层|进阶层/.test(l))
+    .map(cleanOne)
+    .filter(Boolean);
+  if (suggestLines.length) {
+    parts.push(trimCap(`分层模仿：${suggestLines.join('；')}`, 260));
+  }
+  const joined = parts.join('\n').trim();
+  return joined || null;
+}
+
+function scoreOverlap(text, hint) {
+  if (!text || !hint) return 0;
+  const hay = String(text).toLowerCase();
+  const rawTokens = [...new Set(String(hint).toLowerCase().split(/[\s/／、,，+＋|｜:：→\-—（）()【】\[\]。！？!?"'“”‘’]+/).filter((t) => t.length >= 2))];
+  let score = 0;
+  for (const tok of rawTokens) {
+    if (hay.includes(tok)) score += 3;
+    if (/^[\u4e00-\u9fff]{4,}$/.test(tok)) {
+      for (let i = 0; i <= tok.length - 2; i += 2) {
+        const sub = tok.slice(i, i + 2);
+        if (hay.includes(sub)) score += 1;
+      }
+    }
+  }
+  return score;
+}
+
+function extractBenchmarkPlotRecall(benchDir, chapter, outlineHint) {
+  if (!benchDir) return null;
+  const out = [];
+  const tags = [];
+  const emPath = path.join(benchDir, '剧情', '情绪模块.md');
+  const emText = readText(emPath);
+  if (emText) {
+    const cards = [];
+    const lines = emText.split(/\r?\n/);
+    let cur = null;
+    for (const ln of lines) {
+      const hm = /^###\s+(EM-\d+[^\n]*)$/.exec(ln.trim());
+      if (hm) {
+        if (cur) cards.push(cur);
+        cur = { title: hm[1].trim(), lines: [] };
+        continue;
+      }
+      if (cur && /^#{1,2}\s+/.test(ln.trim())) {
+        cards.push(cur);
+        cur = null;
+        continue;
+      }
+      if (cur) cur.lines.push(ln);
+    }
+    if (cur) cards.push(cur);
+    if (cards.length) {
+      const start = (Math.max(1, Number(chapter) || 1) - 1) % cards.length;
+      const ranked = cards
+        .map((c, idx) => ({ c, score: scoreOverlap(`${c.title}\n${c.lines.join('\n')}`, outlineHint), rot: (idx - start + cards.length) % cards.length }))
+        .sort((a, b) => (b.score - a.score) || (a.rot - b.rot));
+      const best = ranked[0].c;
+      const body = best.lines.join('\n');
+      const pickField = (label) => {
+        const mTable = new RegExp(`^\\|\\s*\\*{0,2}${label}\\*{0,2}\\s*\\|\\s*([^|\\n]+)`, 'm').exec(body);
+        if (mTable && !/^\{.*\}$/.test(mTable[1].trim())) return mTable[1].trim();
+        const mList = new RegExp(`^[-*+]\\s*\\*{0,2}${label}\\*{0,2}[：:]\\s*(.+)$`, 'm').exec(body);
+        if (mList && !/^\{.*\}$/.test(mList[1].trim())) return mList[1].trim();
+        return '';
+      };
+      const fields = [
+        ['想看', pickField('读者想看什么')],
+        ['情绪链', pickField('情绪链')],
+        ['戏剧单元', pickField('戏剧单元')],
+        ['禁照搬', pickField('不可照搬')],
+      ]
+        .filter(([, v]) => v)
+        .map(([k, v]) => `${k}：${v}`);
+      if (fields.length) {
+        out.push(`  情绪模块（${best.title}）：${trimCap(fields.join('｜'), 230)}`);
+        tags.push(best.title.split(/\s+/)[0]);
+      }
+    }
+  }
+  const rhPath = path.join(benchDir, '剧情', '节奏.md');
+  const rhText = readText(rhPath);
+  if (rhText) {
+    const rows = [];
+    for (const ln of rhText.split(/\r?\n/)) {
+      const m = /^\|\s*(RH-\d+)\s*\|([^|\n]+)\|([^|\n]+)\|([^|\n]+)\|([^|\n]+)\|([^|\n]+)/.exec(ln.trim());
+      if (m) {
+        rows.push({
+          id: m[1].trim(),
+          summary: `铺垫：${m[3].trim()} → 释放：${m[4].trim()} → 反应：${m[5].trim()} → 衔接：${m[6].trim()}`,
+        });
+      }
+    }
+    if (rows.length) {
+      const start = (Math.max(1, Number(chapter) || 1) - 1) % rows.length;
+      const ranked = rows
+        .map((r, idx) => ({ r, score: scoreOverlap(r.summary, outlineHint), rot: (idx - start + rows.length) % rows.length }))
+        .sort((a, b) => (b.score - a.score) || (a.rot - b.rot));
+      const best = ranked[0].r;
+      out.push(`  节奏循环（${best.id}）：${trimCap(best.summary, 150)}`);
+      tags.push(best.id);
+    }
+  }
+  return out.length ? { text: out.join('\n'), tags } : null;
 }
 
 function scoreSliceForGenre(title, body, genreHint) {
@@ -887,7 +1054,7 @@ function extractGenreProseTechniques(rawText) {
   return body || null;
 }
 
-function collectProseSlices(text) {
+function collectProseSlices(text, { allowUnheadedFence = true } = {}) {
   if (!text) return [];
   const lines = text.split('\n');
   const slices = [];
@@ -965,7 +1132,7 @@ function collectProseSlices(text) {
       k += 1;
     }
   }
-  if (!slices.length) {
+  if (!slices.length && allowUnheadedFence) {
     // 兼容无二级/三级切片小节头、直接放 ```text 代码块的 设定/文风.md
     let inFence = false;
     let current = [];
@@ -990,18 +1157,21 @@ function collectProseSlices(text) {
   return slices;
 }
 
-function extractProseSlices(text, chapter = 1, maxSlices = 2, genreHint = '') {
-  const slices = collectProseSlices(text);
+function extractProseSlices(text, chapter = 1, maxSlices = 2, genreHint = '', opts = {}) {
+  const slices = collectProseSlices(text, opts);
   if (!slices.length) return null;
+  const toneHint = opts.toneHint || '';
   let picked;
   if (slices.length <= maxSlices) {
     picked = slices;
-  } else if (genreHint) {
+  } else if (genreHint || toneHint) {
     const start = (Math.max(1, Number(chapter) || 1) - 1) % slices.length;
     const ranked = slices
       .map((s, idx) => ({
         s,
-        score: scoreSliceForGenre(s.title, s.body, genreHint),
+        score:
+          (toneHint ? scoreOverlap(s.title, toneHint) * 3 + scoreOverlap(s.body.slice(0, 120), toneHint) : 0) +
+          (genreHint ? scoreSliceForGenre(s.title, s.body, genreHint) : 0),
         rot: (idx - start + slices.length) % slices.length,
       }))
       .sort((a, b) => (b.score - a.score) || (a.rot - b.rot));
@@ -1166,7 +1336,8 @@ function learnHeadingForm(project, chapter, title) {
   };
 }
 
-function build(project, chapter, report) {
+function build(project, chapter, report, options = {}) {
+  const allowGap = Boolean(options && options.allowGap);
   const errors = [];
   const outlineDir = path.join(project, '大纲');
   const outlineHit = findOutlineFile(outlineDir, chapter);
@@ -1263,7 +1434,11 @@ function build(project, chapter, report) {
   if (chapter > 1) {
     const { prev: prevFile, tail } = previousChapterTail(project, chapter);
     if (prevFile === null || !tail) {
-      errors.push(`必在块缺失：找不到或读不到第 ${chapter - 1} 章正文（如有意跳章写作且前章未落盘，提交时请配合 --allow-gap）`);
+      if (allowGap) {
+        report.push(`上一章结尾：未找到第 ${chapter - 1} 章正文（已启用 --allow-gap，跳过前章尾部注入）`);
+      } else {
+        errors.push(`必在块缺失：找不到或读不到第 ${chapter - 1} 章正文（如有意跳章写作且前章未落盘，可传 --allow-gap；提交时同样配合 --allow-gap）`);
+      }
     } else {
       parts.push(`——— 上一章结尾（承接用，不重写；不给全章路径）———\n${tail}`);
       report.push(`上一章结尾：${path.basename(prevFile)} 末 ${Array.from(tail).length} 字（按整行回退）`);
@@ -1322,6 +1497,18 @@ function build(project, chapter, report) {
     why.push('custom_style=false');
   }
 
+  const primaryBench = !noBenchmark ? findPrimaryBenchmarkDir(project) : null;
+  const outlineToneHint = [
+    targetEmotion || '',
+    extractAny(outlineText, ['核心事件']) || '',
+    extractAny(outlineText, ['章首钩子', '章首']) || '',
+    extractAny(outlineText, ['爽点', '本章回报']) || '',
+    chapter === 1 ? '开篇钩子' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const benchPlotRecall = primaryBench ? extractBenchmarkPlotRecall(primaryBench.dir, chapter, outlineToneHint) : null;
+
   let slotRecall;
   if (!why.length) {
     const lines = [
@@ -1330,20 +1517,39 @@ function build(project, chapter, report) {
       ...(engine ? [`  这段让读者图什么：${engine}`] : []),
       'rhythm_reference：降档（来源：本段剧情「这段怎么排」）',
       ...(tempo ? [`  ${tempo}`] : []),
+      ...(benchPlotRecall
+        ? [
+            `主对标参考结构（「${primaryBench.name}」，只借情绪链与功能位，严禁照搬专名/台词/桥段）：`,
+            benchPlotRecall.text,
+          ]
+        : []),
     ];
     slotRecall = `——— 情绪与节奏召回 ———\n${lines.join('\n')}`;
     report.push(
       `召回降档：成立，${noBenchmark && !customStyle ? '无对标，' : '文风、'}流派包、目标情绪和剧情段 ${unitId} 情绪/节拍均可用`
     );
   } else {
-    slotRecall = `——— 情绪与节奏召回 ———\n${SLOT_MARK} 降档不成立（${why.join('、')}），按 benchmark-recall.md 走全量召回后填此槽`;
+    slotRecall = `——— 情绪与节奏召回 ———\n${SLOT_MARK} 降档不成立（${why.join('、')}），按 benchmark-recall.md 走全量召回后填此槽${
+      benchPlotRecall
+        ? `\n（已从主对标「${primaryBench.name}」预抽候选参考，只借情绪链与功能位、严禁照搬专名/桥段）：\n${benchPlotRecall.text}`
+        : ''
+    }`;
     report.push(`召回降档：不成立（${why.join('、')}）—— 全量召回归主会话`);
+  }
+  if (benchPlotRecall) {
+    report.push(`主对标结构参考：已从「${primaryBench.name}」自动匹配 ${benchPlotRecall.tags.join(' + ')}`);
   }
 
   const { workspace: wsRoot } = findWorkspace(project);
   const isDeployedPack = (base) => {
     const deployedRel = `agent-references/genre-styles/${base}`;
+    const skillRel = path.join('skills', 'story-setup', 'references', 'agent-references', 'genre-styles', base);
     return [
+      path.join(wsRoot, '.claude', skillRel),
+      path.join(wsRoot, '.agents', skillRel),
+      path.join(wsRoot, '.codex', skillRel),
+      path.join(wsRoot, '.zcode', skillRel),
+      path.join(wsRoot, skillRel),
       path.join(wsRoot, '.claude', deployedRel),
       path.join(wsRoot, '.agents', deployedRel),
       path.join(wsRoot, '.codex', deployedRel),
@@ -1383,21 +1589,33 @@ function build(project, chapter, report) {
   const sliceGenreHint = [genreLine(project), authorDecided(project).decided || ''].filter(Boolean).join(' ');
   let proseSliceText = null;
   let proseSliceSource = null;
+  let benchGuardrailsText = null;
+  let benchGuardrailsName = null;
+  const bench = !noBenchmark ? findBenchmarkStyleFile(project) : null;
+  if (primaryBench) {
+    const bStyleRaw = bench ? readText(bench.file) : '';
+    const guardrails = extractBenchmarkGuardrails(primaryBench.dir, bStyleRaw);
+    if (guardrails) {
+      benchGuardrailsText = guardrails;
+      benchGuardrailsName = primaryBench.name;
+    }
+  }
   if (customStyle) {
-    const ownSlices = extractProseSlices(readText(styleFile), chapter, 2, sliceGenreHint);
+    const ownSlices = extractProseSlices(readText(styleFile), chapter, 2, sliceGenreHint, {
+      allowUnheadedFence: !bench,
+    });
     if (ownSlices) {
       proseSliceText = ownSlices;
       proseSliceSource = `本书文风（${styleFile}）原文锚点`;
     }
   }
-  if (!proseSliceText && !noBenchmark) {
-    const bench = findBenchmarkStyleFile(project);
-    if (bench) {
-      const benchSlices = extractProseSlices(readText(bench.file), chapter, 2, sliceGenreHint);
-      if (benchSlices) {
-        proseSliceText = benchSlices;
-        proseSliceSource = `主对标「${bench.name}」文风原文锚点（${bench.file}）`;
-      }
+  if (!proseSliceText && bench) {
+    const benchSlices = extractProseSlices(readText(bench.file), chapter, 2, sliceGenreHint, {
+      toneHint: outlineToneHint,
+    });
+    if (benchSlices) {
+      proseSliceText = benchSlices;
+      proseSliceSource = `主对标「${bench.name}」文风原文锚点（${bench.file}）`;
     }
   }
   if (!proseSliceText && matchedCards.length) {
@@ -1433,6 +1651,9 @@ function build(project, chapter, report) {
   } else {
     report.push('语感锚点：未抽到可用原文切片（请按 benchmark-recall.md 手动补 1-2 段 200-300 字原文锚点）');
   }
+  if (benchGuardrailsText) {
+    report.push(`主对标避坑：已从「${benchGuardrailsName}」注入不建议模仿与写法要点`);
+  }
 
   const timelineAnchorRaw = recentTimelineAnchors(project);
   let timelineAnchor = null;
@@ -1457,6 +1678,11 @@ function build(project, chapter, report) {
     ...(proseSliceText
       ? [
           `——— 语感锚点切片（只学口语连接、句长断行与对话推进感，严禁照抄人名/台词/桥段）———\n${proseSliceText}`,
+        ]
+      : []),
+    ...(benchGuardrailsText
+      ? [
+          `——— 主对标「${benchGuardrailsName}」避坑与写法要点（只学节奏与招式，绝不照抄专名/桥段）———\n${benchGuardrailsText}`,
         ]
       : []),
     ...(timelineAnchor
@@ -1531,9 +1757,9 @@ function build(project, chapter, report) {
   parts.push(
     `——— 作者偏好（作者记下的写作习惯，低优先级倾向，不逐条追求命中）———\n${memoryBlock}`,
     '——— 写作硬底线 ———\n' +
-      '1. 叙述保人物内心盘算与口语因果连接，严禁抽干内心写成主谓宾摄像头分镜电报体。\n' +
-      '2. 对白净白短打直接交锋，严禁每句台词捆绑端杯、摸袖口、看表盘等道具微动作。\n' +
-      '3. 刀子物件原则：只留改局势或露破绽的实证物，删无功能材质/服饰/天气光影/声效贴纸；反派须按私心反咬设阻，禁走打卡过场。',
+      '1. 叙述保人物内心盘算与口语因果连接（1–3 句自然段与短孤句/短对白错落呼吸），禁一行一句的均匀碎短句、纯动作碎句、连刷「因为/毕竟/所以」解释句及旁白人设标签。\n' +
+      '2. 短对话直接交锋，严禁每句台词捆绑端杯、摸袖口、看表盘等道具微动作。\n' +
+      '3. 只留改局势或露破绽的关键道具和证物，删没用的材质/服饰/天气光影/声效摆设；反派须按私心反咬设阻，禁走过场；道具经手、时间账目与物理/行业常识须前后自洽。',
     '检查分工：写手负责编排、内容覆盖和格式自检；主会话质量阶段负责语义去味及最终文件扫描，写手不重复整轮去味。',
     '本次照你的铁律 1-8 与被调用协议执行（细纲边界、正文形状、新增物三级、交付三附件均以你的定义为准）。',
     `字数目标按细纲执行；整章一次写完，直接写到最终输出路径（临时文件只放 ${chapterWorkDir(project, chapter)}，不写 /tmp）；不拆逐点配额、不自测字数。`
@@ -1545,14 +1771,16 @@ function build(project, chapter, report) {
   return { prompt: `${parts.join('\n\n')}\n`, errors: [] };
 }
 
-const USAGE = 'Usage: node build_writer_prompt.js --project DIR --chapter N [--out [FILE]]\n';
+const USAGE = 'Usage: node build_writer_prompt.js --project DIR --chapter N [--out [FILE]] [--allow-gap]\n';
 
 function parseCliArgs(argv) {
-  const args = { project: null, chapter: null, out: null, help: false };
+  const args = { project: null, chapter: null, out: null, allowGap: false, help: false };
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i];
     if (token === '--help' || token === '-h') {
       return { help: true };
+    } else if (token === '--allow-gap') {
+      args.allowGap = true;
     } else if (token === '--project') {
       if (i + 1 >= argv.length) return { error: '--project requires a value' };
       args.project = argv[++i];
@@ -1614,7 +1842,7 @@ function main(argv = process.argv.slice(2)) {
   }
 
   const report = [];
-  const { prompt, errors } = build(project, args.chapter, report);
+  const { prompt, errors } = build(project, args.chapter, report, { allowGap: args.allowGap });
   if (prompt === null) {
     process.stderr.write('组装中止，先修数据再重跑（这不是回落手拼的理由）：\n');
     for (const item of errors) {

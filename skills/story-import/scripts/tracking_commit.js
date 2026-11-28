@@ -2199,6 +2199,8 @@ function entryShapes(chapter) {
       reveal_chapter: `已揭示或部分揭示时写揭示章的整数（不晚于 ${chapter}），未揭示写 null`,
       characters: ['角色名'],
     },
+    'delta.retired_characters': ['退场角色名（字符串数组；仅 append，且不可与本章 character_snapshots 同时更新同一角色）'],
+    'delta.retired_context_items': ['从 context 移除或改写的旧长期约束/旧连贯性风险原句（字符串数组）'],
     'character_snapshots.{角色名}': snapshotShape,
   };
 }
