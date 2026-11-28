@@ -804,12 +804,16 @@ function plainReport(result) {
   const band = length.user_band || null;
   if (actual !== null && actual !== undefined && band) {
     const span = `${band.min} 到 ${band.max} 字`;
+    const lineSummary =
+      typeof length.line_count === 'number' && length.line_count > 0
+        ? `（共 ${length.line_count} 行，均 ${length.mean_line_chars} 字/行，超 35 字长行 ${length.gt35_line_count} 行${length.gt35_line_count > 15 ? '，长行偏多可按第 2 个逗号断行' : ''}）`
+        : '';
     if (length.status === 'under') {
       lines.push(
-        `可见字数：约 ${actual} 字，比范围（${span}）少了约 ${band.min - actual} 字。欠的不补写，请作者选：收下现在的长度、改细纲或目标后重写、或不要这章。`
+        `可见字数：约 ${actual} 字${lineSummary}，比范围（${span}）少了约 ${band.min - actual} 字。欠的不补写，请作者选：收下现在的长度、改细纲或目标后重写、或不要这章。`
       );
     } else if (length.status === 'over') {
-      lines.push(`可见字数：约 ${actual} 字，比范围（${span}）多了约 ${actual - band.max} 字。`);
+      lines.push(`可见字数：约 ${actual} 字${lineSummary}，比范围（${span}）多了约 ${actual - band.max} 字。`);
       const compression = result.compression;
       if (compression) {
         const remove = compression.remove_to_internal_band;
@@ -818,7 +822,7 @@ function plainReport(result) {
         );
       }
     } else {
-      lines.push(`可见字数：约 ${actual} 字，在范围里（${span}）。`);
+      lines.push(`可见字数：约 ${actual} 字${lineSummary}，在范围里（${span}）。`);
     }
   }
   for (const error of quality.tool_errors || []) {

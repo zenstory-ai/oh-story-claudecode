@@ -354,7 +354,7 @@ function recentTimelineAnchors(project) {
         : (typeof ev.objective_fact === 'string' && ev.objective_fact.trim()
             ? ev.objective_fact
             : (typeof ev.reader_knowledge === 'string' ? ev.reader_knowledge : ''));
-      return { id, ch, storyTime, fact: rawFact.trim().replace(/\s+/g, ' ') };
+      return { id, ch, unrevealed, storyTime, fact: rawFact.trim().replace(/\s+/g, ' ') };
     })
     .sort((a, b) => (a.ch !== b.ch ? a.ch - b.ch : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   if (!valid.length) return null;
@@ -375,7 +375,8 @@ function recentTimelineAnchors(project) {
   let used = Array.from(headerPrefix).length;
   for (let i = recent.length - 1; i >= 0; i -= 1) {
     const ev = recent[i];
-    const baseTag = `${ev.id ? `${ev.id}` : ''}(${ev.ch > 0 ? `第${ev.ch}章揭·` : ''}${truncateChars(ev.storyTime, 22)})`;
+    const chLabel = ev.unrevealed ? '未揭·' : ev.ch > 0 ? `第${ev.ch}章揭·` : '';
+    const baseTag = `${ev.id ? `${ev.id}` : ''}(${chLabel}${truncateChars(ev.storyTime, 22)})`;
     const sepLen = picked.length > 0 ? 1 : 0;
     const baseLen = Array.from(baseTag).length;
     if (ev.fact) {
