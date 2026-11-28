@@ -18,11 +18,11 @@ Each skill includes a `references/` knowledge base loaded on demand to keep cont
 | Chapter Outline Methods | Target emotion and protagonist choice · Six payoff types and back-planning · Climax & anti-filler checks · Revision diagnosis | long-write |
 | De-AI-ify | Prevention · Three-layer rewrite · Rewrite examples · Tiered AI-tell signal index | deslop / long-write / short-write |
 | Quality Checks | General · Long-form specific · Short-form specific · Toxic trope detection | long-write / short-write / short-analyze |
-| Writing Formulas | 22 long-form genre packs · 14 short-form genre packs (36 total) · Five-beat short pacing & five-stage romance | long-write / short-write |
+| Writing Formulas | 36 genre-pack plot templates · Five-beat short pacing & five-stage romance | long-write / short-write |
 | Female-oriented Writing | Female reader preferences · Emotional description · Romance patterns · Benchmark analysis | long-write |
 | Deconstruction Methods | Golden First 3 Chapters · Emotion curves · Structure breakdown · Submission layer (lead-in · paywall break · title and blurb) | long-analyze / short-analyze |
 | Short-form Methodology | Story core · Plot nodes · Explosive point analysis · Writing techniques · Rhythm analysis · Resonance analysis · Character classification · Character contrast · Motivation chain · Character relationships · Romance stages · Platform fit | short-analyze |
-| Reader Profiles | Platform and channel differences · Reader needs · Genre selection and working titles | long-write |
+| Reader Profiles | Platform and channel differences · Reader needs · Genre selection and working titles | story-setup (shared ref) |
 | Market Data | Genre trends · Platform characteristics · Collection formats | long-scan / short-scan |
 | Publish Prep | Fanqie long-form and short-form categories, reading/content tags, and book-entry field rules | story-publish |
 | Cover Styles | 12 genre visual styles · Color composition · Prompt templates | story-cover |
