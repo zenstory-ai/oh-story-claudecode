@@ -12,6 +12,28 @@ compare 链接；小节名使用 Keep a Changelog 的六个英文类别（`Added
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-28
+
+> 本版 `agents_version: 47`、`setup_skill_version: 1.3.15`。更新技能包后，在写作项目根重跑 `/story-setup`（Codex 用 `$story-setup`；ZCode 先在插件面板更新 `oh-story`），再新开会话，让新版 36 份题材包、按节分读与自动召回能力、7 个助手模板与五端 Hook 生效。既有书稿、设定、大纲和追踪不用迁移。
+
+围绕「36 份全题材五段式流派包与脚本级按节分读、拆文到写作自动召回以及跨宿主运行一致化」全面升级长短篇写作套件：长篇题材包扩充至 22 份、短篇题材包扩充至 14 份并补齐分阶段剧情类型库与原创示例切片；架构师与写手均支持按节加载流派包与对标情绪/节奏自动召回；同步细化正文可读性遥测与句式检测规则，并统一全 14 个技能、七端宿主模板及配套文档口径，存量项目完全向后兼容。
+
+### Added
+
+- **扩充长短篇题材包至 36 份并建立统一五段结构与分阶段剧情类型库。** 长篇题材包由 16 份扩充至 22 份（新增 `动漫男频衍生`、`幻想言情仙侠`、`官场商战职场`、`男频年代乡村`、`女频年代军婚`、`女频末世天灾囤货`），短篇题材包由 12 份扩充至 14 份（新增 `校园青春暗恋`、`仙侠奇幻末世`）；36 份题材包统一采用「故事线设计 / 常见剧情设计 / 人物设计 / 正文技巧 / 案例片段」五段结构，提供覆盖开局、中段高潮、节奏调剂与换图收尾的剧情类型库及原创语感切片。（#572, #574）
+- **新增脚本级题材包按节分读与拆文到写作自动召回能力。** 新增短篇题材包切片脚本 `skills/story-short-write/scripts/slice-genre-pack.js`（`--stage plan` 仅加载 1–3 节，`--stage write` 仅加载 4–5 节，自定义包自动回退全文）；长篇 `build_architect_brief.js` 与 `build_writer_prompt.js` 同步按阶段注入对应小节，并在主对标具备 `剧情/情绪模块.md`、`剧情/节奏.md` 与 `文风.md` 时自动匹配并注入情绪模块、节奏参考与同基调语感切片。（#572, #574）
+- **新增女频专项审稿细则与正文结构可读性遥测。** `story-review` 新增女频长篇专项参考 `rubrics/female.md`；`check-ai-patterns.js`（四端同步）新增无功能摆设检测 `idle-prop-decoration-tic` 并校准长短篇自然段落呼吸规则；`storyctl.js` 与 `check-delivery-contract.js` 新增段落/行长与短篇付费卡点分布遥测提示。（#570, #572, #574）
+
+### Changed
+
+- **收敛全仓热路径规范并按阶段分工校准 7 个助手模板与 14 个技能。** 将通用写作原则、视角转换、开篇节奏与女频去油底线集中维护在 `flow-opening-plan.md`、`flow-outline.md`、`flow-drafting.md` 与 `story-short-write/SKILL.md`，各题材包专注呈现题材专属写法与反差切口，并同步收紧 `scripts/doc-budget.json` 锁定上下文预算收益；升级 `narrative-writer`、`story-architect`、`character-designer`、`consistency-checker`、`story-explorer`、`chapter-extractor`、`story-researcher` 模板（`agents_version: 47`），`story-short-analyze` 精简无下游消费的冗余小节并对齐 6 项实测 `voice_metrics`。（#570, #572, #574）
+- **升级七端宿主适配与一致性守卫支持区间细纲。** `consistency-checker`、五端共享 Hook `story_hook_core.js` 及七端宿主项目指令统一支持区间细纲 `大纲/细纲_第A-B章*.md`；`story-review` 与 `story-deslop` 将 `check-degeneration.js` 复核门槛对齐至 `--fail-on=review_required`；精简跨平台 CI 矩阵并调整 `cli-compat.yml` 为定时与手动触发。（#570, #572, #574）
+
+### Fixed
+
+- **修复运行时路径探测、Hook 白名单、校验阈值与多端适配细节。** `story_hook_core.js`（五端同步）将 `设定/全书梗概.md` 纳入非角色卡白名单，避免提交时误报缺角色字段；`build_writer_prompt.js` 补齐对 `.claude`/`.agents`/`.codex`/`.zcode` 与仓库根 `skills/story-setup/references/agent-references/genre-styles/` 实际部署路径的探测；`check-delivery-contract.js` 将短篇旁白破折号软提醒阈值与 `check-ai-patterns.js` 保持一致并补充拟声词豁免；`scripts/sync-opencode.py` 补齐 `Agent(subagent_type: ...)` 到 OpenCode 子代理语法的转换。（#572, #574）
+- **修复追踪初始化、文本统计、本地工作台与跨文件口径偏差。** 修复未揭示时间线事件注入边界、`wordcount_core.js` 默认参数、`check-outline-copy.js --json` 输出、Dashboard 文件名检索语义及 `story-publish` 封面模式字段说明；同步更新 `README.md`、`README_EN.md`、`CONTRIBUTING.md`、`docs/` 与七端规则模板，保持文档与代码实现一致。（#570, #572, #574）
+
 ## [0.12.1] - 2026-11-24
 
 > 本版 `agents_version: 46`、`setup_skill_version: 1.3.14`。更新技能包后即可直接使用；如需同步无 hook 宿主模板的 `--respect-skip` 参数与流派别名微调，可在写作项目根重跑一次 `/story-setup`（Codex 用 `$story-setup`）。书稿、设定、大纲和追踪不用迁移。
@@ -1510,7 +1532,8 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 - 初始版本：长篇/短篇写作、拆文、扫榜、去 AI 味、浏览器操控
 - 用 52000+ 本真实数据增强知识库
 
-[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.12.1...HEAD
+[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.12.1...v0.13.0
 [0.12.1]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.10.5...v0.11.0
