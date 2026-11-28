@@ -1,4 +1,4 @@
-<!-- Last synced with README.md: 2026-11-22 -->
+<!-- Last synced with README.md: 2026-11-28 -->
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/zenstory-ai/zenstory/main/apps/web/public/brand/zenstory-ai-mark.svg" alt="" width="76" height="76">
@@ -43,7 +43,7 @@ Oh Story covers the full web-fiction workflow for both serials and short stories
 - **Files as memory** — settings, outlines, chapters, and continuity tracking live in separate directories, with `追踪/_tracking-state.json` as the single source of truth that generates the continuity card, foreshadowing ledger, character snapshots, and author-truth / reader-known timelines; after context compaction or a new session, writing picks right back up from disk.
 - **7 specialist roles and read/write gates** — dedicated subagents handle outlining, drafting, continuity checks, character design, research, manuscript search, and chapter extraction; long-form gates hard-block drafting when a chapter outline or tracking state is missing/corrupt while flagging uncommitted prior chapters as soft pre-write advisories, and post-write checks catch cut-off endings, leaked outline jargon, and stock AI phrasing (references load on demand; see [Architecture & project layout](docs/architecture_EN.md) and [Knowledge base](docs/knowledge-base_EN.md)).
 - **Built for 7 coding agents** — Claude Code · Codex CLI · Google Antigravity · OpenCode · ZCode · OpenClaw · Reasonix; `/story-setup` deploys native subagents and hooks where supported, while any file-capable Web AI or agent environment can run the skills directly.
-- **Built for major Chinese fiction platforms** — Qidian (起点中文网), Fanqie (番茄小说), Jinjiang (晋江文学城), Qimao (七猫小说), and Ciweimao (刺猬猫) for serials; Zhihu Yanyan (知乎盐言故事), Fanqie Short-form, and Qimao Short-form for short stories.
+- **Built for major Chinese fiction platforms** — Qidian (起点中文网), Fanqie (番茄小说), Jinjiang (晋江文学城), Qimao (七猫小说), and Ciweimao (刺猬猫) for serials; Zhihu Yanyan (知乎盐言故事), Fanqie Short-form, Qimao Short-form, Heiyan, and Dianzhong for short stories.
 
 > **Trope = reliable emotional payoff**
 
@@ -102,7 +102,7 @@ Using the author's own serial as an example: `/story-import` turned 20 published
 The video at the top records this exact run—everything `/story-long-write 写第21章` produced and checked in one pass:
 
 ```text
-Blueprint       细纲_第021章.md              tracking said "no blueprint for ch.21", so the skill wrote one first: unit L1-03, target emotion, stakes, loop state, a 10-row four-column plot table (plus the optional resolution column)
+Blueprint       细纲_第021章.md              tracking said "no blueprint for ch.21", so the skill wrote one first: story arc position, target emotion, protagonist goal/key choice, scene split, and a 3–4 row three-column plot table
 Chapter check   storyctl.js chapter check   ready · 2068 chars / target 2300
                   ├ check-ai-patterns.js     0 hits
                   ├ check-degeneration.js    0 hits

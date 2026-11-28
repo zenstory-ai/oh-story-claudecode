@@ -1657,7 +1657,7 @@ function isGitCommitCommand(command) {
 
 // 设定/ 直属的项目级设定件：flow-opening-plan.md 规定的 关系.md（正文是「# 角色关系图」）、
 // 题材定位.md，以及 文风.md、题材正文提示卡.md 等，它们本来就没有 名字/姓名 字段。
-const SETTING_NON_CHARACTER_FILES = new Set(["关系.md", "题材定位.md", "题材正文提示卡.md", "文风.md", "世界规则.md", "世界观.md", "金手指.md", "背景设定.md"])
+const SETTING_NON_CHARACTER_FILES = new Set(["关系.md", "题材定位.md", "全书梗概.md", "题材正文提示卡.md", "文风.md", "世界规则.md", "世界观.md", "金手指.md", "背景设定.md"])
 
 // 只查角色卡：整棵 设定/ 一刀切会让每次碰设定的提交都刷一屏假警告，把同框的
 // 「正文硬编码角色属性」真警告埋掉。判定口径与 validate-story-commit.sh / opencode

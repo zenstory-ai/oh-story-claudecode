@@ -61,6 +61,8 @@ Only preferences the author states explicitly are recorded; nothing is inferred 
 │   ├── Characters/         # One file per character (Shen_Zhi.md, Lu_Yanzhi.md)
 │   ├── Factions/           # One file per faction/organization (Tianji_Pavilion.md)
 │   ├── Relationships.md    # Character relationship map
+│   ├── Book_Synopsis.md    # Full-book synopsis
+│   ├── Style.md            # Book-level prose style (optional)
 │   └── Genre_Positioning.md # Core trope + benchmark analysis
 ├── Outline/
 │   ├── Outline.md          # Full-book volume-level structure

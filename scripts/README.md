@@ -37,7 +37,7 @@
 | `test-ai-patterns.mjs` | 确定性 AI 句式检测器 `check-ai-patterns.js` 原生 `node:test` 回归（含 >64KB stdout 排空与篇幅缩放） | CI（三平台，`node --test`） |
 | `test-degeneration.mjs` | 模型退化检测器 `check-degeneration.js` 原生 `node:test` 回归（含引号范围、meta-leak 与 skill 调用连线检查） | CI（三平台，`node --test`） |
 | `test-outline-copy.mjs` | 细纲照搬检测器 `check-outline-copy.js` 原生 `node:test` 回归（31 例，含 `--require` 异常注入与完成记录豁免） | CI（三平台，`node --test`） |
-| `test-phase2-contract.js` | 短篇 Phase 2 verifier 行为回归：设计字段、12 列大纲、字数区间、双轨 `hard_failures`/`soft_warnings` + `--strict`、具名失败与 repair_scope | CI（三平台） |
+| `test-phase2-contract.js` | 短篇 Phase 2 verifier 行为回归：设计字段、5 列大纲（兼容旧 12 列）、字数区间、双轨 `hard_failures`/`soft_warnings` + `--strict`、具名失败与 repair_scope | CI（三平台） |
 | `test-delivery-contract.js` | 短篇最终字数、节数、标记、空行及双轨 `hard_failures`/`soft_warnings` + `--strict` 交付契约回归 | CI（三平台） |
 | `test-outline-contract.js` | 长篇细纲结构验收：新旧字段名与小节名、「这章怎么走」五行、三到五列情节点表、字数口径、双轨 `hard_failures`/`soft_warnings` + `--strict` 与正负例回归 | CI（三平台） |
 | `test-normalize-punctuation.js` | 标点归一化的只读检查、frontmatter/fence、CRLF、引号模式与幂等性 | CI（三平台） |

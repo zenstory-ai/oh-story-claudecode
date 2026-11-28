@@ -1543,7 +1543,13 @@ function build(project, chapter, report, options = {}) {
   const { workspace: wsRoot } = findWorkspace(project);
   const isDeployedPack = (base) => {
     const deployedRel = `agent-references/genre-styles/${base}`;
+    const skillRel = path.join('skills', 'story-setup', 'references', 'agent-references', 'genre-styles', base);
     return [
+      path.join(wsRoot, '.claude', skillRel),
+      path.join(wsRoot, '.agents', skillRel),
+      path.join(wsRoot, '.codex', skillRel),
+      path.join(wsRoot, '.zcode', skillRel),
+      path.join(wsRoot, skillRel),
       path.join(wsRoot, '.claude', deployedRel),
       path.join(wsRoot, '.agents', deployedRel),
       path.join(wsRoot, '.codex', deployedRel),
@@ -1751,9 +1757,9 @@ function build(project, chapter, report, options = {}) {
   parts.push(
     `——— 作者偏好（作者记下的写作习惯，低优先级倾向，不逐条追求命中）———\n${memoryBlock}`,
     '——— 写作硬底线 ———\n' +
-      '1. 叙述保人物内心盘算与口语因果连接（1–3 句自然段与短孤句/短对白错落呼吸），禁一行一句的均匀碎短句、纯动作碎句、连刷「因为/毕竟/所以」解释句及旁白人设考点标签。\n' +
+      '1. 叙述保人物内心盘算与口语因果连接（1–3 句自然段与短孤句/短对白错落呼吸），禁一行一句的均匀碎短句、纯动作碎句、连刷「因为/毕竟/所以」解释句及旁白人设标签。\n' +
       '2. 短对话直接交锋，严禁每句台词捆绑端杯、摸袖口、看表盘等道具微动作。\n' +
-      '3. 只留改局势或露破绽的关键道具和证物，删没用的材质/服饰/天气光影/声效摆设；反派须按私心反咬设阻，禁走过场；道具经手与工时物理须前后自洽。',
+      '3. 只留改局势或露破绽的关键道具和证物，删没用的材质/服饰/天气光影/声效摆设；反派须按私心反咬设阻，禁走过场；道具经手、时间账目与物理/行业常识须前后自洽。',
     '检查分工：写手负责编排、内容覆盖和格式自检；主会话质量阶段负责语义去味及最终文件扫描，写手不重复整轮去味。',
     '本次照你的铁律 1-8 与被调用协议执行（细纲边界、正文形状、新增物三级、交付三附件均以你的定义为准）。',
     `字数目标按细纲执行；整章一次写完，直接写到最终输出路径（临时文件只放 ${chapterWorkDir(project, chapter)}，不写 /tmp）；不拆逐点配额、不自测字数。`

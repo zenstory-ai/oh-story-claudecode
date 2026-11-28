@@ -20,7 +20,7 @@ Stage 4–6 时刻读本文件。方法与速查在前，输出模板在后；�
 
 ### Stage 6：结构模式、投稿层、短板检测与综合评估
 
-对照下方三张速查表完成主结构、投稿层、源文短板、五维评估、共鸣与可复用结构，并将 `structure_counts` 与 `voice_metrics` 一次性写入 `_meta.json`。
+对照下方三张速查表完成主结构、投稿层、源文短板、五维评估与可复用结构，并将 `structure_counts` 与 `voice_metrics` 一次性写入 `_meta.json`。
 
 ## 判定速查
 

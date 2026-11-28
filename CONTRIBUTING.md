@@ -274,7 +274,7 @@ PR 中如果修改了 Claude Code 模板文件，CI 会自动检测 opencode 模
 **Glob 不搜索隐藏目录**：opencode 的 Glob 工具不搜索 `.opencode/` 目录，这导致了以下设计决策：
 
 - **agent-references** 部署到 `skills/story-setup/references/agent-references/`（非隐藏），而非 `.opencode/skills/`
-- **agent 文件** 双份部署：`.opencode/agents/`（opencode 系统使用）+ `agents/`（Glob 可见副本）
+- **agent 文件** 仅部署到 `.opencode/agents/`（不复制冗余副本）
 - **subagent 检测**：所有 spawn agent 的 skill（story、story-review、story-long-write、story-deslop、story-import、story-long-analyze、story-short-write）只检查当前运行时的 canonical 目录：Claude `.claude/agents/`、OpenCode `.opencode/agents/`、Codex `.codex/agents/`、Antigravity `.agents/agents/`；不得因其他端文件存在而误判。ZCode 从已启用插件的运行时注册检查同名角色，不要求 `.zcode/agents/`；仅角色或工具不可用才降级。OpenClaw Phase 1 不部署项目 agents，走 solo/direct fallback。
 
 **插件在后台服务里运行**：2.x 由一个后台服务进程服务多个项目，插件里的 `process.cwd()` 不是用户项目；项目根与相对路径起点一律取 `ctx.location.directory`（其 git toplevel）。通过共享 `story_hook_core.js` 完成五端一致的 `agents_version` 过期提醒与书目发现（自动跳过 `拆文库/` 与 `对标/`）：会话首轮请求前用 `ctx.session.hook("context")` 往主会话 `system` 注入部署状态、当前书目上下文位置、`continuityFindings`（连续性缺口提醒，子代理跳过）及写前暂存的非阻断软提醒（`pendingPreWriteWarnings`，如上一章未提交、上章毒句式或手改状态修订）；压缩前注入用 `ctx.session.hook("compaction")` 往摘要请求的 `system` 追加写作上下文位置。

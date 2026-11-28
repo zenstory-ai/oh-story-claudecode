@@ -647,15 +647,16 @@ function verify(projectDir, contract, options = {}) {
   let emDashEvidence = '正文不足 200 字，跳过旁白破折号检查'
   if (bodyChars >= 200) {
     const narrationEmDash = countNarrationEmDashes(bodyLines)
-    const per10k = (narrationEmDash / bodyChars) * 10000
-    emDashOk = narrationEmDash <= 2 || per10k <= 2
+    const perK = (narrationEmDash / bodyChars) * 1000
+    const per10k = perK * 10
+    emDashOk = narrationEmDash < 6 || perK < 1.5
     emDashEvidence = `叙述旁白破折号「——」${narrationEmDash} 处（约 ${per10k.toFixed(1)} 处/万字）`
   }
   checks.push(makeCheck(
     'delivery.short-em-dash',
     emDashOk,
     emDashEvidence,
-    '建议短篇叙述旁白破折号「——」≤2 处/万字（实测真人短篇中位 0 处/万字；对话打断不计）',
+    '短篇叙述旁白尽量少用破折号「——」（达到 ≥6 处且 ≥1.5 处/千字提醒；对话打断不计）',
     '复核旁白破折号：将解释补充型「——」拆成两句短段或直接删去冗余解释，仅保留必要停顿。',
     'advisory'
   ))
@@ -736,7 +737,7 @@ function verify(projectDir, contract, options = {}) {
     paywallRatioOk,
     paywallRatioEvidence,
     '建议付费卡点节末累计实际正文落在全文 30%–45% 区间（知乎盐言中位约 38%）',
-    '复核免费段篇幅：偏高时压缩前段铺垫或前移卡点，偏低时补足前段赌注；若属意难平/死人文学蓄压轨可确认保留。',
+    '复核免费段篇幅：偏高时压缩前段铺垫或前移卡点，偏低时补足前段赌注；若属意难平/死人文学慢蓄压写法（可蓄压至 50%–55% 爆发）可确认保留。',
     'advisory'
   ))
 
