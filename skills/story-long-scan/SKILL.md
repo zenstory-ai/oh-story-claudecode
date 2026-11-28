@@ -124,11 +124,4 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 
 ## 流程衔接
 
-**流水线：** 长篇
-**位置：** 扫榜（第 1/3 步）
-
-| 时机 | 跳转到 | 命令 |
-|---|---|---|
-| 找到方向，想先拆对标书 | story-long-analyze | `/story-long-analyze` |
-| 直接开写 | story-long-write | `/story-long-write` |
-| 更适合短篇 | story-short-scan | `/story-short-scan` |
+**流水线：** 长篇（第 1/3 步）— 先拆对标书走 `/story-long-analyze`，直接开写走 `/story-long-write`，更适合短篇转 `/story-short-scan`。

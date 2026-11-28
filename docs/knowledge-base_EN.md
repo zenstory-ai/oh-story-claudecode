@@ -18,7 +18,7 @@ Each skill includes a `references/` knowledge base loaded on demand to keep cont
 | Chapter Outline Methods | Target emotion and protagonist choice · Six payoff types and back-planning · Climax formula · Revision diagnosis | long-write |
 | De-AI-ify | Prevention · Rewrite order · Rewrite examples · Banned word list | deslop / long-write / short-write |
 | Quality Checks | General · Long-form specific · Short-form specific · Toxic trope detection | long-write / short-write / short-analyze |
-| Writing Formulas | 10 core genre packs · 21 niche genre formulas · Three-flip-four-shock (escalating reversal) · Romance four-stage | short-write |
+| Writing Formulas | 22 long-form genre packs · 14 short-form genre packs (36 total) · Five-beat short pacing & five-stage romance | long-write / short-write |
 | Female-oriented Writing | Female reader preferences · Emotional description · Romance patterns · Benchmark analysis | long-write |
 | Deconstruction Methods | Golden First 3 Chapters · Emotion curves · Structure breakdown · Submission layer (lead-in · paywall break · title and blurb) | long-analyze / short-analyze |
 | Short-form Methodology | Story core · Plot nodes · Explosive point analysis · Writing techniques · Rhythm analysis · Resonance analysis · Character classification · Character contrast · Motivation chain · Character relationships · Romance stages · Platform fit | short-analyze |

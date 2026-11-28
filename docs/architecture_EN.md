@@ -47,7 +47,6 @@ Author memory stays separate from any one book's continuity tracking and lives i
 .story/作者记忆/
 ├── _author-memory-state.json  # Single source of truth
 ├── 作者画像.md               # Confirmed preferences used in creation
-├── 待确认.md                 # Candidates whose scope the author left vague, and conflict candidates
 └── 变更记录.md               # Auditable replacement and withdrawal history
 ```
 
@@ -97,7 +96,7 @@ Only preferences the author states explicitly are recorded; nothing is inferred 
 ├── 设定.md                  # Story core, characters, platform tone, and twist design
 ├── 小节大纲.md              # 8-section structure + emotion curve
 ├── 正文.md                  # Final draft
-└── 拆文库/                  # If a reference novel exists (analyze output)
+└── 对标/                    # If a reference novel exists (synced from deconstruction)
     └── {Book}/
         ├── 拆文报告.md
         ├── 情节节点.md

@@ -55,7 +55,7 @@
 
 ```text
 node {当前 skill 根}/scripts/author_memory_commit.js record  --workspace {工作区} [--book-root {书目录}] --input {工作区}/.story/work/作者记忆-事件.json
-node {当前 skill 根}/scripts/author_memory_commit.js query   --workspace {工作区} --book-root {书目录} --kind {类型}（必传，可重复） [--genre {题材}] [--workflow {流程}]
+node {当前 skill 根}/scripts/author_memory_commit.js query   --workspace {工作区} [--book-root {书目录}] --kind {类型}（必传，可重复） [--genre {题材}] [--workflow {流程}]
 node {当前 skill 根}/scripts/author_memory_commit.js migrate --workspace {工作区} --book-root {书目录}
 node {当前 skill 根}/scripts/author_memory_commit.js check   --workspace {工作区} [--book-root {书目录}] [--strict]
 ```
