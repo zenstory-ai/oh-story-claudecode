@@ -39,15 +39,15 @@ injectAgentsMd: false
 
 | query_type | 用途 | 典型问题 |
 |-----------|------|---------|
-| `character_status` | 查角色当前状态 | "江晨现在什么状态？" |
-| `character_appearances` | 查角色出场章节 | "钟嘉嘉在哪几章出场了？" |
+| `character_status` | 查角色当前状态 | "{角色名}现在什么状态？" |
+| `character_appearances` | 查角色出场章节 | "{角色名}在哪几章出场了？" |
 | `foreshadow_status` | 查特定伏笔状态 | "伏笔 F003 什么状态？" |
 | `foreshadow_list` | 列出伏笔（可按状态筛选） | "当前待回收伏笔有哪些？" |
 | `setting_appearances` | 查设定在哪里出现过 | "力量体系在哪几章提到？" |
 | `setting_detail` | 查设定详细内容 | "修炼等级怎么设定的？" |
 | `timeline` | 查时间线节点 | "第30-50章发生了什么？" |
 | `progress` | 查写作进度 | "现在写到哪了？" |
-| `relationship` | 查角色关系 | "江晨和钟嘉嘉现在什么关系？" |
+| `relationship` | 查角色关系 | "{角色A}和{角色B}现在什么关系？" |
 | `benchmark_style_load` | 加载对标文风资料（流程另读参考文件） | "我要写第 N 章，帮我找对标文风和可参考片段" |
 
 ---

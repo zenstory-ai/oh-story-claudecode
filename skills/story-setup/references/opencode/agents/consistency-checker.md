@@ -142,7 +142,7 @@ steps: 15
 
 ## 被调用协议
 
-skill 通过 `Agent(subagent_type: "consistency-checker")` 调用你。
+skill 通过 OpenCode 子代理 `consistency-checker` 调用你。
 
 你收到的 prompt 会包含：
 - 检查范围（文件路径或章节范围）

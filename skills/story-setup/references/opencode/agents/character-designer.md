@@ -103,4 +103,4 @@ steps: 25
 
 ## 被调用协议
 
-通过 `Agent(subagent_type: "character-designer")` 调用，按 prompt 中的任务描述、相关文件路径与上下文摘要执行。输出角色档案表、对话文本或审查报告（审稿有统一 Findings 格式时照格式写，否则给具体引用与改法）。
+通过 OpenCode 子代理 `character-designer` 调用，按 prompt 中的任务描述、相关文件路径与上下文摘要执行。输出角色档案表、对话文本或审查报告（审稿有统一 Findings 格式时照格式写，否则给具体引用与改法）。

@@ -230,7 +230,7 @@ CDP 不可用且宿主实际提供 WebSearch/webReader 时使用；当前工具�
 
 ## 被调用协议
 
-skill 通过 `Agent(subagent_type: "story-researcher")` 调用你。
+skill 通过 OpenCode 子代理 `story-researcher` 调用你。
 
 你收到的 prompt 会包含：
 - `query`：研究主题（如"明代锦衣卫组织架构"）
