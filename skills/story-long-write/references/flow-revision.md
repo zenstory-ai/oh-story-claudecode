@@ -46,17 +46,17 @@
 
 ### Step 3：备份、改写与检测
 
-1. **备份与计字**：复制原稿到 `.story/work/修订原稿/{YYYYMMDD}_{原文件名}`（不放 `正文/`）；跑 `node {skill 根}/scripts/storyctl.js wordcount measure --file {正文文件}` 记原字数。
+1. **备份与计字**：复制原稿到 `.story/work/修订原稿/{YYYYMMDD}_{原文件名}`（不放 `正文/`）；改章名须先移走旧正文文件防双文件撞车；跑 `node {skill 根}/scripts/storyctl.js wordcount measure --file {正文文件}` 记原字数。
 2. **改写**：有 `narrative-writer` 按 `agent-calls.md`「大修改写」派发；否则按 `flow-drafting.md` 与流派包自改。局部改不动范围外，不擅加细纲外剧情。
-3. **检测收口**：跑 `node {skill 根}/scripts/storyctl.js chapter check --project {书目录} --chapter {X} --fix-punctuation --plain`，并复核动作碎句、没用的环境摆设与零阻力走过场。硬伤清零，`review_required` 改净或附 `--ack <rule-id>:<理由>`；欠字不补、超字净删一次，仍超请作者选；差超 30% 或 800 字汇报明说。
-4. 核对人物、伏笔与长程三易穿帮项（搬家后物位、钱粮/余额加减、跨章倒推相对日历）无冲突；外部事实不明先查证。
+3. **检测收口**：跑 `node {skill 根}/scripts/storyctl.js chapter check --project {书目录} --chapter {X} --fix-punctuation --plain`，复核动作碎句、空景摆设与零阻力过场；删裁判句须留口语转折免缩成碎句。硬伤清零，`review_required` 改净或附 `--ack <rule-id>:<理由>`；欠字不补、超字净删一次，仍超请作者选；差超 30% 或 800 字明说。
+4. 核对人物、伏笔与三易穿帮项（物位、钱粮加减、跨章日历）无冲突；外部事实不明先查证。
 
 ### Step 4：追踪级联更新与提交
 
 用一次 `mode=revision` 事务（报错才读 `tracking-protocol.md`）：
 
 1. 跑 `node {skill 根}/scripts/tracking_commit.js draft --project {书目录} --chapter {X}`，对照新正文保留有效项、修正推翻项。
-2. 逐项重算受影响伏笔（到最新章 M）、时间线（删掉标 `action=delete`）和核心角色截至 M 章快照；X ≤ `imported_through_chapter` 自动生成覆盖记录。
+2. 逐项重算受影响伏笔（到最新章 M）、时间线（删标 `action=delete`）与核心角色截至 M 章快照；X ≤ `imported_through_chapter` 自动生覆盖记录；连改多章时全局约束改写与退役集中放最后改完的章 M，免反复退役撑大体积。
 3. 跑 `node {skill 根}/scripts/storyctl.js chapter commit --project {书目录} --chapter {X} --input {书目录}/.story/work/第{XXX}章/tracking.json`（字数带外给 `1. 按现长度收下 / 2. 再调整 / 3. 退回原稿`，选 1 用 `accept-current-length` 或 `--ack length:<理由>`，不到目标一半坚持才加 `--force`）。
 4. 跑 `tracking_commit.js check --project {书目录}` 确认干净，并扫后续章看是否受影响。
 
