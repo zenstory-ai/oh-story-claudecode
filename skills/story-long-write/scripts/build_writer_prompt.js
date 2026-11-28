@@ -825,17 +825,21 @@ function extractBenchmarkGuardrails(benchDir, styleText) {
     const reportText = readText(path.join(benchDir, '拆文报告.md'));
     avoidBlock = extractMarkdownSection(reportText, /^不建议模仿/);
   }
-  const avoidLines = cleanBulletLines(avoidBlock, 3);
+  const cleanOne = (l) => l.replace(/^[-*+\d.)、\s]+/, '').replace(/[；。;]+$/, '').trim();
+  const avoidLines = cleanBulletLines(avoidBlock, 3).map(cleanOne).filter(Boolean);
   if (avoidLines.length) {
-    parts.push(`不建议模仿：${avoidLines.map((l) => l.replace(/^[-*+\d.)、\s]+/, '')).join('；')}`);
+    parts.push(trimCap(`不建议模仿：${avoidLines.join('；')}`, 220));
   }
   const suggestBlock = extractMarkdownSection(styleText, /^分层模仿建议/);
-  const suggestLines = cleanBulletLines(suggestBlock, 3).filter((l) => /基础层|适配层|进阶层/.test(l));
+  const suggestLines = cleanBulletLines(suggestBlock, 3)
+    .filter((l) => /基础层|适配层|进阶层/.test(l))
+    .map(cleanOne)
+    .filter(Boolean);
   if (suggestLines.length) {
-    parts.push(`分层模仿：${suggestLines.map((l) => l.replace(/^[-*+\s]+/, '')).join('；')}`);
+    parts.push(trimCap(`分层模仿：${suggestLines.join('；')}`, 260));
   }
   const joined = parts.join('\n').trim();
-  return joined ? trimCap(joined, 360) : null;
+  return joined || null;
 }
 
 function scoreOverlap(text, hint) {
@@ -1156,15 +1160,18 @@ function collectProseSlices(text, { allowUnheadedFence = true } = {}) {
 function extractProseSlices(text, chapter = 1, maxSlices = 2, genreHint = '', opts = {}) {
   const slices = collectProseSlices(text, opts);
   if (!slices.length) return null;
+  const toneHint = opts.toneHint || '';
   let picked;
   if (slices.length <= maxSlices) {
     picked = slices;
-  } else if (genreHint) {
+  } else if (genreHint || toneHint) {
     const start = (Math.max(1, Number(chapter) || 1) - 1) % slices.length;
     const ranked = slices
       .map((s, idx) => ({
         s,
-        score: scoreSliceForGenre(s.title, s.body, genreHint),
+        score:
+          (toneHint ? scoreOverlap(s.title, toneHint) * 3 + scoreOverlap(s.body.slice(0, 120), toneHint) : 0) +
+          (genreHint ? scoreSliceForGenre(s.title, s.body, genreHint) : 0),
         rot: (idx - start + slices.length) % slices.length,
       }))
       .sort((a, b) => (b.score - a.score) || (a.rot - b.rot));
@@ -1574,7 +1581,6 @@ function build(project, chapter, report, options = {}) {
     : `${SLOT_MARK} 未匹配到流派包，请检查 agent-references/genre-styles/`;
 
   const sliceGenreHint = [genreLine(project), authorDecided(project).decided || ''].filter(Boolean).join(' ');
-  const benchSliceHint = [outlineToneHint, sliceGenreHint].filter(Boolean).join(' ');
   let proseSliceText = null;
   let proseSliceSource = null;
   let benchGuardrailsText = null;
@@ -1598,7 +1604,9 @@ function build(project, chapter, report, options = {}) {
     }
   }
   if (!proseSliceText && bench) {
-    const benchSlices = extractProseSlices(readText(bench.file), chapter, 2, benchSliceHint);
+    const benchSlices = extractProseSlices(readText(bench.file), chapter, 2, sliceGenreHint, {
+      toneHint: outlineToneHint,
+    });
     if (benchSlices) {
       proseSliceText = benchSlices;
       proseSliceSource = `主对标「${bench.name}」文风原文锚点（${bench.file}）`;

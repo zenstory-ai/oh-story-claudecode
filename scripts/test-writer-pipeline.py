@@ -1979,7 +1979,8 @@ console.log('V5_SLICE_UNIT_OK');
             '### 片段 B — 基调：爽点/打脸\n```text\n爽点打脸原文切片测试文本。\n```\n\n'
             '### 片段 C — 基调：轻松日常\n```text\n日常换气原文切片测试文本。\n```\n\n'
             '## 不建议模仿\n'
-            '- 感叹号刷屏过密\n',
+            '- 感叹号刷屏过密。\n'
+            '- 配角围观三连呼降智且反复报流水账；\n',
             encoding='utf-8',
         )
         (bdir / '剧情' / '情绪模块.md').write_text(
@@ -2007,10 +2008,27 @@ console.log('V5_SLICE_UNIT_OK');
         self.assertIn('EM-001 三级参照打脸', prompt_body)
         self.assertIn('RH-001', prompt_body)
         self.assertIn(f'——— 主对标「{bench}」避坑与写法要点', prompt_body)
-        self.assertIn('感叹号刷屏过密', prompt_body)
+        self.assertIn('感叹号刷屏过密；配角围观三连呼降智且反复报流水账', prompt_body)
+        self.assertNotIn('。；', prompt_body)
+        self.assertNotIn('；；', prompt_body)
+        self.assertIn('适配层（当前项目）', prompt_body)
         self.assertIn(f'主对标「{bench}」文风原文锚点', report_body)
         self.assertIn('主对标结构参考：已从', report_body)
         self.assertIn('主对标避坑：已从', report_body)
+
+        # 验证细纲自然中文基调词可精准命中对应切片（而非因 4 字硬拆落空）
+        (self.book / '大纲' / '细纲_第001章.md').write_text(
+            '### 第 1 章：炖肉换气\n'
+            '- 所属剧情段：U1-1\n'
+            '- 目标情绪：轻松日常烟火暖意\n'
+            '- 主角目标/关键选择：回屋炖肉换气，化开家里紧绷气氛\n'
+            '- 核心事件：买肉回家做晚饭，日常换气\n',
+            encoding='utf-8',
+        )
+        res2 = self.run_builder(1)
+        self.assertEqual(res2.returncode, 0, res2.stderr)
+        prompt2, _ = res2.stdout.split('以下不进 prompt', 1)
+        self.assertIn('【片段 C — 基调：轻松日常】', prompt2)
 
 
 if __name__ == '__main__':
