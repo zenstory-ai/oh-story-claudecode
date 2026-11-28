@@ -12,12 +12,12 @@
   "files": [
     {
       "path": "skills/story/SKILL.md",
-      "budget": 4700,
+      "budget": 4600,
       "why": "主入口路由：意图分发、工具箱菜单、查资料子代理派发与冷路径工作台指针（2026-11-26 拆出 dashboard-and-update.md 后登记锁住瘦身收益）。"
     },
     {
       "path": "skills/story-publish/SKILL.md",
-      "budget": 3600,
+      "budget": 3400,
       "why": "发布资料准备入口：状态与定稿原则、作品材料定位、封面交接、输出模板与格式检查；番茄规则只在参考文件里写一次。发布资料文件是以后自动填表的格式契约（元信息、三种字段取值、文件名），随入口读。 2026-11-04：调用即保存缺项草案，短故事省略简介；显式更新预算。 每次调用必须交付资料，补齐写入失败、未适配及覆盖冲突的交付规则。"
     },
     {
@@ -47,7 +47,7 @@
     },
     {
       "path": "skills/story-long-write/references/author-memory.md",
-      "budget": 5450,
+      "budget": 3600,
       "why": "v0.8.2：作者每说一条长期偏好就整读（由长篇写作维护真源，仅同步到短篇写作）。按作者时刻拆分，只留记一条／确认／替换／忘掉、边界优先级与查询解释；整理、超编、单书布局、迁移、commit、check、冲突候选落定移到 author-memory-maintenance.md（冷路径，不登记）。8954→约 5350，锁住拆分收益。"
     },
     {
@@ -62,17 +62,17 @@
     },
     {
       "path": "skills/story-long-write/references/flow-opening-plan.md",
-      "budget": 5300,
+      "budget": 4800,
       "why": "长篇立项、定设定与出卷纲唯一手册（合并原 workflow-setup/workflow-volume/outline-methods/character-basics/character-relations/long-genre-*）。（2026-11-27 结合 noveldb 与端到端实战校准男女频卷纲分轨、2200字单章1–2场容量与免费段控字规则）"
     },
     {
       "path": "skills/story-long-write/references/flow-outline.md",
-      "budget": 4500,
+      "budget": 4350,
       "why": "长篇细纲规划、黄金三章、钩子节奏与白话模板（合并原 workflow-outline/outline-template/opening-design/plot-core-methods/long-chapter-hooks/long-suspense/long-reversal）。（2026-11-27 结合 noveldb 与端到端实战校准男女频卷纲分轨、2200字单章1–2场容量与免费段控字规则）"
     },
     {
       "path": "skills/story-long-write/references/flow-drafting.md",
-      "budget": 4650,
+      "budget": 4400,
       "why": "长篇单章与日更调度、正文竖屏网感笔法（合并原 workflow-chapter/workflow-daily/writing-craft/long-format/style-combat-face/dialogue-mastery）。"
     },
     {
@@ -82,12 +82,12 @@
     },
     {
       "path": "skills/story-long-write/references/benchmark-recall.md",
-      "budget": 2000,
+      "budget": 1850,
       "why": "长篇对标发现、写前召回与原文切片强制注入（合并原 benchmark-recall/cross-book-recall）。"
     },
     {
       "path": "skills/story-long-write/references/agent-calls.md",
-      "budget": 2450,
+      "budget": 2350,
       "why": "长篇子代理派发手册（只在派发子代理时读）。"
     },
     {
@@ -97,122 +97,122 @@
     },
     {
       "path": "skills/story-long-write/references/genre-styles/传统玄幻仙侠.md",
-      "budget": 6000,
+      "budget": 5550,
       "why": "长篇 20 流派包「传统玄幻仙侠」（按书只读命中 1 份，含 2–3 段真网感示范切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/动漫男频衍生.md",
-      "budget": 5850,
+      "budget": 5550,
       "why": "长篇 20 流派包「动漫男频衍生」（2026-11-26 新增，覆盖番茄男频衍生/同人/搜打撤/四合院）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/历史架空权谋.md",
-      "budget": 5800,
+      "budget": 5400,
       "why": "长篇 20 流派包「历史架空权谋」（按书只读命中 1 份，含 2–3 段真网感示范切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/双男主.md",
-      "budget": 5600,
+      "budget": 5150,
       "why": "长篇 20 流派包「双男主」（按书只读命中 1 份，含 2–3 段真网感示范切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/古言宅斗重生.md",
-      "budget": 6100,
+      "budget": 5750,
       "why": "长篇 22 流派包「古言宅斗重生」（含后宫位分+朝堂权谋女帝双轨及示范切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/女频年代军婚.md",
-      "budget": 5950,
+      "budget": 5550,
       "why": "长篇 22 流派包「女频年代军婚」（2026-11-26 从年代种田拆出，专精 60–80s 年代随军/海岛家属院/大院知青）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/女频末世天灾囤货.md",
-      "budget": 5900,
+      "budget": 5500,
       "why": "长篇 22 流派包「女频末世天灾囤货」（2026-11-26 新增，专精女频天灾空间囤货/安全屋美食反差/反杀道德绑架）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/官场商战职场.md",
-      "budget": 5950,
+      "budget": 5550,
       "why": "长篇 20 流派包「官场商战职场」（2026-11-26 新增，覆盖官场仕途/商战博弈/职场规则）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/年代种田经商.md",
-      "budget": 5850,
+      "budget": 5400,
       "why": "长篇 20 流派包「年代种田经商」（按书只读命中 1 份，含 2–3 段真网感示范切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/幻想言情仙侠.md",
-      "budget": 5750,
+      "budget": 5350,
       "why": "长篇 20 流派包「幻想言情仙侠」（2026-11-26 新增，覆盖女频玄幻仙侠/神女迪化/玄学直播）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/悬疑灵异.md",
-      "budget": 6100,
+      "budget": 5800,
       "why": "长篇 20 流派包「悬疑灵异」（按书只读命中 1 份，含 2–3 段真网感示范切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/末世规则科幻.md",
-      "budget": 5900,
+      "budget": 5600,
       "why": "长篇 20 流派包「末世规则科幻」（按书只读命中 1 份，含 2–3 段真网感示范切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/玄幻脑洞反套路.md",
-      "budget": 5850,
+      "budget": 5500,
       "why": "长篇 20 流派包「玄幻脑洞反套路」（按书只读命中 1 份，含 2–3 段真网感示范切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/现言脑洞快穿.md",
-      "budget": 5750,
+      "budget": 5400,
       "why": "长篇 20 流派包「现言脑洞快穿」（按书只读命中 1 份，含 2–3 段真网感示范切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/男频年代乡村.md",
-      "budget": 5850,
+      "budget": 5550,
       "why": "长篇 20 流派包「男频年代乡村」（2026-11-26 新增，覆盖男频年代护妻/赶山打猎/赶海致富/98创业）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/西幻游戏同人.md",
-      "budget": 6000,
+      "budget": 5650,
       "why": "长篇 16 流派包「西幻游戏同人」（按书只读命中 1 份，含 2–3 段真网感示范切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/豪门虐恋追妻.md",
-      "budget": 6150,
+      "budget": 5600,
       "why": "长篇 16 流派包「豪门虐恋追妻」（按书只读命中 1 份，含 2–3 段真网感示范切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/通用长篇.md",
-      "budget": 4150,
+      "budget": 3850,
       "why": "长篇 16 流派包「通用长篇」（按书只读命中 1 份，含 2–3 段真网感示范切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/都市日常神豪.md",
-      "budget": 5750,
+      "budget": 5350,
       "why": "长篇 16 流派包「都市日常神豪」（按书只读命中 1 份，含 2–3 段真网感示范切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/都市脑洞系统.md",
-      "budget": 5750,
+      "budget": 5400,
       "why": "长篇 16 流派包「都市脑洞系统」（按书只读命中 1 份，含 2–3 段真网感示范切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/都市高武异能.md",
-      "budget": 5700,
+      "budget": 5250,
       "why": "长篇 16 流派包「都市高武异能」（按书只读命中 1 份，含 2–3 段真网感示范切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-long-write/references/genre-styles/青春甜宠文娱.md",
-      "budget": 5900,
+      "budget": 5600,
       "why": "长篇 16 流派包「青春甜宠文娱」（按书只读命中 1 份，含 2–3 段真网感示范切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-short-write/SKILL.md",
-      "budget": 7250,
+      "budget": 7000,
       "why": "短篇自包含主入口：核心笔法、竖屏排版、平台表、Phase 1–4 流程、白话模板与计字命令（折叠原 15 份非流派参考文件，整篇热路径从 33K 降至 ~10K）。（2026-11-27 结合 noveldb 与端到端实战校准男女频卷纲分轨、2200字单章1–2场容量与免费段控字规则）"
     },
     {
       "path": "skills/story-short-write/references/benchmark-recall.md",
-      "budget": 1600,
+      "budget": 1550,
       "why": "短篇对标发现与原文语感切片召回（仅项目有对标/拆文库时读）。"
     },
     {
@@ -222,82 +222,82 @@
     },
     {
       "path": "skills/story-short-write/references/genre-styles/世情打脸.md",
-      "budget": 5800,
+      "budget": 5050,
       "why": "短篇 14 流派包「世情打脸」（含导语公式、付费卡点、核心招式与真网感切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/仙侠奇幻末世.md",
-      "budget": 5850,
+      "budget": 5400,
       "why": "短篇 14 流派包「仙侠奇幻末世」（2026-11-26 新增，覆盖仙侠追夫/宗门火葬场/末世规则货币/都市玄学/非人视角）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/双男主.md",
-      "budget": 5500,
+      "budget": 5050,
       "why": "短篇 14 流派包「双男主」（含导语公式、付费卡点、核心招式与真网感切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/复仇打脸.md",
-      "budget": 5650,
+      "budget": 5050,
       "why": "短篇 14 流派包「复仇打脸」（含导语公式、付费卡点、核心招式与真网感切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/宅斗宫斗.md",
-      "budget": 5600,
+      "budget": 5050,
       "why": "短篇 14 流派包「宅斗宫斗」（含导语公式、付费卡点、核心招式与真网感切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/年代重生打脸.md",
-      "budget": 5650,
+      "budget": 5000,
       "why": "短篇 14 流派包「年代重生打脸」（含导语公式、付费卡点、核心招式与真网感切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/总裁豪门.md",
-      "budget": 5700,
+      "budget": 5000,
       "why": "短篇 14 流派包「总裁豪门」（含导语公式、付费卡点、核心招式与真网感切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/悬疑.md",
-      "budget": 5750,
+      "budget": 5450,
       "why": "短篇 14 流派包「悬疑」（含导语公式、付费卡点、核心招式与真网感切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/校园青春暗恋.md",
-      "budget": 5850,
+      "budget": 5300,
       "why": "短篇 14 流派包「校园青春暗恋」（2026-11-26 新增，覆盖学霸暗恋/手语换志愿/状元顶替/教资闭环/寝室霸凌）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/甜宠.md",
-      "budget": 5700,
+      "budget": 5050,
       "why": "短篇 12 流派包「甜宠」（含导语公式、付费卡点、核心招式与真网感切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/男频都市反杀.md",
-      "budget": 5750,
+      "budget": 5050,
       "why": "短篇 12 流派包「男频都市反杀」（含导语公式、付费卡点、核心招式与真网感切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/脑洞设定流.md",
-      "budget": 5700,
+      "budget": 5250,
       "why": "短篇 12 流派包「脑洞设定流」（含导语公式、付费卡点、核心招式与真网感切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/追妻火葬场.md",
-      "budget": 5750,
+      "budget": 5150,
       "why": "短篇 12 流派包「追妻火葬场」（含导语公式、付费卡点、核心招式与真网感切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-short-write/references/genre-styles/通用短篇.md",
-      "budget": 4400,
+      "budget": 4000,
       "why": "短篇 12 流派包「通用短篇」（含导语公式、付费卡点、核心招式与真网感切片）。（2026-11-27 扩充 11/9 类四层剧情库并结合 noveldb 实战打磨，长篇按节分读实际仅加载 1–3 节或 4–5 节）"
     },
     {
       "path": "skills/story-deslop/SKILL.md",
-      "budget": 4400,
+      "budget": 4350,
       "why": "独立三层去味入口（并入 agent-calls，对齐 --mode=auto 与 short-deslop 覆盖）。"
     },
     {
       "path": "skills/story-deslop/references/deslop-guide.md",
-      "budget": 3450,
+      "budget": 3400,
       "why": "表达/用笔/故事三层去味指南、定点范围映射与 23 类信号索引唯一源（合并原 expression/narrative-focus/story-logic/deslop-gates）。"
     },
     {
@@ -312,7 +312,7 @@
     },
     {
       "path": "skills/story-setup/references/templates/agents/narrative-writer.md",
-      "budget": 6400,
+      "budget": 6050,
       "why": "共享写手模板（更新至 flow-drafting / deslop-guide / short-deslop / genre-styles）。"
     }
   ],
@@ -921,7 +921,7 @@
       "files": [
         "skills/story-long-write/SKILL.md",
         "skills/story-long-write/references/flow-opening-plan.md",
-        "skills/story-long-write/references/genre-styles/豪门虐恋追妻.md"
+        "skills/story-long-write/references/genre-styles/悬疑灵异.md"
       ],
       "branches": [
         {
@@ -962,7 +962,7 @@
       "files": [
         "skills/story-long-write/SKILL.md",
         "skills/story-long-write/references/flow-outline.md",
-        "skills/story-long-write/references/genre-styles/豪门虐恋追妻.md"
+        "skills/story-long-write/references/genre-styles/悬疑灵异.md"
       ],
       "branches": [
         {
@@ -1003,7 +1003,7 @@
       "files": [
         "skills/story-long-write/SKILL.md",
         "skills/story-long-write/references/flow-drafting.md",
-        "skills/story-long-write/references/genre-styles/豪门虐恋追妻.md"
+        "skills/story-long-write/references/genre-styles/悬疑灵异.md"
       ],
       "branches": [
         {
@@ -1055,7 +1055,7 @@
         "skills/story-long-write/SKILL.md",
         "skills/story-long-write/references/flow-revision.md",
         "skills/story-long-write/references/flow-drafting.md#正文笔法与竖屏网感",
-        "skills/story-long-write/references/genre-styles/豪门虐恋追妻.md"
+        "skills/story-long-write/references/genre-styles/悬疑灵异.md"
       ],
       "branches": [
         {
@@ -1095,7 +1095,7 @@
       "label": "长篇开书·定设定（story-architect 任务包）",
       "agent": "skills/story-setup/references/templates/agents/story-architect.md",
       "files": [
-        "skills/story-long-write/references/genre-styles/豪门虐恋追妻.md"
+        "skills/story-long-write/references/genre-styles/悬疑灵异.md"
       ],
       "generated": [
         {
@@ -1121,13 +1121,13 @@
           "budget": 14650
         }
       ],
-      "why": "2026-11-27：补算运行时 build_architect_brief 必拼入的最重流派包（豪门虐恋追妻.md），消除 --rules-only 空目录漏计盲区。"
+      "why": "2026-11-27：补算运行时 build_architect_brief 必拼入的最重流派包（悬疑灵异.md），消除 --rules-only 空目录漏计盲区。"
     },
     {
       "label": "长篇出卷纲（story-architect 任务包）",
       "agent": "skills/story-setup/references/templates/agents/story-architect.md",
       "files": [
-        "skills/story-long-write/references/genre-styles/豪门虐恋追妻.md"
+        "skills/story-long-write/references/genre-styles/悬疑灵异.md"
       ],
       "generated": [
         {
@@ -1153,13 +1153,13 @@
           "budget": 14450
         }
       ],
-      "why": "2026-11-27：补算运行时 build_architect_brief 必拼入的最重流派包（豪门虐恋追妻.md），账面与真实上下文一致。"
+      "why": "2026-11-27：补算运行时 build_architect_brief 必拼入的最重流派包（悬疑灵异.md），账面与真实上下文一致。"
     },
     {
       "label": "长篇出一批细纲（story-architect 任务包）",
       "agent": "skills/story-setup/references/templates/agents/story-architect.md",
       "files": [
-        "skills/story-long-write/references/genre-styles/豪门虐恋追妻.md"
+        "skills/story-long-write/references/genre-styles/悬疑灵异.md"
       ],
       "generated": [
         {
@@ -1187,7 +1187,7 @@
           "budget": 16300
         }
       ],
-      "why": "2026-11-27：补算运行时 build_architect_brief 必拼入的最重流派包（豪门虐恋追妻.md），账面与真实上下文一致。"
+      "why": "2026-11-27：补算运行时 build_architect_brief 必拼入的最重流派包（悬疑灵异.md），账面与真实上下文一致。"
     },
     {
       "label": "story-architect 无任务包（long / short profile）",
@@ -1201,7 +1201,7 @@
           "files": [
             "skills/story-setup/references/agent-references/flow-opening-plan.md",
             "skills/story-setup/references/agent-references/genre-readers.md",
-            "skills/story-setup/references/agent-references/genre-styles/豪门虐恋追妻.md"
+            "skills/story-setup/references/agent-references/genre-styles/悬疑灵异.md"
           ],
           "budget": 20200
         },
@@ -1235,7 +1235,7 @@
           "label": "长篇常规（含最重流派包）",
           "files": [
             "skills/story-setup/references/agent-references/flow-drafting.md#正文笔法与竖屏网感",
-            "skills/story-setup/references/agent-references/genre-styles/豪门虐恋追妻.md"
+            "skills/story-setup/references/agent-references/genre-styles/悬疑灵异.md"
           ],
           "budget": 14700
         },
