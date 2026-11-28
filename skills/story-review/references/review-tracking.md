@@ -1,6 +1,6 @@
 # story-review：审查收尾的追踪文件维护
 
-追踪维护一律通过本 skill 的 `scripts/tracking_commit.js`（Node.js 18+）以结构化 JSON 事务提交。**仅 full / lean 模式可维护 `追踪/`；solo 模式不改任何追踪文件。**禁止直接 Edit/Write/追加 `伏笔.md`、角色快照、时间线、逐章记录或 `上下文.md`。
+追踪维护一律通过本 skill 的 `scripts/tracking_commit.js`（Node.js 18+）以结构化 JSON 事务提交。**仅 full / lean 模式可维护 `追踪/`；solo 模式不改任何追踪文件。**禁止直接手工编辑或追加 `伏笔.md`、角色快照、时间线、逐章记录或 `上下文.md`。
 
 ## 执行步骤
 

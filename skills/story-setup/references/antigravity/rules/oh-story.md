@@ -45,14 +45,24 @@ Read the selected skill's `SKILL.md` first, then load references as it directs.
   can read them directly via `read_file`/`view_file` when `find_by_name` or
   `grep_search` is unavailable). Because `invoke_subagent` runs asynchronously
   in the background, end the turn to wait for the subagent's `send_message`
-  wakeup before running dependent steps such as `manage_analysis_run.js commit`
-  or review synthesis; if the runtime cannot start custom subagents, use the
+  wakeup before running dependent commit or synthesis steps; if the runtime cannot start custom subagents, use the
   skill's documented solo/direct fallback instead of failing the workflow.
+
+## Project layout
+
+- `拆文库/` — benchmark deconstruction outputs
+- `{书名}/正文/` — long-form chapter prose; `{书名}/正文.md` — short-form prose
+- `{书名}/设定/` — character, world, and genre settings
+- `{书名}/大纲/` — volume outlines and chapter/range outlines (`细纲_第N章*.md` / `细纲_第A-B章*.md`)
+- `{书名}/追踪/` — `_tracking-state.json` (source of truth) and derived views (`上下文.md`, records, snapshots, foreshadowing, timelines)
+- `{书名}/对标/` — project benchmark copies
 
 ## Working with the author
 
-- Use plain story terms (book, chapter, outline, setting) in the main reply.
-  Quote script, field, or status names when reporting an error.
+- Reply in the author's language (including subagent wait updates). Use plain
+  story terms (book, chapter, outline, setting) in normal replies and do not
+  expose script, field, or status names; include raw error text only when
+  reporting an actual failure.
 - Skill templates marked `<!-- author-report -->` are format references only:
   reply with the text inside, never the code fence.
 - When the author asks to remember, forget, or confirm a writing habit or

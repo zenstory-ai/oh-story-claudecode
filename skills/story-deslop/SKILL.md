@@ -81,11 +81,11 @@ style_resolution：{生效要求及来源、覆盖的默认条款、事实与信
 
 ```bash
 node scripts/check-ai-patterns.js --check --fail-on=review_required --mode=auto <正文文件...>
-node scripts/check-degeneration.js --check --fail-on=blocking <正文文件...>
+node scripts/check-degeneration.js --check --fail-on=review_required <正文文件...>
 ```
 
-- 退出 1 为有 `review_required`（句式）或 `blocking`（退化），退出 2 为命令/文件错。
-- 句式 `review_required` 优先自然改写，确需保留可说明理由（长篇提交传 `--ack <rule-id>:<理由>`）或登记白名单；退化 `blocking`（复读/打转/截断/工程词）必须重写受损段再核对事实。
+- 退出 1 为有 `review_required` 或 `blocking`，退出 2 为命令/文件错。
+- 句式与退化 `review_required`（含屏蔽拼音/作者元信息行）优先自然改写，确需保留可说明理由（长篇提交传 `--ack <rule-id>:<理由>`）或登记白名单；退化 `blocking`（复读/打转/截断/占位符/粗体残留/工程词）必须重写受损段再核对事实。
 - 语义改完且无硬阻断后整理标点（完整去味跑脚本；局部修改只在范围内人工修）：
 
 ```bash

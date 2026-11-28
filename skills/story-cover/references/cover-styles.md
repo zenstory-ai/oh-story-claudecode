@@ -53,7 +53,6 @@
 - 背景：云海、仙山、古阁、灵力光效 | 光效：`divine golden light rays, mystical mist, spiritual energy glow`
 - 书名：`bold golden brush calligraphy with metallic glow and sharp strokes`
 - 笔名：`small refined white serif with faint golden glow, thin gold line`
-- 示例（起点 3:4）：`Chinese web novel cover, refined cinematic illustration. Title '剑道独尊' top center in bold golden brush calligraphy; author '青椒炒肉' bottom center in small white serif. xianxia, full body dynamic pose, white-robed swordsman on misty peak, blue/gold palette, divine light rays, digital painting, 3:4, safe area 85%, no watermark`
 
 ### 都市
 - 标签：`modern urban contemporary style, clean cinematic composition`

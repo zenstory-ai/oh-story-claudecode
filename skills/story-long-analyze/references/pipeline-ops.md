@@ -30,7 +30,7 @@ node "{story-long-analyze skill 根}/scripts/manage_analysis_run.js" plan --root
 
 ## 4. 执行与提交一个批次
 
-`chapter-extractor` 每次只做 1 批；**主会话不中转内容**，照抄计划字段（路径加 `{拆文目录}/`：`batch_id`、`input_kind`、`source_files`、`chapter_chars`、`min_plot_points`、`input_file`=`_analysis_cache/输入-{批次ID}.md`、`handoff_cache` 仅读 `### 跨批状态`）。子代理写完只回 `BATCH_WRITTEN`，主会话不 Read 文件直接逐个 `commit`（不并发），被拒原样重派附错误码定点修补，成功后删输入文件。
+`chapter-extractor` 每次只做 1 批；**主会话不中转内容**，照抄计划字段（路径加 `{拆文目录}/`：`batch_id`、`input_kind`、`source_files`、`chapter_chars`、`min_plot_points`、`input_file`=`_analysis_cache/输入-{批次ID}.md`、`handoff_cache` 仅读 `### 跨批状态`）。子代理写完只回 `BATCH_WRITTEN`，主会话不读取文件直接逐个 `commit`（不并发），被拒原样重派附错误码定点修补，成功后删输入文件。
 
 派发默认第 2 档有限并行（作者问起按 author-facing 切换）：① 串行 `plan --next 1`；② 有限并行（默认）`plan --next 3` 同轮派 3 批共用轮前 `handoff_cache`；③ 不限顺序最多 12 并发（限流/超时上限减半，多书共用）。子代理不可用时先读 [stage2-extraction.md](stage2-extraction.md) 自写，再提交（`REUSE` 不传 `--range-sha256`）：
 

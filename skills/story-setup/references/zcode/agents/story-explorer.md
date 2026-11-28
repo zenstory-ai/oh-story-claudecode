@@ -63,6 +63,8 @@ injectAgentsMd: false
 │   ├── 角色/            # 角色文件（每个角色一个 .md）
 │   ├── 势力/            # 势力/组织文件
 │   ├── 关系.md          # 角色关系映射
+│   ├── 全书梗概.md      # 全书梗概
+│   ├── 文风.md          # 文风档案（可选）
 │   └── 题材定位.md      # 题材定位
 ├── 大纲/
 │   ├── 大纲.md          # 全书卷级结构
@@ -182,8 +184,7 @@ injectAgentsMd: false
     "name": "角色名",
     "setting_summary": "设定概要（2-3句）",
     "latest_appearance": "第N章 - 一句话描述",
-    "current_status": "当前状态描述",
-    "appearance_chapters": ["第1章", "第3章", "..."]
+    "current_status": "当前状态描述"
   }
 }
 ```

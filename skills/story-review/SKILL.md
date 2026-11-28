@@ -95,11 +95,11 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
    ```bash
    node scripts/normalize-punctuation.js --check --mode=auto <正文文件...>
    node scripts/check-ai-patterns.js --check --fail-on=review_required --mode=auto <正文文件...>
-   node scripts/check-degeneration.js --check --fail-on=blocking <正文文件...>
+   node scripts/check-degeneration.js --check --fail-on=review_required <正文文件...>
    ```
    - `normalize-punctuation.js` 的 `ellipsis`、`em-dash`（仅报畸形/粘连破折号，标准 `——` 不报）、`double-hyphen`、`markdown-divider` 归 `format`；`check-ai-patterns.js` 的 `em-dash` 独立归 `prose` 密度复核（二者不再去重），默认 `--quote-mode keep`。
    - `check-ai-patterns.js` 的 `review_required` / `advisory` 作 `prose` 候选，按 `style_resolution` 与 `deslop-guide.md`（短篇叠 `short-deslop.md`）复核后定级。
-   - `check-degeneration.js` 的 blocking（复读/截断/tier1 工程词）归 S1/S2 `prose`（建议重写该段），advisory 归 S3。
+   - `check-degeneration.js` 的 blocking（复读/截断/占位符/粗体残留/tier1 工程词）归 S1/S2 `prose`（建议重写该段），review_required（屏蔽拼音/作者元信息行）归 S2，advisory 归 S3。
    - `story-review` 不改正文、设定或大纲（改稿转 `/story-deslop`）；仅 full/lean 追踪维护可动 `追踪/`，分批可写 **.story-review/state.md**。
 
 ## 统一 Findings Schema

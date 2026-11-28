@@ -24,7 +24,7 @@
 |---|---|
 | [flow-opening-plan.md](flow-opening-plan.md) | 长篇立项、定设定、人设关系与出卷纲（任务包已切片时优先以任务包为准） |
 | [flow-outline.md](flow-outline.md) | 排或审长篇细纲、黄金三章、钩子与悬念反转节奏 |
-| [flow-drafting.md](flow-drafting.md) | 核对长篇正文笔法、竖屏网感、对话与爽点围观分层 |
+| [flow-drafting.md](flow-drafting.md) | 核对长篇正文笔法、竖屏网感、对话与爽点反应层 |
 | [benchmark-recall.md](benchmark-recall.md) | 有外部对标或任务包点名召回时读；无对标时不读 |
 | [long-quality.md](long-quality.md) | 黄金三章、连载节奏、读者期待与后手储备审查 |
 

@@ -547,7 +547,6 @@ function measureShortMetrics(rawText, filePath = null, options = {}) {
       median_para_chars: Math.round(medianParaChars),
       single_sentence_para_rate: singleSentenceRate,
       dialogue_ratio: dialogueRatio,
-      first_conflict_char: null,
       first_dialogue_char: firstDialogueChar,
       hook_rate: null,
       ending_type: null,
