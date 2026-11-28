@@ -156,7 +156,7 @@ function adaptBody(body, name, tools) {
     )
     adapted = replaceRequired(
       adapted,
-      "直接降级到 WebSearch/webReader",
+      "直接改用 WebSearch/webReader",
       "返回结构化 research gap，由父会话继续",
       "step 1 fallback phrase",
     )
@@ -171,12 +171,6 @@ function adaptBody(body, name, tools) {
       /### 第三步：WebSearch\/webReader（兜底）[\s\S]*?(?=\n### 第四步：整理输出)/,
       "### 第三步：CDP 不可用时交回父会话\n\n返回 `status: \"failed\"`，在 `gaps` 中说明 CDP 不可用或页面提取失败，并给出建议检索词与候选来源类型。不要自行声称已调用联网兜底，也不要编造内容。\n",
       "step 3 WebSearch fallback section",
-    )
-    adapted = replaceRequired(
-      adapted,
-      "{google | bing | websearch}",
-      "{google | bing}",
-      "markdown search_engine enum",
     )
     adapted = replaceRequired(
       adapted,

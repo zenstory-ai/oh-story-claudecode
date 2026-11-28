@@ -97,7 +97,7 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 顶部视频录的就是这次运行——`/story-long-write 写第21章` 一次跑完的产出与检查：
 
 ```text
-细纲       细纲_第021章.md              追踪里写着「第21章尚无细纲」，skill 先补纲：单元 L1-03、目标情绪、本章标价、闭环状态、10 个情节点四列表格（外加可选的展开粒度列）
+细纲       细纲_第021章.md              追踪里写着「第21章尚无细纲」，skill 先补纲：属于哪段剧情、目标情绪、主角目标/关键选择、分场与 3–4 个关键情节点三列表格
 章级检查   storyctl.js chapter check   ready · 字数 2068 / 目标 2300
              ├ check-ai-patterns.js     0 命中
              ├ check-degeneration.js    0 命中
